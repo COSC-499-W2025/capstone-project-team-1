@@ -1,7 +1,7 @@
 # Sept 15-21
 
 Tasks that I worked on this week:
-![Tasks_I_Did](Tasks%20Sept15-21.png)
+![Tasks_I_Did](Week3.png)
 
 
 ### Recap on this week's progress:
@@ -19,3 +19,5 @@ Tasks that I worked on this week:
 
 ### Reflection:  
 Everyone in the group is eager to contribute to the project and willing to bring their thoughts to the table and have an open discussion. The workload seems fairly distributed as we lay the groundwork for our project such as setting the repo, project board and a discord channel
+
+
