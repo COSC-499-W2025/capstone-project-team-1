@@ -1,3 +1,10 @@
+# Sept 29-Oct5
+
+Tasks:
+![Tasks](Tasks%20Sept29-Oct5.png)
+
+We designed the data flow diagram this week. I contributed.
+
 # Sept 22-28
 
 Tasks:
@@ -11,3 +18,4 @@ Tasks:
 ![Tasks](Tasks%20Sept15-21.png)
 
 We only wrote potential requirements this week. I participated.
+
