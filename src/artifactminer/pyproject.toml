@@ -1,7 +1,11 @@
 [project]
 name = "artifactminer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Artifact mining system for repository intelligence"
 readme = "../README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "gitpython"
+]
