@@ -1,10 +1,9 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Input, Button, DataTable
 from textual.screen import Screen
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical
 from artifactminer.tui.services.prefs import load_prefs, save_prefs, validate_path
 
-# GenAI: Initial structure generated, reviewed and modified by Ahmad
 STATE = {
     "scan_paths": [],
     "results": [
@@ -13,20 +12,28 @@ STATE = {
     ],
 }
 
-# GenAI: Welcome screen structure generated, reviewed and simplified by Ahmad
+# Written by Ahmad, reviewed by GenAI - Welcome screen with keyboard navigation
 class Welcome(Screen):
-    BINDINGS = [("p", "go_paths", "Paths"), ("d", "go_dash", "Dashboard"), ("q", "app.quit", "Quit")]
+    BINDINGS = [
+        ("p", "go_paths", "Paths"),
+        ("d", "go_dash", "Dashboard"),
+        ("q", "app.quit", "Quit")
+    ]
+    # GenAI: Suggested compose() structure, implemented by Ahmad
     def compose(self) -> ComposeResult:
         yield Header()
         prefs = load_prefs()
         paths = prefs.get("scan_paths", [])
-        msg = f"ARTIFACT Miner - {len(paths)} folder(s) configured\n[P] Configure Paths  [D] Dashboard  [Q] Quit"
+        msg = (
+            f"ARTIFACT Miner - {len(paths)} folder(s) configured\n"
+            "[P] Configure Paths  [D] Dashboard  [Q] Quit"
+        )
         yield Static(msg)
         yield Footer()
     def action_go_paths(self): self.app.push_screen(Paths())
     def action_go_dash(self): self.app.push_screen(Dashboard())
 
-# GenAI: Paths screen with validation logic generated, reviewed by Ahmad
+# Written by Ahmad, reviewed by GenAI - Path management with persistence
 class Paths(Screen):
     def compose(self):
         yield Header()
@@ -42,8 +49,10 @@ class Paths(Screen):
     def on_show(self) -> None:
         prefs = load_prefs()
         STATE["scan_paths"] = prefs.get("scan_paths", [])
-        self.query_one("#paths_list", Static).update("\n".join(f"- {p}" for p in STATE["scan_paths"]))
+        paths_display = "\n".join(f"- {p}" for p in STATE["scan_paths"])
+        self.query_one("#paths_list", Static).update(paths_display)
 
+    # GenAI: Suggested validation flow, implemented by Ahmad
     def on_button_pressed(self, event):
         if event.button.id != "add_btn": return
         path = self.query_one("#path_input", Input).value.strip()
@@ -54,10 +63,11 @@ class Paths(Screen):
             self.app.notify("Already added.", severity="warning"); return
         STATE["scan_paths"].append(path)
         save_prefs({"scan_paths": STATE["scan_paths"]})
-        self.query_one("#paths_list", Static).update("\n".join(f"- {p}" for p in STATE["scan_paths"]))
+        paths_display = "\n".join(f"- {p}" for p in STATE["scan_paths"])
+        self.query_one("#paths_list", Static).update(paths_display)
         self.app.notify("Path added.")
 
-# GenAI: Dashboard screen generated, reviewed by Ahmad
+# Written by Ahmad - Dashboard with DataTable display
 class Dashboard(Screen):
     def compose(self):
         yield Header()
@@ -71,7 +81,7 @@ class Dashboard(Screen):
         for r in STATE["results"]:
             self.table.add_row(r["name"], r["type"], str(r["size"]), r["tags"])
 
-# GenAI: App class generated, reviewed by Ahmad
+# Written by Ahmad - Main app entry point
 class ArtifactMinerTUI(App):
     def on_mount(self): self.push_screen(Welcome())
 
