@@ -1,4 +1,6 @@
 textual>=0.62
+pydantic>=2
+httpx>=0.27
 
 [dev]
 pytest>=8

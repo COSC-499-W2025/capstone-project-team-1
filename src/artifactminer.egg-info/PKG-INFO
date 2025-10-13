@@ -1,10 +1,12 @@
 Metadata-Version: 2.4
 Name: artifactminer
 Version: 0.1.0
-Summary: Simple TUI welcome screen
+Summary: Add your description here
 Requires-Python: >=3.11
 Description-Content-Type: text/markdown
 Requires-Dist: textual>=0.62
+Requires-Dist: pydantic>=2
+Requires-Dist: httpx>=0.27
 Provides-Extra: dev
 Requires-Dist: pytest>=8; extra == "dev"
 Requires-Dist: ruff>=0.6; extra == "dev"

@@ -10,4 +10,7 @@ src/artifactminer.egg-info/requires.txt
 src/artifactminer.egg-info/top_level.txt
 src/artifactminer/tui/__init__.py
 src/artifactminer/tui/app.py
+src/artifactminer/tui/screens/__init__.py
+src/artifactminer/tui/services/__init__.py
+src/artifactminer/tui/services/prefs.py
 tests/test_metrics.py
