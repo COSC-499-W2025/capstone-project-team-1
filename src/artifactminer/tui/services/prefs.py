@@ -1,3 +1,4 @@
+# GenAI: Preferences service generated, reviewed and validated by Ahmad
 import json, os
 from pathlib import Path
 
