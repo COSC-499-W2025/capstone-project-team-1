@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/artifactminer/__init__.py
+src/artifactminer/main.py
+src/artifactminer.egg-info/PKG-INFO
+src/artifactminer.egg-info/SOURCES.txt
+src/artifactminer.egg-info/dependency_links.txt
+src/artifactminer.egg-info/entry_points.txt
+src/artifactminer.egg-info/requires.txt
+src/artifactminer.egg-info/top_level.txt
+src/artifactminer/tui/__init__.py
+src/artifactminer/tui/app.py
+tests/test_cli_entry.py
+tests/test_imports.py
+tests/test_metrics.py
