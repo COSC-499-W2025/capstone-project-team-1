@@ -1,40 +1,11 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "artifactminer"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "Artifact mining system for repository intelligence"
+readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "textual>=0.62",
-  "pydantic>=2",
-  "httpx>=0.27",
     "fastapi",
     "uvicorn",
     "gitpython"
-]
-
-[project.scripts]
-artifactminer-tui = "artifactminer.tui.app:run"
-
-# Tell setuptools we're using the src/ layout
-[tool.setuptools.packages.find]
-where = ["src"]
-
-# Pytest config
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-testpaths = ["tests"]
-addopts = "-q"
-
-# Optional dev extras
-[project.optional-dependencies]
-dev = [
-  "pytest>=8",
-  "pytest-asyncio>=0.21",
-  "ruff>=0.6",
-  "mypy>=1.10",
 ]
