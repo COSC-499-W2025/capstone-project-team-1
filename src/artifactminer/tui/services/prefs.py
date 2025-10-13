@@ -1,4 +1,4 @@
-# GenAI: Preferences service generated, reviewed and validated by Ahmad
+# Written by Ahmad, reviewed by GenAI - Preferences persistence service
 import json, os
 from pathlib import Path
 
@@ -16,6 +16,7 @@ def save_prefs(prefs: dict) -> None:
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(prefs, indent=2))
 
+# GenAI: Generated validation logic, reviewed and tested by Ahmad
 def validate_path(p: str) -> tuple[bool, str]:
     if not p:
         return False, "Path is empty."
