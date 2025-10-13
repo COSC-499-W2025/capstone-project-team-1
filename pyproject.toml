@@ -16,6 +16,12 @@ dependencies = [
     "uvicorn",
     "gitpython",
     "openai>=2.3.0",
+    "python-dotenv>=1.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
 ]
 
 [project.scripts]

@@ -1,13 +1,19 @@
 """Utilities for interacting with the OpenAI Responses API."""
 from __future__ import annotations
 
+import os
+
+from dotenv import load_dotenv
 from openai import OpenAI
 
-__all__ = ["get_gpt5_mini_response"]
+# Load environment variables from .env file
+load_dotenv()
+
+__all__ = ["get_gpt4o_mini_response"]
 
 
-def get_gpt5_mini_response(prompt: str) -> str:
-    """Call the OpenAI Responses API with the gpt5-mini model and return plain text.
+def get_gpt4o_mini_response(prompt: str) -> str:
+    """Call the OpenAI Responses API with the gpt-4o-mini model and return plain text.
 
     Args:
         prompt: The string to send to the model.
@@ -18,7 +24,7 @@ def get_gpt5_mini_response(prompt: str) -> str:
     """
 
     response = OpenAI().responses.create(
-        model="gpt5-mini", 
+        model="gpt-4o-mini",
         input=prompt
     )
 
