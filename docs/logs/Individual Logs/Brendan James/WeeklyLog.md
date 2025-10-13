@@ -1,3 +1,14 @@
+# Oct 6-12
+
+Tasks:
+![Tasks](Tasks%20Oct6-12.png)
+
+I performed minor contributions to the project outline.
+| **Task**                               | **Status**     |
+| -------------------------------------- | -------------- |
+| Update WBS                             | ■ Done         |
+| Initial work on file analysis function | ■■ Not Started |
+
 # Sept 29-Oct5
 
 Tasks:
@@ -18,4 +29,5 @@ Tasks:
 ![Tasks](Tasks%20Sept15-21.png)
 
 We only wrote potential requirements this week. I participated.
+
 
