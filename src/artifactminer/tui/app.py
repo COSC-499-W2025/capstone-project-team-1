@@ -4,6 +4,7 @@ from textual.screen import Screen
 from textual.containers import Vertical, Horizontal
 from artifactminer.tui.services.prefs import load_prefs, save_prefs, validate_path
 
+# GenAI: Initial structure generated, reviewed and modified by Ahmad
 STATE = {
     "scan_paths": [],
     "results": [
@@ -12,6 +13,7 @@ STATE = {
     ],
 }
 
+# GenAI: Welcome screen structure generated, reviewed and simplified by Ahmad
 class Welcome(Screen):
     BINDINGS = [("p", "go_paths", "Paths"), ("d", "go_dash", "Dashboard"), ("q", "app.quit", "Quit")]
     def compose(self) -> ComposeResult:
@@ -24,6 +26,7 @@ class Welcome(Screen):
     def action_go_paths(self): self.app.push_screen(Paths())
     def action_go_dash(self): self.app.push_screen(Dashboard())
 
+# GenAI: Paths screen with validation logic generated, reviewed by Ahmad
 class Paths(Screen):
     def compose(self):
         yield Header()
@@ -54,6 +57,7 @@ class Paths(Screen):
         self.query_one("#paths_list", Static).update("\n".join(f"- {p}" for p in STATE["scan_paths"]))
         self.app.notify("Path added.")
 
+# GenAI: Dashboard screen generated, reviewed by Ahmad
 class Dashboard(Screen):
     def compose(self):
         yield Header()
@@ -67,6 +71,7 @@ class Dashboard(Screen):
         for r in STATE["results"]:
             self.table.add_row(r["name"], r["type"], str(r["size"]), r["tags"])
 
+# GenAI: App class generated, reviewed by Ahmad
 class ArtifactMinerTUI(App):
     def on_mount(self): self.push_screen(Welcome())
 
