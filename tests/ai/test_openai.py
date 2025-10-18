@@ -6,9 +6,8 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from artifactminer.utils.openai import get_gpt4o_mini_response
+from artifactminer.ai.openai import get_gpt5_nano_response
 
-# Load environment variables
 load_dotenv()
 
 
@@ -22,7 +21,7 @@ class TestOpenAIIntegration:
     def test_simple_prompt_response(self):
         """Test that a simple prompt returns a non-empty response."""
         prompt = "Say 'Hello World' and nothing else."
-        result = get_gpt4o_mini_response(prompt)
+        result = get_gpt5_nano_response(prompt)
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -31,7 +30,7 @@ class TestOpenAIIntegration:
     def test_math_prompt_response(self):
         """Test that a math question returns a response containing the answer."""
         prompt = "What is 2 + 2? Respond with only the number."
-        result = get_gpt4o_mini_response(prompt)
+        result = get_gpt5_nano_response(prompt)
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -41,7 +40,7 @@ class TestOpenAIIntegration:
     def test_code_generation_prompt(self):
         """Test that a code generation request returns code."""
         prompt = "Write a Python function that adds two numbers. Just the function, no explanation."
-        result = get_gpt4o_mini_response(prompt)
+        result = get_gpt5_nano_response(prompt)
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -52,7 +51,7 @@ class TestOpenAIIntegration:
         from openai import BadRequestError
 
         with pytest.raises(BadRequestError):
-            get_gpt4o_mini_response("")
+            get_gpt5_nano_response("")
 
     def test_multiline_prompt(self):
         """Test that multiline prompts work correctly."""
@@ -61,7 +60,7 @@ Line 2: World
 Line 3: Test
 
 Respond with 'Success'"""
-        result = get_gpt4o_mini_response(prompt)
+        result = get_gpt5_nano_response(prompt)
 
         assert isinstance(result, str)
         assert len(result) > 0
