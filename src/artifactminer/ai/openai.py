@@ -1,19 +1,16 @@
 """Utilities for interacting with the OpenAI Responses API."""
-from __future__ import annotations
-
-import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from typing import List
 
-# Load environment variables from .env file
 load_dotenv()
 
-__all__ = ["get_gpt4o_mini_response"]
+__all__ = ["get_gpt5_nano_response"]
 
 
-def get_gpt4o_mini_response(prompt: str) -> str:
-    """Call the OpenAI Responses API with the gpt-4o-mini model and return plain text.
+def get_gpt5_nano_response(prompt: str) -> str:
+    """Call the OpenAI Responses API with the gpt-5-nano model and return plain text.
 
     Args:
         prompt: The string to send to the model.
@@ -24,14 +21,14 @@ def get_gpt4o_mini_response(prompt: str) -> str:
     """
 
     response = OpenAI().responses.create(
-        model="gpt-4o-mini",
+        model="gpt-5-nano",
         input=prompt
     )
 
     if getattr(response, "output_text", None):
         return response.output_text
 
-    text_parts: list[str] = []
+    text_parts: List[str] = []
     for item in getattr(response, "output", []) or []:
         for content in getattr(item, "content", []) or []:
             text = getattr(content, "text", None)
