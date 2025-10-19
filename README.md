@@ -1,21 +1,23 @@
-[![Open in Visual Studio Code](https://classroom.github.com/assets/open-in-vscode-2e0aaae1b6195c2367325f4f02e2d04e9abb55f0b24a779b69b11b9e10269abc.svg)](https://classroom.github.com/online_ide?assignment_repo_id=20510427&assignment_repo_type=AssignmentRepo)
-# Project-Starter
-Please use the provided folder structure for your project. You are free to organize any additional internal folder structure as required by the project. 
+# Running the ARTIFACT-MINER TUI
 
-```
-.
-├── docs                    # Documentation files
-│   ├── contract            # Team contract
-│   ├── proposal            # Project proposal 
-│   ├── design              # UI mocks
-│   ├── minutes             # Minutes from team meetings
-│   ├── logs                # Team and individual Logs
-│   └── ...          
-├── src                     # Source files (alternatively `app`)
-├── tests                   # Automated tests 
-├── utils                   # Utility files
-└── README.md
-```
+Follow these steps from the repository root.
 
-Please use a branching workflow, and once an item is ready, do remember to issue a PR, review, and merge it into the master branch.
-Be sure to keep your docs and README.md up-to-date.
+1. Create (once) and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Windows: .venv\Scripts\activate
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r project/requirements.txt
+   ```
+3. Start the FastAPI server in a dedicated terminal and keep it running:
+   ```bash
+   UVLOOP_NO_EXTENSIONS=1 uvicorn server.server:app --app-dir project --loop asyncio --http h11 --reload
+   ```
+4. In a second terminal (same virtual environment), launch the Textual client:
+   ```bash
+   python project/tui/app.py
+   ```
+
+The TUI will now connect to the local API. Upload a `.zip`, wait for the candidate list, select the desired folders, and save the selection. Stop both processes with `Ctrl+C` when finished.
