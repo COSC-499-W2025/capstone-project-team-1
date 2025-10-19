@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 artifactminer-tui = "artifactminer.tui.app:run"
+api = "artifactminer.api.main:main"
 
 # Tell setuptools we're using the src/ layout
 [tool.setuptools.packages.find]
