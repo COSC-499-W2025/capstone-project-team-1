@@ -1,2 +1,0 @@
-[console_scripts]
-artifactminer-tui = artifactminer.tui.app:run

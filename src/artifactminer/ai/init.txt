@@ -1,1 +1,0 @@
-This is where all the OpenAI or any other AI related external apis will go
