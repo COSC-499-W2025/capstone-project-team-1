@@ -1,7 +1,13 @@
-# Environment variables
+## Environment variables (do not commit secrets)
 .env
 .env.local
 .env.*.local
+
+## Virtual environments
+.venv/
+venv/
+env/
+ENV/
 
 # Python
 __pycache__/
@@ -26,11 +32,31 @@ wheels/
 *.egg
 MANIFEST
 
-# Virtual environments
-.venv
-venv/
-ENV/
-env/
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
 
 # IDEs
 .vscode/
@@ -39,10 +65,11 @@ env/
 *.swo
 *~
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
