@@ -6,7 +6,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from artifactminer.ai.openai import get_gpt5_nano_response
+from artifactminer.helpers.openai import get_gpt5_nano_response
 
 load_dotenv()
 
