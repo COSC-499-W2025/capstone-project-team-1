@@ -30,6 +30,11 @@ pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
+
 # Optional dev extras
 [project.optional-dependencies]
 dev = [
