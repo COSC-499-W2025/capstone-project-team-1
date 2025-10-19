@@ -1,4 +1,5 @@
-
+import os
+from pathlib import Path
 # Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
 
@@ -14,3 +15,6 @@ class RepoStats: #This is the basic Repo class for storing the results of the gi
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
 
+def isGitRepo(path :os.PathLike | str) -> bool:#This function checks whether the git directory exists inside of the given path
+    p = Path(path)
+    return (p / ".git").is_dir()
