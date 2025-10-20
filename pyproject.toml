@@ -25,6 +25,7 @@ dev = [
 
 [project.scripts]
 artifactminer-tui = "artifactminer.tui.app:run"
+api = "artifactminer.api.main:main"
 
 # Tell setuptools we're using the src/ layout
 [tool.setuptools.packages.find]
@@ -35,6 +36,11 @@ where = ["src"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
 
 # Optional dev extras
 [project.optional-dependencies]
