@@ -14,11 +14,18 @@ dependencies = [
   "httpx>=0.27",
     "fastapi",
     "uvicorn",
-    "gitpython"
+    "openai>=2.3.0",
+    "python-dotenv>=1.1.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
 ]
 
 [project.scripts]
 artifactminer-tui = "artifactminer.tui.app:run"
+api = "artifactminer.api.main:main"
 
 # Tell setuptools we're using the src/ layout
 [tool.setuptools.packages.find]
