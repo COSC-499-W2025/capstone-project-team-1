@@ -1,10 +1,10 @@
 import sys
 import os
-
+from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import RepoStats,isGitRepo
+from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import RepoStats,isGitRepo,getAuthorsCommitCounts
 
 def test_create_RepoStats():
     mytestproject = RepoStats(project_name="test-project", primary_language="Python", is_collaborative=True)
@@ -29,3 +29,8 @@ def test_isGitRepoFalse(tmp_path):
     not_repo = tmp_path/"projB"
     not_repo.mkdir()
     assert isGitRepo(not_repo) is False #checks that the git directory does not exists inside of the given path
+
+
+def test_isGitRepo2(): #checks that our current repo is a git repo
+    root = Path(__file__).resolve().parents[2]
+    assert isGitRepo(root) is True #checks that the git directory exists inside of the given path
