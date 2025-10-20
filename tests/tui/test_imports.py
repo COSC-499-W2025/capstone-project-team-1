@@ -5,4 +5,4 @@ def test_module_imports():
 
 def test_app_class_exists():
     import artifactminer.tui.app as app
-    assert hasattr(app, "ArtifactMinerTUI")
+    assert hasattr(app, "ArtifactMinerApp")

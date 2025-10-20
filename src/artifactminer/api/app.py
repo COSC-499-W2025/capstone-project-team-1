@@ -1,6 +1,6 @@
 """ASGI application exposing Artifact Miner backend services."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
@@ -18,7 +18,7 @@ def create_app() -> FastAPI:
     @app.get("/health", response_model=HealthStatus, tags=["system"])
     async def healthcheck() -> HealthStatus:
         """Basic readiness probe that lets the TUI verify connectivity."""
-        return HealthStatus(status="ok", timestamp=datetime.utcnow())
+        return HealthStatus(status="ok", timestamp=datetime.now(UTC))
 
     return app
 
