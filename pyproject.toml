@@ -11,7 +11,6 @@ requires-python = ">=3.11"
 dependencies = [
   "textual>=0.62",
   "pydantic>=2",
-    "gitpython"
 ]
 
 [project.scripts]
