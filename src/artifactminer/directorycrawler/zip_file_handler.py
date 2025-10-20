@@ -1,6 +1,6 @@
 import zipfile
 
-ZIPFILEPATH = "/Users/nathanhelm/Code/Projects/capstone/capstone-project-team-1/tests/directorycrawlertest/mocks/mockdirectory_zip.zip"
+ZIPFILEPATH = "/Users/nathanhelm/Code/Projects/capstone/capstone-project-team-1/tests/directorycrawler/mocks/mockdirectory_zip.zip"
 EXTRACTPATH = "" #TODO
 
 with zipfile.ZipFile(ZIPFILEPATH, 'r') as zip_ref:

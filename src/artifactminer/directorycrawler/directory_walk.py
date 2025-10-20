@@ -1,7 +1,7 @@
 import os
 
 #change this for a path that you choose
-CURRENTPATH = "/Users/nathanhelm/Code/Projects/capstone/capstone-project-team-1/tests/directorycrawlertest/mocks/mockdirectory_zip.zip"
+CURRENTPATH = "/Users/nathanhelm/Code/Projects/capstone/capstone-project-team-1/tests/directorycrawler/mocks/mockdirectory"
 
 from .store_file_dict import StoreFileDict
 
@@ -19,7 +19,7 @@ def simple_directory_crawl():
             for file in files: 
                 print_files(file) #print files
                 full_path = os.path.join(root, file)
-                if file != ".DS_Store": #continue the trend of checking filename later
+                if file != ".DS_Store": #check whether filename is valid
                     store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
                 
 
