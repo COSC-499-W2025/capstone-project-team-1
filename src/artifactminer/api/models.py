@@ -1,0 +1,12 @@
+from sqlalchemy import Column, Integer, String, DateTime
+from datetime import datetime
+from database import Base
+
+class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
+    __tablename__ = "artifacts"
+
+    id = Column(Integer, primary_key=True, index=True)#unique identifier for each artifact
+    name = Column(String)#name of the artifact
+    path = Column(String, unique=True)#file system path to the artifact
+    type = Column(String)#type of the artifact like file or directory
+    scanned_at = Column(DateTime, default=datetime.utcnow) #timestamp when the artifact was scanned
