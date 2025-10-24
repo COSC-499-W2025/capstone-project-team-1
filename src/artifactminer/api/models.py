@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, DateTime
 from datetime import datetime
-from database import Base
+from .database import Base
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
     __tablename__ = "artifacts"
