@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from .schemas import HealthStatus
 
+from .database import Base, engine
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
@@ -14,6 +15,8 @@ def create_app() -> FastAPI:
         description="Backend services powering the Artifact Miner TUI.",
         version="0.1.0",
     )
+# Create database tables on startup
+    Base.metadata.create_all(bind=engine)
 
     @app.get("/health", response_model=HealthStatus, tags=["system"])
     async def healthcheck() -> HealthStatus:
