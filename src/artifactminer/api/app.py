@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from .schemas import HealthStatus
 
-from .database import Base, engine
+from ..db.database import Base, engine
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
