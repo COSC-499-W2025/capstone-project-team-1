@@ -7,36 +7,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 
 from .schemas import HealthStatus, QuestionResponse
-from .database import Base, engine, SessionLocal
-from .models import Question
-
-
-def get_db():
-    """Database session dependency."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def seed_questions(db: Session) -> None:
-    """Populate initial questions if the table is empty."""
-    existing_count = db.query(Question).count()
-    if existing_count > 0:
-        return
-    
-    questions = [
-        Question(question_text="What artifacts should we focus on? (e.g., code files, documentation, configs)", order=1, is_active=True),
-        Question(question_text="What is your end goal with this analysis?", order=2, is_active=True),
-        Question(question_text="Should we prioritize git repository analysis or scan all file types?", order=3, is_active=True),
-        Question(question_text="Any specific file patterns to include or exclude?", order=4, is_active=True),
-    ]
-    
-    db.add_all(questions)
-    db.commit()
-
-from ..db.database import Base, engine
+from ..db import Base, engine, SessionLocal, Question, get_db, seed_questions
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
@@ -64,7 +35,7 @@ def create_app() -> FastAPI:
     @app.get("/questions", response_model=List[QuestionResponse], tags=["questions"])
     async def get_questions(db: Session = Depends(get_db)) -> List[Question]:
         """Fetch all active questions ordered by their display order."""
-        questions = db.query(Question).filter(Question.is_active == True).order_by(Question.order).all()
+        questions = db.query(Question).filter(Question.is_active == True).order_by(Question.order).all()  # noqa: E712
         return questions
 
     return app
