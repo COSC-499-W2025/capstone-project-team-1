@@ -16,6 +16,8 @@ from textual.widgets import (
     ListItem,
 )
 
+from .userconfig import UserConfigScreen
+
 # Toggle between mock data and real ZIP extraction
 USE_MOCK = True
 
@@ -52,12 +54,12 @@ class WelcomeScreen(Screen):
                 with Vertical(id="card"):
                     yield Static("ARTIFACT-MINER", id="title")
                     yield Static("Welcome to the artifact staging tool.", id="subtitle")
-                    yield Button("Begin", id="begin-btn", variant="primary")
+                    yield Button("Start Mining", id="begin-btn", variant="primary")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "begin-btn":
-            await self.app.push_screen("upload")
+            await self.app.push_screen("userconfig")
 
 
 class UploadScreen(Screen):
@@ -208,6 +210,7 @@ class ArtifactMinerApp(App):
 
     def on_mount(self) -> None:
         self.install_screen(WelcomeScreen(), "welcome")
+        self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
         self.push_screen("welcome")
 
