@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from datetime import datetime
 from .database import Base
 
@@ -10,3 +10,12 @@ class Artifact(Base):#basic model for artifacts, this will be used to store arti
     path = Column(String, unique=True)#file system path to the artifact
     type = Column(String)#type of the artifact like file or directory
     scanned_at = Column(DateTime, default=datetime.utcnow) #timestamp when the artifact was scanned
+
+class Question(Base):
+    __tablename__ = "questions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    question_text = Column(String, nullable=False)
+    order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
