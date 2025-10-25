@@ -17,6 +17,7 @@ from textual.widgets import (
 )
 
 from .userconfig import UserConfigScreen
+from .screens.consent import ConsentScreen
 
 # Toggle between mock data and real ZIP extraction
 USE_MOCK = True
@@ -59,7 +60,8 @@ class WelcomeScreen(Screen):
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "begin-btn":
-            await self.app.push_screen("userconfig")
+            await self.app.push_screen("consent")
+
 
 
 class UploadScreen(Screen):
@@ -212,6 +214,7 @@ class ArtifactMinerApp(App):
         self.install_screen(WelcomeScreen(), "welcome")
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
+        self.install_screen(ConsentScreen(), "consent")
         self.push_screen("welcome")
 
     def on_resize(self, event) -> None:
