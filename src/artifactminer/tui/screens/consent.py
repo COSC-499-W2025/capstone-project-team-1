@@ -4,7 +4,7 @@ from textual.containers import Vertical
 from textual.widgets import Button, Footer, Header, Static
 
 class ConsentScreen(Screen[None]):
-    consent = "By using this tool, you consent to the collection and analysis of artifacts from the provided .zip file. Ensure you have the necessary permissions to analyze the data contained within."
+    consent: str = "By using this tool, you consent to the collection and analysis of artifacts from the provided .zip file. Ensure you have the necessary permissions to analyze the data contained within."
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -20,5 +20,5 @@ class ConsentScreen(Screen[None]):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "consent-btn":
             await self.app.switch_screen("userconfig")
-        else: 
+        else:
             return
