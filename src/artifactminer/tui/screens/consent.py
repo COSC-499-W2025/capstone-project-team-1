@@ -33,7 +33,7 @@ class ConsentScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield Header()
         with Vertical(id="consent-container"):
-            yield Static("Data Usage Consent", id="consent-title")
+            # yield Static("Data Usage Consent", id="consent-title")
             yield Markdown(CONSENT_TEXT, id="consent-markdown")
             with Horizontal(id="consent-buttons"):
                 yield Button("Consent with LLM", id="consent-full-btn", variant="success")
