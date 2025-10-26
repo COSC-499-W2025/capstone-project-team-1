@@ -33,13 +33,13 @@ class ConsentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    accepted: bool
-    version: str
+    consent_level: Literal["full", "no_llm", "none"]
     accepted_at: datetime | None = None
 
 
 class ConsentUpdateRequest(BaseModel):
     """Request payload to update consent state."""
 
-    accepted: bool = Field(description="Whether the user accepts the current consent version.")
-    version: str = Field(description="App's current consent version the user is accepting.")
+    consent_level: Literal["full", "no_llm", "none"] = Field(
+        description="Consent level: 'full' (with LLM), 'no_llm' (without LLM), or 'none'."
+    )
