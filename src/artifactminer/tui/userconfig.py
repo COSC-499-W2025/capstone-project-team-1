@@ -106,4 +106,4 @@ class UserConfigScreen(Screen):
             except Exception:
                 pass
         
-        await self.app.push_screen("upload")
+        await self.app.navigate("upload")
