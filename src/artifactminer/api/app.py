@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from .schemas import HealthStatus, QuestionResponse
 from ..db import Base, engine, SessionLocal, Question, get_db, seed_questions
+from .consent import router as consent_router
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
@@ -37,6 +38,9 @@ def create_app() -> FastAPI:
         """Fetch all active questions ordered by their display order."""
         questions = db.query(Question).filter(Question.is_active == True).order_by(Question.order).all()  # noqa: E712
         return questions
+
+    # Mount consent router
+    app.include_router(consent_router)
 
     return app
 
