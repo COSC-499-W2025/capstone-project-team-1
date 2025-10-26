@@ -248,6 +248,14 @@ class ArtifactMinerApp(App):
         else:
             await self.push_screen(name)
 
+    async def back(self) -> None:
+        """Navigate back in the screen stack if possible."""
+        try:
+            await self.pop_screen()
+        except Exception:
+            # If there is nothing to pop, do nothing.
+            pass
+
     async def on_mount(self) -> None:
         # Load consent state from API; fall back to not consented on failure.
         try:
