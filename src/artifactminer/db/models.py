@@ -19,3 +19,12 @@ class Question(Base):
     order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Consent(Base):
+    __tablename__ = "consents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    accepted = Column(Boolean, default=False, nullable=False)
+    version = Column(String, default="v1", nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
