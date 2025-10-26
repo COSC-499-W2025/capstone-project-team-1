@@ -2,6 +2,8 @@ from __future__ import annotations
 from pathlib import Path
 import zipfile
 
+import httpx
+
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
@@ -210,7 +212,31 @@ class ArtifactMinerApp(App):
     """
     BINDINGS = [("q", "quit", "Quit")]
 
-    def on_mount(self) -> None:
+    # App-level consent state cache loaded from the backend on startup.
+    # Example: {"accepted": bool, "version": str}
+    consent_state: dict | None = None
+
+    async def on_mount(self) -> None:
+        # Load consent state from API; fall back to not consented on failure.
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get("http://127.0.0.1:8000/consent", timeout=10.0)
+                resp.raise_for_status()
+                data = resp.json()
+                self.consent_state = {
+                    "accepted": bool(data.get("accepted", False)),
+                    "version": str(data.get("version", "")),
+                }
+        except Exception as ex:
+            self.consent_state = {"accepted": False, "version": ""}
+            # Non-blocking notice; protected navigation will be added later
+            self.notify(
+                f"Consent state unavailable ({str(ex)}). Proceeding with limited functionality.", # we need to figure out what the limited functionality means
+                title="Consent load failed",
+                severity="warning",
+                timeout=8,
+            )
+
         self.install_screen(WelcomeScreen(), "welcome")
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
