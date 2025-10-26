@@ -26,5 +26,5 @@ class Consent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     accepted = Column(Boolean, default=False, nullable=False)
-    version = Column(String, default="v1", nullable=False)
+    version = Column(String, default="v0", nullable=False)
     accepted_at = Column(DateTime, nullable=True)
