@@ -25,6 +25,5 @@ class Consent(Base):
     __tablename__ = "consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    accepted = Column(Boolean, default=False, nullable=False)
-    version = Column(String, default="v0", nullable=False)
+    consent_level = Column(String, default="none", nullable=False)
     accepted_at = Column(DateTime, nullable=True)
