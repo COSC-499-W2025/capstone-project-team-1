@@ -95,7 +95,7 @@ class ArtifactMinerApp(App):
         width: 80%;
         max-width: 100;
         height: auto;
-        padding: 2;
+        padding: 1;
         border: round $surface;
         background: $panel;
     }
