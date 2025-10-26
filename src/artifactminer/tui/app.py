@@ -3,6 +3,7 @@ from pathlib import Path
 import zipfile
 
 import httpx
+from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
@@ -215,6 +216,37 @@ class ArtifactMinerApp(App):
     # App-level consent state cache loaded from the backend on startup.
     # Example: {"accepted": bool, "version": str}
     consent_state: dict | None = None
+
+    # Current consent version expected by this client (kept in sync with API)
+    CONSENT_VERSION: str = "v0"
+
+    # Bookmarking the screen to return to after obtaining consent, good UX. 
+    pending_destination: Optional[str] = None
+
+    # Names of screens that require consent (will be superseded by per-screen flags later)
+    protected_screens: set[str] = {"userconfig", "upload"}
+
+    def is_consent_valid(self) -> bool:
+        """Return True if current in-memory consent is accepted and version matches."""
+        state = self.consent_state or {}
+        return bool(state.get("accepted")) and state.get("version") == self.CONSENT_VERSION
+
+    async def navigate(self, name: str, mode: str = "push") -> None:
+        """Central navigation with consent guard.
+
+        If the target is protected and consent is invalid, redirect to the consent screen
+        and remember the intended destination.
+        """
+        requires = name in self.protected_screens
+        if requires and not self.is_consent_valid():
+            self.pending_destination = name
+            await self.switch_screen("consent")
+            return
+
+        if mode == "switch":
+            await self.switch_screen(name)
+        else:
+            await self.push_screen(name)
 
     async def on_mount(self) -> None:
         # Load consent state from API; fall back to not consented on failure.
