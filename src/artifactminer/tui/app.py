@@ -24,7 +24,7 @@ class WelcomeScreen(Screen):
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "begin-btn":
-            await self.app.push_screen("consent")
+            await self.app.navigate("consent")
 
 
 
