@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
@@ -11,10 +11,12 @@ from textual.widgets import Button, Footer, Header, Input, Label, Static
 class WelcomeScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="box"):
-            yield Static("ARTIFACT-MINER", id="title")
-            yield Static("Welcome to the artifact staging tool.", id="subtitle")
-            yield Button("Begin", id="begin-btn", variant="primary")
+        with Container(id="content"):
+            with Container(id="card-wrapper"):
+                with Vertical(id="card"):
+                    yield Static("ARTIFACT-MINER", id="title")
+                    yield Static("Welcome to the artifact staging tool.", id="subtitle")
+                    yield Button("Begin", id="begin-btn", variant="primary")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -25,12 +27,14 @@ class WelcomeScreen(Screen):
 class UploadScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="box"):
-            yield Static("Enter a path to a .zip file.")
-            with Horizontal(id="zip-row"):
-                yield Input(placeholder="Path to .zip", id="zip-path")
-                yield Button("Upload", id="upload-btn", variant="primary")
-            yield Label("Waiting for a file...", id="status")
+        with Container(id="content"):
+            with Container(id="card-wrapper"):
+                with Vertical(id="card"):
+                    yield Static("Enter a path to a .zip file.")
+                    with Horizontal(id="zip-row"):
+                        yield Input(placeholder="Path to .zip", id="zip-path")
+                        yield Button("Upload", id="upload-btn", variant="primary")
+                    yield Label("Waiting for a file...", id="status")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -55,26 +59,60 @@ class UploadScreen(Screen):
 class ArtifactMinerApp(App):
     TITLE = "ARTIFACT-MINER"
     CSS = """
-    Screen {
-        align: center middle;
+    App {
+        height: 100%;
+        width: 100%;
     }
 
-    #box {
-        width: 60%;
-        max-width: 60;
-        padding: 2;
+    Screen {
+        layout: grid;
+        grid-rows: auto 1fr auto;
+        height: 100%;
+        width: 100%;
+    }
+
+    #content {
+        layout: vertical;
+        width: 100%;
+        height: 100%;
+        padding: 1 2;
+    }
+
+    #card-wrapper {
+        width: 100%;
+        height: auto;
+        align: center middle;
+        content-align: center middle;
+    }
+
+    #card {
+        layout: vertical;
+        width: 100%;
+        max-width: 80;
+        padding: 2 4;
         border: round $surface;
         background: $panel;
         align: center middle;
+        content-align: center middle;
+        height: auto;
     }
 
     #title, #subtitle {
         text-align: center;
-        padding-bottom: 1;
+    }
+
+    #subtitle {
+        margin-top: 1;
+    }
+
+    #begin-btn {
+        margin-top: 2;
     }
 
     #zip-row {
+        width: 100%;
         margin-top: 1;
+        align: center middle;
     }
 
     #zip-path {
@@ -92,6 +130,9 @@ class ArtifactMinerApp(App):
         self.install_screen(WelcomeScreen(), "welcome")
         self.install_screen(UploadScreen(), "upload")
         self.push_screen("welcome")
+
+    def on_resize(self, event) -> None:
+        self.refresh()
 
 
 def run() -> None:
