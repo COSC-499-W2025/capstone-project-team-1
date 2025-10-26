@@ -35,9 +35,17 @@ class ConsentScreen(Screen[None]):
                     timeout=10.0,
                 )
                 resp.raise_for_status()
+                payload = resp.json()
 
-            # Success: proceed to next screen (will be guarded once navigation abstraction is added)
-            await self.app.switch_screen("userconfig")
+            # Success: update app state and navigate to pending destination (or default- userconfig)
+            if isinstance(payload, dict):
+                self.app.consent_state = {
+                    "accepted": bool(payload.get("accepted", True)),
+                    "version": str(payload.get("version", self.CONSENT_VERSION)),
+                }
+            target = self.app.pending_destination or "userconfig"
+            self.app.pending_destination = None
+            await self.app.navigate(target, mode="switch") # Dont need to build a stack for navigation, user config will be the first screen after consent
 
         except httpx.HTTPStatusError as e:
             # Attempt to parse structured error detail
