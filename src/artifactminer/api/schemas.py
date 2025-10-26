@@ -26,3 +26,20 @@ class QuestionResponse(BaseModel):
     id: int
     question_text: str
     order: int
+
+
+class ConsentResponse(BaseModel):
+    """Response shape for consent state."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    accepted: bool
+    version: str
+    accepted_at: datetime | None = None
+
+
+class ConsentUpdateRequest(BaseModel):
+    """Request payload to update consent state."""
+
+    accepted: bool = Field(description="Whether the user accepts the current consent version.")
+    version: str = Field(description="App's current consent version the user is accepting.")
