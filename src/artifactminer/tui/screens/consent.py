@@ -1,81 +1,71 @@
-from socket import timeout
 import httpx
 from textual.screen import Screen
 from textual.app import ComposeResult
-from textual.containers import Vertical
-from textual.widgets import Button, Footer, Header, Static
+from textual.containers import Horizontal, Vertical
+from textual.widgets import Button, Footer, Header, Markdown, Static
+
+CONSENT_TEXT = """\
+# Consent Required
+
+By using **Artifact Miner**, you consent to the collection and analysis of artifacts from the provided .zip file. 
+
+## What We Collect
+
+- Artifact metadata (file names, paths, types)
+- File contents for analysis purposes
+- Timestamps of when artifacts were scanned
+
+## Your Data Rights
+
+You must ensure you have the necessary permissions to analyze the data contained within the uploaded files.
+
+## LLM Processing Options
+
+You can choose whether to allow external Large Language Models (LLMs) to process your data:
+
+- **Consent with LLM**: Your data may be sent to external LLM services for enhanced analysis
+- **Consent without LLM**: Your data will be processed locally only, without any external LLM services
+
+Please select your preference below to continue.
+"""
 
 class ConsentScreen(Screen[None]):
-    consent: str = "By using this tool, you consent to the collection and analysis of artifacts from the provided .zip file. Ensure you have the necessary permissions to analyze the data contained within."
-    CONSENT_VERSION: str = "v0"
-
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="box"):
-            yield Static("Consent Required", id="title")
-            yield Static(
-                self.consent,
-                id="consent-text"
-            )
-            yield Button("I Consent", id="consent-btn", variant="success")
+        with Vertical(id="consent-container"):
+            yield Static("Data Usage Consent", id="consent-title")
+            yield Markdown(CONSENT_TEXT, id="consent-markdown")
+            with Horizontal(id="consent-buttons"):
+                yield Button("Consent with LLM", id="consent-full-btn", variant="success")
+                yield Button("Consent without LLM", id="consent-no-llm-btn", variant="primary")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id != "consent-btn":
-            return
+        if event.button.id == "consent-full-btn":
+            await self._save_consent("full")
+        elif event.button.id == "consent-no-llm-btn":
+            await self._save_consent("no_llm")
 
+    async def _save_consent(self, consent_level: str) -> None:
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.put(
                     "http://127.0.0.1:8000/consent",
-                    json={
-                        "accepted": True,
-                        "version": self.CONSENT_VERSION,
-                    },
+                    json={"consent_level": consent_level},
                     timeout=10.0,
                 )
                 resp.raise_for_status()
                 payload = resp.json()
 
-            # Success: update app state and navigate to pending destination (or default- userconfig)
             if isinstance(payload, dict):
                 self.app.consent_state = {
-                    "accepted": bool(payload.get("accepted", True)),
-                    "version": str(payload.get("version", self.CONSENT_VERSION)),
+                    "consent_level": payload.get("consent_level", "none"),
+                    "accepted_at": payload.get("accepted_at"),
                 }
-            target = self.app.pending_destination or "userconfig"
-            self.app.pending_destination = None
-            await self.app.navigate(target, mode="switch") # Dont need to build a stack for navigation, user config will be the first screen after consent
-
-        except httpx.HTTPStatusError as e:
-            # Attempt to parse structured error detail
-            detail = None
-            try:
-                body = e.response.json()
-                detail = body.get("detail")
-            except Exception:
-                detail = None
-
-            # Consent version mismatch handling
-            if isinstance(detail, dict) and detail.get("code") == "CONSENT_VERSION_MISMATCH":
-                server_version = detail.get("server_version", "unknown")
-                self.app.notify(
-                    f"Consent text updated to {server_version}. Please update your app to continue.",
-                    title="Consent version out of date",
-                    severity="warning",
-                    timeout=8,
-                )
-            else:
-                # Generic error notification with human readable message
-                self.app.notify(
-                    f"Unable to save consent. {str(e)}",
-                    title="Consent error",
-                    severity="error",
-                    timeout=15
-                )
+            
+            self.app.switch_screen("userconfig")
 
         except httpx.ConnectError:
-            # Network connectivity issue
             self.app.notify(
                 "Cannot connect to the backend server. Is it running?",
                 title="Connection error",
@@ -83,9 +73,8 @@ class ConsentScreen(Screen[None]):
                 timeout=15
             )
         except Exception as ex:
-            # Catch-all for unexpected errors
             self.app.notify(
-                f"Unexpected error: {str(ex)}",
+                f"Unable to save consent: {str(ex)}",
                 title="Consent error",
                 severity="error",
                 timeout=15
