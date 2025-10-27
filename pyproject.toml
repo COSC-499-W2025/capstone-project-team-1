@@ -12,10 +12,14 @@ dependencies = [
   "textual>=0.62",
   "pydantic>=2",
   "httpx>=0.27",
-    "fastapi",
-    "uvicorn",
-    "openai>=2.3.0",
-    "python-dotenv>=1.1.1",
+  "fastapi",
+  "uvicorn",
+  "openai>=2.3.0",
+  "python-dotenv>=1.1.1",
+  "gitpython",
+  "sqlalchemy>=2.0",
+  "alembic>=1.13",
+  "aiosqlite>=0.19"
 ]
 
 [dependency-groups]

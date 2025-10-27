@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthStatus(BaseModel):
@@ -16,3 +16,13 @@ class HealthStatus(BaseModel):
         default_factory=datetime.utcnow,
         description="UTC timestamp when the status was generated.",
     )
+
+
+class QuestionResponse(BaseModel):
+    """Response shape for question objects."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    question_text: str
+    order: int
