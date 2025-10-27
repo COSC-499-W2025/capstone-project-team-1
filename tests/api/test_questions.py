@@ -1,10 +1,4 @@
-from fastapi.testclient import TestClient
-
-from artifactminer.api.app import app
-
-
-def test_get_questions_returns_list():
-    client = TestClient(app)
+def test_get_questions_returns_list(client):
     response = client.get("/questions")
 
     assert response.status_code == 200
@@ -13,8 +7,7 @@ def test_get_questions_returns_list():
     assert len(questions) > 0
 
 
-def test_questions_have_required_fields():
-    client = TestClient(app)
+def test_questions_have_required_fields(client):
     response = client.get("/questions")
 
     assert response.status_code == 200
@@ -29,8 +22,7 @@ def test_questions_have_required_fields():
         assert isinstance(question["order"], int)
 
 
-def test_questions_are_ordered():
-    client = TestClient(app)
+def test_questions_are_ordered(client):
     response = client.get("/questions")
 
     assert response.status_code == 200

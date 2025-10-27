@@ -1,41 +1,4 @@
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from artifactminer.api.app import app
-from artifactminer.db import Base, get_db
-
-
-engine = create_engine(
-    "sqlite:///:memory:",
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_db] = override_get_db
-
-
-def setup_function():
-    Base.metadata.create_all(bind=engine)
-
-
-def teardown_function():
-    Base.metadata.drop_all(bind=engine)
-
-
-def test_get_consent_seeds_default_if_missing():
-    client = TestClient(app)
+def test_get_consent_seeds_default_if_missing(client):
     response = client.get("/consent")
 
     assert response.status_code == 200
@@ -44,8 +7,7 @@ def test_get_consent_seeds_default_if_missing():
     assert payload["accepted_at"] is None
 
 
-def test_get_consent_returns_existing_state():
-    client = TestClient(app)
+def test_get_consent_returns_existing_state(client):
     
     client.put("/consent", json={"consent_level": "full"})
     
@@ -56,8 +18,7 @@ def test_get_consent_returns_existing_state():
     assert payload["accepted_at"] is not None
 
 
-def test_get_consent_response_structure():
-    client = TestClient(app)
+def test_get_consent_response_structure(client):
     response = client.get("/consent")
 
     assert response.status_code == 200
@@ -68,8 +29,7 @@ def test_get_consent_response_structure():
     assert payload["consent_level"] in ("full", "no_llm", "none")
 
 
-def test_accept_full_consent():
-    client = TestClient(app)
+def test_accept_full_consent(client):
     response = client.put("/consent", json={"consent_level": "full"})
 
     assert response.status_code == 200
@@ -78,8 +38,7 @@ def test_accept_full_consent():
     assert payload["accepted_at"] is not None
 
 
-def test_accept_no_llm_consent():
-    client = TestClient(app)
+def test_accept_no_llm_consent(client):
     response = client.put("/consent", json={"consent_level": "no_llm"})
 
     assert response.status_code == 200
@@ -88,8 +47,7 @@ def test_accept_no_llm_consent():
     assert payload["accepted_at"] is not None
 
 
-def test_set_consent_to_none():
-    client = TestClient(app)
+def test_set_consent_to_none(client):
     
     client.put("/consent", json={"consent_level": "full"})
     
@@ -100,8 +58,7 @@ def test_set_consent_to_none():
     assert payload["accepted_at"] is None
 
 
-def test_change_consent_level():
-    client = TestClient(app)
+def test_change_consent_level(client):
     
     client.put("/consent", json={"consent_level": "full"})
     
@@ -112,8 +69,7 @@ def test_change_consent_level():
     assert payload["accepted_at"] is not None
 
 
-def test_accepted_at_timestamp_format():
-    client = TestClient(app)
+def test_accepted_at_timestamp_format(client):
     response = client.put("/consent", json={"consent_level": "full"})
 
     assert response.status_code == 200
@@ -124,8 +80,7 @@ def test_accepted_at_timestamp_format():
     assert isinstance(accepted_at, str)
 
 
-def test_multiple_updates_timestamp():
-    client = TestClient(app)
+def test_multiple_updates_timestamp(client):
     
     response1 = client.put("/consent", json={"consent_level": "full"})
     timestamp1 = response1.json()["accepted_at"]
@@ -138,8 +93,7 @@ def test_multiple_updates_timestamp():
     assert timestamp1 != timestamp2
 
 
-def test_consent_persists_across_requests():
-    client = TestClient(app)
+def test_consent_persists_across_requests(client):
     
     client.put("/consent", json={"consent_level": "full"})
     
@@ -152,15 +106,13 @@ def test_consent_persists_across_requests():
     assert response.json()["consent_level"] == "full"
 
 
-def test_update_consent_with_missing_fields():
-    client = TestClient(app)
+def test_update_consent_with_missing_fields(client):
     
     response = client.put("/consent", json={})
     assert response.status_code == 422
 
 
-def test_invalid_consent_level():
-    client = TestClient(app)
+def test_invalid_consent_level(client):
     response = client.put("/consent", json={"consent_level": "invalid_level"})
 
     assert response.status_code == 422
