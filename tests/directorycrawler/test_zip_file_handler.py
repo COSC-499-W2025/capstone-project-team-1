@@ -8,6 +8,6 @@ dirname = os.path.dirname(__file__)
 zipfile = os.path.join(dirname,"mocks/mockdirectory_zip.zip")
 nonzipfile = os.path.join(dirname,"mocks/mockdirectory/mock.c")
 def test_read_zip():
-    assert process_zip(zipfile, True) != None
+    assert process_zip(zipfile, True) is not None
 def test_dont_read_nonzip():
-    assert process_zip(nonzipfile) == None
+    assert process_zip(nonzipfile) is None
