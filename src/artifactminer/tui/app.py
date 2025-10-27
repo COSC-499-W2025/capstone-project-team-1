@@ -48,6 +48,9 @@ def list_zip_dirs(zip_path: Path) -> list[str]:
     except Exception as exc:
         return [f"[Error] {exc}"]
 
+from .userconfig import UserConfigScreen
+from .screens.consent import ConsentScreen
+
 
 class WelcomeScreen(Screen):
     def compose(self) -> ComposeResult:
@@ -63,7 +66,6 @@ class WelcomeScreen(Screen):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "begin-btn":
             self.app.switch_screen("consent")
-
 
 class UploadScreen(Screen):
     def compose(self) -> ComposeResult:
