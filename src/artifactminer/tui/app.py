@@ -48,10 +48,6 @@ def list_zip_dirs(zip_path: Path) -> list[str]:
     except Exception as exc:
         return [f"[Error] {exc}"]
 
-from .userconfig import UserConfigScreen
-from .userconfig import UserConfigScreen
-from .screens.consent import ConsentScreen
-
 
 class WelcomeScreen(Screen):
     def compose(self) -> ComposeResult:
