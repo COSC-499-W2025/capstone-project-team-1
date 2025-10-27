@@ -1,5 +1,6 @@
 import sys
 import os
+import pytest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))) #goto project directory
 
@@ -10,4 +11,5 @@ nonzipfile = os.path.join(dirname,"mocks/mockdirectory/mock.c")
 def test_read_zip():
     assert process_zip(zipfile, True) is not None
 def test_dont_read_nonzip():
-    assert process_zip(nonzipfile) is None
+    with pytest.raises(ValueError):
+        process_zip(nonzipfile)
