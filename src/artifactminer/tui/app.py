@@ -2,12 +2,9 @@ from __future__ import annotations
 from pathlib import Path
 import zipfile
 
-import zipfile
-
 import httpx
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import (
@@ -61,12 +58,6 @@ class WelcomeScreen(Screen):
                     yield Static("ARTIFACT-MINER", id="title")
                     yield Static("Welcome to the artifact staging tool.", id="subtitle")
                     yield Button("Start Mining", id="begin-btn", variant="primary")
-        with Container(id="content"):
-            with Container(id="card-wrapper"):
-                with Vertical(id="card"):
-                    yield Static("ARTIFACT-MINER", id="title")
-                    yield Static("Welcome to the artifact staging tool.", id="subtitle")
-                    yield Button("Start Mining", id="begin-btn", variant="primary")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -77,14 +68,6 @@ class WelcomeScreen(Screen):
 class UploadScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
-        with Container(id="content"):
-            with Container(id="card-wrapper"):
-                with Vertical(id="card"):
-                    yield Static("Enter a path to a .zip file.")
-                    with Horizontal(id="zip-row"):
-                        yield Input(placeholder="Path to .zip", id="zip-path")
-                        yield Button("Upload", id="upload-btn", variant="primary")
-                    yield Label("Waiting for a file...", id="status")
         with Container(id="content"):
             with Container(id="card-wrapper"):
                 with Vertical(id="card"):
@@ -159,11 +142,6 @@ class ArtifactMinerApp(App):
         width: 100%;
     }
 
-    App {
-        height: 100%;
-        width: 100%;
-    }
-
     Screen {
         layout: grid;
         grid-rows: auto 1fr auto;
@@ -181,32 +159,10 @@ class ArtifactMinerApp(App):
     #card-wrapper {
         width: 100%;
         height: auto;
-        layout: grid;
-        grid-rows: auto 1fr auto;
-        height: 100%;
-        width: 100%;
-    }
-
-    #content {
-        layout: vertical;
-        width: 100%;
-        height: 100%;
-        padding: 1 2;
-    }
-
-    #card-wrapper {
-        width: 100%;
-        height: auto;
         align: center middle;
         content-align: center middle;
-        content-align: center middle;
     }
 
-    #card {
-        layout: vertical;
-        width: 100%;
-        max-width: 80;
-        padding: 2 4;
     #card {
         layout: vertical;
         width: 100%;
@@ -216,9 +172,6 @@ class ArtifactMinerApp(App):
         background: $panel;
         align: center middle;
         content-align: center middle;
-        height: auto;
-        content-align: center middle;
-        height: auto;
     }
 
     #title, #subtitle {
@@ -233,19 +186,9 @@ class ArtifactMinerApp(App):
         margin-top: 2;
     }
 
-    #subtitle {
-        margin-top: 1;
-    }
-
-    #begin-btn {
-        margin-top: 2;
-    }
-
     #zip-row {
         width: 100%;
-        width: 100%;
         margin-top: 1;
-        align: center middle;
         align: center middle;
     }
 
@@ -256,15 +199,6 @@ class ArtifactMinerApp(App):
 
     #status {
         margin-top: 1;
-    }
-
-    #zip-contents {
-        border: round $surface;
-        height: 20;
-        width: 80%;
-        margin: 1 0;
-        align: center middle;
-        overflow: auto;
     }
 
     #zip-contents {
@@ -329,9 +263,6 @@ class ArtifactMinerApp(App):
         self.install_screen(UploadScreen(), "upload")
         self.install_screen(ConsentScreen(), "consent")
         self.push_screen("welcome")
-
-    def on_resize(self, event) -> None:
-        self.refresh()
 
     def on_resize(self, event) -> None:
         self.refresh()
