@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from textual.app import active_app
+
 from artifactminer.tui.app import UploadScreen
 
 
@@ -63,6 +65,13 @@ async def test_upload_screen_accepts_zip(tmp_path: Path) -> None:
     zip_path.touch()
     screen, status = make_screen(str(zip_path))
 
-    await screen.on_button_pressed(make_event())
+    async def _fake_push_screen(_screen):
+        return None
 
-    assert status.message == f"Got it: {zip_path.name}"
+    token = active_app.set(SimpleNamespace(push_screen=_fake_push_screen))
+    try:
+        await screen.on_button_pressed(make_event())
+    finally:
+        active_app.reset(token)
+
+    assert status.message == "Processing ZIP contents..."
