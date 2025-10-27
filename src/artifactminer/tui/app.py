@@ -49,6 +49,7 @@ def list_zip_dirs(zip_path: Path) -> list[str]:
         return [f"[Error] {exc}"]
 
 from .userconfig import UserConfigScreen
+from .userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
 
 
