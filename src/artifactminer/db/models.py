@@ -27,3 +27,15 @@ class Consent(Base):
     id = Column(Integer, primary_key=True, index=True)
     consent_level = Column(String, default="none", nullable=False)
     accepted_at = Column(DateTime, nullable=True)
+
+class RepoStat(Base):
+    __tablename__ = "repo_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_name = Column(String, nullable=False)
+    primary_language = Column(String, nullable=True)
+    is_collaborative = Column(Boolean, default=False)
+    first_commit = Column(DateTime, nullable=True)
+    last_commit = Column(DateTime, nullable=True)
+    total_commits = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
