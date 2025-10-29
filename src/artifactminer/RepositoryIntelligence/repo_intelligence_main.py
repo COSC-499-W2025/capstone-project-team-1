@@ -7,6 +7,8 @@ from datetime import datetime
 from typing import Dict, Iterable, Optional, Union
 from pathlib import Path
 import git
+from artifactminer.db.models import RepoStat
+from artifactminer.db.database import SessionLocal
 
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
@@ -60,15 +62,31 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
     first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None
     last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None
 
-
-    #Puts Repo stats into SQLite table
-    #currently not implemented, will be in future versions
-
-
     return RepoStats(
         project_name=project_name,
         primary_language=primary_language,
         is_collaborative=is_collaborative,
         first_commit=first_commit,
-        last_commit=last_commit
+        last_commit=last_commit,
     )
+
+def save_repo_stats(stats):
+    db = SessionLocal()
+    try:
+        repo_stat = RepoStat(
+            project_name=stats.project_name,
+            primary_language=stats.primary_language,
+            is_collaborative=stats.is_collaborative,
+            first_commit=stats.first_commit,
+            last_commit=stats.last_commit,
+            total_commits=stats.total_commits,
+        )
+        db.add(repo_stat)
+        db.commit()
+        db.refresh(repo_stat)
+        print(f"Saved repo stats: {repo_stat.project_name}")
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving repo stats: {e}")
+    finally:
+        db.close()
