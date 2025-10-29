@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Dict, Iterable, Optional, Union
 from pathlib import Path
+import git
 
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
@@ -33,14 +34,41 @@ def runGit(repo_path: Pathish, args: Iterable[str]) -> str: #This function will 
     )
     return result.stdout #return gits printed output
 
-def getAuthorsCommitCounts(repo_path: Pathish, since: Optional[str] = None) -> Dict[str, int]: #Function takes the Repo path, and "since" which is an optional time filter so it will only count commits pass a certain time, and returns a count of commits per email that made a commit/contributed.
-#Example : getAuthorCommitCounts("/path/to/my/repo/")
-#Example2 : getAuthorCommitCounts("/path/to/my/repo/", "10,19,2025")
-    args = ["log", "--all", "--pretty=%ae"]  #args is for the command we are going to run in git, all logs, pretty=%ae makes it return only the authors email
-    if since:#if the user specified a since date it will be added to the arguement
-        args.insert(1, f'--since={since}')
-    out = runGit(repo_path, args)#use the runGit method with our args
-    emails = [line.strip().lower() for line in out.splitlines() if line.strip()]#Formats all the emails to be consistent all lowercase in one line in a list and skips blank lines.
-    counts = Counter(emails)# Counts each of teh emails
-    counts.pop("", None) #remove anything empty
-    return dict(counts)
+def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the basic repo stats for a given git repo path
+    if not isGitRepo(repo_path): #check if its a git repo
+        raise ValueError(f"The path {repo_path} is not a git repository.") #raise error if not
+
+    repo = git.Repo(repo_path) #initialize the git repo object
+
+    # Get project name from the folder name
+    project_name = Path(repo_path).name
+
+    # Get primary language by analyzing file extensions
+    language_counter = Counter()
+    for blob in repo.head.commit.tree.traverse(): #traverse all files in the repo
+        if blob.type == 'blob': #if its a file
+            ext = Path(blob.path).suffix.lower() #get the file extension
+            if ext: #if it has an extension
+                language_counter[ext] += 1 #count it
+    primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
+
+    # Check if the repository is collaborative
+    is_collaborative = len(repo.remotes) > 0
+
+    # Get first and last commit dates
+    commits = list(repo.iter_commits())
+    first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None
+    last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None
+
+
+    #Puts Repo stats into SQLite table
+    #currently not implemented, will be in future versions
+
+
+    return RepoStats(
+        project_name=project_name,
+        primary_language=primary_language,
+        is_collaborative=is_collaborative,
+        first_commit=first_commit,
+        last_commit=last_commit
+    )
