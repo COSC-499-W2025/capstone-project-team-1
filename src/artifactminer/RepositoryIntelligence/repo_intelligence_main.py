@@ -20,6 +20,7 @@ class RepoStats: #This is the basic Repo class for storing the results of the gi
     language_percentage: Optional[float] = None # Optional addition is the percentage of the primary language used in the repo
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
+    total_commits: Optional[int] = None # Optional addition is the total number of commits in the repo
 
 def isGitRepo(path :os.PathLike | str) -> bool:#This function checks whether the git directory exists inside of the given path
     p = Path(path)
@@ -76,6 +77,7 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         language_percentage=language_percentage,
         first_commit=first_commit,
         last_commit=last_commit,
+        total_commits=len(commits),
     )
 
 def save_repo_stats(stats):

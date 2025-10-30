@@ -50,3 +50,20 @@ def test_save_repo_stats(): #checks that we can save the repo stats to the datab
         save_repo_stats(stats)
     except Exception as e:
         assert False, f"save_repo_stats raised an exception: {e}"
+
+def test_select_repo_stats_from_db(): #checks that we can select the saved repo stats from the database
+    from src.artifactminer.db.database import SessionLocal
+    from src.artifactminer.db.models import RepoStat
+
+    root = Path(__file__).resolve().parents[2]
+    stats = getRepoStats(root)
+    save_repo_stats(stats)
+
+    db = SessionLocal()
+    repo_stat = db.query(RepoStat).filter(RepoStat.project_name == stats.project_name).first()
+    assert repo_stat is not None
+    assert repo_stat.project_name == stats.project_name
+    assert repo_stat.primary_language == stats.primary_language
+    assert repo_stat.is_collaborative == stats.is_collaborative
+    db.close()
+
