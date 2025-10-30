@@ -86,7 +86,7 @@ def save_repo_stats(stats):
             is_collaborative=stats.is_collaborative,
             primary_language=stats.primary_language,
             secondary_language=stats.secondary_language,
-            tertiary_language=stats.terteiary_language,
+            tertiary_language=stats.tertiary_language,
             language_percentage=stats.language_percentage,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,

@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import RepoStats, isGitRepo, getRepoStats
+from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import RepoStats, isGitRepo, getRepoStats, save_repo_stats
 
 def test_create_RepoStats():
     mytestproject = RepoStats(project_name="test-project", primary_language="Python", is_collaborative=True)
@@ -42,3 +42,11 @@ def test_getRepoStats():#checks that we can get the repo stats for our current r
     assert isinstance(stats.project_name, str)
     assert isinstance(stats.primary_language, str)
     assert isinstance(stats.is_collaborative, bool)
+
+def test_save_repo_stats(): #checks that we can save the repo stats to the database
+    root = Path(__file__).resolve().parents[2]
+    stats = getRepoStats(root)
+    try:
+        save_repo_stats(stats)
+    except Exception as e:
+        assert False, f"save_repo_stats raised an exception: {e}"
