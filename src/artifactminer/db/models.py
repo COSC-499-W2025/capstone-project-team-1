@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON
 from datetime import datetime
 from .database import Base
 
@@ -34,10 +34,9 @@ class RepoStat(Base):
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String, nullable=False)
     is_collaborative = Column(Boolean, default=False)
+    languages = Column(JSON, nullable=True)
+    language_percentages = Column(JSON, nullable=True)
     primary_language = Column(String, nullable=True)
-    secondary_language = Column(String, nullable=True)
-    tertiary_language = Column(String, nullable=True)
-    language_percentage = Column(Integer, nullable=True)
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)

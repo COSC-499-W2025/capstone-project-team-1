@@ -2,9 +2,9 @@
 #Owner: Evan/van-cpu
 import subprocess, os
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Iterable, Optional, Union
+from typing import Dict, Iterable, Optional, Union, List
 from pathlib import Path
 import git
 from artifactminer.db.models import RepoStat
@@ -14,10 +14,9 @@ from artifactminer.db.database import SessionLocal
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
     project_name: str #store project name as a string
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
-    primary_language: str #Primary language name as a string
-    secondary_language: Optional[str] = None #Secondary language name as an optional string
-    tertiary_language: Optional[str] = None #Tertiary language language name as an optional string
-    language_percentage: Optional[float] = None # Optional addition is the percentage of the primary language used in the repo
+    Languages: List[str] = field(default_factory=list) #Languages as a string list to store the languages used in the repo
+    language_percentages: List[float] = field(default_factory=list)# Language percentages as a float list to store the percentage of each language used in the repo
+    primary_language: Optional[str] = None # Optional addition is the primary language used in the repo
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
     total_commits: Optional[int] = None # Optional addition is the total number of commits in the repo
@@ -57,9 +56,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
             if ext: #if it has an extension
                 language_counter[ext] += 1 #count it
     primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
-    secondary_language = language_counter.most_common(2)[1][0] if len(language_counter) > 1 else "Unknown"
-    tertiary_language = language_counter.most_common(3)[2][0] if len(language_counter) > 2 else "Unknown"
-    language_percentage = (language_counter[primary_language] / sum(language_counter.values())) * 100 if language_counter else 100
+    languages = [lang for lang, _ in language_counter.most_common()] #list of languages used in the repo
+    language_percentages = [count / sum(language_counter.values()) * 100 for _, count in language_counter.most_common()] #percentage of each language used
     # Check if the repository is collaborative
     is_collaborative = len(repo.remotes) > 0
 
@@ -72,9 +70,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         project_name=project_name,
         is_collaborative=is_collaborative,
         primary_language=primary_language,
-        secondary_language=secondary_language,
-        tertiary_language=tertiary_language,
-        language_percentage=language_percentage,
+        Languages=languages,
+        language_percentages=language_percentages,
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=len(commits),
@@ -87,9 +84,8 @@ def save_repo_stats(stats):
             project_name=stats.project_name,
             is_collaborative=stats.is_collaborative,
             primary_language=stats.primary_language,
-            secondary_language=stats.secondary_language,
-            tertiary_language=stats.tertiary_language,
-            language_percentage=stats.language_percentage,
+            languages=stats.Languages,
+            language_percentages=stats.language_percentages,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
