@@ -59,8 +59,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     # Get first and last commit dates
     commits = list(repo.iter_commits())
-    first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None
-    last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None
+    first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
+    last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
 
     return RepoStats(
         project_name=project_name,

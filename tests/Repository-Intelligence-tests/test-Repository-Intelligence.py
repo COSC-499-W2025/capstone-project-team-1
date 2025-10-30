@@ -35,7 +35,7 @@ def test_isGitRepo2(): #checks that our current repo is a git repo
     root = Path(__file__).resolve().parents[2]
     assert isGitRepo(root) is True #checks that the git directory exists inside of the given path
 
-def test_getRepoStats():
+def test_getRepoStats():#checks that we can get the repo stats for our current repo
     root = Path(__file__).resolve().parents[2]
     stats = getRepoStats(root)
     assert isinstance(stats, RepoStats)
