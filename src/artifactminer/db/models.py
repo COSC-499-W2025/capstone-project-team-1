@@ -33,8 +33,10 @@ class RepoStat(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String, nullable=False)
-    primary_language = Column(String, nullable=True)
     is_collaborative = Column(Boolean, default=False)
+    primary_language = Column(String, nullable=True)
+    secondary_language = Column(String, nullable=True)
+    terteiary_language = Column(String, nullable=True)
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)

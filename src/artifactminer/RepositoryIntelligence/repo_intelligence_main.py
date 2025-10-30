@@ -13,8 +13,10 @@ from artifactminer.db.database import SessionLocal
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
     project_name: str #store project name as a string
-    primary_language: str #Primary language name as a string
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
+    primary_language: str #Primary language name as a string
+    secondary_language: Optional[str] = None #Secondary language name as an optional string
+    terteiary_language: Optional[str] = None #Terteiary language name as an
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
 
@@ -53,7 +55,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
             if ext: #if it has an extension
                 language_counter[ext] += 1 #count it
     primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
-
+    secondary_language = language_counter.most_common(2)[1][0] if len(language_counter) > 1 else "Unknown"
+    terteiary_language = language_counter.most_common(3)[2][0] if len(language_counter) > 2 else "Unknown"
     # Check if the repository is collaborative
     is_collaborative = len(repo.remotes) > 0
 
@@ -64,8 +67,10 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     return RepoStats(
         project_name=project_name,
-        primary_language=primary_language,
         is_collaborative=is_collaborative,
+        primary_language=primary_language,
+        secondary_language=secondary_language,
+        terteiary_language=terteiary_language,
         first_commit=first_commit,
         last_commit=last_commit,
     )
@@ -75,8 +80,10 @@ def save_repo_stats(stats):
     try:
         repo_stat = RepoStat(
             project_name=stats.project_name,
-            primary_language=stats.primary_language,
             is_collaborative=stats.is_collaborative,
+            primary_language=stats.primary_language,
+            secondary_language=stats.secondary_language,
+            terteiary_language=stats.terteiary_language,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
