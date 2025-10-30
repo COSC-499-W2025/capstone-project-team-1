@@ -16,7 +16,8 @@ class RepoStats: #This is the basic Repo class for storing the results of the gi
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
     primary_language: str #Primary language name as a string
     secondary_language: Optional[str] = None #Secondary language name as an optional string
-    terteiary_language: Optional[str] = None #Terteiary language name as an
+    tertiary_language: Optional[str] = None #Tertiary language language name as an optional string
+    language_percentage: Optional[float] = None # Optional addition is the percentage of the primary language used in the repo
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
 
@@ -56,7 +57,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
                 language_counter[ext] += 1 #count it
     primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
     secondary_language = language_counter.most_common(2)[1][0] if len(language_counter) > 1 else "Unknown"
-    terteiary_language = language_counter.most_common(3)[2][0] if len(language_counter) > 2 else "Unknown"
+    tertiary_language = language_counter.most_common(3)[2][0] if len(language_counter) > 2 else "Unknown"
+    language_percentage = (language_counter[primary_language] / sum(language_counter.values())) * 100 if language_counter else 100
     # Check if the repository is collaborative
     is_collaborative = len(repo.remotes) > 0
 
@@ -70,7 +72,8 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         is_collaborative=is_collaborative,
         primary_language=primary_language,
         secondary_language=secondary_language,
-        terteiary_language=terteiary_language,
+        tertiary_language=tertiary_language,
+        language_percentage=language_percentage,
         first_commit=first_commit,
         last_commit=last_commit,
     )
@@ -83,7 +86,8 @@ def save_repo_stats(stats):
             is_collaborative=stats.is_collaborative,
             primary_language=stats.primary_language,
             secondary_language=stats.secondary_language,
-            terteiary_language=stats.terteiary_language,
+            tertiary_language=stats.terteiary_language,
+            language_percentage=stats.language_percentage,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
