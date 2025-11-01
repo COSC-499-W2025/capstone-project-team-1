@@ -18,7 +18,7 @@ from textual.widgets import (
     Static,
 )
 
-from .userconfig import UserConfigScreen
+from .screens.userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
 
 # Toggle between mock data and real ZIP extraction
