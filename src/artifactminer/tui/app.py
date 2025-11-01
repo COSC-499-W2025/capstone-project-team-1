@@ -7,22 +7,14 @@ import httpx
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import (
-    Button,
-    Footer,
-    Header,
-    Input,
-    Label,
-    ListItem,
-    ListView,
-    Static,
-)
+from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, Static
 
 from .userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
+from .screens.file_browser import FileBrowserScreen
 
 # Toggle between mock data and real ZIP extraction
-USE_MOCK = True
+USE_MOCK = False
 
 # Mock data for ZIP contents
 MOCK_DIRS = [
@@ -70,9 +62,10 @@ class UploadScreen(Screen):
         with Container(id="content"):
             with Container(id="card-wrapper"):
                 with Vertical(id="card"):
-                    yield Static("Enter a path to a .zip file.")
+                    yield Static("Enter a path to a .zip file or browse for one.")
                     with Horizontal(id="zip-row"):
                         yield Input(placeholder="Path to .zip", id="zip-path")
+                        yield Button("Browse", id="browse-btn")
                         yield Button("Upload", id="upload-btn", variant="primary")
                     yield Label("Waiting for a file...", id="status")
                     with Horizontal(id="actions-row"):
@@ -88,6 +81,17 @@ class UploadScreen(Screen):
             field.value = ""
             field.focus()
             await self.app.switch_screen("userconfig")
+            return
+
+        if event.button.id == "browse-btn":
+            # Open file browser
+            def handle_file_selected(result: Path | None) -> None:
+                """Handle the file selection from the browser."""
+                if result:
+                    field.value = str(result)
+                    status.update(f"Selected: {result.name}")
+
+            await self.app.push_screen(FileBrowserScreen(), callback=handle_file_selected)
             return
 
         if event.button.id != "upload-btn":
@@ -225,8 +229,42 @@ class ArtifactMinerApp(App):
         margin-right: 1;
     }
 
+    #browse-btn {
+        margin-right: 1;
+    }
+
     #status {
         margin-top: 1;
+    }
+
+    #browser-container {
+        width: 100%;
+        height: 25;
+        margin: 1 0;
+        border: round $surface;
+    }
+
+    #file-tree {
+        width: 100%;
+        height: 100%;
+    }
+
+    #browser-status {
+        margin-top: 1;
+        color: $warning;
+        text-align: center;
+        height: auto;
+    }
+
+    #browser-actions {
+        width: 100%;
+        align: center middle;
+        content-align: center middle;
+        margin-top: 1;
+    }
+
+    #browser-actions Button {
+        margin: 0 1;
     }
 
     #zip-contents {
@@ -277,6 +315,7 @@ class ArtifactMinerApp(App):
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
         self.install_screen(ConsentScreen(), "consent")
+        self.install_screen(FileBrowserScreen(), "filebrowser")
         self.push_screen("welcome")
 
     def on_resize(self, event) -> None:
