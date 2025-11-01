@@ -9,7 +9,7 @@ from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, Static
 
-from .userconfig import UserConfigScreen
+from .screens.userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
 from .screens.file_browser import FileBrowserScreen
 
