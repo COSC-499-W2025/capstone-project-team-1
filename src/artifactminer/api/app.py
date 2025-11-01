@@ -6,8 +6,8 @@ from typing import List
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 
-from .schemas import HealthStatus, QuestionResponse
-from ..db import Base, engine, SessionLocal, Question, get_db, seed_questions
+from .schemas import HealthStatus, QuestionResponse, UserAnswersRequest, UserAnswerResponse
+from ..db import Base, engine, SessionLocal, Question, UserAnswer, get_db, seed_questions
 from .consent import router as consent_router
 
 def create_app() -> FastAPI:
@@ -38,6 +38,37 @@ def create_app() -> FastAPI:
         """Fetch all active questions ordered by their display order."""
         questions = db.query(Question).filter(Question.is_active == True).order_by(Question.order).all()  # noqa: E712
         return questions
+
+    @app.post("/answers", response_model=List[UserAnswerResponse], tags=["questions"])
+    async def submit_answers(
+        request: UserAnswersRequest,
+        db: Session = Depends(get_db)
+    ) -> List[UserAnswer]:
+        """Save user answers to configuration questions."""
+        # Map fields to question IDs (based on order from seed.py)
+        answers_data = [
+            (1, request.email),
+            (2, request.artifacts_focus),
+            (3, request.end_goal),
+            (4, request.repository_priority),
+            (5, request.file_patterns),
+        ]
+
+        saved_answers = []
+        for question_id, answer_text in answers_data:
+            user_answer = UserAnswer(
+                question_id=question_id,
+                answer_text=answer_text
+            )
+            db.add(user_answer)
+            saved_answers.append(user_answer)
+
+        db.commit()
+
+        for answer in saved_answers:
+            db.refresh(answer)
+
+        return saved_answers
 
     # Mount consent router
     app.include_router(consent_router)
