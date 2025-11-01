@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import httpx
 from textual.app import ComposeResult
-from textual.containers import ScrollableContainer, Vertical
+from textual.containers import Container, ScrollableContainer, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
@@ -13,19 +13,16 @@ class UserConfigScreen(Screen):
     """Screen for collecting user configuration through questions."""
 
     CSS = """
-    UserConfigScreen #config-box {
-        width: 80%;
-        max-width: 80;
-        padding: 2;
-        border: round $surface;
-        background: $panel;
-        align: center middle;
-    }
-
     UserConfigScreen #config-title {
         text-align: center;
         padding-bottom: 1;
         text-style: bold;
+    }
+
+    UserConfigScreen #questions-container {
+        width: 100%;
+        max-height: 30;
+        margin-top: 1;
     }
 
     UserConfigScreen .question-label {
@@ -56,10 +53,12 @@ class UserConfigScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(id="config-box"):
-            yield Static("User Configuration", id="config-title")
-            yield ScrollableContainer(id="questions-container")
-            yield Button("Continue", id="continue-btn", variant="primary")
+        with Container(id="content"):
+            with Container(id="card-wrapper"):
+                with Vertical(id="card"):
+                    yield Static("User Configuration", id="config-title")
+                    yield ScrollableContainer(id="questions-container")
+                    yield Button("Continue", id="continue-btn", variant="primary")
         yield Footer()
 
     async def on_mount(self) -> None:
