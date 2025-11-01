@@ -70,6 +70,8 @@ class UploadScreen(Screen):
                     yield Label("Waiting for a file...", id="status")
                     with Horizontal(id="actions-row"):
                         yield Button("Back", id="back-btn")
+                    with Horizontal(id="actions-row"):
+                        yield Button("Back", id="back-btn")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
