@@ -16,10 +16,7 @@ def process_zip(filePath: str, verbose: bool = False):
                         print(file.filename)
             return (zip_ref, zipped_files) # returns the contents of the zip and basic metadata on each file contained within the zip.
             # zipped files can be later opened by calling zip_ref.open(zipped_file[N].filename where N is the index of file to be opened.  
-    
     except zipfile.BadZipFile as ziperror:
         raise ziperror
     except zipfile.LargeZipFile as ziperror:
         raise ziperror
-    
-
