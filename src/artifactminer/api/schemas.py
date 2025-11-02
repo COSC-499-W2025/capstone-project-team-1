@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr, ValidationError
 
 
 class HealthStatus(BaseModel):
@@ -43,3 +43,24 @@ class ConsentUpdateRequest(BaseModel):
     consent_level: Literal["full", "no_llm", "none"] = Field(
         description="Consent level: 'full' (with LLM), 'no_llm' (without LLM), or 'none'."
     )
+
+
+class UserAnswersRequest(BaseModel):
+    """Request payload to submit user configuration answers."""
+
+    email: EmailStr = Field(description="User's email address")
+    artifacts_focus: str = Field(min_length=1, description="What artifacts to focus on")
+    end_goal: str = Field(min_length=1, description="End goal of the analysis")
+    repository_priority: str = Field(min_length=1, description="Repository analysis priority")
+    file_patterns: str = Field(min_length=1, description="File patterns to include/exclude")
+
+
+class UserAnswerResponse(BaseModel):
+    """Response shape for user answer objects."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    question_id: int
+    answer_text: str
+    answered_at: datetime

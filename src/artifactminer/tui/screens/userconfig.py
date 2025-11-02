@@ -98,12 +98,72 @@ class UserConfigScreen(Screen):
         """Handle the Continue button press."""
         if event.button.id != "continue-btn":
             return
-        
+
+        # Collect answers from input fields
         for question in self.questions:
             try:
                 answer_input = self.query_one(f"#answer-{question['id']}", Input)
                 self.answers[question["id"]] = answer_input.value.strip()
             except Exception:
                 pass
-        
-        self.app.switch_screen("upload")
+
+        # Map question IDs to field names
+        field_map = {
+            1: "email",
+            2: "artifacts_focus",
+            3: "end_goal",
+            4: "repository_priority",
+            5: "file_patterns",
+        }
+
+        # Prepare payload with individual fields
+        answers_payload = {}
+        for qid, field_name in field_map.items():
+            answers_payload[field_name] = self.answers.get(qid, "")
+
+        # Submit answers to API
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "http://127.0.0.1:8000/answers",
+                    json=answers_payload,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+
+            self.app.switch_screen("upload")
+
+        except httpx.HTTPStatusError as e:
+            # Parse validation error for better message
+            error_msg = "Please check your answers. All fields must be filled out."
+            try:
+                error_detail = e.response.json().get("detail", [])
+                if isinstance(error_detail, list) and len(error_detail) > 0:
+                    first_error = error_detail[0]
+                    if "email" in first_error.get("loc", []):
+                        error_msg = "Invalid email address. Please provide a valid email."
+            except Exception:
+                pass
+
+            self.app.notify(
+                error_msg,
+                title="Invalid Input",
+                severity="error",
+                timeout=10
+            )
+
+        except httpx.ConnectError:
+            self.app.notify(
+                "Cannot connect to server. Please ensure it is running.",
+                title="Connection Error",
+                severity="error",
+                timeout=15
+            )
+
+        except Exception as e:
+            self.app.notify(
+                f"Error: {str(e)}",
+                title="Submission Error",
+                severity="error",
+                timeout=10
+            )
