@@ -6,13 +6,9 @@ import pytest
 
 from textual.app import active_app
 
-from artifactminer.tui import app as tui_app
-from artifactminer.tui.app import (
-    ListContentsScreen,
-    MOCK_DIRS,
-    UploadScreen,
-    list_zip_dirs,
-)
+import artifactminer.tui.screens.upload as upload_module
+from artifactminer.tui.screens.list_contents import ListContentsScreen
+from artifactminer.tui.screens.upload import MOCK_DIRS, UploadScreen, list_zip_dirs
 
 
 class StatusStub:
@@ -66,14 +62,14 @@ async def test_upload_screen_pushes_mock_list_screen(tmp_path: Path) -> None:
 
     event = SimpleNamespace(button=SimpleNamespace(id="upload-btn"))
 
-    original_use_mock = tui_app.USE_MOCK
-    tui_app.USE_MOCK = True
+    original_use_mock = upload_module.USE_MOCK
+    upload_module.USE_MOCK = True
     token = active_app.set(SimpleNamespace(push_screen=fake_push_screen))
     try:
         await screen.on_button_pressed(event)
     finally:
         active_app.reset(token)
-        tui_app.USE_MOCK = original_use_mock
+        upload_module.USE_MOCK = original_use_mock
 
     assert "screen" in pushed
     list_screen = pushed["screen"]

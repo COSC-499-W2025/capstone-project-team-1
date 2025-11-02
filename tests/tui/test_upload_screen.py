@@ -7,7 +7,7 @@ import pytest
 
 from textual.app import active_app
 
-from artifactminer.tui.app import UploadScreen
+from artifactminer.tui.screens.upload import UploadScreen
 
 
 class StatusStub:

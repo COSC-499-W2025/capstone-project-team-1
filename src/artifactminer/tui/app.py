@@ -1,7 +1,4 @@
 from __future__ import annotations
-from pathlib import Path
-import zipfile
-
 import httpx
 
 from textual.app import App, ComposeResult
