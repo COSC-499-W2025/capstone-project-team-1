@@ -6,9 +6,26 @@ from typing import List
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 
-from .schemas import HealthStatus, QuestionResponse, UserAnswersRequest, UserAnswerResponse
-from ..db import Base, engine, SessionLocal, Question, UserAnswer, get_db, seed_questions
+from fastapi import HTTPException
+from email_validator import validate_email, EmailNotValidError
+
+from .schemas import (
+    HealthStatus,
+    QuestionResponse,
+    UserAnswerResponse,
+    KeyedAnswersRequest,
+)
+from ..db import (
+    Base,
+    engine,
+    SessionLocal,
+    Question,
+    UserAnswer,
+    get_db,
+    seed_questions,
+)
 from .consent import router as consent_router
+
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
@@ -17,11 +34,11 @@ def create_app() -> FastAPI:
         description="Backend services powering the Artifact Miner TUI.",
         version="0.1.0",
     )
-    
+
     # Create database tables on startup
     Base.metadata.create_all(bind=engine)
-    
-    # Seed questions
+
+    # Initialize database schema and seed
     db = SessionLocal()
     try:
         seed_questions(db)
@@ -36,38 +53,75 @@ def create_app() -> FastAPI:
     @app.get("/questions", response_model=List[QuestionResponse], tags=["questions"])
     async def get_questions(db: Session = Depends(get_db)) -> List[Question]:
         """Fetch all active questions ordered by their display order."""
-        questions = db.query(Question).filter(Question.is_active == True).order_by(Question.order).all()  # noqa: E712
+        questions = (
+            db.query(Question)
+            .filter(Question.is_active == True)
+            .order_by(Question.order)
+            .all()
+        )  # noqa: E712
         return questions
 
     @app.post("/answers", response_model=List[UserAnswerResponse], tags=["questions"])
     async def submit_answers(
-        request: UserAnswersRequest,
-        db: Session = Depends(get_db)
+        request: KeyedAnswersRequest, db: Session = Depends(get_db)
     ) -> List[UserAnswer]:
-        """Save user answers to configuration questions."""
-        # Map fields to question IDs (based on order from seed.py)
-        answers_data = [
-            (1, request.email),
-            (2, request.artifacts_focus),
-            (3, request.end_goal),
-            (4, request.repository_priority),
-            (5, request.file_patterns),
-        ]
+        """Save user answers to configuration questions using a keyed payload."""
 
-        saved_answers = []
-        for question_id, answer_text in answers_data:
-            user_answer = UserAnswer(
-                question_id=question_id,
-                answer_text=answer_text
+        # Prefetch active questions into a mapping for lookups and validation
+        questions: list[Question] = (
+            db.query(Question)
+            .filter(Question.is_active == True)
+            .order_by(Question.order)
+            .all()
+        )
+        key_to_q = {q.key or str(q.id): q for q in questions}
+
+        saved_answers: list[UserAnswer] = []
+
+        # Normalize incoming answers: coerce to str and strip whitespace
+        raw_answers = request.answers or {}
+        answers = {k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()}
+
+        # Validate required fields and answer types
+        required_missing = [
+            k
+            for k, q in key_to_q.items()
+            if (
+                q.required and (k not in answers or not str(answers.get(k, "")).strip())
             )
-            db.add(user_answer)
-            saved_answers.append(user_answer)
+        ]
+        if required_missing:
+            # Generic validation error for missing required fields
+            raise HTTPException(
+                status_code=422, detail="Please fill in all required fields."
+            )
+
+        # Type-specific validation (email)
+        for k, v in answers.items():
+            q = key_to_q.get(k)
+            if not q:
+                # Generic error for unknown fields
+                raise HTTPException(status_code=422, detail="Invalid field provided.")
+            if (q.answer_type or "text") == "email":
+                try:
+                    # Validate format only; avoid DNS/network checks
+                    validate_email(v, check_deliverability=False)
+                except EmailNotValidError:
+                    # Generic error for invalid email format
+                    raise HTTPException(
+                        status_code=422, detail="Invalid email provided."
+                    )
+
+        # Persist
+        for k, v in answers.items():
+            q = key_to_q[k]
+            ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
+            db.add(ua)
+            saved_answers.append(ua)
 
         db.commit()
-
-        for answer in saved_answers:
-            db.refresh(answer)
-
+        for ans in saved_answers:
+            db.refresh(ans)
         return saved_answers
 
     # Mount consent router

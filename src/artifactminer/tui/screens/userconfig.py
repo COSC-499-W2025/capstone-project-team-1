@@ -48,7 +48,6 @@ class UserConfigScreen(Screen):
 
     def __init__(self):
         super().__init__()
-        self.answers: dict[int, str] = {}
         self.questions: list[dict] = []
 
     def compose(self) -> ComposeResult:
@@ -75,10 +74,15 @@ class UserConfigScreen(Screen):
                 container.mount(Static("No questions available.", classes="question-label"))
             else:
                 for question in self.questions:
+                    # Only use keyed questions
+                    key = question.get("key")
+                    if not key:
+                        continue
                     container.mount(Label(question["question_text"], classes="question-label"))
+                    input_id = f"answer-{key}"
                     container.mount(Input(
                         placeholder="Your answer...",
-                        id=f"answer-{question['id']}",
+                        id=input_id,
                         classes="answer-input"
                     ))
         
@@ -98,34 +102,25 @@ class UserConfigScreen(Screen):
         if event.button.id != "continue-btn":
             return
 
-        # Collect answers from input fields
+        # Collect answers from input fields keyed by question key only
+        keyed_answers: dict[str, str] = {}
         for question in self.questions:
+            key = question.get("key")
+            if not key:
+                continue
+            input_id = f"#answer-{key}"
             try:
-                answer_input = self.query_one(f"#answer-{question['id']}", Input)
-                self.answers[question["id"]] = answer_input.value.strip()
+                answer_input = self.query_one(input_id, Input)
+                keyed_answers[key] = answer_input.value.strip()
             except Exception:
                 pass
-
-        # Map question IDs to field names
-        field_map = {
-            1: "email",
-            2: "artifacts_focus",
-            3: "end_goal",
-            4: "repository_priority",
-            5: "file_patterns",
-        }
-
-        # Prepare payload with individual fields
-        answers_payload = {}
-        for qid, field_name in field_map.items():
-            answers_payload[field_name] = self.answers.get(qid, "")
 
         # Submit answers to API
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     "http://127.0.0.1:8000/answers",
-                    json=answers_payload,
+                    json={"answers": keyed_answers},
                     timeout=10.0
                 )
                 response.raise_for_status()
@@ -133,14 +128,12 @@ class UserConfigScreen(Screen):
             self.app.switch_screen("upload")
 
         except httpx.HTTPStatusError as e:
-            # Parse validation error for better message
+            # Show server-provided error detail when available; otherwise a generic message
             error_msg = "Please check your answers. All fields must be filled out."
             try:
-                error_detail = e.response.json().get("detail", [])
-                if isinstance(error_detail, list) and len(error_detail) > 0:
-                    first_error = error_detail[0]
-                    if "email" in first_error.get("loc", []):
-                        error_msg = "Invalid email address. Please provide a valid email."
+                detail = e.response.json().get("detail")
+                if isinstance(detail, str) and detail.strip():
+                    error_msg = detail.strip()
             except Exception:
                 pass
 
