@@ -16,10 +16,16 @@ class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
+    # Stable identifier for the question (e.g., "email", "end_goal").
+    # New deployments will create this as a column; existing DBs will be migrated at app startup.
+    key = Column(String, unique=True, index=True, nullable=True)
     question_text = Column(String, nullable=False)
     order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Basic validation/UX metadata
+    required = Column(Boolean, default=True)
+    answer_type = Column(String, default="text")  # e.g., "text", "email", "choice"
 
     # Relationship to answers
     answers = relationship("UserAnswer", back_populates="question")

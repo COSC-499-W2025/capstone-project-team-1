@@ -35,11 +35,13 @@ def test_questions_are_ordered(client):
 def test_submit_answers_success(client):
     """Test successful answer submission with valid email."""
     answers_payload = {
-        "email": "test@example.com",
-        "artifacts_focus": "Focus on Python files",
-        "end_goal": "Analyze code quality",
-        "repository_priority": "Git repository",
-        "file_patterns": "*.py"
+        "answers": {
+            "email": "test@example.com",
+            "artifacts_focus": "Focus on Python files",
+            "end_goal": "Analyze code quality",
+            "repository_priority": "Git repository",
+            "file_patterns": "*.py",
+        }
     }
 
     response = client.post("/answers", json=answers_payload)
@@ -59,11 +61,13 @@ def test_submit_answers_success(client):
 def test_submit_answers_invalid_email(client):
     """Test that invalid email is rejected."""
     answers_payload = {
-        "email": "not-an-email",
-        "artifacts_focus": "Focus on Python files",
-        "end_goal": "Analyze code quality",
-        "repository_priority": "Git repository",
-        "file_patterns": "*.py"
+        "answers": {
+            "email": "not-an-email",
+            "artifacts_focus": "Focus on Python files",
+            "end_goal": "Analyze code quality",
+            "repository_priority": "Git repository",
+            "file_patterns": "*.py",
+        }
     }
 
     response = client.post("/answers", json=answers_payload)
@@ -73,11 +77,13 @@ def test_submit_answers_invalid_email(client):
 def test_submit_answers_empty_text(client):
     """Test answer submission with empty answer fails validation."""
     answers_payload = {
-        "email": "test@example.com",
-        "artifacts_focus": "",  # Empty field
-        "end_goal": "Analyze code quality",
-        "repository_priority": "Git repository",
-        "file_patterns": "*.py"
+        "answers": {
+            "email": "test@example.com",
+            "artifacts_focus": "",  # Empty field
+            "end_goal": "Analyze code quality",
+            "repository_priority": "Git repository",
+            "file_patterns": "*.py",
+        }
     }
 
     response = client.post("/answers", json=answers_payload)

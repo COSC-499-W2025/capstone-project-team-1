@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, EmailStr, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
 class HealthStatus(BaseModel):
@@ -24,8 +24,11 @@ class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    key: str | None = None
     question_text: str
     order: int
+    required: bool = True
+    answer_type: str = "text"
 
 
 class ConsentResponse(BaseModel):
@@ -45,14 +48,14 @@ class ConsentUpdateRequest(BaseModel):
     )
 
 
-class UserAnswersRequest(BaseModel):
-    """Request payload to submit user configuration answers."""
+class KeyedAnswersRequest(BaseModel):
+    """New request payload keyed by question `key`.
 
-    email: EmailStr = Field(description="User's email address")
-    artifacts_focus: str = Field(min_length=1, description="What artifacts to focus on")
-    end_goal: str = Field(min_length=1, description="End goal of the analysis")
-    repository_priority: str = Field(min_length=1, description="Repository analysis priority")
-    file_patterns: str = Field(min_length=1, description="File patterns to include/exclude")
+    Example:
+        {"answers": {"email": "me@example.com", "end_goal": "..."}}
+    """
+
+    answers: dict[str, str] = Field(default_factory=dict)
 
 
 class UserAnswerResponse(BaseModel):
