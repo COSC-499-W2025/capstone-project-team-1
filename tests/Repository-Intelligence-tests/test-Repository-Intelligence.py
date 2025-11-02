@@ -57,13 +57,13 @@ def test_select_repo_stats_from_db(): #checks that we can select the saved repo 
 
     root = Path(__file__).resolve().parents[2]
     stats = getRepoStats(root)
-    save_repo_stats(stats)
+    save_repo_stats(stats)#save the stats first
 
-    db = SessionLocal()
-    repo_stat = db.query(RepoStat).filter(RepoStat.project_name == stats.project_name).first()
+    db = SessionLocal()#create a new session
+    repo_stat = db.query(RepoStat).filter(RepoStat.project_name == stats.project_name).first()#select the saved stats
     assert repo_stat is not None
     assert repo_stat.project_name == stats.project_name
     assert repo_stat.primary_language == stats.primary_language
     assert repo_stat.is_collaborative == stats.is_collaborative
-    db.close()
+    db.close()#close the session
 

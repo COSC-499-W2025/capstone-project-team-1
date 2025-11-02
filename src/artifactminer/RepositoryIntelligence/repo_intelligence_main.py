@@ -59,10 +59,10 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
     languages = [lang for lang, _ in language_counter.most_common()] #list of languages used in the repo
     language_percentages = [count / sum(language_counter.values()) * 100 for _, count in language_counter.most_common()] #percentage of each language used
     # Check if the repository is collaborative
-    is_collaborative = len(repo.remotes) > 0
+    is_collaborative = len(repo.remotes) > 0 # if there are remotes, its collaborative
 
     # Get first and last commit dates
-    commits = list(repo.iter_commits())
+    commits = list(repo.iter_commits())#list of all commits in the repo
     first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
     last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
 
