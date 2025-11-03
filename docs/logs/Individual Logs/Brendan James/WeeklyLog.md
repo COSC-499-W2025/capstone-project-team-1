@@ -1,3 +1,18 @@
+# Oct 27-Nov2
+
+Tasks:
+![Tasks](Tasks%20Oct27-Nov2.png)
+
+I've started work on basic metadata analysis and spent a bunch of time researching how to programatically read when a file was created.
+
+| **Task**            |  **Description**                 | **Status**     |
+| --------------------|------------------ | -------------- |
+| Activity Ratios | Code/test/docs/design/devops proportions | ■■ Not Started |
+| Role-Aware Ranking | Rank projects by contribution, role fit, recency, complexity | ■■ Not Started |
+| Chronology (Projects) | Ordered list with durations | ■■■ In Progress |
+| Report Assembly | Compose text/JSON outputs for TUI & exports |  ■■ Not Started |
+| Retrieval APIs | GET /projects, /projects/chronology, /reports/{id} |  ■■ Not Started |
+
 # Oct 20-26
 
 Tasks:
@@ -60,6 +75,7 @@ Tasks:
 ![Tasks](Tasks%20Sept15-21.png)
 
 We only wrote potential requirements this week. I participated.
+
 
 
 
