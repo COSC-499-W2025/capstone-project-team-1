@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text,JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -63,3 +63,16 @@ class UserAnswer(Base):
 
     # Relationship to question
     question = relationship("Question", back_populates="answers")
+class RepoStat(Base):#model for storing repository statistics
+    __tablename__ = "repo_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_name = Column(String, nullable=False)
+    is_collaborative = Column(Boolean, default=False)
+    languages = Column(JSON, nullable=True)#list of languages used in the repo
+    language_percentages = Column(JSON, nullable=True)#percentage of each language used
+    primary_language = Column(String, nullable=True)#primary language of the repo
+    first_commit = Column(DateTime, nullable=True)
+    last_commit = Column(DateTime, nullable=True)
+    total_commits = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
