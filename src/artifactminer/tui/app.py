@@ -1,166 +1,12 @@
 from __future__ import annotations
 import httpx
 
-<<<<<<< HEAD
-from textual.app import App, ComposeResult
-from textual.containers import Container, Horizontal, Vertical
-from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, Static
-=======
 from textual.app import App
->>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
 
-from .screens.userconfig import UserConfigScreen
-from .screens.consent import ConsentScreen
-<<<<<<< HEAD
-from .screens.file_browser import FileBrowserScreen
-
-# Toggle between mock data and real ZIP extraction
-USE_MOCK = False
-
-# Mock data for ZIP contents
-MOCK_DIRS = [
-    "src/",
-    "src/utils/",
-    "src/helpers/",
-    "docs/",
-    "tests/",
-    "requirements.txt",
-]
-
-
-def list_zip_dirs(zip_path: Path) -> list[str]:
-    """Return top-level and subdirectory names from a zip file."""
-    try:
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            return sorted(
-                set(
-                    f.split("/")[0] + "/" if "/" in f else f
-                    for f in zip_ref.namelist()
-                )
-            )
-    except Exception as exc:
-        return [f"[Error] {exc}"]
-
-
-class WelcomeScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with Container(id="content"):
-            with Container(id="card-wrapper"):
-                with Vertical(id="card"):
-                    yield Static("ARTIFACT-MINER", id="title")
-                    yield Static("Welcome to the artifact staging tool.", id="subtitle")
-                    yield Button("Start Mining", id="begin-btn", variant="primary")
-        yield Footer()
-
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "begin-btn":
-            self.app.switch_screen("consent")
-
-class UploadScreen(Screen):
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with Container(id="content"):
-            with Container(id="card-wrapper"):
-                with Vertical(id="card"):
-                    yield Static("Enter a path to a .zip file or browse for one.")
-                    with Horizontal(id="zip-row"):
-                        yield Input(placeholder="Path to .zip", id="zip-path")
-                        yield Button("Browse", id="browse-btn")
-                        yield Button("Upload", id="upload-btn", variant="primary")
-                    yield Label("Waiting for a file...", id="status")
-                    with Horizontal(id="actions-row"):
-                        yield Button("Back", id="back-btn")
-                    with Horizontal(id="actions-row"):
-                        yield Button("Back", id="back-btn")
-        yield Footer()
-
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        field = self.query_one("#zip-path", Input)
-        status = self.query_one("#status", Label)
-
-        if event.button.id == "back-btn":
-            status.update("Waiting for a file...")
-            field.value = ""
-            field.focus()
-            await self.app.switch_screen("userconfig")
-            return
-
-        if event.button.id == "browse-btn":
-            # Open file browser
-            def handle_file_selected(result: Path | None) -> None:
-                """Handle the file selection from the browser."""
-                if result:
-                    field.value = str(result)
-                    status.update(f"Selected: {result.name}")
-
-            await self.app.push_screen(FileBrowserScreen(), callback=handle_file_selected)
-            return
-
-        if event.button.id != "upload-btn":
-            return
-
-        text = field.value.strip()
-
-
-        if not text:
-            status.update("Please enter a path.")
-            return
-
-
-        path = Path(text).expanduser()
-        if not path.exists():
-            status.update(f"File not found: {path}")
-            return
-
-
-        if path.suffix.lower() != ".zip":
-            status.update("Need a .zip file.")
-            return
-
-        status.update("Processing ZIP contents...")
-
-        dirs = MOCK_DIRS if USE_MOCK else list_zip_dirs(path)
-
-        def reset_form(_result: None = None) -> None:
-            """Reset upload form when the contents screen closes."""
-            status.update("Waiting for a file...")
-            field.value = ""
-            field.focus()
-
-        await self.app.push_screen(ListContentsScreen(dirs), callback=reset_form)
-
-
-class ListContentsScreen(Screen):
-    """Displays directories from a zip file (mock or real)."""
-
-    def __init__(self, dirs: list[str] | None = None) -> None:
-        super().__init__()
-        self.dirs = dirs or []
-
-    def compose(self) -> ComposeResult:
-        yield Header()
-        with Container(id="content"):
-            with Container(id="card-wrapper"):
-                with Vertical(id="card"):
-                    yield Static("Contents of ZIP File", id="title")
-                    with Container(id="list-container"):
-                        yield ListView(
-                            *[ListItem(Label(name)) for name in self.dirs],
-                            id="zip-contents",
-                        )
-                    with Horizontal(id="list-actions"):
-                        yield Button("Back", id="back-btn", variant="primary")
-        yield Footer()
-
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == "back-btn":
-            self.dismiss(None)
-=======
-from .screens.upload import UploadScreen
 from .screens.welcome import WelcomeScreen
->>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
+from .screens.consent import ConsentScreen
+from .screens.userconfig import UserConfigScreen
+from .screens.upload import UploadScreen
 
 
 class ArtifactMinerApp(App):
@@ -320,10 +166,9 @@ class ArtifactMinerApp(App):
             self.consent_state = {"consent_level": "none", "accepted_at": None}
 
         self.install_screen(WelcomeScreen(), "welcome")
+        self.install_screen(ConsentScreen(), "consent")
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
-        self.install_screen(ConsentScreen(), "consent")
-        self.install_screen(FileBrowserScreen(), "filebrowser")
         self.push_screen("welcome")
 
     def on_resize(self, event) -> None:
