@@ -2,7 +2,9 @@ import os
 from pathlib import Path
 
 #change this for a path that you choose
-CURRENTPATH = "/Users/nathanhelm/Code/Projects/capstone/capstone-project-team-1/tests/directorycrawler/mocks/mockdirectory"
+root = Path(__file__).resolve() #get current file path
+project = root.parents[3] #gets project folder (../../../)
+CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / "mockdirectory" #get mock directory path
 
 from .store_file_dict import StoreFileDict
 
@@ -22,7 +24,7 @@ def crawl_directory():
         print("path does not exist")
         return
 
-    for (root,dirs,files) in os.walk(path, topdown=True):
+    for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         if(files):
             current_folder = os.path.basename(root)
             print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
