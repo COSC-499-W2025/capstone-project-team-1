@@ -8,6 +8,7 @@ from .screens.consent import ConsentScreen
 from .screens.userconfig import UserConfigScreen
 from .screens.upload import UploadScreen
 from .screens.list_contents import ListContentsScreen
+from .screens.file_browser import FileBrowserScreen
 
 
 class ArtifactMinerApp(App):
