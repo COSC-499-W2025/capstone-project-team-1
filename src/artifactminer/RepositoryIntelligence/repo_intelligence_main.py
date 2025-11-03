@@ -77,7 +77,7 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         total_commits=len(commits),
     )
 
-def save_repo_stats(stats):
+def saveRepoStats(stats):
     db = SessionLocal()
     try:
         repo_stat = RepoStat(
