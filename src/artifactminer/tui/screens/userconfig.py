@@ -2,11 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import httpx
+from dotenv import load_dotenv
 from textual.app import ComposeResult
 from textual.containers import Container, ScrollableContainer, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
+
+
+# Load environment variables from a .env file if present
+load_dotenv()
+
+# Base URL for the API (configurable via .env)
+_DEFAULT_API_BASE_URL = "http://127.0.0.1:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", _DEFAULT_API_BASE_URL).rstrip("/")
 
 
 class UserConfigScreen(Screen):
@@ -66,7 +76,7 @@ class UserConfigScreen(Screen):
         
         try:
             async with httpx.AsyncClient() as client:
-                response = await client.get("http://127.0.0.1:8000/questions")
+                response = await client.get(f"{API_BASE_URL}/questions")
                 response.raise_for_status()
                 self.questions = response.json()
             
@@ -88,7 +98,7 @@ class UserConfigScreen(Screen):
         
         except httpx.ConnectError:
             container.mount(Static(
-                "Error: Cannot connect to API. Please ensure the API server is running at http://127.0.0.1:8000",
+                f"Error: Cannot connect to API. Please ensure the API server is running at {API_BASE_URL}",
                 id="error-message"
             ))
         except Exception as e:
@@ -119,7 +129,7 @@ class UserConfigScreen(Screen):
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(
-                    "http://127.0.0.1:8000/answers",
+                    f"{API_BASE_URL}/answers",
                     json={"answers": keyed_answers},
                     timeout=10.0
                 )
