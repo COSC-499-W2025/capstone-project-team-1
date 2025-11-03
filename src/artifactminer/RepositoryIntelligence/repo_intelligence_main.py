@@ -4,7 +4,7 @@ import subprocess, os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Iterable, Optional, Union, List
+from typing import Iterable, Optional, Union, List
 from pathlib import Path
 import git
 from artifactminer.db.models import RepoStat
