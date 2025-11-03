@@ -1,19 +1,26 @@
 #Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
-import subprocess, os
+import subprocess
+import os
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Iterable, Optional, Union
+from typing import Iterable, Optional, Union, List
 from pathlib import Path
+import git
+from artifactminer.db.models import RepoStat
+from artifactminer.db.database import SessionLocal
 
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
     project_name: str #store project name as a string
-    primary_language: str #Primary language name as a string
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
+    Languages: List[str] = field(default_factory=list) #Languages as a string list to store the languages used in the repo
+    language_percentages: List[float] = field(default_factory=list)# Language percentages as a float list to store the percentage of each language used in the repo
+    primary_language: Optional[str] = None # Optional addition is the primary language used in the repo
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
+    total_commits: Optional[int] = None # Optional addition is the total number of commits in the repo
 
 def isGitRepo(path :os.PathLike | str) -> bool:#This function checks whether the git directory exists inside of the given path
     p = Path(path)
@@ -33,14 +40,63 @@ def runGit(repo_path: Pathish, args: Iterable[str]) -> str: #This function will 
     )
     return result.stdout #return gits printed output
 
-def getAuthorsCommitCounts(repo_path: Pathish, since: Optional[str] = None) -> Dict[str, int]: #Function takes the Repo path, and "since" which is an optional time filter so it will only count commits pass a certain time, and returns a count of commits per email that made a commit/contributed.
-#Example : getAuthorCommitCounts("/path/to/my/repo/")
-#Example2 : getAuthorCommitCounts("/path/to/my/repo/", "10,19,2025")
-    args = ["log", "--all", "--pretty=%ae"]  #args is for the command we are going to run in git, all logs, pretty=%ae makes it return only the authors email
-    if since:#if the user specified a since date it will be added to the arguement
-        args.insert(1, f'--since={since}')
-    out = runGit(repo_path, args)#use the runGit method with our args
-    emails = [line.strip().lower() for line in out.splitlines() if line.strip()]#Formats all the emails to be consistent all lowercase in one line in a list and skips blank lines.
-    counts = Counter(emails)# Counts each of teh emails
-    counts.pop("", None) #remove anything empty
-    return dict(counts)
+def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the basic repo stats for a given git repo path
+    if not isGitRepo(repo_path): #check if its a git repo
+        raise ValueError(f"The path {repo_path} is not a git repository.") #raise error if not
+
+    repo = git.Repo(repo_path) #initialize the git repo object
+
+    # Get project name from the folder name
+    project_name = Path(repo_path).name
+
+    # Get primary language by analyzing file extensions
+    language_counter = Counter()
+    for blob in repo.head.commit.tree.traverse(): #traverse all files in the repo
+        if blob.type == 'blob': #if its a file
+            ext = Path(blob.path).suffix.lower() #get the file extension
+            if ext: #if it has an extension
+                language_counter[ext] += 1 #count it
+    primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
+    languages = [lang for lang, _ in language_counter.most_common()] #list of languages used in the repo
+    language_percentages = [count / sum(language_counter.values()) * 100 for _, count in language_counter.most_common()] #percentage of each language used
+    # Check if the repository is collaborative
+    is_collaborative = len(repo.remotes) > 0 # if there are remotes, its collaborative
+
+    # Get first and last commit dates
+    commits = list(repo.iter_commits())#list of all commits in the repo
+    first_commit = datetime.fromtimestamp(commits[-1].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
+    last_commit = datetime.fromtimestamp(commits[0].committed_date) if commits else None #Formatted as year-month-day hour:minute:second
+
+    return RepoStats(
+        project_name=project_name,
+        is_collaborative=is_collaborative,
+        primary_language=primary_language,
+        Languages=languages,
+        language_percentages=language_percentages,
+        first_commit=first_commit,
+        last_commit=last_commit,
+        total_commits=len(commits),
+    )
+
+def saveRepoStats(stats):
+    db = SessionLocal()
+    try:
+        repo_stat = RepoStat(
+            project_name=stats.project_name,
+            is_collaborative=stats.is_collaborative,
+            primary_language=stats.primary_language,
+            languages=stats.Languages,
+            language_percentages=stats.language_percentages,
+            first_commit=stats.first_commit,
+            last_commit=stats.last_commit,
+            total_commits=stats.total_commits,
+        )
+        db.add(repo_stat)
+        db.commit()
+        db.refresh(repo_stat)
+        print(f"Saved repo stats: {repo_stat.project_name}")
+    except Exception as e:
+        db.rollback()
+        print(f"Error saving repo stats: {e}")
+    finally:
+        db.close()
