@@ -17,13 +17,8 @@ userIncludeAllFiles = False
 
 store_file_dictionary = StoreFileDict()
 #storing files from mock folder to dictionary
-<<<<<<< HEAD
 def crawl_directory(): 
     if os.path.exists(CURRENTPATH) == False:
-=======
-def simple_directory_crawl_from_path(path): 
-    if os.path.exists(path) == False:
->>>>>>> origin/development
         print("path does not exist")
         return
 
@@ -34,7 +29,6 @@ def simple_directory_crawl_from_path(path):
             for file in files: 
                
                 full_path = os.path.join(root, file)
-<<<<<<< HEAD
                 if file in userExcludeFileName: #user 
                     continue
                 if file not in userKeepFileName: #if file in user file name skip other functions
@@ -48,13 +42,6 @@ def simple_directory_crawl_from_path(path):
                     print("user file include name: ", file)
                 print_files(file) #print files
                 store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
-=======
-                if file != ".DS_Store": #check whether filename is valid
-                    store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
-
-def simple_directory_crawl(): 
-    simple_directory_crawl_from_path(CURRENTPATH)
->>>>>>> origin/development
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
