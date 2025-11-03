@@ -76,3 +76,6 @@ Thumbs.db
 
 #Database
 artifactminer.db
+
+# Uploaded files
+uploads/
