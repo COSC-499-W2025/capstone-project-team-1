@@ -24,8 +24,11 @@ class QuestionResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    key: str | None = None
     question_text: str
     order: int
+    required: bool = True
+    answer_type: str = "text"
 
 
 class ConsentResponse(BaseModel):
@@ -43,3 +46,24 @@ class ConsentUpdateRequest(BaseModel):
     consent_level: Literal["full", "no_llm", "none"] = Field(
         description="Consent level: 'full' (with LLM), 'no_llm' (without LLM), or 'none'."
     )
+
+
+class KeyedAnswersRequest(BaseModel):
+    """New request payload keyed by question `key`.
+
+    Example:
+        {"answers": {"email": "me@example.com", "end_goal": "..."}}
+    """
+
+    answers: dict[str, str] = Field(default_factory=dict)
+
+
+class UserAnswerResponse(BaseModel):
+    """Response shape for user answer objects."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    question_id: int
+    answer_text: str
+    answered_at: datetime

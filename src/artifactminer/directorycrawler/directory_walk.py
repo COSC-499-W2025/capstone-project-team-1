@@ -7,12 +7,12 @@ from .store_file_dict import StoreFileDict
 
 store_file_dictionary = StoreFileDict()
 #storing files from mock folder to dictionary
-def simple_directory_crawl(): 
-    if os.path.exists(CURRENTPATH) == False:
+def simple_directory_crawl_from_path(path): 
+    if os.path.exists(path) == False:
         print("path does not exist")
         return
 
-    for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
+    for (root,dirs,files) in os.walk(path, topdown=True):
         if(files):
             current_folder = os.path.basename(root)
             print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
@@ -21,6 +21,9 @@ def simple_directory_crawl():
                 full_path = os.path.join(root, file)
                 if file != ".DS_Store": #check whether filename is valid
                     store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
+
+def simple_directory_crawl(): 
+    simple_directory_crawl_from_path(CURRENTPATH)
                 
 
 
