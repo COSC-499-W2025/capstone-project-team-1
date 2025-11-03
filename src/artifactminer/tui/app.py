@@ -1,28 +1,22 @@
 from __future__ import annotations
-from pathlib import Path
-import zipfile
-
 import httpx
 
+<<<<<<< HEAD
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import (
-    Button,
-    Footer,
-    Header,
-    Input,
-    Label,
-    ListItem,
-    ListView,
-    Static,
-)
+from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, Static
+=======
+from textual.app import App
+>>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
 
-from .userconfig import UserConfigScreen
+from .screens.userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
+<<<<<<< HEAD
+from .screens.file_browser import FileBrowserScreen
 
 # Toggle between mock data and real ZIP extraction
-USE_MOCK = True
+USE_MOCK = False
 
 # Mock data for ZIP contents
 MOCK_DIRS = [
@@ -70,20 +64,43 @@ class UploadScreen(Screen):
         with Container(id="content"):
             with Container(id="card-wrapper"):
                 with Vertical(id="card"):
-                    yield Static("Enter a path to a .zip file.")
+                    yield Static("Enter a path to a .zip file or browse for one.")
                     with Horizontal(id="zip-row"):
                         yield Input(placeholder="Path to .zip", id="zip-path")
+                        yield Button("Browse", id="browse-btn")
                         yield Button("Upload", id="upload-btn", variant="primary")
                     yield Label("Waiting for a file...", id="status")
+                    with Horizontal(id="actions-row"):
+                        yield Button("Back", id="back-btn")
+                    with Horizontal(id="actions-row"):
+                        yield Button("Back", id="back-btn")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
+        field = self.query_one("#zip-path", Input)
+        status = self.query_one("#status", Label)
+
+        if event.button.id == "back-btn":
+            status.update("Waiting for a file...")
+            field.value = ""
+            field.focus()
+            await self.app.switch_screen("userconfig")
+            return
+
+        if event.button.id == "browse-btn":
+            # Open file browser
+            def handle_file_selected(result: Path | None) -> None:
+                """Handle the file selection from the browser."""
+                if result:
+                    field.value = str(result)
+                    status.update(f"Selected: {result.name}")
+
+            await self.app.push_screen(FileBrowserScreen(), callback=handle_file_selected)
+            return
+
         if event.button.id != "upload-btn":
             return
 
-
-        field = self.query_one("#zip-path", Input)
-        status = self.query_one("#status", Label)
         text = field.value.strip()
 
 
@@ -106,7 +123,13 @@ class UploadScreen(Screen):
 
         dirs = MOCK_DIRS if USE_MOCK else list_zip_dirs(path)
 
-        await self.app.push_screen(ListContentsScreen(dirs))
+        def reset_form(_result: None = None) -> None:
+            """Reset upload form when the contents screen closes."""
+            status.update("Waiting for a file...")
+            field.value = ""
+            field.focus()
+
+        await self.app.push_screen(ListContentsScreen(dirs), callback=reset_form)
 
 
 class ListContentsScreen(Screen):
@@ -119,18 +142,25 @@ class ListContentsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Container(id="content"):
-            with Vertical(id="card"):
-                yield Static("Contents of ZIP File", id="title")
-                yield ListView(
-                    *[ListItem(Label(name)) for name in self.dirs],
-                    id="zip-contents",
-                )
-                yield Button("Back", id="back-btn", variant="primary")
+            with Container(id="card-wrapper"):
+                with Vertical(id="card"):
+                    yield Static("Contents of ZIP File", id="title")
+                    with Container(id="list-container"):
+                        yield ListView(
+                            *[ListItem(Label(name)) for name in self.dirs],
+                            id="zip-contents",
+                        )
+                    with Horizontal(id="list-actions"):
+                        yield Button("Back", id="back-btn", variant="primary")
         yield Footer()
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back-btn":
-            await self.app.pop_screen()
+            self.dismiss(None)
+=======
+from .screens.upload import UploadScreen
+from .screens.welcome import WelcomeScreen
+>>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
 
 
 class ArtifactMinerApp(App):
@@ -191,8 +221,23 @@ class ArtifactMinerApp(App):
         align: center middle;
     }
 
+    #actions-row {
+        width: 100%;
+        margin-top: 1;
+        align: left middle;
+        content-align: left middle;
+    }
+
+    #actions-row Button {
+        margin-right: 1;
+    }
+
     #zip-path {
         width: 1fr;
+        margin-right: 1;
+    }
+
+    #browse-btn {
         margin-right: 1;
     }
 
@@ -200,45 +245,62 @@ class ArtifactMinerApp(App):
         margin-top: 1;
     }
 
+    #browser-container {
+        width: 100%;
+        height: 25;
+        margin: 1 0;
+        border: round $surface;
+    }
+
+    #file-tree {
+        width: 100%;
+        height: 100%;
+    }
+
+    #browser-status {
+        margin-top: 1;
+        color: $warning;
+        text-align: center;
+        height: auto;
+    }
+
+    #browser-actions {
+        width: 100%;
+        align: center middle;
+        content-align: center middle;
+        margin-top: 1;
+    }
+
+    #browser-actions Button {
+        margin: 0 1;
+    }
+
     #zip-contents {
         border: round $surface;
         height: 20;
-        width: 80%;
-        margin: 1 0;
-        align: center middle;
+        width: 100%;
+        max-width: 60;
         overflow: auto;
     }
 
-    #consent-container {
-        width: 80%;
-        max-width: 100;
-        height: auto;
-        padding: 1;
-        border: round $surface;
-        background: $panel;
-    }
-
-    #consent-title {
-        text-align: center;
-        text-style: bold;
-        padding-bottom: 1;
-    }
-
-    #consent-markdown {
-        height: auto;
-        max-height: 30;
-        padding: 1;
-        margin-bottom: 1;
-    }
-
-    #consent-buttons {
+    #list-container {
+        width: 100%;
         align: center middle;
-        height: auto;
+        content-align: center middle;
+        margin: 1 0;
     }
 
-    #consent-buttons Button {
+    #list-actions {
+        width: 100%;
+        align: center middle;
+        content-align: center middle;
+        margin-top: 1;
+    }
+
+    #list-actions Button {
         margin: 0 1;
     }
+
     """
     BINDINGS = [("q", "quit", "Quit")]
 
@@ -261,6 +323,7 @@ class ArtifactMinerApp(App):
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
         self.install_screen(ConsentScreen(), "consent")
+        self.install_screen(FileBrowserScreen(), "filebrowser")
         self.push_screen("welcome")
 
     def on_resize(self, event) -> None:
