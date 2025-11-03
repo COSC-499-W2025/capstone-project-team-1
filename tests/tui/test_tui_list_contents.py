@@ -6,13 +6,9 @@ import pytest
 
 from textual.app import active_app
 
-from artifactminer.tui import app as tui_app
-from artifactminer.tui.app import (
-    ListContentsScreen,
-    MOCK_DIRS,
-    UploadScreen,
-    list_zip_dirs,
-)
+import artifactminer.tui.screens.upload as upload_module
+from artifactminer.tui.screens.list_contents import ListContentsScreen
+from artifactminer.tui.screens.upload import MOCK_DIRS, UploadScreen, list_zip_dirs
 
 
 class StatusStub:
@@ -25,6 +21,17 @@ class StatusStub:
         self.message = message
 
 
+class InputStub:
+    """Simplified Input replacement that tracks focus calls."""
+
+    def __init__(self, value: str) -> None:
+        self.value = value
+        self.focus_called = False
+
+    def focus(self) -> None:
+        self.focus_called = True
+
+
 @pytest.mark.asyncio
 async def test_upload_screen_pushes_mock_list_screen(tmp_path: Path) -> None:
     """Ensure UploadScreen routes to ListContentsScreen with mock directories."""
@@ -32,7 +39,7 @@ async def test_upload_screen_pushes_mock_list_screen(tmp_path: Path) -> None:
     zip_path.touch()
 
     screen = UploadScreen()
-    field = SimpleNamespace(value=str(zip_path))
+    field = InputStub(str(zip_path))
     status = StatusStub()
 
     def fake_query_one(selector: str, _expected=None):
@@ -44,26 +51,32 @@ async def test_upload_screen_pushes_mock_list_screen(tmp_path: Path) -> None:
 
     screen.query_one = fake_query_one  # type: ignore[assignment]
 
-    pushed: dict[str, ListContentsScreen] = {}
+    pushed: dict[str, object] = {}
 
-    async def fake_push_screen(list_screen: ListContentsScreen) -> None:
+    async def fake_push_screen(
+        list_screen: ListContentsScreen, callback=None, wait_for_dismiss: bool = False
+    ) -> None:
         pushed["screen"] = list_screen
+        pushed["callback"] = callback
+        pushed["wait_for_dismiss"] = wait_for_dismiss
 
     event = SimpleNamespace(button=SimpleNamespace(id="upload-btn"))
 
-    original_use_mock = tui_app.USE_MOCK
-    tui_app.USE_MOCK = True
+    original_use_mock = upload_module.USE_MOCK
+    upload_module.USE_MOCK = True
     token = active_app.set(SimpleNamespace(push_screen=fake_push_screen))
     try:
         await screen.on_button_pressed(event)
     finally:
         active_app.reset(token)
-        tui_app.USE_MOCK = original_use_mock
+        upload_module.USE_MOCK = original_use_mock
 
     assert "screen" in pushed
     list_screen = pushed["screen"]
     assert isinstance(list_screen, ListContentsScreen)
     assert list_screen.dirs == MOCK_DIRS
+    assert pushed.get("callback") is not None
+    assert pushed.get("wait_for_dismiss") is False
 
 
 def test_list_zip_dirs_returns_expected_structure(tmp_path: Path) -> None:
