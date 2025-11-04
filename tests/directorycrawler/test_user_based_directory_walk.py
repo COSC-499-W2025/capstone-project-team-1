@@ -20,7 +20,8 @@ def test_user_based_directory_walk():
 
     crawl_directory() #crawl the mock directory
     assert a.get_dict_len() == 4 #assuming we are getting all files from mock directory
+    
     a.remove_all_dict() #remove all elements from dictionary
-    dw.userKeepFileName = []
+    dw.userKeepFileName = [] #reset user config list manually 
     dw.userExcludeFileName = [] 
 
