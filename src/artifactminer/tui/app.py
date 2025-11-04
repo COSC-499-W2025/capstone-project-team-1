@@ -1,18 +1,14 @@
 from __future__ import annotations
 import httpx
 
-<<<<<<< HEAD
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, ListItem, ListView, Static
-=======
 from textual.app import App
->>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
 
 from .screens.userconfig import UserConfigScreen
 from .screens.consent import ConsentScreen
-<<<<<<< HEAD
 from .screens.file_browser import FileBrowserScreen
 
 # Toggle between mock data and real ZIP extraction
@@ -157,10 +153,8 @@ class ListContentsScreen(Screen):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back-btn":
             self.dismiss(None)
-=======
 from .screens.upload import UploadScreen
 from .screens.welcome import WelcomeScreen
->>>>>>> 3a466bcfca96d3a5088e57d4a4ccc04e3dde23b3
 
 
 class ArtifactMinerApp(App):

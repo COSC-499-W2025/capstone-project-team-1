@@ -16,8 +16,7 @@ def test_user_based_directory_walk():
     ubdw.EXCLUDE_ANSWER_TEXT_EXAMPLE = "mock.c" 
     mock_adding_user_answer()
     get_user_data()
-    delete_all_users() #run last
-
+    delete_all_users()
     crawl_directory() #crawl the mock directory
     assert a.get_dict_len() == 4 #assuming we are getting all files from mock directory
     

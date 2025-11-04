@@ -99,3 +99,4 @@ def print_files(file):
 
     print("\n>",file)
 
+crawl_directory()
