@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON
+from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Boolean, JSON, Text
+from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
 
@@ -97,4 +98,4 @@ class UserAnswer(Base):
     answered_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship to question
-    question = relationship("Question", back_populates="answers")
+    question = relationship("Question")

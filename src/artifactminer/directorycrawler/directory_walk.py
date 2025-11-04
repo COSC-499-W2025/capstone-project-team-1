@@ -1,5 +1,9 @@
 import os
 from pathlib import Path
+'''
+in mock folder there are 4 readable filetypes
+
+'''
 
 #change this for a path that you choose
 root = Path(__file__).resolve() #get current file path
@@ -10,11 +14,20 @@ from .store_file_dict import StoreFileDict
 
 readableFileTypes = [] #TODO
 
-ignoredFileNames = [".DS_Store"] #file name not file extension
-ignoredExtensions = [".tmp", ".log", ".bak", ".gitignore"]
+ignoredFileNames = [] #file name not file extension
+ignoredExtensions = [ #current list of file types that shouldn't be read. unless user config says otherwise...
+    ".gitignore",".log", ".toml", ".exe", ".dll", ".bin", ".o", ".so",
+    ".tar", ".tar.gz", ".rar", ".7z",".bmp", ".tiff",
+    ".mp3", ".wav", ".flac", ".ogg", ".mp4", ".mkv", ".avi",
+    ".sqlite", ".db", ".mdb", ".cache", ".pyc", ".class", ".jar",
+    ".DS_Store", ".tmp", ".swp", ".swo", ".lock", ".bak"
+    ]
 
+#USER INFORMATION: 
 userExcludeFileName = []    #["excluded_file.py"] #user's file that will be excluded
 userKeepFileName = []    #["include_file.log"] #even though its 'log' the user has specifically asked us to use it
+
+
 userIncludeAllFiles = False 
 
 store_file_dictionary = StoreFileDict()
@@ -32,16 +45,17 @@ def crawl_directory():
                
                 full_path = os.path.join(root, file)
                 if file in userExcludeFileName: #user 
+                    print("the file the user has excluded: ", file)
                     continue
                 if file not in userKeepFileName: #if file in user file name skip other functions
+                    if is_file_readable(full_path) == False: #check whether filename is even readible
+                        print("file name: ", file, " is not readble")
+                        continue
                     if is_file_ignored(file) == False: #check whether filename is valid
                         print("file name: ", file ," is ignored")
                         continue
-                    if is_file_readable(full_path) == False:
-                        print("file name: ", file, " is not readble")
-                        continue
                 else:
-                    print("user file include name: ", file)
+                    print("the file the user has included: ", file)
                 print_files(file) #print files
                 store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
                 
@@ -80,9 +94,8 @@ def user_keep_file(fileName):
 def user_exclude_file(fileName):
     userExcludeFileName.append(fileName)
 
+
 def print_files(file):
 
-    print("\n>", file)
+    print("\n>",file)
 
-
-crawl_directory()
