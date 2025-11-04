@@ -112,12 +112,21 @@ def create_app() -> FastAPI:
                         status_code=422, detail="Invalid email provided."
                     )
 
-        # Persist
+        # Persist (upsert: update existing or create new)
         for k, v in answers.items():
             q = key_to_q[k]
-            ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
-            db.add(ua)
-            saved_answers.append(ua)
+            # Check if answer already exists for this question
+            existing = db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            if existing:
+                # Update existing answer
+                existing.answer_text = str(v).strip()
+                existing.answered_at = datetime.now()
+                saved_answers.append(existing)
+            else:
+                # Create new answer
+                ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
+                db.add(ua)
+                saved_answers.append(ua)
 
         db.commit()
         for ans in saved_answers:
