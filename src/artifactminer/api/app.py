@@ -111,6 +111,17 @@ def create_app() -> FastAPI:
                     raise HTTPException(
                         status_code=422, detail="Invalid email provided."
                     )
+            elif (q.answer_type or "text") == "comma_separated":
+                # Allow empty string (required=False questions)
+                if v.strip():
+                    # Split by comma, strip whitespace from each item
+                    items = [item.strip() for item in v.split(",")]
+                    # Reject if any empty items (e.g., "*.py,,*.js" or ",*.py")
+                    if any(not item for item in items):
+                        raise HTTPException(
+                            status_code=422,
+                            detail="Invalid comma-separated format. Use: *.py,*.js"
+                        )
 
         # Persist (upsert: update existing or create new)
         for k, v in answers.items():
