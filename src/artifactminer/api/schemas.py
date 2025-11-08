@@ -67,3 +67,20 @@ class UserAnswerResponse(BaseModel):
     question_id: int
     answer_text: str
     answered_at: datetime
+
+
+class ZipUploadResponse(BaseModel):
+    """Response shape for ZIP file upload."""
+
+    zip_id: int = Field(description="Unique identifier for the uploaded ZIP file.")
+    filename: str = Field(description="Original filename of the uploaded ZIP.")
+
+
+class DirectoriesResponse(BaseModel):
+    """Response shape for directory listing from ZIP file."""
+
+    zip_id: int = Field(description="ID of the uploaded ZIP file.")
+    filename: str = Field(description="Original filename of the ZIP.")
+    directories: list[str] = Field(
+        description="List of top-level directories in the ZIP file."
+    )
