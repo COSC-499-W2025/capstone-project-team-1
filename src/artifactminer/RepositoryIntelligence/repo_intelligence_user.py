@@ -6,13 +6,11 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from artifactminer.db.models import RepoStat
+from artifactminer.db.models import Consent, UserRepoStat
 from artifactminer.db.database import SessionLocal
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from email_validator import validate_email
 from artifactminer.helpers.openai import get_gpt5_nano_response
-from artifactminer.db.database import SessionLocal
-from artifactminer.db.models import Consent
 
 @dataclass
 class UserRepoStats:
@@ -20,6 +18,8 @@ class UserRepoStats:
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
+    userStatspercentages:  Optional[int] = None# Percentage of user's contributions compared to total repo activity
+    commitFrequency: Optional[float] = None # Average number of commits per week by the user
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -32,19 +32,23 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
     project_name = Path(repo_path).name #Get project name from the folder name
 
     commits = list(repo.iter_commits(author=user_email)) #Get all commits by the specified user email
-
+    total_repo_commits = list(repo.iter_commits()) #Get all commits in the repo
     if not commits:
         return UserRepoStats(project_name=project_name) #return empty stats if no commits by user
 
     first_commit = datetime.fromtimestamp(commits[-1].committed_date)
     last_commit = datetime.fromtimestamp(commits[0].committed_date)
     total_commits = len(commits)
+    userStatspercentages = (total_commits / len(total_repo_commits)) * 100 if total_repo_commits else 0 #calculate user contribution percentage
+    commitFrequency = total_commits / ((last_commit - first_commit).days / 7) if (last_commit - first_commit).days > 0 else total_commits #average commits per week
 
     return UserRepoStats(
         project_name=project_name,
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=total_commits
+        userStatspercentages=userStatspercentages,
+        commitFrequency=commitFrequency,
     )
 
 # Extract added lines from a unified diff
@@ -137,16 +141,19 @@ def user_allows_llm() -> bool:
 
 
 
-def saveUserRepoStatsToDB(stats: UserRepoStats): #placeholder function to save user repo stats to the database
+def saveUserRepoStatsTo(stats: UserRepoStats):
     db = SessionLocal()
     try:
-        repo_stat = RepoStat(
+        user_repo_stat = UserRepoStat(
             project_name=stats.project_name,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
-            total_commits=stats.total_commits
+            total_commits=stats.total_commits,
+            userStatspercentages=stats.userStatspercentages,
+            commitFrequency=stats.commitFrequency,
         )
-        db.add(repo_stat)
+        db.add(user_repo_stat)
         db.commit()
+        db.refresh(user_repo_stat)
     finally:
         db.close()
