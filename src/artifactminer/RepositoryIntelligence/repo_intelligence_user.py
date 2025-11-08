@@ -1,10 +1,9 @@
 #Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
-import subprocess, os
-from collections import Counter
+
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Iterable, Optional, Union, List
+from typing import Optional, List
 from pathlib import Path
 import git
 from artifactminer.db.models import RepoStat
