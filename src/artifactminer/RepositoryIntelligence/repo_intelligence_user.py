@@ -11,6 +11,9 @@ from artifactminer.db.database import SessionLocal
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from email_validator import validate_email
 from artifactminer.helpers.openai import get_gpt5_nano_response
+from artifactminer.db.database import SessionLocal
+from artifactminer.db.models import Consent
+
 @dataclass
 class UserRepoStats:
     project_name: str 
@@ -119,6 +122,19 @@ def collect_user_additions(
             additions_per_commit.append(added_only)
 
     return additions_per_commit
+
+
+# Check if user has allowed LLM usage via consent
+def user_allows_llm() -> bool:
+    db = SessionLocal() #create a new database session
+    try:
+        consent = db.get(Consent, 1)
+        if consent is None: #no consent row means no consent given
+            consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
+        return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
+    finally:
+        db.close()
+
 
 
 def saveUserRepoStatsToDB(stats: UserRepoStats): #placeholder function to save user repo stats to the database
