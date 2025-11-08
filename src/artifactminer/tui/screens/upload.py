@@ -10,19 +10,13 @@ from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from .list_contents import ListContentsScreen
 from .file_browser import FileBrowserScreen
+from ..api import ApiClient
 
-# Toggle between mock data and real ZIP extraction
-USE_MOCK = True
+# Toggle for mock mode (kept for early dev). Default to False to use API.
+USE_MOCK = False
 
-# Mock data for ZIP contents when mock mode is enabled.
-MOCK_DIRS = [
-    "src/",
-    "src/utils/",
-    "src/helpers/",
-    "docs/",
-    "tests/",
-    "requirements.txt",
-]
+# Deprecated: example mock entries (kept to avoid breaking references)
+MOCK_DIRS: list[str] = []
 
 
 def list_zip_dirs(zip_path: Path) -> list[str]:
@@ -96,9 +90,27 @@ class UploadScreen(Screen[None]):
             status.update("Need a .zip file.")
             return
 
-        status.update("Processing ZIP contents...")
+        status.update("Uploading and fetching contents...")
 
-        dirs = MOCK_DIRS if USE_MOCK else list_zip_dirs(path)
+        dirs: list[str]
+        if USE_MOCK:
+            dirs = MOCK_DIRS
+        else:
+            # Call API: upload zip then fetch directories by zip_id
+            try:
+                client = ApiClient()
+                upload = await client.upload_zip(path)
+                zip_id = int(upload["zip_id"])  # type: ignore[index]
+                data = await client.list_zip_directories(zip_id)
+                raw_items = list(data.get("directories", []))
+                # Normalize: remove trailing slashes for display
+                dirs = [item[:-1] if item.endswith("/") else item for item in raw_items]
+                if not dirs:
+                    status.update("No contents found in archive.")
+                    return
+            except Exception as exc:  # noqa: BLE001 - show concise error to user
+                status.update(f"Error: {exc}")
+                return
 
         def reset_form(_result: None = None) -> None:
             """Reset upload form when the contents screen closes."""
