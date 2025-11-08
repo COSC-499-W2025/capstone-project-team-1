@@ -82,3 +82,24 @@ class UserAnswer(Base):
 
     # Relationship to question
     question = relationship("Question", back_populates="answers")
+
+class UploadedZip(Base):
+    """Store uploaded ZIP files for artifact analysis.
+
+    Each uploaded ZIP is saved to the filesystem and tracked in the database
+    with metadata for later processing.
+
+    Example usage:
+        uploaded_zip = UploadedZip(
+            filename="portfolio.zip",
+            path="./uploads/20251106_142530_portfolio.zip"
+        )
+        db.add(uploaded_zip)
+        db.commit()
+    """
+    __tablename__ = "uploaded_zips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, nullable=False)  # Original filename
+    path = Column(String, nullable=False)  # Server filesystem path
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
