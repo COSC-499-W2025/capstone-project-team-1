@@ -52,6 +52,18 @@ class RepoStat(Base):#model for storing repository statistics
     total_commits = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
+    __tablename__ = "user_repo_stats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_name = Column(String, nullable=False)
+    first_commit = Column(DateTime, nullable=True)
+    last_commit = Column(DateTime, nullable=True)
+    total_commits = Column(Integer, nullable=True)
+    userStatspercentages = Column(Integer, nullable=True) # Percentage of user's contributions compared to total repo activity
+    commitFrequency = Column(Integer, nullable=True) # Average number of commits per week by the user
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class UserAnswer(Base):
     """Store user responses to configuration questions.
 
