@@ -71,7 +71,7 @@ async def test_upload_screen_missing_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_upload_screen_accepts_zip(tmp_path: Path) -> None:
+async def test_upload_screen_accepts_zip(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     zip_path = tmp_path / "artifact.zip"
     zip_path.touch()
     screen, status, field = make_screen(str(zip_path))
@@ -83,13 +83,26 @@ async def test_upload_screen_accepts_zip(tmp_path: Path) -> None:
         assert wait_for_dismiss is False
         return None
 
+    # Stub ApiClient used by UploadScreen to simulate a successful upload and directory listing
+    class _FakeClient:
+        async def upload_zip(self, p: Path):
+            return {"zip_id": 1, "filename": p.name}
+
+        async def list_zip_directories(self, zip_id: int):  # noqa: ARG002 - captured via integration test
+            return {"zip_id": 1, "filename": "artifact.zip", "directories": ["src/", "README.md"]}
+
+    import artifactminer.tui.screens.upload as upload_module
+
+    monkeypatch.setattr(upload_module, "ApiClient", lambda: _FakeClient())
+
     token = active_app.set(SimpleNamespace(push_screen=_fake_push_screen))
     try:
         await screen.on_button_pressed(make_event())
     finally:
         active_app.reset(token)
 
-    assert status.message == "Processing ZIP contents..."
+    # New flow status message
+    assert status.message == "Uploading and fetching contents..."
     assert "screen" in captured
     callback = captured.get("callback")
     assert callable(callback)
