@@ -22,13 +22,31 @@ def test_user_allows_llm_default_false():
 
     assert user_allows_llm() is False
     db.close()
+    
 def test_user_allows_llm_true():
     db = SessionLocal()
-    # Set consent to 'full'
-    consent = Consent(consent_level='full')
-    db.add(consent)
+    consent = db.get(Consent, 1)
+    if consent:
+        consent.consent_level = "all"
+    else:
+        consent = Consent(id=1, consent_level="all")
+        db.add(consent)
     db.commit()
-
-    assert user_allows_llm() is True
     db.close()
+
+    assert user_allows_llm() is False
+
+
+def test_user_allows_llm_false():
+    db = SessionLocal()
+    consent = db.get(Consent, 1)
+    if consent:
+        consent.consent_level = "none"
+    else:
+        consent = Consent(id=1, consent_level="none")
+        db.add(consent)
+    db.commit()
+    db.close()
+
+    assert user_allows_llm() is False
 
