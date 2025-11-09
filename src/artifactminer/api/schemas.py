@@ -84,3 +84,13 @@ class DirectoriesResponse(BaseModel):
     directories: list[str] = Field(
         description="List of top-level directories in the ZIP file."
     )
+class OpenAIRequest(BaseModel):
+    """Request payload for OpenAI API calls."""
+
+    prompt: str = Field(..., description="The prompt to send to the OpenAI model.")
+
+
+class OpenAIResponse(BaseModel):
+    """Response shape for OpenAI API calls."""
+
+    response: str = Field(..., description="The model's response text.")

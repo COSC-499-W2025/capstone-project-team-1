@@ -1,8 +1,9 @@
 """Utilities for interacting with the OpenAI Responses API."""
 
+from typing import List
+
 from dotenv import load_dotenv
 from openai import OpenAI
-from typing import List
 
 load_dotenv()
 
@@ -20,6 +21,7 @@ def get_gpt5_nano_response(prompt: str) -> str:
         empty string is returned.
     """
 
+    # Using just OpenAI() means that it picks up the API key from the environment
     response = OpenAI().responses.create(
         model="gpt-5-nano",
         input=prompt
