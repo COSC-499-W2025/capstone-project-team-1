@@ -43,7 +43,6 @@ class ArtifactMinerApp(App):
     #card {
         layout: vertical;
         width: 100%;
-        max-width: 80;
         padding: 2 4;
         border: round $surface;
         background: $panel;
@@ -127,7 +126,6 @@ class ArtifactMinerApp(App):
         border: round $surface;
         height: 20;
         width: 100%;
-        max-width: 60;
         overflow: auto;
     }
 
