@@ -138,10 +138,52 @@ def user_allows_llm() -> bool:
         return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
     finally:
         db.close()
+# Create a summary of user additions using LLM if consented and without LLM if not
+def createSummaryFromUserAdditions(additions: List[str]) -> str:
+    if not additions:
+        return "No additions found for the specified user."
+    if not user_allows_llm():
+        #User has not consented to LLM usage we will create a summary without LLM, placeholder for now
+        return "User has not consented to LLM usage."
+    else:
+        #User has consented to LLM usage we will create a summary with LLM
+        createAIsummaryFromUserAdditions(additions)
 
+# Create a summary of user additions using LLM
+def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
+    #Each addition in additions is a string of added lines from a single commit
+    if not additions:
+        return "No additions found for the specified user."
+    if not user_allows_llm():
+        return "User has not consented to LLM usage."
+    
+    #A for loop that goes through every addition and asks the AI to summarize it, then combines all summaries into one final summary, and asks the AI to summarize that final summary.
+    for addition in additions:
+        prompt = (
+        "You are evaluating a student's code contribution from a single commit."
+        "Analyze the added lines below and produce a focused, evidence-based critique."
 
+        "For this commit, cover:"
+        "- Functional intent: what changed and why it likely matters"
+        "- CS concepts observed: OOP (abstraction/encapsulation/inheritance/polymorphism), data structures, algorithms"
+        "- Complexity/performance notes: any Big-O implications, memory or latency tradeoffs"
+        "- Software engineering practices: modularity, testing, error handling, naming, logging, docs"
+        "- Risks/edge cases/security: call out anything suspicious or fragile"
 
-def saveUserRepoStatsTo(stats: UserRepoStats):
+        "Constraints:"
+        "- Be concise: 4–6 bullets. No fluff, no speculation beyond the diff."
+        "- Don’t restate the code—explain what it implies about skill and decisions."
+
+        "ADDED LINES (unified diff subset, additions only):"
+        )
+        prompt += f"{addition}\n\n"
+        intermediate_summary += get_gpt5_nano_response(prompt)
+    final_summary = get_gpt5_nano_response(
+        "Summarize the following summaries of code additions made by the user in the repository into a single concise summary:\n\n"
+        + intermediate_summary)
+    return final_summary
+
+def saveUserRepoStats(stats: UserRepoStats):
     db = SessionLocal()
     try:
         user_repo_stat = UserRepoStat(
