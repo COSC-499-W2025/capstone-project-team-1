@@ -5,10 +5,11 @@
 import sys
 import os
 from pathlib import Path
+from datetime import datetime
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_user import createSummaryFromUserAdditions, createAIsummaryFromUserAdditions, user_allows_llm, collect_user_additions
+from src.artifactminer.RepositoryIntelligence.repo_intelligence_user import user_allows_llm, getUserRepoStats
 from src.artifactminer.db.database import SessionLocal
 from src.artifactminer.db.models import Consent
 
@@ -30,19 +31,16 @@ def test_user_allows_llm_true():
 
     assert user_allows_llm() is True
     db.close()
-def testcreateSummaryFromUserAdditions():
-    additions = [
-        "+ This is the first added line.",
-        "+ Another line added by the user.",
-        "+ Final addition to the code."
-    ]
-    summary = createSummaryFromUserAdditions(additions)
-    assert summary is not None
-
-def test_createAIsummaryFromUserAdditions():
+# test getUserRepoStats with current repo and user email
+def test_getUserRepoStats():
     root = Path(__file__).resolve().parents[2]
-    email = "ecrowl01@student.ubc.ca"
-    additions = collect_user_additions(root, email)  # Collect additions first
-    summary = createAIsummaryFromUserAdditions(additions)
-    assert summary is not None
-    print("AI-generated summary:", summary)
+    # Replace with a valid email present in the commit history of the repo
+    test_email = "ecrowl01@student.ubc.ca"
+    stats = getUserRepoStats(root, test_email)
+    assert stats.project_name == root.name
+    assert isinstance(stats.first_commit, (type(None), datetime))
+    assert isinstance(stats.last_commit, (type(None), datetime))
+    assert isinstance(stats.total_commits, (type(None), int))
+    assert isinstance(stats.userStatspercentages, (type(None), float))
+    assert isinstance(stats.commitFrequency, (type(None), float))
+    print(f"UserRepoStats: {stats}")
