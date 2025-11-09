@@ -11,7 +11,7 @@ from artifactminer.tui.screens.upload import UploadScreen
 
 
 class StatusStub:
-    """Capture status updates without needing a textual Label instance."""
+    """Capture status updates without a textual Label instance."""
 
     def __init__(self) -> None:
         self.message: str | None = None
