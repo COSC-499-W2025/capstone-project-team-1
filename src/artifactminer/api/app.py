@@ -2,10 +2,8 @@
 
 from datetime import UTC, datetime
 from typing import List
-from pathlib import Path
-import shutil
 
-from fastapi import FastAPI, Depends, UploadFile, File
+from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException
@@ -16,8 +14,6 @@ from .schemas import (
     QuestionResponse,
     UserAnswerResponse,
     KeyedAnswersRequest,
-    ZipUploadResponse,
-    DirectoriesResponse,
 )
 from ..db import (
     Base,
@@ -25,11 +21,11 @@ from ..db import (
     SessionLocal,
     Question,
     UserAnswer,
-    UploadedZip,
     get_db,
     seed_questions,
 )
 from .consent import router as consent_router
+from .zip import router as zip_router
 
 
 def create_app() -> FastAPI:
@@ -149,84 +145,9 @@ def create_app() -> FastAPI:
             db.refresh(ans)
         return saved_answers
 
-    @app.post("/zip/upload", response_model=ZipUploadResponse, tags=["upload"])
-    async def upload_zip(
-        file: UploadFile = File(...), db: Session = Depends(get_db)
-    ) -> ZipUploadResponse:
-        """Upload a ZIP file for artifact analysis.
-
-        Accepts a ZIP file, saves it to the ./uploads/ directory,
-        and stores metadata in the database.
-        """
-        # Validate file extension
-        if not file.filename or not file.filename.endswith(".zip"):
-            raise HTTPException(
-                status_code=422, detail="Only ZIP files are allowed."
-            )
-
-        # Create uploads directory if it doesn't exist
-        upload_dir = Path("./uploads")
-        upload_dir.mkdir(exist_ok=True)
-
-        # Generate unique filename with timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_filename = f"{timestamp}_{file.filename}"
-        file_path = upload_dir / safe_filename
-
-        # Save file to disk
-        with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Store metadata in database
-        uploaded_zip = UploadedZip(
-            filename=file.filename, path=str(file_path)
-        )
-        db.add(uploaded_zip)
-        db.commit()
-        db.refresh(uploaded_zip)
-
-        return ZipUploadResponse(
-            zip_id=uploaded_zip.id, filename=uploaded_zip.filename
-        )
-
-    @app.get(
-        "/zip/{zip_id}/directories",
-        response_model=DirectoriesResponse,
-        tags=["upload"],
-    )
-    async def get_directories(
-        zip_id: int, db: Session = Depends(get_db)
-    ) -> DirectoriesResponse:
-        """Get list of directories from an uploaded ZIP file.
-
-        Currently returns mock data for testing purposes.
-        Backend extraction logic will be added later.
-        """
-        # Verify ZIP exists
-        uploaded_zip = (
-            db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
-        )
-
-        if not uploaded_zip:
-            raise HTTPException(status_code=404, detail="ZIP file not found.")
-
-        # Mock directory list (backend extraction logic pending)
-        mock_directories = [
-            "cs320_project/",
-            "cs540_ai_project/",
-            "hackathon_2024/",
-            "personal_website/",
-            "senior_design/",
-        ]
-
-        return DirectoriesResponse(
-            zip_id=uploaded_zip.id,
-            filename=uploaded_zip.filename,
-            directories=mock_directories,
-        )
-
     # Mount consent router
     app.include_router(consent_router)
+    app.include_router(zip_router)
 
     return app
 
