@@ -46,7 +46,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
         project_name=project_name,
         first_commit=first_commit,
         last_commit=last_commit,
-        total_commits=total_commits
+        total_commits=total_commits,
         userStatspercentages=userStatspercentages,
         commitFrequency=commitFrequency,
     )
@@ -146,7 +146,7 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
         return "No additions found for the specified user."
     if not user_allows_llm():
         return "User has not consented to LLM usage."
-    
+    intermediate_summary = ""
     #A for loop that goes through every addition and asks the AI to summarize it, then combines all summaries into one final summary, and asks the AI to summarize that final summary.
     for addition in additions:
         prompt = (
