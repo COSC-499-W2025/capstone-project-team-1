@@ -1,4 +1,6 @@
 """Integration tests for OpenAI API endpoint using real API calls."""
+
+
 import os
 
 import pytest
@@ -6,6 +8,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+"""
+# Run all OpenAI endpoint tests
+uv run pytest tests/api/test_openai.py -v
+
+# Run with output visible
+uv run pytest tests/api/test_openai.py -v -s
+
+# Run only integration tests (requires API key)
+uv run pytest tests/api/test_openai.py::TestOpenAIEndpointIntegration -v -s
+
+# Run only validation tests (no API key needed)
+uv run pytest tests/api/test_openai.py::TestOpenAIEndpointValidation -v
+"""
 
 @pytest.mark.skipif(
     not os.getenv("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here",
