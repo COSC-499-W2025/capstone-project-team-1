@@ -17,7 +17,7 @@ def test_dont_read_nonzip():
 def test_extract_directory_tree():
     assert extract_directory_tree(zipfile) == ["child/"]
 
-    # TEST FAILS ON PYTHON VERSIONS BELOW 3.10, PLEASE CHECK VERSION BEFORE REPORTING TEST FAILURE
+    # TEST REQUIRES PYTHON 3.10 OR LATER, PLEASE CHECK VERSION BEFORE REPORTING TEST FAILURE
 def test_extract_selected_to_temp():
     assert len(extract_selected_to_temp(zipfile, ["mock1.js","mock.c"],templocation)) == 2
     os.remove(os.path.join(templocation,"mockdirectory_zip/mock1.js"))

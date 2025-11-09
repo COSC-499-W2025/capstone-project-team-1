@@ -30,7 +30,6 @@ def extract_directory_tree(zip_path: str)  -> list[str]:
                 print("Zip contains malformed file: "+zip_ref.testzip())
                 return
             zipPath = list(zipfile.Path(zip_ref).iterdir())[0]
-            #zipPath = zipPath.joinpath(zipPath.iterdir()[-1])
             results = []
             for i in zipPath.iterdir():
                 if i.is_dir(): 
