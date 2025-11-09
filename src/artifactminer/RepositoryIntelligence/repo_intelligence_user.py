@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from artifactminer.db.models import Consent, UserRepoStat
+from artifactminer.db.models import Consent, UserRepoStat, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from email_validator import validate_email
@@ -138,16 +138,6 @@ def user_allows_llm() -> bool:
         return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
     finally:
         db.close()
-# Create a summary of user additions using LLM if consented and without LLM if not
-def createSummaryFromUserAdditions(additions: List[str]) -> str:
-    if not additions:
-        return "No additions found for the specified user."
-    if not user_allows_llm():
-        #User has not consented to LLM usage we will create a summary without LLM, placeholder for now
-        return "User has not consented to LLM usage."
-    else:
-        #User has consented to LLM usage we will create a summary with LLM
-        createAIsummaryFromUserAdditions(additions)
 
 # Create a summary of user additions using LLM
 def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
@@ -183,6 +173,20 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
         + intermediate_summary)
     return final_summary
 
+
+# Create a summary of user additions using LLM if consented and without LLM if not
+def createSummaryFromUserAdditions(additions: List[str]) -> str:
+    summary: str
+    if not additions:
+        return "No additions found for the specified user."
+    if not user_allows_llm():
+        #User has not consented to LLM usage we will create a summary without LLM, placeholder for now
+        summary = "User has not consented to LLM usage. Summary generation without LLM is not yet implemented."
+    else:
+        #User has consented to LLM usage we will create a summary with LLM
+        summary = createAIsummaryFromUserAdditions(additions)
+    return summary
+
 def saveUserRepoStats(stats: UserRepoStats):
     db = SessionLocal()
     try:
@@ -197,5 +201,19 @@ def saveUserRepoStats(stats: UserRepoStats):
         db.add(user_repo_stat)
         db.commit()
         db.refresh(user_repo_stat)
+    finally:
+        db.close()
+
+def saveUserAIntelligenceSummary(repo_path: str, user_email: str, summary_text: str):
+    db = SessionLocal()
+    try:
+        user_summary = UserAIntelligenceSummary(
+            repo_path=repo_path,
+            user_email=user_email,
+            summary_text=summary_text,
+        )
+        db.add(user_summary)
+        db.commit()
+        db.refresh(user_summary)
     finally:
         db.close()

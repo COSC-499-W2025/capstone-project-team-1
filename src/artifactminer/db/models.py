@@ -64,6 +64,15 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     commitFrequency = Column(Integer, nullable=True) # Average number of commits per week by the user
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class UserAIntelligenceSummary(Base):
+    __tablename__ = "user_intelligence_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_path = Column(String, nullable=False)
+    user_email = Column(String, nullable=False)
+    summary_text = Column(Text, nullable=False)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
 class UserAnswer(Base):
     """Store user responses to configuration questions.
 
