@@ -12,10 +12,7 @@ from .list_contents import ListContentsScreen
 from .file_browser import FileBrowserScreen
 from ..api import ApiClient
 
-# Toggle for mock mode (kept for early dev). Default to False to use API.
 USE_MOCK = False
-
-# Deprecated: example mock entries (kept to avoid breaking references)
 MOCK_DIRS: list[str] = []
 
 
@@ -29,12 +26,12 @@ def list_zip_dirs(zip_path: Path) -> list[str]:
                     for f in zip_ref.namelist()
                 )
             )
-    except Exception as exc:  # noqa: BLE001 - show user-friendly error message
+    except Exception as exc:  # noqa: BLE001
         return [f"[Error] {exc}"]
 
 
 class UploadScreen(Screen[None]):
-    """Screen that allows the user to select and preview a ZIP file."""
+    """Select and preview a ZIP file."""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -64,7 +61,6 @@ class UploadScreen(Screen[None]):
 
         if event.button.id == "browse-btn":
             def handle_file_selection(selected_path: Path | None) -> None:
-                """Update input field with selected file path."""
                 if selected_path:
                     field.value = str(selected_path)
                     field.focus()
@@ -96,16 +92,13 @@ class UploadScreen(Screen[None]):
         if USE_MOCK:
             dirs = MOCK_DIRS
         else:
-            # Call API: upload zip then fetch directories by zip_id
             try:
                 client = ApiClient()
                 upload = await client.upload_zip(path)
                 zip_id = int(upload["zip_id"])  # type: ignore[index]
                 data = await client.list_zip_directories(zip_id)
                 raw_items = list(data.get("directories", []))
-                # Normalize: remove trailing slashes for display
                 cleaned = [item[:-1] if item.endswith("/") else item for item in raw_items]
-                # Filter macOS metadata entries
                 dirs = [
                     item for item in cleaned
                     if not item.startswith("__MACOSX/") and not item.split("/")[-1].startswith("._")
@@ -113,12 +106,11 @@ class UploadScreen(Screen[None]):
                 if not dirs:
                     status.update("No contents found in archive.")
                     return
-            except Exception as exc:  # noqa: BLE001 - show concise error to user
+            except Exception as exc:  # noqa: BLE001
                 status.update(f"Error: {exc}")
                 return
 
         def reset_form(_result: None = None) -> None:
-            """Reset upload form when the contents screen closes."""
             status.update("Waiting for a file...")
             field.value = ""
             field.focus()

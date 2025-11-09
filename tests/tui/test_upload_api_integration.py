@@ -19,18 +19,16 @@ class InputStub:
     def __init__(self, value: str) -> None:
         self.value = value
 
-    def focus(self) -> None:  # noqa: D401 - stub
-        """No-op focus"""
+    def focus(self) -> None:  # noqa: D401
         return None
 
 
 @pytest.mark.asyncio
 async def test_upload_screen_uses_zip_id_and_renders_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """UploadScreen should call API upload, use zip_id for listing, then push ListContentsScreen with dirs."""
+    """UploadScreen uses API zip_id to list and display dirs."""
     zip_path = tmp_path / "artifact.zip"
     zip_path.touch()
 
-    # Arrange screen and stubs
     screen = UploadScreen()
     field = InputStub(str(zip_path))
     status = LabelStub()
@@ -51,47 +49,41 @@ async def test_upload_screen_uses_zip_id_and_renders_dirs(tmp_path: Path, monkey
         pushed["wait_for_dismiss"] = wait_for_dismiss
         pushed["callback"] = callback
 
-    # Stub API client methods and capture zip_id usage
     called: dict[str, object] = {}
 
     class FakeClient:
-        async def upload_zip(self, p: Path):  # noqa: D401 - stub
+        async def upload_zip(self, p: Path):  # noqa: D401
             called["upload_zip_path"] = p
             return {"zip_id": 42, "filename": p.name}
 
-        async def list_zip_directories(self, zip_id: int):  # noqa: D401 - stub
+        async def list_zip_directories(self, zip_id: int):  # noqa: D401
             called["list_zip_directories_zip_id"] = zip_id
             return {"zip_id": zip_id, "filename": "artifact.zip", "directories": ["src/", "README.md"]}
 
-    # Patch ApiClient constructor to return our fake
     import artifactminer.tui.screens.upload as upload_module
 
     monkeypatch.setattr(upload_module, "ApiClient", lambda: FakeClient())
 
-    # Provide minimal app with push_screen via active_app
     from textual.app import active_app
     token = active_app.set(SimpleNamespace(push_screen=fake_push_screen))
 
-    # Act: click upload
     event = SimpleNamespace(button=SimpleNamespace(id="upload-btn"))
     try:
         await screen.on_button_pressed(event)
     finally:
         active_app.reset(token)
 
-    # Assert API interactions
     assert called.get("upload_zip_path") == zip_path
     assert called.get("list_zip_directories_zip_id") == 42
 
-    # Assert navigation and rendered dirs
     assert isinstance(pushed.get("screen"), ListContentsScreen)
     list_screen = pushed["screen"]  # type: ignore[index]
-    assert list_screen.dirs == ["src", "README.md"]  # trailing slash removed in screen logic
+    assert list_screen.dirs == ["src", "README.md"]
 
 
 @pytest.mark.asyncio
 async def test_upload_screen_handles_empty_directories_response(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """If API returns no directories, status label should inform the user and not navigate."""
+    """Empty directories response shows message and no navigation."""
     zip_path = tmp_path / "empty.zip"
     zip_path.touch()
 
