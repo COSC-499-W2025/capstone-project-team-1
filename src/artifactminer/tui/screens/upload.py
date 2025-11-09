@@ -104,7 +104,12 @@ class UploadScreen(Screen[None]):
                 data = await client.list_zip_directories(zip_id)
                 raw_items = list(data.get("directories", []))
                 # Normalize: remove trailing slashes for display
-                dirs = [item[:-1] if item.endswith("/") else item for item in raw_items]
+                cleaned = [item[:-1] if item.endswith("/") else item for item in raw_items]
+                # Filter macOS metadata entries
+                dirs = [
+                    item for item in cleaned
+                    if not item.startswith("__MACOSX/") and not item.split("/")[-1].startswith("._")
+                ]
                 if not dirs:
                     status.update("No contents found in archive.")
                     return
