@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON,ForeignKey, Text
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON,ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -60,8 +60,8 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)
-    userStatspercentages = Column(Integer, nullable=True) # Percentage of user's contributions compared to total repo activity
-    commitFrequency = Column(Integer, nullable=True) # Average number of commits per week by the user
+    userStatspercentages = Column(Float, nullable=True) # Percentage of user's contributions compared to total repo activity
+    commitFrequency = Column(Float, nullable=True) # Average number of commits per week by the user
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class UserAIntelligenceSummary(Base):
