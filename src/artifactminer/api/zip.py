@@ -29,7 +29,8 @@ async def upload_zip(
     upload_dir.mkdir(exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    safe_filename = f"{timestamp}_{file.filename}"
+    normalized_name = Path(file.filename).name
+    safe_filename = f"{timestamp}_{normalized_name}"
     file_path = upload_dir / safe_filename
 
     with file_path.open("wb") as buffer:
