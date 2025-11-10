@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, DateTime, Boolean, JSON, Text
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON,ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -52,8 +52,27 @@ class RepoStat(Base):#model for storing repository statistics
     total_commits = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
+    __tablename__ = "user_repo_stats"
 
-#TODO remove this once stavan's branch is merged.  #107
+    id = Column(Integer, primary_key=True, index=True)
+    project_name = Column(String, nullable=False)
+    first_commit = Column(DateTime, nullable=True)
+    last_commit = Column(DateTime, nullable=True)
+    total_commits = Column(Integer, nullable=True)
+    userStatspercentages = Column(Float, nullable=True) # Percentage of user's contributions compared to total repo activity
+    commitFrequency = Column(Float, nullable=True) # Average number of commits per week by the user
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class UserAIntelligenceSummary(Base):
+    __tablename__ = "user_intelligence_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_path = Column(String, nullable=False)
+    user_email = Column(String, nullable=False)
+    summary_text = Column(Text, nullable=False)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
 class UserAnswer(Base):
     """Store user responses to configuration questions.
     Each user answer is linked to a specific question via question_id.
@@ -80,4 +99,25 @@ class UserAnswer(Base):
     answered_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship to question
-    question = relationship("Question")
+    question = relationship("Question", back_populates="answers")
+
+class UploadedZip(Base):
+    """Store uploaded ZIP files for artifact analysis.
+
+    Each uploaded ZIP is saved to the filesystem and tracked in the database
+    with metadata for later processing.
+
+    Example usage:
+        uploaded_zip = UploadedZip(
+            filename="portfolio.zip",
+            path="./uploads/20251106_142530_portfolio.zip"
+        )
+        db.add(uploaded_zip)
+        db.commit()
+    """
+    __tablename__ = "uploaded_zips"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, nullable=False)  # Original filename
+    path = Column(String, nullable=False)  # Server filesystem path
+    uploaded_at = Column(DateTime, default=datetime.utcnow)

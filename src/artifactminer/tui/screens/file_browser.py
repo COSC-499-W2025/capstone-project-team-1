@@ -17,7 +17,7 @@ class FilteredDirectoryTree(DirectoryTree):
 
 
 class FileBrowserScreen(Screen):
-    """Screen for browsing and selecting .zip files from the filesystem."""
+    """Browse and select .zip files from the filesystem."""
 
     def compose(self) -> ComposeResult:
         yield Header()
