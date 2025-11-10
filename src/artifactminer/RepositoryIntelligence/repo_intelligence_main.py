@@ -1,6 +1,7 @@
 #Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
-import subprocess, os
+import subprocess
+import os
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime

@@ -9,6 +9,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from .list_contents import ListContentsScreen
+from .file_browser import FileBrowserScreen
 
 # Toggle between mock data and real ZIP extraction
 USE_MOCK = True
@@ -49,6 +50,7 @@ class UploadScreen(Screen[None]):
                     yield Static("Enter a path to a .zip file.")
                     with Horizontal(id="zip-row"):
                         yield Input(placeholder="Path to .zip", id="zip-path")
+                        yield Button("Browse", id="browse-btn")
                         yield Button("Upload", id="upload-btn", variant="primary")
                     yield Label("Waiting for a file...", id="status")
                     with Horizontal(id="actions-row"):
@@ -64,6 +66,16 @@ class UploadScreen(Screen[None]):
             field.value = ""
             field.focus()
             await self.app.switch_screen("userconfig")
+            return
+
+        if event.button.id == "browse-btn":
+            def handle_file_selection(selected_path: Path | None) -> None:
+                """Update input field with selected file path."""
+                if selected_path:
+                    field.value = str(selected_path)
+                    field.focus()
+
+            await self.app.push_screen(FileBrowserScreen(), callback=handle_file_selection)
             return
 
         if event.button.id != "upload-btn":

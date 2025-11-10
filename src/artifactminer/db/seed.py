@@ -48,12 +48,20 @@ def seed_questions(db: Session) -> None:
             answer_type="text",
         ),
         Question(
-            key="file_patterns",
-            question_text="Any specific file patterns to include or exclude?",
+            key="file_patterns_include",
+            question_text="File names to include. Please separate with commas.",
             order=5,
             is_active=True,
-            required=True,
-            answer_type="text",
+            required=False,
+            answer_type="comma_separated",
+        ),
+        Question(
+            key="file_patterns_exclude",
+            question_text="File names to exclude. Please separate with commas.",
+            order=6,
+            is_active=True,
+            required=False,
+            answer_type="comma_separated",
         ),
     ]
     
