@@ -1,16 +1,15 @@
 #Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from artifactminer.db.models import Consent, UserRepoStat, UserAIntelligenceSummary
+from artifactminer.db.models import UserRepoStat
 from artifactminer.db.database import SessionLocal
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
-from email_validator import validate_email
-from artifactminer.helpers.openai import get_gpt5_nano_response
+from email_validator import validate_email, EmailNotValidError
 
 @dataclass
 class UserRepoStats:
@@ -18,15 +17,19 @@ class UserRepoStats:
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
-    userStatspercentages:  Optional[int] = None# Percentage of user's contributions compared to total repo activity
+    userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
     if not isGitRepo(repo_path): 
         raise ValueError(f"The path {repo_path} is not a git repository.") 
-    if not validate_email(user_email):
-        raise ValueError(f"The email {user_email} is not valid.")
+    try:
+        user_email = validate_email(user_email, check_deliverability=False).email
+    except EmailNotValidError as e:
+        raise ValueError(f"Invalid email address: {user_email}") from e
+   
+
     repo = git.Repo(repo_path) #initialize the git repo object
 
     project_name = Path(repo_path).name #Get project name from the folder name
@@ -38,9 +41,15 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
 
     first_commit = datetime.fromtimestamp(commits[-1].committed_date)
     last_commit = datetime.fromtimestamp(commits[0].committed_date)
-    total_commits = len(commits)
+    total_commits = len(commits) #total number of commits by the user not the repo
     userStatspercentages = (total_commits / len(total_repo_commits)) * 100 if total_repo_commits else 0 #calculate user contribution percentage
-    commitFrequency = total_commits / ((last_commit - first_commit).days / 7) if (last_commit - first_commit).days > 0 else total_commits #average commits per week
+    
+    delta = last_commit - first_commit
+    weeks = delta.total_seconds() / 604800  # seconds in a week, weeks between first and last commit, to calculate commit frequency more accurately then just dividing by total weeks in delta
+    if weeks <= 0: #avoid division by zero
+        commitFrequency = float(total_commits) #all commits happened within the same week
+    else:
+        commitFrequency = total_commits / weeks #average commits per week
 
     return UserRepoStats( #return the populated UserRepoStats dataclass
         project_name=project_name,
