@@ -35,7 +35,7 @@ def test_user_based_directory_walk():
     delete_all_user_questions(db)
     update_path()
     crawl_directory() #crawl the mock directory
-    assert a.get_dict_len() == 3 #assuming we are getting all files from mock directory
+    assert a.get_dict_len() == 2 #assuming we are getting all files from mock directory
     
     a.remove_all_dict() #remove all elements from dictionary
     dw.userKeepFileName = [] #reset user config list manually 

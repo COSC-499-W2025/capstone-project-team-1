@@ -35,8 +35,18 @@ def get_user_data(db: Session): #retrieve data from DB
     print("Include:",include_result)
     print("Exclude:", exclude_result)
 
-    include_arr = parse_user_input_text(str(include_result[0]))
-    exclude_arr = parse_user_input_text(str(exclude_result[0]))
+    include_arr = []
+    exclude_arr = []
+
+    if include_result is not None:
+        include_arr = parse_user_input_text(str(include_result[0]))
+    else:
+        print("No include data found for user")
+
+    if exclude_result is not None:
+        exclude_arr = parse_user_input_text(str(exclude_result[0]))
+    else:
+        print("No exclude data found for user")
 
     for file in include_arr:
         if is_extension(file): #does the user input use *.<fileextension> or is it a filename? 

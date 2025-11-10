@@ -93,7 +93,7 @@ def is_file_ignored(file_name: str) -> bool:
 def get_extension(fileName) -> str:
     temp = fileName.rfind('.')
     if(temp != -1):
-        return "." + fileName[temp:]
+        return fileName[temp:]
     else:
         return "none"
 
