@@ -9,19 +9,11 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from .list_contents import ListContentsScreen
+from .file_browser import FileBrowserScreen
+from ..api import ApiClient
 
-# Toggle between mock data and real ZIP extraction
-USE_MOCK = True
-
-# Mock data for ZIP contents when mock mode is enabled.
-MOCK_DIRS = [
-    "src/",
-    "src/utils/",
-    "src/helpers/",
-    "docs/",
-    "tests/",
-    "requirements.txt",
-]
+USE_MOCK = False
+MOCK_DIRS: list[str] = []
 
 
 def list_zip_dirs(zip_path: Path) -> list[str]:
@@ -34,12 +26,12 @@ def list_zip_dirs(zip_path: Path) -> list[str]:
                     for f in zip_ref.namelist()
                 )
             )
-    except Exception as exc:  # noqa: BLE001 - show user-friendly error message
+    except Exception as exc:  # noqa: BLE001
         return [f"[Error] {exc}"]
 
 
 class UploadScreen(Screen[None]):
-    """Screen that allows the user to select and preview a ZIP file."""
+    """Select and preview a ZIP file."""
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -49,6 +41,7 @@ class UploadScreen(Screen[None]):
                     yield Static("Enter a path to a .zip file.")
                     with Horizontal(id="zip-row"):
                         yield Input(placeholder="Path to .zip", id="zip-path")
+                        yield Button("Browse", id="browse-btn")
                         yield Button("Upload", id="upload-btn", variant="primary")
                     yield Label("Waiting for a file...", id="status")
                     with Horizontal(id="actions-row"):
@@ -64,6 +57,15 @@ class UploadScreen(Screen[None]):
             field.value = ""
             field.focus()
             await self.app.switch_screen("userconfig")
+            return
+
+        if event.button.id == "browse-btn":
+            def handle_file_selection(selected_path: Path | None) -> None:
+                if selected_path:
+                    field.value = str(selected_path)
+                    field.focus()
+
+            await self.app.push_screen(FileBrowserScreen(), callback=handle_file_selection)
             return
 
         if event.button.id != "upload-btn":
@@ -84,12 +86,31 @@ class UploadScreen(Screen[None]):
             status.update("Need a .zip file.")
             return
 
-        status.update("Processing ZIP contents...")
+        status.update("Uploading and fetching contents...")
 
-        dirs = MOCK_DIRS if USE_MOCK else list_zip_dirs(path)
+        dirs: list[str]
+        if USE_MOCK:
+            dirs = MOCK_DIRS
+        else:
+            try:
+                client = ApiClient()
+                upload = await client.upload_zip(path)
+                zip_id = int(upload["zip_id"])  # type: ignore[index]
+                data = await client.list_zip_directories(zip_id)
+                raw_items = list(data.get("directories", []))
+                cleaned = [item[:-1] if item.endswith("/") else item for item in raw_items]
+                dirs = [
+                    item for item in cleaned
+                    if not item.startswith("__MACOSX/") and not item.split("/")[-1].startswith("._")
+                ]
+                if not dirs:
+                    status.update("No contents found in archive.")
+                    return
+            except Exception as exc:  # noqa: BLE001
+                status.update(f"Error: {exc}")
+                return
 
         def reset_form(_result: None = None) -> None:
-            """Reset upload form when the contents screen closes."""
             status.update("Waiting for a file...")
             field.value = ""
             field.focus()

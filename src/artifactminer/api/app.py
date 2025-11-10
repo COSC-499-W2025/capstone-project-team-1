@@ -25,6 +25,8 @@ from ..db import (
     seed_questions,
 )
 from .consent import router as consent_router
+from .zip import router as zip_router
+from .openai import router as openai_router
 
 
 def create_app() -> FastAPI:
@@ -111,13 +113,33 @@ def create_app() -> FastAPI:
                     raise HTTPException(
                         status_code=422, detail="Invalid email provided."
                     )
+            elif (q.answer_type or "text") == "comma_separated":
+                # Allow empty string (required=False questions)
+                if v.strip():
+                    # Split by comma, strip whitespace from each item
+                    items = [item.strip() for item in v.split(",")]
+                    # Reject if any empty items (e.g., "*.py,,*.js" or ",*.py")
+                    if any(not item for item in items):
+                        raise HTTPException(
+                            status_code=422,
+                            detail="Invalid comma-separated format. Use: *.py,*.js"
+                        )
 
-        # Persist
+        # Persist (upsert: update existing or create new)
         for k, v in answers.items():
             q = key_to_q[k]
-            ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
-            db.add(ua)
-            saved_answers.append(ua)
+            # Check if answer already exists for this question
+            existing = db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            if existing:
+                # Update existing answer
+                existing.answer_text = str(v).strip()
+                existing.answered_at = datetime.now()
+                saved_answers.append(existing)
+            else:
+                # Create new answer
+                ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
+                db.add(ua)
+                saved_answers.append(ua)
 
         db.commit()
         for ans in saved_answers:
@@ -126,7 +148,9 @@ def create_app() -> FastAPI:
 
     # Mount consent router
     app.include_router(consent_router)
+    app.include_router(zip_router)
 
+    app.include_router(openai_router)
     return app
 
 
