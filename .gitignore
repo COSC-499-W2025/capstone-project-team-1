@@ -80,3 +80,7 @@ artifactminer.db
 
 # Uploaded files
 uploads/
+
+# Others
+.claude
+.ruff_cache
