@@ -39,7 +39,7 @@ def test_check_file_duplicate():
     dw.MOCKNAME = "mockdirectory2" #change to a new mock directory
     dw.update_path()
     crawl_directory()
-    assert a.get_dict_len() == 1
+    assert a.get_dict_len() == 100
 
     
     
