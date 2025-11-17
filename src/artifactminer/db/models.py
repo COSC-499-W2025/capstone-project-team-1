@@ -57,6 +57,10 @@ class RepoStat(Base):#model for storing repository statistics
     ranked_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
 
+    # Relationships
+    project_skills = relationship("ProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan")
+    resume_items = relationship("ResumeItem", back_populates="repo_stat", cascade="all, delete-orphan")
+
 class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
     __tablename__ = "user_repo_stats"
 
@@ -138,6 +142,9 @@ class Skill(Base):
     category = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Relationships
+    project_skills = relationship("ProjectSkill", back_populates="skill", cascade="all, delete-orphan")
+
 
 class ProjectSkill(Base):
     __tablename__ = "project_skills"
@@ -147,6 +154,10 @@ class ProjectSkill(Base):
     skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
     weight = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    repo_stat = relationship("RepoStat", back_populates="project_skills")
+    skill = relationship("Skill", back_populates="project_skills")
 
 
 class ResumeItem(Base):
@@ -158,6 +169,9 @@ class ResumeItem(Base):
     category = Column(String, nullable=True)
     repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    repo_stat = relationship("RepoStat", back_populates="resume_items")
 
 
 class Export(Base):
