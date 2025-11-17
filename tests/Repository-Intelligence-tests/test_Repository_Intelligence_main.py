@@ -8,10 +8,11 @@ from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import Repo
 
 def test_create_RepoStats():
     mytestproject = RepoStats(project_name="test-project", primary_language="Python", is_collaborative=True)
-    
+
     assert mytestproject.project_name == "test-project" #test to see if the name is correct
     assert mytestproject.primary_language == "Python" #test to see if the language is correct
     assert mytestproject.is_collaborative is True #test to see if the project is collaborative or not
+    assert isinstance(mytestproject.frameworks, list) #test to see if frameworks is initialized as a list
 
 def test_create_RepoStats_false():
     mytestproject_wrong = RepoStats(project_name="test-project-wrong", primary_language="Java", is_collaborative=False)
@@ -42,6 +43,7 @@ def test_getRepoStats():#checks that we can get the repo stats for our current r
     assert isinstance(stats.project_name, str)
     assert isinstance(stats.primary_language, str)
     assert isinstance(stats.is_collaborative, bool)
+    assert isinstance(stats.frameworks, list) #test to see if frameworks is a list
 
 def test_save_repo_stats(): #checks that we can save the repo stats to the database
     root = Path(__file__).resolve().parents[2]
@@ -65,5 +67,7 @@ def test_select_repo_stats_from_db(): #checks that we can select the saved repo 
     assert repo_stat.project_name == stats.project_name
     assert repo_stat.primary_language == stats.primary_language
     assert repo_stat.is_collaborative == stats.is_collaborative
+    assert isinstance(repo_stat.frameworks, list) #test to see if frameworks is saved as a list
+    assert repo_stat.frameworks == stats.frameworks #test to see if saved frameworks match detected frameworks
     db.close()#close the session
 
