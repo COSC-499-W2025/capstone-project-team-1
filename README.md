@@ -169,6 +169,13 @@ uv run alembic upgrade head
 
 Run this command after you clone the repo and whenever you pull schema changes. It applies every migration in `alembic/versions/` and creates `artifactminer.db` if it does not exist.
 
+> **Already have a DB from before Alembic?** The initial migration represents the schema as of Milestone 1, so older copies of `artifactminer.db` will block `alembic upgrade` with "table already exists" errors. Before running the command above for the first time, either delete or move your existing file (make a backup if you care about the data) and let Alembic recreate it:
+
+```bash
+mv artifactminer.db artifactminer.db.bak  # optional backup
+uv run alembic upgrade head
+```
+
 ### Creating a new migration
 
 1. Update the SQLAlchemy models in `src/artifactminer/db/models.py`.
