@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON,ForeignKey, Text
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -51,6 +51,11 @@ class RepoStat(Base):#model for storing repository statistics
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    frameworks = Column(JSON, nullable=True)
+    collaboration_metadata = Column(JSON, nullable=True)
+    ranking_score = Column(Float, nullable=True)
+    ranked_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True)
 
 class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
     __tablename__ = "user_repo_stats"
@@ -63,6 +68,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     userStatspercentages = Column(Float, nullable=True) # Percentage of user's contributions compared to total repo activity
     commitFrequency = Column(Float, nullable=True) # Average number of commits per week by the user
     created_at = Column(DateTime, default=datetime.utcnow)
+    activity_breakdown = Column(JSON, nullable=True)
 
 class UserAIntelligenceSummary(Base):
     __tablename__ = "user_intelligence_summaries"
@@ -121,3 +127,45 @@ class UploadedZip(Base):
     filename = Column(String, nullable=False)  # Original filename
     path = Column(String, nullable=False)  # Server filesystem path
     uploaded_at = Column(DateTime, default=datetime.utcnow)
+    extraction_path = Column(String, nullable=True)
+
+
+class Skill(Base):
+    __tablename__ = "skills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)
+    category = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ProjectSkill(Base):
+    __tablename__ = "project_skills"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    weight = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ResumeItem(Base):
+    __tablename__ = "resume_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    category = Column(String, nullable=True)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Export(Base):
+    __tablename__ = "exports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    export_type = Column(String, nullable=False)
+    path = Column(String, nullable=False)
+    status = Column(String, default="pending")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
