@@ -3,10 +3,9 @@ Framework Detection Module for Repository Intelligence
 Detects frameworks by analyzing dependency files and configuration files
 """
 
+import json
 from pathlib import Path
 from typing import List
-import json
-import re
 
 
 def detect_python_frameworks(repo_path: str) -> List[str]:
@@ -22,21 +21,21 @@ def detect_python_frameworks(repo_path: str) -> List[str]:
 
     # Framework patterns for Python
     python_frameworks = {
-        'Django': ['django'],
-        'Flask': ['flask'],
-        'FastAPI': ['fastapi'],
-        'SQLAlchemy': ['sqlalchemy'],
-        'Pytest': ['pytest'],
-        'Celery': ['celery'],
-        'Pydantic': ['pydantic'],
-        'aiohttp': ['aiohttp'],
+        "Django": ["django"],
+        "Flask": ["flask"],
+        "FastAPI": ["fastapi"],
+        "SQLAlchemy": ["sqlalchemy"],
+        "Pytest": ["pytest"],
+        "Celery": ["celery"],
+        "Pydantic": ["pydantic"],
+        "aiohttp": ["aiohttp"],
     }
 
     # Check requirements.txt
-    requirements_path = repo_path / 'requirements.txt'
+    requirements_path = repo_path / "requirements.txt"
     if requirements_path.exists():
         try:
-            with open(requirements_path, 'r') as f:
+            with open(requirements_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in python_frameworks.items():
                     for pattern in patterns:
@@ -48,10 +47,10 @@ def detect_python_frameworks(repo_path: str) -> List[str]:
             pass
 
     # Check pyproject.toml
-    pyproject_path = repo_path / 'pyproject.toml'
+    pyproject_path = repo_path / "pyproject.toml"
     if pyproject_path.exists():
         try:
-            with open(pyproject_path, 'r') as f:
+            with open(pyproject_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in python_frameworks.items():
                     for pattern in patterns:
@@ -63,10 +62,10 @@ def detect_python_frameworks(repo_path: str) -> List[str]:
             pass
 
     # Check Pipfile
-    pipfile_path = repo_path / 'Pipfile'
+    pipfile_path = repo_path / "Pipfile"
     if pipfile_path.exists():
         try:
-            with open(pipfile_path, 'r') as f:
+            with open(pipfile_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in python_frameworks.items():
                     for pattern in patterns:
@@ -78,10 +77,10 @@ def detect_python_frameworks(repo_path: str) -> List[str]:
             pass
 
     # Check setup.py
-    setup_path = repo_path / 'setup.py'
+    setup_path = repo_path / "setup.py"
     if setup_path.exists():
         try:
-            with open(setup_path, 'r') as f:
+            with open(setup_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in python_frameworks.items():
                     for pattern in patterns:
@@ -105,30 +104,30 @@ def detect_javascript_frameworks(repo_path: str) -> List[str]:
 
     # Framework patterns for JavaScript
     js_frameworks = {
-        'React': ['react'],
-        'Vue': ['vue'],
-        'Angular': ['@angular/core'],
-        'Express': ['express'],
-        'Next.js': ['next'],
-        'Nest.js': ['@nestjs/common'],
-        'Svelte': ['svelte'],
-        'Nuxt': ['nuxt'],
-        'Webpack': ['webpack'],
-        'Vite': ['vite'],
-        'Jest': ['jest'],
-        'Mocha': ['mocha'],
-        'TypeScript': ['typescript'],
+        "React": ["react"],
+        "Vue": ["vue"],
+        "Angular": ["@angular/core"],
+        "Express": ["express"],
+        "Next.js": ["next"],
+        "Nest.js": ["@nestjs/common"],
+        "Svelte": ["svelte"],
+        "Nuxt": ["nuxt"],
+        "Webpack": ["webpack"],
+        "Vite": ["vite"],
+        "Jest": ["jest"],
+        "Mocha": ["mocha"],
+        "TypeScript": ["typescript"],
     }
 
     # Check package.json
-    package_path = repo_path / 'package.json'
+    package_path = repo_path / "package.json"
     if package_path.exists():
         try:
-            with open(package_path, 'r') as f:
+            with open(package_path, "r") as f:
                 package_data = json.load(f)
                 # Check in dependencies
-                dependencies = package_data.get('dependencies', {})
-                dev_dependencies = package_data.get('devDependencies', {})
+                dependencies = package_data.get("dependencies", {})
+                dev_dependencies = package_data.get("devDependencies", {})
 
                 all_deps = {**dependencies, **dev_dependencies}
 
@@ -155,18 +154,18 @@ def detect_java_frameworks(repo_path: str) -> List[str]:
 
     # Framework patterns for Java
     java_frameworks = {
-        'Spring': ['spring-boot', 'spring-core', 'spring-context'],
-        'Hibernate': ['hibernate'],
-        'JUnit': ['junit'],
-        'Gradle': ['gradle'],
-        'Maven': ['maven'],
+        "Spring": ["spring-boot", "spring-core", "spring-context"],
+        "Hibernate": ["hibernate"],
+        "JUnit": ["junit"],
+        "Gradle": ["gradle"],
+        "Maven": ["maven"],
     }
 
     # Check pom.xml
-    pom_path = repo_path / 'pom.xml'
+    pom_path = repo_path / "pom.xml"
     if pom_path.exists():
         try:
-            with open(pom_path, 'r') as f:
+            with open(pom_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in java_frameworks.items():
                     for pattern in patterns:
@@ -178,10 +177,10 @@ def detect_java_frameworks(repo_path: str) -> List[str]:
             pass
 
     # Check build.gradle
-    gradle_path = repo_path / 'build.gradle'
+    gradle_path = repo_path / "build.gradle"
     if gradle_path.exists():
         try:
-            with open(gradle_path, 'r') as f:
+            with open(gradle_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in java_frameworks.items():
                     for pattern in patterns:
@@ -193,10 +192,10 @@ def detect_java_frameworks(repo_path: str) -> List[str]:
             pass
 
     # Check for build.gradle.kts (Kotlin DSL)
-    gradle_kts_path = repo_path / 'build.gradle.kts'
+    gradle_kts_path = repo_path / "build.gradle.kts"
     if gradle_kts_path.exists():
         try:
-            with open(gradle_kts_path, 'r') as f:
+            with open(gradle_kts_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in java_frameworks.items():
                     for pattern in patterns:
@@ -220,18 +219,18 @@ def detect_go_frameworks(repo_path: str) -> List[str]:
 
     # Framework patterns for Go
     go_frameworks = {
-        'Gin': ['gin-gonic/gin'],
-        'Echo': ['echo'],
-        'Fiber': ['fiber'],
-        'Beego': ['beego'],
-        'GORM': ['gorm'],
+        "Gin": ["gin-gonic/gin"],
+        "Echo": ["echo"],
+        "Fiber": ["fiber"],
+        "Beego": ["beego"],
+        "GORM": ["gorm"],
     }
 
     # Check go.mod
-    go_mod_path = repo_path / 'go.mod'
+    go_mod_path = repo_path / "go.mod"
     if go_mod_path.exists():
         try:
-            with open(go_mod_path, 'r') as f:
+            with open(go_mod_path, "r") as f:
                 content = f.read().lower()
                 for framework, patterns in go_frameworks.items():
                     for pattern in patterns:
