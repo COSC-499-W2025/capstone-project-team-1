@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -148,6 +148,9 @@ class Skill(Base):
 
 class ProjectSkill(Base):
     __tablename__ = "project_skills"
+    __table_args__ = (
+        UniqueConstraint('repo_stat_id', 'skill_id', name='uq_project_skill'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
