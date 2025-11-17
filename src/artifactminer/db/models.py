@@ -143,8 +143,8 @@ class ProjectSkill(Base):
     __tablename__ = "project_skills"
 
     id = Column(Integer, primary_key=True, index=True)
-    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id"), nullable=False)
-    skill_id = Column(Integer, ForeignKey("skills.id"), nullable=False)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
     weight = Column(Float, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -156,7 +156,7 @@ class ResumeItem(Base):
     title = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     category = Column(String, nullable=True)
-    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id"), nullable=True)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
