@@ -156,3 +156,34 @@ The DFD diagram is a proposed solution to our project requirements and is subjec
 * **Parallelization:** API (Room 2\) publishes schemas/stubs first; Rooms 3–6 code behind them; TUI (Room 1\) targets mocks.
 
 * **Local-first:** All rooms default to offline; LLM path is optional and consent-gated (Room 2+6). 
+
+## Database Migrations (Alembic)
+
+We now manage schema changes with Alembic so developers never have to delete `artifactminer.db`. Always apply migrations instead of rebuilding the file manually.
+
+### First-time setup / keeping the DB up to date
+
+```bash
+uv run alembic upgrade head
+```
+
+Run this command after you clone the repo and whenever you pull schema changes. It applies every migration in `alembic/versions/` and creates `artifactminer.db` if it does not exist.
+
+### Creating a new migration
+
+1. Update the SQLAlchemy models in `src/artifactminer/db/models.py`.
+2. Generate a migration script:
+   ```bash
+   uv run alembic revision --autogenerate -m "Describe your change"
+   ```
+3. Inspect the generated file under `alembic/versions/` (fix anything Alembic could not infer).
+4. Apply it locally with `uv run alembic upgrade head`.
+5. Commit both the model changes and the new migration file.
+
+### Downgrading / testing migrations
+
+Use `uv run alembic downgrade -1` to roll back the latest revision and verify reversibility. Re-run `uv run alembic upgrade head` afterward to return to the newest schema.
+
+### Seeding default data
+
+After migrations are applied, start the API (`uv run api`) to let the existing seeder populate the baseline questions. No manual DB deletion is required; Alembic upgrades keep everyone aligned.
