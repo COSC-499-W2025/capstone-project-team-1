@@ -126,9 +126,10 @@ def upgrade() -> None:
     sa.Column('skill_id', sa.Integer(), nullable=False),
     sa.Column('weight', sa.Float(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
-    sa.ForeignKeyConstraint(['repo_stat_id'], ['repo_stats.id'], ),
-    sa.ForeignKeyConstraint(['skill_id'], ['skills.id'], ),
-    sa.PrimaryKeyConstraint('id')
+    sa.ForeignKeyConstraint(['repo_stat_id'], ['repo_stats.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['skill_id'], ['skills.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('repo_stat_id', 'skill_id', name='uq_project_skill'),
     )
     op.create_index(op.f('ix_project_skills_id'), 'project_skills', ['id'], unique=False)
     op.create_table('resume_items',
