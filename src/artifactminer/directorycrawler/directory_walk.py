@@ -13,6 +13,7 @@ MOCKNAME = "mockdirectory"
 CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
 from .store_file_dict import StoreFileDict
+from .check_file_duplicate import is_file_duplicate
 
 readableFileTypes = [] #TODO
 
@@ -61,7 +62,9 @@ def crawl_directory():
                 else:
                     print("the file the user has included: ", file)
                 print_files(file) #print files
-                store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
+
+                if(is_file_duplicate(file, dirs)):
+                    store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
