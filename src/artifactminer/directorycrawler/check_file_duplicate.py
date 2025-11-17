@@ -16,7 +16,7 @@ def chunk_reader(fobj, chunk_size=1024):
             return
         yield chunk
 
-def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1) -> bool:
+def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1):
     hashobj = hash()
     fullPath = os.path.join(dirPath, fileName)
     for chunck in chunk_reader(open(fullPath, 'rb')):
@@ -24,9 +24,9 @@ def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1) -> bool:
     file_id = (hashobj.digest(), os.path.getsize(fullPath))
     duplicate = dict.get_dict(file_id)
     if duplicate:
-        return True
+        return True, None
     
-    return False
+    return False, file_id
 
     
     

@@ -63,8 +63,10 @@ def crawl_directory():
                     print("the file the user has included: ", file)
                 print_files(file) #print files
 
-                if(is_file_duplicate(file, dirs)):
-                    store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
+                isDuplicate, fileId = is_file_duplicate(file, root)
+
+                if(isDuplicate == False):
+                    store_file_dictionary.add_to_dict(fileId, full_path) #key = filename, path = filepath
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
