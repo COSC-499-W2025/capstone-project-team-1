@@ -35,3 +35,11 @@ def test_exclude_file_user_setting():
     dw.userKeepFileName = []
     dw.userExcludeFileName = [] 
 
+def test_check_file_duplicate():
+    dw.MOCKNAME = "mockdirectory2" #change to a new mock directory
+    dw.update_path()
+    crawl_directory()
+    assert a.get_dict_len() == 1
+
+    
+    

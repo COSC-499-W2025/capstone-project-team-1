@@ -19,10 +19,11 @@ class StoreFileDict:
             del self.file_dict[key]
 
     def get_dict(self, key): #get value from dictionary
-        return self.file_dict[key]
+        return self.get(key)
 
     def get_dict_len(self):
         return len(self.file_dict)
+    
     
     def remove_all_dict(self):
         self.file_dict.clear()
