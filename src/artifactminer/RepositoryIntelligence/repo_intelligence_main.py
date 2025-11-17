@@ -10,6 +10,7 @@ from pathlib import Path
 import git
 from artifactminer.db.models import RepoStat
 from artifactminer.db.database import SessionLocal
+from artifactminer.RepositoryIntelligence.framework_detector import detect_frameworks
 
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
@@ -21,6 +22,7 @@ class RepoStats: #This is the basic Repo class for storing the results of the gi
     first_commit: Optional[datetime] = None # Optional addition is the users first commit date/time
     last_commit: Optional[datetime] = None # Optional addition is the users last commit date/time
     total_commits: Optional[int] = None # Optional addition is the total number of commits in the repo
+    frameworks: List[str] = field(default_factory=list) # List of detected frameworks in the repo
 
 def isGitRepo(path :os.PathLike | str) -> bool:#This function checks whether the git directory exists inside of the given path
     p = Path(path)
@@ -59,6 +61,10 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
     primary_language = language_counter.most_common(1)[0][0] if language_counter else "Unknown"
     languages = [lang for lang, _ in language_counter.most_common()] #list of languages used in the repo
     language_percentages = [count / sum(language_counter.values()) * 100 for _, count in language_counter.most_common()] #percentage of each language used
+
+    # Detect frameworks
+    frameworks = detect_frameworks(repo_path)
+
     # Check if the repository is collaborative
     is_collaborative = len(repo.remotes) > 0 # if there are remotes, its collaborative
 
@@ -76,6 +82,7 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=len(commits),
+        frameworks=frameworks,
     )
 
 def saveRepoStats(stats):
@@ -90,6 +97,7 @@ def saveRepoStats(stats):
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
+            frameworks=stats.frameworks,
         )
         db.add(repo_stat)
         db.commit()

@@ -76,6 +76,11 @@ Thumbs.db
 
 #Database
 artifactminer.db
+*.db.bak
 
 # Uploaded files
 uploads/
+
+# Others
+.claude
+.ruff_cache
