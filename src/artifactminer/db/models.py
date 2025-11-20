@@ -156,6 +156,8 @@ class ProjectSkill(Base):
     repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
     skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
     weight = Column(Float, nullable=True)
+    proficiency = Column(Float, nullable=True)
+    evidence = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
