@@ -16,14 +16,13 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
     getRepoStats,
     isGitRepo,
 )
+from artifactminer.mappings import CATEGORIES, DEPENDENCY_SKILLS
 from artifactminer.helpers.openai import get_gpt5_nano_response
 from .skill_patterns import (
     CODE_REGEX_PATTERNS,
-    DEPENDENCY_SKILLS,
     FILE_PATTERNS,
     GIT_SKILLS,
     LANGUAGE_EXTENSIONS,
-    CATEGORIES,
 )
 
 

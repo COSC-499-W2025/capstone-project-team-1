@@ -4,6 +4,7 @@ import git
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from artifactminer.RepositoryIntelligence.framework_detector import detect_frameworks
 from artifactminer.db import Base
 from artifactminer.db.models import RepoStat
 from artifactminer.skills.skill_extractor import SkillExtractor, persist_extracted_skills
@@ -172,3 +173,21 @@ def test_git_signals_count_user_merge_commits(tmp_path):
 
     assert signals["merge_commits"] == 2  # target-authored merge + PR #99 merge
     assert signals["branches"] >= 3  # main + feature branches
+
+
+def test_shared_dependency_mapping_drives_detector_and_extractor(tmp_path):
+    repo_root = tmp_path / "shared_mapping_repo"
+    repo_root.mkdir()
+    (repo_root / "requirements.txt").write_text("flask\n")
+
+    extractor = SkillExtractor(enable_llm=False)
+    skills = extractor.extract_skills(
+        repo_path=repo_root,
+        user_contributions={},
+        consent_level="no_llm",
+    )
+    names = {s.skill for s in skills}
+    assert "Flask" in names
+
+    frameworks = detect_frameworks(repo_root)
+    assert "Flask" in frameworks
