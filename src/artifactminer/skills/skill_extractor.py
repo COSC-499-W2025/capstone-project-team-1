@@ -55,13 +55,17 @@ class SkillExtractor:
         repo_path: str,
         user_contributions: Dict | None = None,
         consent_level: str = "none",
+        frameworks: List[str] | None = None,
+        languages: List[str] | None = None,
     ) -> List[ExtractedSkill]:
         repo_path = str(repo_path)
         user_contributions = user_contributions or {}
         skills: Dict[str, ExtractedSkill] = {}
 
+        # Ecosystem context
         file_counts = self._count_files_by_ext(repo_path)
         total_files = max(sum(file_counts.values()), 1)
+        detected_languages = set(lang.lower() for lang in (languages or []))
 
         # Languages from repository contents
         for ext, count in file_counts.items():
@@ -71,11 +75,13 @@ class SkillExtractor:
                 evidence = [f"{count} *{ext} files detected"]
                 proficiency = self._score(count, total_files)
                 self._add_skill(skills, name, category, evidence, proficiency)
+                detected_languages.add(name.lower())
 
         # Language signals from manifests/shebangs/key files
         for lang_signal, evidence in self._language_signals(repo_path, file_counts):
             name, category = lang_signal
             self._add_skill(skills, name, category, [evidence], 0.55)
+            detected_languages.add(name.lower())
 
         # Frameworks and languages via repo stats
         try:
@@ -86,6 +92,7 @@ class SkillExtractor:
                     name, category = mapping
                     evidence = [f"Detected via repo stats: {lang}"]
                     self._add_skill(skills, name, category, evidence, 0.55)
+                    detected_languages.add(name.lower())
             for fw in getattr(stats, "frameworks", []) or []:
                 self._add_skill(
                     skills,
@@ -94,30 +101,33 @@ class SkillExtractor:
                     [f"Detected framework {fw}"],
                     0.6,
                 )
+                detected_languages.update(self._ecosystems_from_frameworks([fw]))
         except Exception:
             # Repo stats are optional; continue with other signals
             pass
 
-        # Framework detection pass (filesystem-based)
-        try:
-            for fw in detect_frameworks(repo_path):
-                self._add_skill(
-                    skills,
-                    fw,
-                    CATEGORIES["frameworks"],
-                    [f"Dependency or config indicates {fw}"],
-                    0.62,
-                )
-        except Exception:
-            pass
+        # Frameworks from caller input (preferred) or RepoStat detection
+        frameworks = frameworks or []
+        for fw in frameworks:
+            self._add_skill(
+                skills,
+                fw,
+                CATEGORIES["frameworks"],
+                [f"Dependency or config indicates {fw}"],
+                0.62,
+            )
+        detected_languages.update(self._ecosystems_from_frameworks(frameworks))
 
-        # Dependency manifests (pyproject/requirements)
-        for dep, (skill_name, category) in DEPENDENCY_SKILLS.items():
-            dep_hits = self._dependency_hits(repo_path, dep)
-            if dep_hits:
-                evidence = [f"{dep_hits} occurrence(s) of '{dep}' in manifests"]
-                proficiency = min(0.8, 0.45 + 0.1 * dep_hits)
-                self._add_skill(skills, skill_name, category, evidence, proficiency)
+        ecosystems = self._ecosystems(detected_languages)
+
+        # Dependency manifests (pyproject/requirements/etc) scoped by ecosystem
+        for eco in ecosystems | {"cross"}:
+            for dep, (skill_name, category) in DEPENDENCY_SKILLS.get(eco, {}).items():
+                dep_hits = self._dependency_hits(repo_path, dep)
+                if dep_hits:
+                    evidence = [f"{dep_hits} occurrence(s) of '{dep}' in manifests"]
+                    proficiency = min(0.8, 0.45 + 0.1 * dep_hits)
+                    self._add_skill(skills, skill_name, category, evidence, proficiency)
 
         # File/dir presence patterns
         for pattern in FILE_PATTERNS:
@@ -130,6 +140,9 @@ class SkillExtractor:
         # Code regex patterns from user additions/changes
         additions_text = self._collect_additions_text(user_contributions)
         for pattern in CODE_REGEX_PATTERNS:
+            if pattern.ecosystems:
+                if not ecosystems.intersection(set(pattern.ecosystems)):
+                    continue
             hits = len(re.findall(pattern.regex, additions_text, flags=re.MULTILINE))
             if hits:
                 evidence = [f"{pattern.evidence} ({hits} match{'es' if hits != 1 else ''})"]
@@ -218,6 +231,47 @@ class SkillExtractor:
             except Exception:
                 continue
         return total_hits
+
+    def _ecosystems(self, detected_languages: Iterable[str]) -> set[str]:
+        lang_map = {
+            "python": "python",
+            "javascript": "javascript",
+            "js": "javascript",
+            "typescript": "typescript",
+            "ts": "typescript",
+            "java": "java",
+            "kotlin": "java",
+            "go": "go",
+            "rust": "rust",
+            "c#": "csharp",
+            "csharp": "csharp",
+            "php": "php",
+            "ruby": "ruby",
+            "swift": "swift",
+        }
+        ecos = set()
+        for lang in detected_languages:
+            low = lang.lower()
+            mapped = lang_map.get(low)
+            if mapped:
+                ecos.add(mapped)
+        return ecos
+
+    def _ecosystems_from_frameworks(self, frameworks: Iterable[str]) -> set[str]:
+        ecos = set()
+        fw_map = {
+            "python": ["fastapi", "flask", "django", "pydantic", "sqlalchemy"],
+            "javascript": ["react", "vue", "angular", "next", "express", "nest", "next.js"],
+            "typescript": ["react", "vue", "angular", "next", "express", "nest", "next.js"],
+            "java": ["spring", "spring boot", "hibernate", "junit"],
+            "go": ["gin", "echo", "fiber", "gorm"],
+        }
+        for fw in frameworks:
+            fw_lower = fw.lower()
+            for eco, needles in fw_map.items():
+                if any(n in fw_lower for n in needles):
+                    ecos.add(eco)
+        return ecos
 
     def _collect_additions_text(self, user_contributions: Dict) -> str:
         additions = user_contributions.get("additions") or user_contributions.get(
@@ -356,3 +410,60 @@ class SkillExtractor:
             # Fall back to existing skills if parsing fails
             return skills
         return skills
+
+
+def persist_extracted_skills(
+    db,
+    repo_stat_id: int,
+    extracted: List[ExtractedSkill],
+    *,
+    commit: bool = True,
+):
+    """Persist extracted skills to Skill and ProjectSkill tables."""
+    from sqlalchemy.orm import Session
+    from artifactminer.db.models import Skill, ProjectSkill, RepoStat
+
+    if not isinstance(db, Session):
+        raise ValueError("db must be a SQLAlchemy Session")
+
+    if not db.query(RepoStat).filter(RepoStat.id == repo_stat_id).first():
+        raise ValueError(f"RepoStat {repo_stat_id} does not exist")
+
+    saved = []
+    for sk in extracted:
+        skill_row = db.query(Skill).filter(Skill.name == sk.skill).first()
+        if not skill_row:
+            skill_row = Skill(name=sk.skill, category=sk.category)
+            db.add(skill_row)
+            db.flush()
+
+        proj_skill = (
+            db.query(ProjectSkill)
+            .filter(
+                ProjectSkill.repo_stat_id == repo_stat_id,
+                ProjectSkill.skill_id == skill_row.id,
+            )
+            .first()
+        )
+
+        if proj_skill:
+            # Update proficiency/evidence conservatively
+            proj_skill.proficiency = max((proj_skill.proficiency or 0.0), sk.proficiency)
+            existing_evidence = set(proj_skill.evidence or [])
+            merged = list(existing_evidence.union(sk.evidence))
+            proj_skill.evidence = merged
+        else:
+            proj_skill = ProjectSkill(
+                repo_stat_id=repo_stat_id,
+                skill_id=skill_row.id,
+                proficiency=sk.proficiency,
+                evidence=list(sk.evidence),
+            )
+            db.add(proj_skill)
+        saved.append(proj_skill)
+
+    if commit:
+        db.commit()
+    for ps in saved:
+        db.refresh(ps)
+    return saved

@@ -1,3 +1,3 @@
 """Skill extraction package."""
 
-from .skill_extractor import SkillExtractor, ExtractedSkill  # noqa: F401
+from .skill_extractor import SkillExtractor, ExtractedSkill, persist_extracted_skills  # noqa: F401

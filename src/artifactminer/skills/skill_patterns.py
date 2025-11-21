@@ -24,6 +24,7 @@ class CodePattern:
     category: str
     evidence: str
     weight: float = 0.6
+    ecosystems: tuple[str, ...] | None = None  # e.g., ("python",)
 
 
 @dataclass(frozen=True)
@@ -59,59 +60,65 @@ LANGUAGE_EXTENSIONS: Dict[str, tuple[str, str]] = {
     ".md": ("Technical Writing", CATEGORIES["practices"]),
 }
 
-# Dependency names we care about (parsed from common manifests)
-# Keep this list high-signal and multi-language; evidence is added in extractor.
-DEPENDENCY_SKILLS: Dict[str, tuple[str, str]] = {
-    # Python web/backend
-    "fastapi": ("FastAPI", CATEGORIES["frameworks"]),
-    "uvicorn": ("FastAPI", CATEGORIES["frameworks"]),
-    "starlette": ("FastAPI", CATEGORIES["frameworks"]),
-    "httptools": ("FastAPI", CATEGORIES["frameworks"]),
-    "flask": ("Flask", CATEGORIES["frameworks"]),
-    "django": ("Django", CATEGORIES["frameworks"]),
-    # Python data/ML
-    "numpy": ("Numerical Computing", CATEGORIES["frameworks"]),
-    "pandas": ("Data Analysis", CATEGORIES["frameworks"]),
-    "scikit-learn": ("Machine Learning", CATEGORIES["frameworks"]),
-    "torch": ("Deep Learning (PyTorch)", CATEGORIES["frameworks"]),
-    "tensorflow": ("Deep Learning (TensorFlow)", CATEGORIES["frameworks"]),
-    # Python infra/testing/utilities
-    "sqlalchemy": ("SQLAlchemy", CATEGORIES["frameworks"]),
-    "alembic": ("Database Migrations", CATEGORIES["tools"]),
-    "pydantic": ("Data Validation", CATEGORIES["frameworks"]),
-    "pytest": ("Testing", CATEGORIES["practices"]),
-    "pytest-asyncio": ("Async Testing", CATEGORIES["practices"]),
-    "httpx": ("HTTP Clients", CATEGORIES["frameworks"]),
-    "openai": ("LLM Integration", CATEGORIES["tools"]),
-    "gitpython": ("Git Automation", CATEGORIES["tools"]),
-    "aiosqlite": ("Async Datastores", CATEGORIES["frameworks"]),
-    "email-validator": ("Input Validation", CATEGORIES["practices"]),
-    "python-multipart": ("File Upload Handling", CATEGORIES["practices"]),
-    "celery": ("Task Queues", CATEGORIES["tools"]),
-    "redis": ("Caching", CATEGORIES["tools"]),
-    "kafka": ("Message Queues", CATEGORIES["tools"]),
-    # JavaScript / TypeScript
-    "react": ("React", CATEGORIES["frameworks"]),
-    "vue": ("Vue", CATEGORIES["frameworks"]),
-    "@angular/core": ("Angular", CATEGORIES["frameworks"]),
-    "next": ("Next.js", CATEGORIES["frameworks"]),
-    "express": ("Express", CATEGORIES["frameworks"]),
-    "@nestjs/common": ("NestJS", CATEGORIES["frameworks"]),
-    "jest": ("Testing", CATEGORIES["practices"]),
-    "vitest": ("Testing", CATEGORIES["practices"]),
-    "webpack": ("Build Tooling", CATEGORIES["tools"]),
-    "vite": ("Build Tooling", CATEGORIES["tools"]),
-    "typescript": ("TypeScript", CATEGORIES["languages"]),
-    # Java / JVM
-    "spring-boot": ("Spring Boot", CATEGORIES["frameworks"]),
-    "spring-core": ("Spring", CATEGORIES["frameworks"]),
-    "hibernate": ("Hibernate", CATEGORIES["frameworks"]),
-    "junit": ("Testing", CATEGORIES["practices"]),
-    # Go
-    "github.com/gin-gonic/gin": ("Gin", CATEGORIES["frameworks"]),
-    "github.com/labstack/echo": ("Echo", CATEGORIES["frameworks"]),
-    "github.com/gofiber/fiber": ("Fiber", CATEGORIES["frameworks"]),
-    "gorm.io/gorm": ("GORM", CATEGORIES["frameworks"]),
+# Dependency names we care about (parsed from common manifests), grouped by ecosystem.
+DEPENDENCY_SKILLS: Dict[str, Dict[str, tuple[str, str]]] = {
+    "python": {
+        "fastapi": ("FastAPI", CATEGORIES["frameworks"]),
+        "uvicorn": ("FastAPI", CATEGORIES["frameworks"]),
+        "starlette": ("FastAPI", CATEGORIES["frameworks"]),
+        "httptools": ("FastAPI", CATEGORIES["frameworks"]),
+        "flask": ("Flask", CATEGORIES["frameworks"]),
+        "django": ("Django", CATEGORIES["frameworks"]),
+        "numpy": ("Numerical Computing", CATEGORIES["frameworks"]),
+        "pandas": ("Data Analysis", CATEGORIES["frameworks"]),
+        "scikit-learn": ("Machine Learning", CATEGORIES["frameworks"]),
+        "torch": ("Deep Learning (PyTorch)", CATEGORIES["frameworks"]),
+        "tensorflow": ("Deep Learning (TensorFlow)", CATEGORIES["frameworks"]),
+        "sqlalchemy": ("SQLAlchemy", CATEGORIES["frameworks"]),
+        "alembic": ("Database Migrations", CATEGORIES["tools"]),
+        "pydantic": ("Data Validation", CATEGORIES["frameworks"]),
+        "pytest": ("Testing", CATEGORIES["practices"]),
+        "pytest-asyncio": ("Async Testing", CATEGORIES["practices"]),
+        "httpx": ("HTTP Clients", CATEGORIES["frameworks"]),
+        "openai": ("LLM Integration", CATEGORIES["tools"]),
+        "gitpython": ("Git Automation", CATEGORIES["tools"]),
+        "aiosqlite": ("Async Datastores", CATEGORIES["frameworks"]),
+        "email-validator": ("Input Validation", CATEGORIES["practices"]),
+        "python-multipart": ("File Upload Handling", CATEGORIES["practices"]),
+        "celery": ("Task Queues", CATEGORIES["tools"]),
+        "redis": ("Caching", CATEGORIES["tools"]),
+        "kafka": ("Message Queues", CATEGORIES["tools"]),
+    },
+    "javascript": {
+        "react": ("React", CATEGORIES["frameworks"]),
+        "vue": ("Vue", CATEGORIES["frameworks"]),
+        "@angular/core": ("Angular", CATEGORIES["frameworks"]),
+        "next": ("Next.js", CATEGORIES["frameworks"]),
+        "express": ("Express", CATEGORIES["frameworks"]),
+        "@nestjs/common": ("NestJS", CATEGORIES["frameworks"]),
+        "jest": ("Testing", CATEGORIES["practices"]),
+        "vitest": ("Testing", CATEGORIES["practices"]),
+        "webpack": ("Build Tooling", CATEGORIES["tools"]),
+        "vite": ("Build Tooling", CATEGORIES["tools"]),
+        "typescript": ("TypeScript", CATEGORIES["languages"]),
+    },
+    "java": {
+        "spring-boot": ("Spring Boot", CATEGORIES["frameworks"]),
+        "spring-core": ("Spring", CATEGORIES["frameworks"]),
+        "hibernate": ("Hibernate", CATEGORIES["frameworks"]),
+        "junit": ("Testing", CATEGORIES["practices"]),
+    },
+    "go": {
+        "github.com/gin-gonic/gin": ("Gin", CATEGORIES["frameworks"]),
+        "github.com/labstack/echo": ("Echo", CATEGORIES["frameworks"]),
+        "github.com/gofiber/fiber": ("Fiber", CATEGORIES["frameworks"]),
+        "gorm.io/gorm": ("GORM", CATEGORIES["frameworks"]),
+    },
+    "cross": {
+        # Cross-cutting tools not tied to a single ecosystem
+        "docker": ("Containerization", CATEGORIES["tools"]),
+        "kubernetes": ("Container Orchestration", CATEGORIES["tools"]),
+    },
 }
 
 FILE_PATTERNS: List[FilePattern] = [
@@ -164,12 +171,14 @@ CODE_REGEX_PATTERNS: List[CodePattern] = [
         regex=r"\basync\s+def\b",
         category=CATEGORIES["practices"],
         evidence="async def usage in changes",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="Error Handling",
         regex=r"class\s+.*Exception",
         category=CATEGORIES["practices"],
         evidence="Custom exception detected",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="SQL",
@@ -182,42 +191,70 @@ CODE_REGEX_PATTERNS: List[CodePattern] = [
         regex=r"import\s+unittest|pytest\.",
         category=CATEGORIES["practices"],
         evidence="Testing imports detected",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="REST API Design",
         regex=r"@router\.(get|post|put|delete)",
         category=CATEGORIES["frameworks"],
         evidence="HTTP route handlers detected",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="Data Validation",
         regex=r"pydantic\.BaseModel|from\s+pydantic\s+import",
         category=CATEGORIES["frameworks"],
         evidence="Pydantic models referenced",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="Dependency Injection",
         regex=r"Depends\(",
         category=CATEGORIES["practices"],
         evidence="FastAPI Depends used",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="Logging",
         regex=r"logging\.",
         category=CATEGORIES["practices"],
         evidence="Logging statements present",
+        ecosystems=None,
     ),
     CodePattern(
         skill="Command Line Tools",
         regex=r"argparse|click",
         category=CATEGORIES["tools"],
         evidence="CLI parsing detected",
+        ecosystems=("python",),
     ),
     CodePattern(
         skill="Configuration Management",
         regex=r"dotenv|os\.getenv",
         category=CATEGORIES["practices"],
         evidence="Env var configuration detected",
+        ecosystems=("python",),
+    ),
+    CodePattern(
+        skill="Annotation-based APIs",
+        regex=r"@RestController|@GetMapping|@PostMapping|@RequestMapping",
+        category=CATEGORIES["frameworks"],
+        evidence="Java/Spring REST annotations detected",
+        ecosystems=("java",),
+    ),
+    CodePattern(
+        skill="JUnit Testing",
+        regex=r"@Test",
+        category=CATEGORIES["practices"],
+        evidence="JUnit tests detected",
+        ecosystems=("java",),
+    ),
+    CodePattern(
+        skill="TypeScript Typing",
+        regex=r":\s*[A-Z][A-Za-z0-9_<>]+(?=\s*[=;,)])",
+        category=CATEGORIES["practices"],
+        evidence="Type annotations detected in TS/JS",
+        ecosystems=("typescript", "javascript"),
     ),
 ]
 
