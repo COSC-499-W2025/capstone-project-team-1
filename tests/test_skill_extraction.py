@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import git
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -101,3 +102,73 @@ def test_ecosystem_filtering_skips_python_patterns_for_java_context(tmp_path):
     )
     names = {s.skill for s in skills}
     assert "Asynchronous Programming" not in names  # python-only pattern should be gated out
+
+
+def test_git_signals_count_user_merge_commits(tmp_path):
+    repo_root = tmp_path / "git_signals_repo"
+    repo_root.mkdir()
+    repo = git.Repo.init(repo_root)
+
+    main_file = repo_root / "file.txt"
+    main_file.write_text("init")
+    repo.index.add(["file.txt"])
+
+    target_actor = git.Actor("Target User", "target@example.com")
+    other_actor = git.Actor("Other User", "other@example.com")
+
+    # Seed main with an initial commit by someone else
+    repo.index.commit("initial", author=other_actor, committer=other_actor)
+
+    # Feature branch merged by target author (should count)
+    repo.git.checkout("-b", "feature1")
+    main_file.write_text("user change 1")
+    repo.index.add(["file.txt"])
+    repo.index.commit("user change 1", author=target_actor, committer=target_actor)
+    repo.git.checkout("main")
+    main_file.write_text("user change 1 merged")
+    repo.index.add(["file.txt"])
+    repo.index.commit(
+        "Merge branch 'feature1'",
+        parent_commits=(repo.head.commit, repo.refs["feature1"].commit),
+        author=target_actor,
+        committer=target_actor,
+    )
+
+    # Feature branch merged by someone else but referencing target's PR number (should count)
+    repo.git.checkout("-b", "feature2")
+    main_file.write_text("other change 2")
+    repo.index.add(["file.txt"])
+    repo.index.commit("other change 2", author=other_actor, committer=other_actor)
+    repo.git.checkout("main")
+    main_file.write_text("other change 2 merged")
+    repo.index.add(["file.txt"])
+    repo.index.commit(
+        "Merge pull request #99 from someone/feature2",
+        parent_commits=(repo.head.commit, repo.refs["feature2"].commit),
+        author=other_actor,
+        committer=other_actor,
+    )
+
+    # Feature branch merged by someone else with no relation to user (should NOT count)
+    repo.git.checkout("-b", "feature3")
+    main_file.write_text("other change 3")
+    repo.index.add(["file.txt"])
+    repo.index.commit("other change 3", author=other_actor, committer=other_actor)
+    repo.git.checkout("main")
+    main_file.write_text("other change 3 merged")
+    repo.index.add(["file.txt"])
+    repo.index.commit(
+        "Merge branch 'feature3'",
+        parent_commits=(repo.head.commit, repo.refs["feature3"].commit),
+        author=other_actor,
+        committer=other_actor,
+    )
+
+    extractor = SkillExtractor(enable_llm=False)
+    signals = extractor._git_signals(
+        repo_root,
+        {"user_email": "target@example.com", "pr_numbers": [99]},
+    )
+
+    assert signals["merge_commits"] == 2  # target-authored merge + PR #99 merge
+    assert signals["branches"] >= 3  # main + feature branches
