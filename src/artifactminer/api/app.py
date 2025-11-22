@@ -1,6 +1,6 @@
 """ASGI application exposing Artifact Miner backend services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, date, timedelta
 from typing import List
 
 from fastapi import FastAPI, Depends
@@ -14,6 +14,7 @@ from .schemas import (
     QuestionResponse,
     UserAnswerResponse,
     KeyedAnswersRequest,
+    ProjectTimelineItem,
 )
 from ..db import (
     Base,
@@ -145,6 +146,69 @@ def create_app() -> FastAPI:
         for ans in saved_answers:
             db.refresh(ans)
         return saved_answers
+
+    @app.get("/projects/timeline", response_model=List[ProjectTimelineItem], tags=["projects"])
+    async def get_project_timeline(
+        start_date: date | None = None,
+        end_date: date | None = None,
+        active_only: bool | None = None,
+    ) -> list[ProjectTimelineItem]:
+        """Return mocked project timeline data with simple filters applied."""
+
+        now = datetime.utcnow()
+        six_months_ago = now - timedelta(days=180)
+
+        # Mocked dataset representing different activity patterns.
+        mock_projects = [
+            {
+                "project_name": "Legacy Data Pipeline",
+                "first_commit": datetime(2020, 2, 10),
+                "last_commit": datetime(2020, 9, 25),
+            },
+            {
+                "project_name": "Mobile Experience",
+                "first_commit": now - timedelta(days=60),
+                "last_commit": now - timedelta(days=2),
+            },
+            {
+                "project_name": "Platform Core Services",
+                "first_commit": datetime(2018, 7, 1),
+                "last_commit": now - timedelta(days=5),
+            },
+            {
+                "project_name": "Analytics Dashboard",
+                "first_commit": now - timedelta(days=400),
+                "last_commit": now - timedelta(days=190),
+            },
+        ]
+
+        sorted_projects = sorted(mock_projects, key=lambda proj: proj["first_commit"])
+
+        timeline_items: list[ProjectTimelineItem] = []
+        for proj in sorted_projects:
+            first_commit: datetime = proj["first_commit"]
+            last_commit: datetime = proj["last_commit"]
+            duration_days = (last_commit - first_commit).days
+            was_active = last_commit >= six_months_ago
+
+            if start_date and first_commit.date() < start_date:
+                continue
+            if end_date and first_commit.date() > end_date:
+                continue
+            if active_only and not was_active:
+                continue
+
+            timeline_items.append(
+                ProjectTimelineItem(
+                    project_name=proj["project_name"],
+                    first_commit=first_commit,
+                    last_commit=last_commit,
+                    duration_days=duration_days,
+                    was_active=was_active,
+                )
+            )
+
+        return timeline_items
 
     # Mount consent router
     app.include_router(consent_router)
