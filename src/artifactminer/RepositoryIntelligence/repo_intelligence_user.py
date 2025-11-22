@@ -54,7 +54,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
         commitFrequency = total_commits / weeks #average commits per week
 
 
-    commitActivities = classify_commit_activities(collect_user_additions(repo_path, user_email, max_commits=50)) #get the user's commit activities breakdown
+    commitActivities = classify_commit_activities(collect_user_additions(repo_path, user_email, max_commits=5000)) #get the user's commit activities breakdown
 
     return UserRepoStats( #return the populated UserRepoStats dataclass
         project_name=project_name,
@@ -141,6 +141,17 @@ def collect_user_additions(
             additions_per_commit.append(added_only)
 
     return additions_per_commit
+
+def split_text_into_chunks(text: str, max_chunk_size: int) -> List[str]:
+    """Split text into chunks of at most `max_chunk_size` characters."""
+    chunks: List[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chunk_size, len(text))
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
 
 def saveUserRepoStats(stats: UserRepoStats):
     db = SessionLocal()

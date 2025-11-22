@@ -2,95 +2,209 @@ from typing import List, Dict
 
 ActivityKey = ["code", "test", "design", "docs", "config"]
 
-# Classifies the commit activities of the user in teh selected repo path using collect_user_additions() to get the additions then counting keywords and syntax to create a table
-#Ex:{
-#  "code": {"commits": 45, "lines_added": 1200, "percentage": 60},
-#  "test": {"commits": 15, "lines_added": 400, "percentage": 20},
-#  "docs": {"commits": 10, "lines_added": 300, "percentage": 15},
-#  "config": {"commits": 5, "lines_added": 100, "percentage": 5}
-#}
-
 
 def classify_commit_activities(additions: List[str]) -> dict:
-    # base structure
+    """
+    Classify commit activity based on added text blobs.
+
+    - A single commit can contribute to multiple categories (test + docs + config, etc.)
+    - Docs are detected ONLY from comment-only / doc-style lines, never from code+comment lines.
+    - Code+comment lines always count as code, never docs.
+    - Percentages are based on lines_added and normalized to sum to 100 when there is activity.
+    """
     activity_summary: Dict[str, dict] = {
         key: {"commits": 0, "lines_added": 0} for key in ActivityKey
     }
 
-    # per-commit loop
     for addition in additions:
         lines = addition.splitlines()
-        lines_added = len(lines)
-        addition_lower = addition.lower()
+        non_blank_lines = [ln for ln in lines if ln.strip()]
+        lines_added = len(non_blank_lines)
+        if lines_added == 0:
+            continue
 
-        # flags so a commit can land in multiple buckets
-        is_test = False
-        is_docs = False
-        is_config = False
-        is_design = False
+        has_test = False
+        has_docs = False
+        has_config = False
+        has_design = False
 
-        # --- tests ---
-        if (
-            " pytest" in addition_lower
-            or "unittest" in addition_lower
-            or "assert " in addition_lower
-            or " describe(" in addition_lower  # JS tests
-            or " it(" in addition_lower
-        ):
-            is_test = True
+        doc_like_lines = 0
+        config_like_lines = 0
+        docs_keyword_hit = False  # track if we saw doc-ish text at all
 
-        # --- docs ---
-        if (
-            "# " in addition  # markdown heading
-            or "## " in addition
-            or "documentation" in addition_lower
-            or "readme" in addition_lower
-        ):
-            is_docs = True
+        for line in non_blank_lines:
+            raw = line.rstrip("\n")
+            stripped = raw.lstrip()
 
-        # --- config ---
-        if (
-            "json" in addition_lower
-            or "yaml" in addition_lower
-            or "toml" in addition_lower
-            or "env" in addition_lower
-            or "settings" in addition_lower
-        ):
-            is_config = True
+            # Quick check for HTML comment-only docs (e.g. PR templates)
+            if stripped.startswith("<!--"):
+                # Treat HTML comment blocks as doc-ish by default
+                doc_like_lines += 1
+                docs_keyword_hit = True
+                continue
 
-        # --- design ---
-        if (
-            "figma" in addition_lower
-            or "wireframe" in addition_lower
-            or "mockup" in addition_lower
-            or "prototype" in addition_lower
-        ):
-            is_design = True
+            # Split into code vs comment part for languages with #, //, /*.
+            comment_markers = ["#", "//", "/*"]
+            split_index = None
 
-        # apply classifications
+            for marker in comment_markers:
+                idx = raw.find(marker)
+                if idx != -1 and (split_index is None or idx < split_index):
+                    split_index = idx
+
+            if split_index is None:
+                code_part = raw
+                comment_part = ""
+            else:
+                code_part = raw[:split_index]
+                comment_part = raw[split_index:]
+
+            code_part_stripped = code_part.strip()
+            comment_part_stripped = comment_part.strip()
+
+            has_code = bool(code_part_stripped)
+            has_comment_only = (not has_code) and bool(comment_part_stripped)
+
+            code_lower = code_part_stripped.lower()
+            comment_lower = comment_part_stripped.lower()
+            lower_whole = raw.strip().lower()
+
+            # --------------------
+            # TEST detection (code-focused)
+            # --------------------
+            if code_lower:
+                if (
+                    "assert " in code_lower
+                    or "assert(" in code_lower
+                    or "pytest" in code_lower
+                    or "unittest" in code_lower
+                    or "expect(" in code_lower
+                    or "describe(" in code_lower
+                    or " it(" in code_lower
+                    or code_lower.startswith("def test_")
+                    or " test_" in code_lower
+                    or code_lower.startswith("test(")
+                ):
+                    has_test = True
+
+            # --------------------
+            # DOCS detection (comment-only / doc-style)
+            # --------------------
+            if has_comment_only:
+                # Markdown-style headings / bullet docs
+                if comment_lower.startswith("# ") or comment_lower.startswith("## "):
+                    doc_like_lines += 1
+                    docs_keyword_hit = True
+                # Common doc-ish words
+                elif any(
+                    kw in comment_lower
+                    for kw in [
+                        "readme",
+                        "documentation",
+                        "user guide",
+                        "usage:",
+                        "example:",
+                        "examples:",
+                        "parameters",
+                        "returns",
+                        "notes:",
+                        "note:",
+                        "warning:",
+                        "api reference",
+                        "changelog",
+                        "release notes",
+                    ]
+                ):
+                    doc_like_lines += 1
+                    docs_keyword_hit = True
+                # Docstring-only lines (Python) like """Summary"""
+                elif stripped.startswith('"""') or stripped.startswith("'''"):
+                    # treat short triple-quoted lines as doc-ish
+                    doc_like_lines += 1
+                    docs_keyword_hit = True
+
+            # --------------------
+            # CONFIG detection (config-like structure)
+            # --------------------
+            # env-style: FOO=bar (no '==' and uppercase key)
+            if (
+                "=" in raw
+                and "==" not in raw
+                and not raw.strip().startswith(("if ", "while ", "for "))
+                and raw.split("=", 1)[0].strip().isupper()
+            ):
+                config_like_lines += 1
+            # yaml-style: key: value (no trailing ';', no def/class)
+            elif (
+                ":" in raw
+                and not raw.strip().endswith(";")
+                and not raw.lstrip().startswith(("def ", "class "))
+            ):
+                key_part = raw.split(":", 1)[0].strip()
+                if key_part and key_part.replace("-", "_").replace(".", "").isalnum():
+                    config_like_lines += 1
+            # obvious config keywords on simple lines
+            elif any(
+                kw in lower_whole
+                for kw in ["toml", "yaml", "yml", "json", "settings", "config"]
+            ):
+                if len(raw.strip().split()) <= 4:
+                    config_like_lines += 1
+
+            # --------------------
+            # DESIGN detection (comment-only or doc-style references)
+            # --------------------
+            if has_comment_only:
+                if any(
+                    kw in comment_lower
+                    for kw in [
+                        "figma",
+                        "wireframe",
+                        "mockup",
+                        "prototype",
+                        "ui spec",
+                        "ux spec",
+                        "screen flow",
+                        "user flow",
+                    ]
+                ):
+                    has_design = True
+
+        # Decide docs/config based on thresholds
+        # Docs: either clear doc keywords or a big chunk of comment-only lines
+        if doc_like_lines >= 3 and (doc_like_lines / lines_added) >= 0.2:
+            has_docs = True
+        elif docs_keyword_hit and doc_like_lines >= 1:
+            # a small amount of clearly doc-ish text
+            has_docs = True
+
+        # Config: multiple config-like lines and decent proportion
+        if config_like_lines >= 3 and (config_like_lines / lines_added) >= 0.2:
+            has_config = True
+
         classified_any = False
 
-        if is_test:
+        if has_test:
             activity_summary["test"]["commits"] += 1
             activity_summary["test"]["lines_added"] += lines_added
             classified_any = True
 
-        if is_docs:
+        if has_docs:
             activity_summary["docs"]["commits"] += 1
             activity_summary["docs"]["lines_added"] += lines_added
             classified_any = True
 
-        if is_config:
+        if has_config:
             activity_summary["config"]["commits"] += 1
             activity_summary["config"]["lines_added"] += lines_added
             classified_any = True
 
-        if is_design:
+        if has_design:
             activity_summary["design"]["commits"] += 1
             activity_summary["design"]["lines_added"] += lines_added
             classified_any = True
 
-        # default bucket → code
+        # Default bucket → code
         if not classified_any:
             activity_summary["code"]["commits"] += 1
             activity_summary["code"]["lines_added"] += lines_added
@@ -99,7 +213,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
     total_lines = sum(v["lines_added"] for v in activity_summary.values())
 
     if total_lines > 0:
-        # compute raw float percentages
         raw = {
             k: (v["lines_added"] * 100.0) / total_lines
             for k, v in activity_summary.items()
@@ -107,7 +220,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
         floored = {k: int(raw[k]) for k in raw}
         remainder = 100 - sum(floored.values())
 
-        # distribute remainder by largest fractional part
         frac = {k: raw[k] - floored[k] for k in raw}
         keys_ordered = sorted(frac.keys(), key=lambda k: frac[k], reverse=True)
 
