@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Set
 
 from artifactminer.helpers.openai import get_gpt5_nano_response
@@ -18,10 +19,15 @@ from .skill_patterns import FILE_PATTERNS, GIT_SKILLS, LANGUAGE_EXTENSIONS
 
 
 class SkillExtractor:
-    """Heuristic skill extractor that works offline, with optional LLM refinement."""
+    """Heuristic skill extractor that works offline, with optional LLM refinement and default kit enrichment."""
 
     def __init__(self, enable_llm: bool = False) -> None:
         self.enable_llm = enable_llm
+        # Kit defaults are opinionated and not configurable via init to reduce surface area.
+        self.kit_top_k = 5
+        self.kit_max_queries = 8
+        self.kit_chunk_by = "symbols"
+        self.kit_build_index = True
 
     def extract_skills(
         self,
@@ -164,6 +170,14 @@ class SkillExtractor:
                 prof = min(0.8, pattern["weight"] + 0.05 * count)
                 self._add_skill(skills, pattern["skill"], pattern["category"], evidence, prof)
 
+        # Kit-based semantic enrichment (CLI; always on, default embedding model)
+        if consent_level != "none":
+            try:
+                skills = self._enhance_with_kit(repo_path, skills, touched_paths)
+            except Exception:
+                # Keep baseline results if kit enrichment fails
+                pass
+
         # Optional LLM refinement
         if self.enable_llm and consent_level == "full":
             try:
@@ -274,4 +288,40 @@ class SkillExtractor:
         except Exception:
             # Fall back to existing skills if parsing fails
             return skills
+        return skills
+
+    def _enhance_with_kit(
+        self,
+        repo_path: str,
+        skills: Dict[str, ExtractedSkill],
+        touched_paths: Set[str] | None,
+    ) -> Dict[str, ExtractedSkill]:
+        """Use kit CLI semantic search to enrich evidence for existing skills."""
+        if not skills:
+            return skills
+
+        try:
+            from artifactminer.skills.kit_client import semantic_skill_evidence
+        except Exception:
+            return skills
+
+        queries = list(skills.keys())[: self.kit_max_queries]
+        evidence_map = semantic_skill_evidence(
+            repo_path,
+            queries,
+            top_k=self.kit_top_k,
+            chunk_by=self.kit_chunk_by,
+            persist_dir=str(Path(repo_path) / ".kit" / "semantic-index"),
+            touched_paths=touched_paths,
+            build_index=self.kit_build_index,
+        )
+
+        for name, evidence in evidence_map.items():
+            if not evidence:
+                continue
+            existing = skills.get(name)
+            category = existing.category if existing else CATEGORIES["practices"]
+            proficiency = existing.proficiency if existing else 0.55
+            self._add_skill(skills, name, category, evidence, proficiency)
+
         return skills

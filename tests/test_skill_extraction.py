@@ -41,7 +41,7 @@ def test_extract_skills_offline_with_no_llm_consent():
         repo_stat=repo_stat,
         user_email="user@example.com",
         user_contributions=user_contributions,
-        consent_level="no_llm",
+        consent_level="none",  # disable kit/LLM for deterministic testing
     )
 
     assert skills, "Expected at least one skill to be extracted"
@@ -84,7 +84,7 @@ def test_ecosystem_filtering_skips_python_patterns_for_java_context(tmp_path):
         repo_stat=repo_stat,
         user_email="user@example.com",
         user_contributions={"additions": ["async def foo():\n    return True"]},
-        consent_level="no_llm",
+        consent_level="none",  # disable kit/LLM for deterministic testing
         languages=["Java"],
         frameworks=["Spring Boot"],
     )
@@ -189,7 +189,7 @@ def test_user_scoped_skills_ignore_other_authors(tmp_path):
         repo_path=repo_root,
         repo_stat=repo_stat,
         user_email="target@example.com",
-        consent_level="no_llm",
+        consent_level="none",  # disable kit/LLM for deterministic testing
     )
 
     names = {s.skill for s in skills}
@@ -211,7 +211,7 @@ def test_shared_dependency_mapping_drives_detector_and_extractor(tmp_path):
         repo_stat=repo_stat,
         user_email="user@example.com",
         user_contributions={},
-        consent_level="no_llm",
+        consent_level="none",  # disable kit/LLM for deterministic testing
     )
     names = {s.skill for s in skills}
     assert "Flask" in names
