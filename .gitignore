@@ -84,3 +84,4 @@ uploads/
 # Others
 .claude
 .ruff_cache
+.kit/
