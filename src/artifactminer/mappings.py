@@ -75,13 +75,13 @@ DEPENDENCY_SKILLS: Dict[str, Dict[str, tuple[str, str]]] = {
     },
 }
 
-# Pre-computed lookup of dependency needle -> framework skill per ecosystem (framework-only).
+# Pre-computed lookup of dependency needle -> skill name per ecosystem (all dependencies).
 FRAMEWORK_DEPENDENCIES_BY_ECOSYSTEM: Dict[str, Dict[str, str]] = {}
 for eco, mapping in DEPENDENCY_SKILLS.items():
-    frameworks = {
+    all_deps = {
         dep.lower(): skill
         for dep, (skill, category) in mapping.items()
-        if category == CATEGORIES["frameworks"]
     }
-    if frameworks:
-        FRAMEWORK_DEPENDENCIES_BY_ECOSYSTEM[eco] = frameworks
+    if all_deps:
+        FRAMEWORK_DEPENDENCIES_BY_ECOSYSTEM[eco] = all_deps
+
