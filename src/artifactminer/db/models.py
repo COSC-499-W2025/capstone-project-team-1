@@ -63,6 +63,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     userStatspercentages = Column(Float, nullable=True) # Percentage of user's contributions compared to total repo activity
     commitFrequency = Column(Float, nullable=True) # Average number of commits per week by the user
     created_at = Column(DateTime, default=datetime.utcnow)
+    activity_breakdown = Column(JSON, nullable=True) # New field to store activity breakdown
 
 class UserAIntelligenceSummary(Base):
     __tablename__ = "user_intelligence_summaries"
