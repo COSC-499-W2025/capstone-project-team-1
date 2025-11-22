@@ -23,6 +23,50 @@ def user_allows_llm() -> bool:
     finally:
         db.close()
 
+
+from typing import List
+
+#The goal of this function is to take a list of commit additions (each a string) and merge them into at most `max_blocks` strings, each no longer than `max_chars_per_block` characters.
+#basically to limit the stress on the LLM by chunking the input into manageable pieces.
+def group_additions_into_blocks(
+    additions: List[str],
+    max_blocks: int = 5,
+    max_chars_per_block: int = 8000,) -> List[str]:
+    """Take a list of commit additions (each a string) and merge them into
+    at most `max_blocks` strings."""
+    blocks: List[str] = []
+    current = ""
+
+    for addition in additions:
+        # stop if we already filled all blocks
+        if len(blocks) >= max_blocks:
+            break
+
+        # what it would look like if we add this commit to current
+        candidate = (current + "\n\n" + addition) if current else addition
+
+        if len(candidate) <= max_chars_per_block:
+            # still fits, keep growing current block
+            current = candidate
+        else:
+            # current has content, close it out
+            if current:
+                blocks.append(current)
+                if len(blocks) >= max_blocks:
+                    break
+                # start new block with this addition (maybe truncated)
+                current = addition[:max_chars_per_block]
+            else:
+                # single huge commit: just take a truncated version as its own block
+                blocks.append(addition[:max_chars_per_block])
+
+    # push the last block if there's room
+    if current and len(blocks) < max_blocks:
+        blocks.append(current)
+
+    return blocks
+
+
 # Create a summary of user additions using LLM
 def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
     #Each addition in additions is a string of added lines from a single commit
