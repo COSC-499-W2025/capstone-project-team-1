@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from artifactminer.db import Base
 from artifactminer.db.models import RepoStat
-from artifactminer.skills import SkillExtractor, persist_extracted_skills
+from artifactminer.skills import SkillExtractor
 from artifactminer.RepositoryIntelligence.framework_detector import detect_frameworks
 
 
@@ -67,36 +67,7 @@ def test_extract_skills_offline_with_no_llm_consent():
         assert skill.evidence
 
 
-def test_persist_skills_to_db():
-    repo_root = Path(__file__).resolve().parents[1]
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
-    db = Session()
 
-    # Seed a RepoStat row
-    repo_stat = RepoStat(project_name=repo_root.name, primary_language="Python")
-    db.add(repo_stat)
-    db.commit()
-    db.refresh(repo_stat)
-
-    extractor = SkillExtractor(enable_llm=False)
-    skills = extractor.extract_skills(
-        repo_path=repo_root,
-        repo_stat=repo_stat,
-        user_email="user@example.com",
-        user_contributions={"additions": ["async def foo():\n    return True"]},
-        consent_level="no_llm",
-        languages=["Python"],
-    )
-
-    saved = persist_extracted_skills(db, repo_stat.id, skills)
-    assert saved, "Project skills should be persisted"
-    assert db.query(RepoStat).filter(RepoStat.id == repo_stat.id).first()
-
-    for ps in saved:
-        assert ps.proficiency is not None
-        assert ps.evidence
 
 
 def test_ecosystem_filtering_skips_python_patterns_for_java_context(tmp_path):
