@@ -22,7 +22,15 @@ def user_allows_llm() -> bool:
         return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
     finally:
         db.close()
-
+# Set user consent level for LLM usage
+def set_user_consent(level: str):
+    db = SessionLocal()
+    try:
+        consent = Consent(id=1, consent_level=level)
+        db.merge(consent)   # merge = insert or update
+        db.commit()
+    finally:
+        db.close()
 
 from typing import List
 
@@ -78,27 +86,41 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
     #A for loop that goes through every addition and asks the AI to summarize it, then combines all summaries into one final summary, and asks the AI to summarize that final summary.
     for addition in additions:
         prompt = (
-        "You are evaluating a student's code contribution from a single commit."
-        "Analyze the added lines below and produce a focused, evidence-based critique."
+        "You are evaluating a student's code contribution from a single commit. "
+        "Your job is to identify and articulate the *strengths* demonstrated in the added lines. "
+        "Focus only on positive, portfolio-ready highlights. "
+        "Do not mention weaknesses, omissions, inconsistencies, errors, or anything negative. "
 
-        "For this commit, cover:"
-        "- Functional intent: what changed and why it likely matters"
-        "- CS concepts observed: OOP (abstraction/encapsulation/inheritance/polymorphism), data structures, algorithms"
-        "- Complexity/performance notes: any Big-O implications, memory or latency tradeoffs"
-        "- Software engineering practices: modularity, testing, error handling, naming, logging, docs"
-        "- Risks/edge cases/security: call out anything suspicious or fragile"
+        "For this commit, highlight: "
+        "- Functional impact: what the change enables or improves "
+        "- Technical skills demonstrated (OOP, data structures, algorithms, async patterns, etc.) "
+        "- Software engineering competencies (clean architecture, modularity, documentation-quality, tests, type safety) "
+        "- Performance or reliability improvements implied by the change "
+        "- Indicators of good development practices (readability, maintainability, clarity, structure) "
 
-        "Constraints:"
-        "- Be concise: 4–6 bullets. No fluff, no speculation beyond the diff."
-        "- Don’t restate the code—explain what it implies about skill and decisions."
+        "Constraints: "
+        "- Produce 4–6 concise bullet points "
+        "- No criticism or negativity "
+        "- No speculation beyond what's visible in the diff "
+        "- Do not restate the code; describe the skill it implies "
 
-        "ADDED LINES (unified diff subset, additions only):"
+        "ADDED LINES (unified diff subset, additions only):\n"
         )
+
         prompt += f"{addition}\n\n"
         intermediate_summary += get_gpt5_nano_response(prompt)
     final_summary = get_gpt5_nano_response(
-        "Summarize the following summaries of code additions made by the user in the repository into a single concise summary:\n\n"
-        + intermediate_summary)
+    "Create a polished, portfolio-ready summary of this student's overall code contributions. "
+    "Only highlight strengths, technical skills, and positive impact. "
+    "Do not mention weaknesses, issues, inconsistencies, or anything negative. "
+    "Focus on themes such as engineering maturity, problem-solving ability, code quality, "
+    "architecture decisions, and demonstrated competencies. "
+    "Keep the tone professional and achievement-oriented. "
+    "Be concise and produce a cohesive paragraph or a short set of strong bullets. "
+    "Here are the aggregated commit analyses:\n\n"
+    + intermediate_summary
+)
+
     return final_summary
 
 
