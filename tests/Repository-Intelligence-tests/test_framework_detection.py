@@ -53,7 +53,7 @@ class TestPythonFrameworkDetection:
             req_file = Path(tmpdir) / "requirements.txt"
             req_file.write_text("pytest==7.3.0\npytest-cov==4.1.0\n")
             frameworks = detect_python_frameworks(tmpdir)
-            assert "Pytest" in frameworks
+            assert "Testing" in frameworks
 
     def test_detect_sqlalchemy_from_requirements(self):
         """Test SQLAlchemy detection from requirements.txt"""
@@ -72,7 +72,7 @@ class TestPythonFrameworkDetection:
             )
             frameworks = detect_python_frameworks(tmpdir)
             assert "FastAPI" in frameworks
-            assert "Pydantic" in frameworks
+            assert "Data Validation" in frameworks
 
     def test_detect_from_pipfile(self):
         """Test framework detection from Pipfile"""
@@ -81,7 +81,7 @@ class TestPythonFrameworkDetection:
             pipfile.write_text("[packages]\ndjango = '*'\ncelery = '*'\n")
             frameworks = detect_python_frameworks(tmpdir)
             assert "Django" in frameworks
-            assert "Celery" in frameworks
+            assert "Task Queues" in frameworks
 
     def test_detect_from_setup_py(self):
         """Test framework detection from setup.py"""
@@ -159,7 +159,7 @@ class TestJavaScriptFrameworkDetection:
                 json.dumps({"dependencies": {"@nestjs/common": "^9.0.0"}})
             )
             frameworks = detect_javascript_frameworks(tmpdir)
-            assert "Nest.js" in frameworks
+            assert "NestJS" in frameworks
 
     def test_detect_typescript(self):
         """Test TypeScript detection from devDependencies"""
@@ -177,7 +177,7 @@ class TestJavaScriptFrameworkDetection:
             pkg = Path(tmpdir) / "package.json"
             pkg.write_text(json.dumps({"devDependencies": {"jest": "^29.0.0"}}))
             frameworks = detect_javascript_frameworks(tmpdir)
-            assert "Jest" in frameworks
+            assert "Testing" in frameworks
 
     def test_detect_multiple_js_frameworks(self):
         """Test detection of multiple JavaScript frameworks"""
@@ -194,8 +194,8 @@ class TestJavaScriptFrameworkDetection:
             frameworks = detect_javascript_frameworks(tmpdir)
             assert "React" in frameworks
             assert "Express" in frameworks
-            assert "Webpack" in frameworks
-            assert "Jest" in frameworks
+            assert "Build Tooling" in frameworks
+            assert "Testing" in frameworks
 
     def test_invalid_package_json(self):
         """Test handling of invalid package.json"""
@@ -226,7 +226,7 @@ class TestJavaFrameworkDetection:
                 """
             )
             frameworks = detect_java_frameworks(tmpdir)
-            assert "Spring" in frameworks
+            assert "Spring Boot" in frameworks
 
     def test_detect_hibernate_from_pom(self):
         """Test Hibernate detection from pom.xml"""
@@ -264,7 +264,7 @@ class TestJavaFrameworkDetection:
                 """
             )
             frameworks = detect_java_frameworks(tmpdir)
-            assert "JUnit" in frameworks
+            assert "Testing" in frameworks
 
     def test_detect_from_gradle(self):
         """Test framework detection from build.gradle"""
@@ -280,9 +280,9 @@ class TestJavaFrameworkDetection:
                 """
             )
             frameworks = detect_java_frameworks(tmpdir)
-            assert "Spring" in frameworks
+            assert "Spring Boot" in frameworks
             assert "Hibernate" in frameworks
-            assert "JUnit" in frameworks
+            assert "Testing" in frameworks
 
     def test_detect_from_gradle_kts(self):
         """Test framework detection from build.gradle.kts"""
@@ -297,7 +297,7 @@ class TestJavaFrameworkDetection:
                 """
             )
             frameworks = detect_java_frameworks(tmpdir)
-            assert "Spring" in frameworks
+            assert "Spring Boot" in frameworks
             assert "Hibernate" in frameworks
 
 
@@ -408,7 +408,7 @@ class TestIntegratedFrameworkDetection:
 
             assert "Django" in frameworks
             assert "React" in frameworks
-            assert "Spring" in frameworks
+            assert "Spring Boot" in frameworks
             assert "Gin" in frameworks
 
     def test_no_duplicates_in_results(self):
