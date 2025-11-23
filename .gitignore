@@ -84,3 +84,6 @@ uploads/
 # Others
 .claude
 .ruff_cache
+
+# Projets Mock Data for testing
+projects/
