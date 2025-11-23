@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Sequence
+from typing import Dict, List
 
 from artifactminer.mappings import CATEGORIES
 
@@ -18,17 +18,6 @@ class CodePattern:
     evidence: str
     weight: float = 0.6
     ecosystems: tuple[str, ...] | None = None  # e.g., ("python",)
-
-
-@dataclass(frozen=True)
-class FilePattern:
-    """Filesystem-based signal for a skill."""
-
-    paths: Sequence[str]
-    skill: str
-    category: str
-    evidence: str
-    weight: float = 0.55
 
 
 LANGUAGE_EXTENSIONS: Dict[str, tuple[str, str]] = {
@@ -52,50 +41,6 @@ LANGUAGE_EXTENSIONS: Dict[str, tuple[str, str]] = {
     ".ps1": ("PowerShell", CATEGORIES["languages"]),
     ".md": ("Technical Writing", CATEGORIES["practices"]),
 }
-
-FILE_PATTERNS: List[FilePattern] = [
-    FilePattern(
-        paths=["Dockerfile", "docker-compose.yml", "docker-compose.yaml"],
-        skill="Containerization",
-        category=CATEGORIES["tools"],
-        evidence="Docker configuration present",
-        weight=0.65,
-    ),
-    FilePattern(
-        paths=[".github/workflows"],
-        skill="CI/CD",
-        category=CATEGORIES["practices"],
-        evidence="GitHub Actions workflows present",
-        weight=0.65,
-    ),
-    FilePattern(
-        paths=["requirements.txt", "pyproject.toml"],
-        skill="Dependency Management",
-        category=CATEGORIES["practices"],
-        evidence="Python dependency manifest present",
-    ),
-    FilePattern(
-        paths=["alembic.ini", "alembic"],
-        skill="Database Migrations",
-        category=CATEGORIES["tools"],
-        evidence="Alembic migration config present",
-        weight=0.62,
-    ),
-    FilePattern(
-        paths=["tests", "pytest.ini", "pyproject.toml"],
-        skill="Automated Testing",
-        category=CATEGORIES["practices"],
-        evidence="Test suite present",
-        weight=0.62,
-    ),
-    FilePattern(
-        paths=["README.md", "docs"],
-        skill="Documentation",
-        category=CATEGORIES["practices"],
-        evidence="Project documentation present",
-        weight=0.55,
-    ),
-]
 
 CODE_REGEX_PATTERNS: List[CodePattern] = [
     CodePattern(
@@ -252,20 +197,3 @@ DEEP_CODE_PATTERNS: List[CodePattern] = [
 ]
 
 CODE_REGEX_PATTERNS.extend(DEEP_CODE_PATTERNS)
-
-GIT_SKILLS = [
-    {
-        "key": "merge_commits",
-        "skill": "Version Control",
-        "category": CATEGORIES["practices"],
-        "evidence": "Merge commits found",
-        "weight": 0.55,
-    },
-    {
-        "key": "branches",
-        "skill": "Branching Strategies",
-        "category": CATEGORIES["practices"],
-        "evidence": "Multiple branches present",
-        "weight": 0.52,
-    },
-]
