@@ -70,7 +70,7 @@ def test_user_additions_collection():
     # Replace with a valid email present in the commit history of the repo
     test_email = "ecrowl01@student.ubc.ca"
     additions = collect_user_additions(root, test_email, max_commits=100)
-    summarized_texts = group_additions_into_blocks(additions, max_blocks=4, max_chars_per_block=9000)
+    summarized_texts = group_additions_into_blocks(additions, max_blocks=2, max_chars_per_block=10000)
     summary1 = createAIsummaryFromUserAdditions(summarized_texts)
     print(f"Collected {len(additions)} additions, summarized into {len(summarized_texts)} blocks.")
     print(f"AI Summary from User Additions: {summary1}")
