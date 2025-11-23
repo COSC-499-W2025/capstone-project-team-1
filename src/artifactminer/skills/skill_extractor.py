@@ -2,26 +2,23 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, Iterable, List, Set
 
-from artifactminer.helpers.openai import get_gpt5_nano_response
 from artifactminer.mappings import CATEGORIES, DEPENDENCY_SKILLS
 from artifactminer.skills.models import ExtractedSkill
 from artifactminer.skills.signals.code_signals import collect_additions_text, iter_code_pattern_hits
 from artifactminer.skills.signals.dependency_signals import dependency_hits
-from artifactminer.skills.signals.file_signals import paths_present
-from artifactminer.skills.signals.git_signals import git_signals
-from artifactminer.skills.signals.language_signals import count_files_by_ext, language_signals
+from artifactminer.skills.signals.language_signals import count_files_by_ext
 from artifactminer.skills.user_profile import build_user_profile
-from .skill_patterns import FILE_PATTERNS, GIT_SKILLS, LANGUAGE_EXTENSIONS
+from .skill_patterns import LANGUAGE_EXTENSIONS
 
 
 class SkillExtractor:
-    """Heuristic skill extractor that works offline, with optional LLM refinement."""
+    """Heuristic skill extractor that relies on deterministic signals only."""
 
     def __init__(self, enable_llm: bool = False) -> None:
-        self.enable_llm = enable_llm
+        # enable_llm is accepted for backward compatibility but ignored
+        self.enable_llm = False
 
     def extract_skills(
         self,
@@ -81,17 +78,13 @@ class SkillExtractor:
                 self._add_skill(skills, name, category, evidence, proficiency)
                 detected_languages.add(name.lower())
 
-        # Language signals from manifests/shebangs/key files
-        for lang_signal, evidence in language_signals(repo_path, touched_paths=touched_paths):
-            name, category = lang_signal
-            self._add_skill(skills, name, category, [evidence], 0.55)
-            detected_languages.add(name.lower())
-
         # Repo-wide languages/frameworks are only used when the repo is not collaborative
         repo_languages = self._normalize_list(getattr(repo_stat, "Languages", None)) or self._normalize_list(
             getattr(repo_stat, "languages", None)
         )
         repo_frameworks = self._normalize_list(getattr(repo_stat, "frameworks", None))
+        for lang in repo_languages:
+            detected_languages.add(str(lang).lower())
         if not collab_flag:
             for lang in repo_languages:
                 mapping = LANGUAGE_EXTENSIONS.get(lang)
@@ -136,14 +129,7 @@ class SkillExtractor:
                     proficiency = min(0.8, 0.45 + 0.1 * dep_hits)
                     self._add_skill(skills, skill_name, category, evidence, proficiency)
 
-        for pattern in FILE_PATTERNS:
-            matched = paths_present(repo_path, pattern.paths, touched_paths=touched_paths)
-            if matched:
-                prof = pattern.weight
-                evidence = [f"{pattern.evidence}: {', '.join(matched)}"]
-                self._add_skill(skills, pattern.skill, pattern.category, evidence, prof)
-
-        # ----------------------- code and git signals ----------------------- #
+        # ----------------------- code signals ----------------------- #
         additions_text = collect_additions_text(user_contributions)
         if user_profile and user_profile.get("additions_text"):
             if not additions_text:
@@ -155,22 +141,6 @@ class SkillExtractor:
             evidence = [f"{pattern.evidence} ({hits} match{'es' if hits != 1 else ''})"]
             prof = min(0.9, pattern.weight + 0.05 * hits)
             self._add_skill(skills, pattern.skill, pattern.category, evidence, prof)
-
-        git_info = git_signals(repo_path, user_contributions)
-        for pattern in GIT_SKILLS:
-            if git_info.get(pattern["key"], 0):
-                count = git_info[pattern["key"]]
-                evidence = [f"{pattern['evidence']} ({count})"]
-                prof = min(0.8, pattern["weight"] + 0.05 * count)
-                self._add_skill(skills, pattern["skill"], pattern["category"], evidence, prof)
-
-        # Optional LLM refinement
-        if self.enable_llm and consent_level == "full":
-            try:
-                skills = self._enhance_with_llm(repo_path, skills)
-            except Exception:
-                # If LLM fails, keep baseline results
-                pass
 
         return list(skills.values())
 
@@ -245,33 +215,3 @@ class SkillExtractor:
                 if any(n in fw_lower for n in needles):
                     ecos.add(eco)
         return ecos
-
-    def _enhance_with_llm(
-        self, repo_path: str, skills: Dict[str, ExtractedSkill]
-    ) -> Dict[str, ExtractedSkill]:
-        """Refine proficiency and add nuanced skills via LLM."""
-        # Prepare a concise payload to stay within prompt limits
-        summary = [
-            {"skill": s.skill, "category": s.category, "evidence": s.evidence[:3], "proficiency": s.proficiency}
-            for s in skills.values()
-        ]
-        prompt = (
-            "You are refining detected technical skills from a repository scan.\n"
-            "Given the baseline skills (with evidence snippets), adjust proficiency to a 0-1 scale "
-            "where 1 is expert-level, and propose any additional nuanced skills you see.\n"
-            "Return JSON with shape: {\"skills\": [{\"skill\": str, \"category\": str, \"proficiency\": float, \"evidence\": [str,...]}]}.\n\n"
-            f"Baseline: {json.dumps(summary)}"
-        )
-        response = get_gpt5_nano_response(prompt)
-        try:
-            data = json.loads(response)
-            for item in data.get("skills", []):
-                skill_name = item.get("skill")
-                category = item.get("category", CATEGORIES["practices"])
-                evidence = item.get("evidence", [])
-                prof = float(item.get("proficiency", 0.5))
-                self._add_skill(skills, skill_name, category, evidence, prof)
-        except Exception:
-            # Fall back to existing skills if parsing fails
-            return skills
-        return skills

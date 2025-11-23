@@ -51,16 +51,12 @@ def test_extract_skills_offline_with_no_llm_consent():
     assert "Python" in names
     assert "FastAPI" in names or "REST API Design" in names
     assert "SQLAlchemy" in names
-    assert "Dependency Management" in names
-    assert "Automated Testing" in names
 
     # Contribution-driven signals
     assert "Unit Testing" in names
     assert "Asynchronous Programming" in names
     assert "Error Handling" in names
     assert "SQL" in names
-    assert "Version Control" in names
-    assert "Branching Strategies" in names
 
     for skill in skills:
         assert 0.0 <= skill.proficiency <= 1.0
