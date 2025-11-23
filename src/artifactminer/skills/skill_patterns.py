@@ -190,7 +190,7 @@ CODE_REGEX_PATTERNS: List[CodePattern] = [
     ),
 ]
 
-# Additional, higher-order patterns that still operate on user additions (option 1 approach).
+# Additional, higher-order patterns that still operate on user additions.
 DEEP_CODE_PATTERNS: List[CodePattern] = [
     # Complexity / resource-awareness signals
     CodePattern(
