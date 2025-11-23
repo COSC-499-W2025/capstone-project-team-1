@@ -190,6 +190,69 @@ CODE_REGEX_PATTERNS: List[CodePattern] = [
     ),
 ]
 
+# Additional, higher-order patterns that still operate on user additions (option 1 approach).
+DEEP_CODE_PATTERNS: List[CodePattern] = [
+    # Complexity / resource-awareness signals
+    CodePattern(
+        skill="Resource Management",
+        regex=r"\b(max_\w+|limit\w*|chunk\w*|batch\w*|throttle|sample_limit|timeout)\s*[:=]",
+        category=CATEGORIES["practices"],
+        evidence="Resource caps or chunking present in changes",
+        weight=0.68,
+    ),
+    # Data-structure sophistication
+    CodePattern(
+        skill="Advanced Collections",
+        regex=r"(from\s+collections\s+import\s+|collections\.)(Counter|defaultdict|deque|OrderedDict|ChainMap)",
+        category=CATEGORIES["practices"],
+        evidence="Specialized Python collections in changes",
+        ecosystems=("python",),
+        weight=0.7,
+    ),
+    CodePattern(
+        skill="Algorithm Optimization",
+        regex=r"\b(heapq|bisect|functools\.lru_cache|@lru_cache)\b",
+        category=CATEGORIES["practices"],
+        evidence="Algorithmic optimization techniques in changes",
+        ecosystems=("python",),
+        weight=0.72,
+    ),
+    # Abstraction / design
+    CodePattern(
+        skill="Dataclass Design",
+        regex=r"@dataclass|@dataclasses\.dataclass",
+        category=CATEGORIES["practices"],
+        evidence="Dataclass-based modeling in changes",
+        ecosystems=("python",),
+        weight=0.65,
+    ),
+    CodePattern(
+        skill="Abstract Interfaces",
+        regex=r"(ABC|Protocol|@abstractmethod|@abc\.abstractmethod|interface\s+I[A-Z])",
+        category=CATEGORIES["practices"],
+        evidence="Abstract base classes or interfaces in changes",
+        weight=0.75,
+    ),
+    # Robustness / error handling
+    CodePattern(
+        skill="Exception Design",
+        regex=r"class\s+\w+(Error|Exception)\(",
+        category=CATEGORIES["practices"],
+        evidence="Custom exception types declared in changes",
+        weight=0.7,
+    ),
+    CodePattern(
+        skill="Context Management",
+        regex=r"(with\s+.+:|\bcontextmanager\b|__enter__|__exit__)",
+        category=CATEGORIES["practices"],
+        evidence="Context manager usage for resource safety in changes",
+        ecosystems=("python",),
+        weight=0.73,
+    ),
+]
+
+CODE_REGEX_PATTERNS.extend(DEEP_CODE_PATTERNS)
+
 GIT_SKILLS = [
     {
         "key": "merge_commits",
