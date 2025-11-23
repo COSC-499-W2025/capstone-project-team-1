@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from artifactminer.skills.models import ExtractedSkill
 from artifactminer.skills.skill_extractor import SkillExtractor
+from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 
 
 @dataclass
@@ -40,17 +41,26 @@ class DeepRepoAnalyzer:
             "why": "Specialized collections and optimization tools indicate performance-minded choices.",
         },
         "Abstraction and encapsulation": {
-            "skills": {"Dataclass Design", "Abstract Interfaces"},
+            "skills": {"Dataclass Design", "Abstract Interfaces", "Data Validation"},
             "why": "Structured modeling and interfaces reflect design thinking beyond scripts.",
         },
         "Robustness and error handling": {
-            "skills": {"Exception Design", "Context Management"},
-            "why": "Custom exceptions and managed resources reduce brittleness in failure scenarios.",
+            "skills": {"Exception Design", "Context Management", "Error Handling", "Logging"},
+            "why": "Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
+        },
+        "Async and concurrency": {
+            "skills": {"Asynchronous Programming"},
+            "why": "Async patterns enable scalable, non-blocking operations.",
+        },
+        "API design and architecture": {
+            "skills": {"REST API Design", "Dependency Injection", "Data Validation"},
+            "why": "Clean API design with validation and DI shows architectural maturity.",
         },
     }
 
     def __init__(self, enable_llm: bool = False) -> None:
         self.extractor = SkillExtractor(enable_llm=enable_llm)
+        self._validate_insight_rules()
 
     def analyze(
         self,
@@ -70,6 +80,14 @@ class DeepRepoAnalyzer:
         )
         insights = self._derive_insights(skills)
         return DeepAnalysisResult(skills=skills, insights=insights)
+
+    def _validate_insight_rules(self) -> None:
+        """Fail fast if insight rules reference skills that do not exist."""
+        available_skills = {pattern.skill for pattern in CODE_REGEX_PATTERNS}
+        for title, rule in self._INSIGHT_RULES.items():
+            missing = set(rule["skills"]) - available_skills
+            if missing:
+                raise ValueError(f"Insight '{title}' references unknown skills: {sorted(missing)}")
 
     def _derive_insights(self, skills: List[ExtractedSkill]) -> List[Insight]:
         insight_results: List[Insight] = []
