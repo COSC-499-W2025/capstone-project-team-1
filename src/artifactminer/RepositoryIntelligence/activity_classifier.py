@@ -233,7 +233,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
             classified_any = True
 
         # Default bucket → code
-        if not classified_any:
+        if not classified_any or has_code_activity:
             activity_summary["code"]["commits"] += 1
             activity_summary["code"]["lines_added"] += lines_added
 
