@@ -10,6 +10,7 @@ in mock folder there are 4 readable filetypes
 #change this for a path that you choose
 root = Path(__file__).resolve() #get current file path
 project = root.parents[3] #gets project folder (../../../)
+
 MOCKNAME = "mockdirectory"
 CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
@@ -148,4 +149,22 @@ def user_exclude_extension(exName):
 def print_files(file):
     print("\n>",file)
 
-#crawl_directory()
+def print_values_in_dict():
+    print("here are the files in the dictionary: \n")
+    '''This message is specific to SHLOK: if you would like to get the files from my system please first
+
+        1) get the dictionary:
+        store_file_dictionary = StoreFileDict()
+
+        2) run directory walk function
+
+        3) get values to be transfered to LLM, it has the name/path. 
+        store_file_dictionary.values()
+      
+        '''
+    print(store_file_dictionary.values())
+
+
+
+crawl_directory()
+print_values_in_dict()
