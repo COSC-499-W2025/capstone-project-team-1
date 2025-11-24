@@ -3,8 +3,8 @@ class FileValues:
         self.fileName = fileName
         self.filePath = filePath
 
-    def get_file_name():
+    def get_file_name(self):
         return self.fileName
-    def get_file_absolutePath():
+    def get_file_absolutePath(self):
         return self.filePath
     
