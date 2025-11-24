@@ -162,9 +162,5 @@ def print_values_in_dict():
         store_file_dictionary.values()
       
         '''
-    print(store_file_dictionary.values())
+    print(store_file_dictionary.get_values())
 
-
-
-crawl_directory()
-print_values_in_dict()
