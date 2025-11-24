@@ -32,7 +32,7 @@ Pathish = Union[os.PathLike, str]#pathlike will accept anything that looks like 
 
 def runGit(repo_path: Pathish, args: Iterable[str]) -> str: #This function will take the git repo path and run the given git command in the repo. It will fail if the Repo is not a git repo or git is not working properly
 #Example : runGit("/path/to/my/repo/", ["rev-parse", "--is-inside-work-tree"]) would return true if that was a real repo
-    result = subprocess.run(# run teh git command
+    result = subprocess.run(# run the git command
         ["git", *args], #git plus the cmd, we use "rev-parse --is-inside-work-tree" in our example
         cwd=Path(repo_path),#run it in the selected git repo, we use "/path/to/my/repo/" in the example
         check=True, #If a non-zero exit happens a called process error is thrown
@@ -67,6 +67,9 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     # Check if the repository is collaborative
     is_collaborative = len(repo.remotes) > 0 # if there are remotes, its collaborative
+    # Email-based check for multiple contributors
+    authors = {commit.author.email for commit in repo.iter_commits()}
+    is_collaborative = is_collaborative or len(authors) > 1
 
     # Get first and last commit dates
     commits = list(repo.iter_commits())#list of all commits in the repo
