@@ -1,8 +1,8 @@
-import os
 import subprocess
 import re
 from pathlib import Path
 from typing import List, Dict
+
 
 def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
     """
@@ -37,13 +37,13 @@ def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
                     ["git", "shortlog", "-s", "-n", "-e", "--all"],
                     cwd=str(project_path),
                     text=True,
-                    stderr=subprocess.DEVNULL
+                    stderr=subprocess.DEVNULL,
                 )
 
                 total_commits = 0
                 user_commits = 0
 
-                for line in output.strip().split('\n'):
+                for line in output.strip().split("\n"):
                     if not line.strip():
                         continue
 
@@ -62,7 +62,7 @@ def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
                         total_commits += count
 
                         # Extract email
-                        email_match = re.search(r'<([^>]+)>', rest)
+                        email_match = re.search(r"<([^>]+)>", rest)
                         if email_match:
                             author_email = email_match.group(1).lower().strip()
                             if author_email == target_email:
@@ -71,14 +71,18 @@ def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
                     except ValueError:
                         continue
 
-                score = (user_commits / total_commits * 100) if total_commits > 0 else 0.0
+                score = (
+                    (user_commits / total_commits * 100) if total_commits > 0 else 0.0
+                )
 
-                projects.append({
-                    "name": project_path.name,
-                    "score": round(score, 2),
-                    "total_commits": total_commits,
-                    "user_commits": user_commits
-                })
+                projects.append(
+                    {
+                        "name": project_path.name,
+                        "score": round(score, 2),
+                        "total_commits": total_commits,
+                        "user_commits": user_commits,
+                    }
+                )
 
             except subprocess.CalledProcessError:
                 continue
