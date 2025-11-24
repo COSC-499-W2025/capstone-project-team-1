@@ -1,9 +1,9 @@
-"""Filesystem-based signals (presence of key files/directories)."""
+"""Filesystem-based signals (path matching utilities)."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterable, List, Set
+from typing import Set
 
 
 def path_in_touched(rel: str, touched_paths: Set[str]) -> bool:
@@ -22,18 +22,3 @@ def path_in_touched(rel: str, touched_paths: Set[str]) -> bool:
         except Exception:
             continue
     return False
-
-
-def paths_present(
-    repo_path: str, paths: Iterable[str], *, touched_paths: Set[str] | None = None
-) -> List[str]:
-    """Return which of the candidate paths exist, optionally filtered to user-touched paths."""
-    root = Path(repo_path)
-    matched: List[str] = []
-    for rel in paths:
-        if touched_paths is not None and not path_in_touched(rel, touched_paths):
-            continue
-        candidate = root / rel
-        if candidate.exists():
-            matched.append(rel)
-    return matched
