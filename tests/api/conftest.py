@@ -5,7 +5,7 @@ from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from artifactminer.api.app import create_app
-from artifactminer.db import Base, get_db, seed_questions
+from artifactminer.db import Base, get_db, seed_questions, seed_repo_stats
 
 
 @pytest.fixture(scope="function")
@@ -34,6 +34,7 @@ def client():
     db = TestingSessionLocal()
     try:
         seed_questions(db)
+        seed_repo_stats(db)
     finally:
         db.close()
     

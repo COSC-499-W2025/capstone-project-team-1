@@ -27,6 +27,7 @@ from ..db import (
 from .consent import router as consent_router
 from .zip import router as zip_router
 from .openai import router as openai_router
+from .projects import router as projects_router
 
 
 def create_app() -> FastAPI:
@@ -149,7 +150,7 @@ def create_app() -> FastAPI:
     # Mount consent router
     app.include_router(consent_router)
     app.include_router(zip_router)
-
+    app.include_router(projects_router)
     app.include_router(openai_router)
     return app
 

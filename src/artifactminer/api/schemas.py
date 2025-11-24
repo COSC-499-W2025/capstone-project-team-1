@@ -84,6 +84,18 @@ class DirectoriesResponse(BaseModel):
     directories: list[str] = Field(
         description="List of top-level directories in the ZIP file."
     )
+
+
+class ProjectTimelineItem(BaseModel):
+    """Aggregated activity window for a project repository."""
+
+    project_name: str = Field(description="Display name of the project.")
+    first_commit: datetime = Field(description="Timestamp of the first commit seen.")
+    last_commit: datetime = Field(description="Timestamp of the most recent commit seen.")
+    duration_days: int = Field(description="Number of days between first and last commit.")
+    was_active: bool = Field(description="Whether the project was active in the last 6 months.")
+
+
 class OpenAIRequest(BaseModel):
     """Request payload for OpenAI API calls."""
 
