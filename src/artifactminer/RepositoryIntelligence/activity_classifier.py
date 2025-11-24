@@ -8,8 +8,8 @@ def classify_commit_activities(additions: List[str]) -> dict:
     Classify commit activity based on added text blobs.
 
     - A single commit can contribute to multiple categories (test + docs + config, etc.)
-    - Docs are detected ONLY from comment-only / doc-style lines, never from code+comment lines.
-    - Code+comment lines always count as code, never docs.
+    - Docs are detected from comment-only / doc-style lines, and from doc-ish inline comments in the comment portion.
+    - Code+comment lines always count as code; their comments may also contribute to docs.
     - Percentages are based on lines_added and normalized to sum to 100 when there is activity.
     """
     activity_summary: Dict[str, dict] = {
@@ -39,6 +39,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
 
             # Quick check for HTML comment-only docs (e.g. PR templates)
             if stripped.startswith("<!--"):
+                # Treat HTML comment blocks as doc-ish by default
                 doc_like_lines += 1
                 docs_keyword_hit = True
                 continue
@@ -73,7 +74,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
             lower_whole = raw.strip().lower()
 
             # --------------------
-            # TEST detection
+            # TEST detection (code-focused)
             # --------------------
             if code_lower:
                 if (
@@ -91,12 +92,14 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_test = True
 
             # --------------------
-            # DOCS detection
+            # DOCS detection (comment-only / doc-style)
             # --------------------
             if has_comment_only:
+                # Markdown-style headings / bullet docs
                 if comment_lower.startswith("# ") or comment_lower.startswith("## "):
                     doc_like_lines += 1
                     docs_keyword_hit = True
+                # Common doc-ish words
                 elif any(
                     kw in comment_lower
                     for kw in [
@@ -118,13 +121,40 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 ):
                     doc_like_lines += 1
                     docs_keyword_hit = True
+                # Docstring-only lines (Python) like """Summary"""
                 elif stripped.startswith('"""') or stripped.startswith("'''"):
+                    # treat short triple-quoted lines as doc-ish
+                    doc_like_lines += 1
+                    docs_keyword_hit = True
+
+            # Inline comments may also contain doc-like text
+            if comment_part_stripped and not has_comment_only:
+                if any(
+                    kw in comment_lower
+                    for kw in [
+                        "readme",
+                        "documentation",
+                        "user guide",
+                        "usage:",
+                        "example:",
+                        "examples:",
+                        "parameters",
+                        "returns",
+                        "notes:",
+                        "note:",
+                        "warning:",
+                        "api reference",
+                        "changelog",
+                        "release notes",
+                    ]
+                ):
                     doc_like_lines += 1
                     docs_keyword_hit = True
 
             # --------------------
-            # CONFIG detection
+            # CONFIG detection (config-like structure)
             # --------------------
+            # env-style: FOO=bar (no '==' and uppercase key)
             if (
                 "=" in raw
                 and "==" not in raw
@@ -132,6 +162,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 and raw.split("=", 1)[0].strip().isupper()
             ):
                 config_like_lines += 1
+            # yaml-style: key: value (no trailing ';', no def/class)
             elif (
                 ":" in raw
                 and not raw.strip().endswith(";")
@@ -140,6 +171,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 key_part = raw.split(":", 1)[0].strip()
                 if key_part and key_part.replace("-", "_").replace(".", "").isalnum():
                     config_like_lines += 1
+            # obvious config keywords on simple lines
             elif any(
                 kw in lower_whole
                 for kw in ["toml", "yaml", "yml", "json", "settings", "config"]
@@ -148,7 +180,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     config_like_lines += 1
 
             # --------------------
-            # DESIGN detection
+            # DESIGN detection (comment-only or doc-style references)
             # --------------------
             if has_comment_only:
                 if any(
@@ -167,11 +199,14 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_design = True
 
         # Decide docs/config based on thresholds
+        # Docs: either clear doc keywords or a big chunk of comment-only lines
         if doc_like_lines >= 3 and (doc_like_lines / lines_added) >= 0.2:
             has_docs = True
         elif docs_keyword_hit and doc_like_lines >= 1:
+            # a small amount of clearly doc-ish text
             has_docs = True
 
+        # Config: multiple config-like lines and decent proportion
         if config_like_lines >= 3 and (config_like_lines / lines_added) >= 0.2:
             has_config = True
 
@@ -197,13 +232,8 @@ def classify_commit_activities(additions: List[str]) -> dict:
             activity_summary["design"]["lines_added"] += lines_added
             classified_any = True
 
-        # NEW: count code when code exists
-        if has_code_activity:
-            activity_summary["code"]["commits"] += 1
-            activity_summary["code"]["lines_added"] += lines_added
-
-        # Fallback only if nothing classified AND no code detected
-        if not classified_any and not has_code_activity:
+        # Default bucket → code
+        if not classified_any:
             activity_summary["code"]["commits"] += 1
             activity_summary["code"]["lines_added"] += lines_added
 
