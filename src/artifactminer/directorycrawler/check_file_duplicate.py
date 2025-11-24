@@ -4,7 +4,7 @@ import os
 from .store_file_dict import StoreFileDict
 
 '''
-This system will take files from db and check whether there are duplicate copies of a file before passing "scraped" file to AI model.
+This system will take a file from .
 '''
 dict = StoreFileDict()
 

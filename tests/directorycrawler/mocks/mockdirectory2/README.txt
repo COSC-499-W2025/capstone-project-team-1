@@ -1,0 +1,1 @@
+This mock directory is specifically used to test whether the crawler can accept duplicate code or not
