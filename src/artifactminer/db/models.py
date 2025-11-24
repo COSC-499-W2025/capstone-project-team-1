@@ -35,7 +35,7 @@ class Consent(Base):
     __tablename__ = "consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    consent_level = Column(String, default="none", nullable=False)
+    consent_level = Column(String, default="none", nullable=False) # e.g., "none", "full"
     accepted_at = Column(DateTime, nullable=True)
 
 class RepoStat(Base):#model for storing repository statistics
@@ -59,6 +59,9 @@ class RepoStat(Base):#model for storing repository statistics
 
     # Relationships
     project_skills = relationship("ProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan")
+    user_project_skills = relationship(
+        "UserProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan"
+    )
     resume_items = relationship("ResumeItem", back_populates="repo_stat", cascade="all, delete-orphan")
 
 class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
@@ -144,6 +147,7 @@ class Skill(Base):
 
     # Relationships
     project_skills = relationship("ProjectSkill", back_populates="skill", cascade="all, delete-orphan")
+    user_project_skills = relationship("UserProjectSkill", back_populates="skill", cascade="all, delete-orphan")
 
 
 class ProjectSkill(Base):
@@ -156,11 +160,34 @@ class ProjectSkill(Base):
     repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
     skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
     weight = Column(Float, nullable=True)
+    proficiency = Column(Float, nullable=True)
+    evidence = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     repo_stat = relationship("RepoStat", back_populates="project_skills")
     skill = relationship("Skill", back_populates="project_skills")
+
+
+class UserProjectSkill(Base):
+    """User-scoped skills for collaborative repositories."""
+
+    __tablename__ = "user_project_skills"
+    __table_args__ = (
+        UniqueConstraint("repo_stat_id", "skill_id", "user_email", name="uq_user_project_skill"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    user_email = Column(String, nullable=False)
+    proficiency = Column(Float, nullable=True)
+    evidence = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    repo_stat = relationship("RepoStat", back_populates="user_project_skills")
+    skill = relationship("Skill", back_populates="user_project_skills")
 
 
 class ResumeItem(Base):

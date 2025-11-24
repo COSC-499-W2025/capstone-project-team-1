@@ -93,9 +93,3 @@ def parse_user_input_text(text) -> list[text]:
     else:
         return [x.strip() for x in text.split(",")]
     
-
-'''
-mock_adding_user_answer()
-get_user_data()
-delete_all_users() #run last
-'''
