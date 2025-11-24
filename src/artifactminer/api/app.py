@@ -1,6 +1,6 @@
 """ASGI application exposing Artifact Miner backend services."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, date, timedelta
 from typing import List
 
 from fastapi import FastAPI, Depends
@@ -14,6 +14,7 @@ from .schemas import (
     QuestionResponse,
     UserAnswerResponse,
     KeyedAnswersRequest,
+    ProjectTimelineItem,
 )
 from ..db import (
     Base,
@@ -23,6 +24,8 @@ from ..db import (
     UserAnswer,
     get_db,
     seed_questions,
+    seed_repo_stats,
+    RepoStat,
 )
 from .consent import router as consent_router
 from .zip import router as zip_router
@@ -44,6 +47,7 @@ def create_app() -> FastAPI:
     db = SessionLocal()
     try:
         seed_questions(db)
+        seed_repo_stats(db)
     finally:
         db.close()
 
@@ -145,6 +149,55 @@ def create_app() -> FastAPI:
         for ans in saved_answers:
             db.refresh(ans)
         return saved_answers
+
+    @app.get("/projects/timeline", response_model=List[ProjectTimelineItem], tags=["projects"])
+    async def get_project_timeline(
+        start_date: date | None = None,
+        end_date: date | None = None,
+        active_only: bool | None = None,
+        db: Session = Depends(get_db),
+    ) -> list[ProjectTimelineItem]:
+        """Return stored project activity windows with optional filtering."""
+
+        now = datetime.utcnow()
+        six_months_ago = now - timedelta(days=180)
+
+        repo_stats: List[RepoStat] = (
+            db.query(RepoStat)
+            .filter(RepoStat.first_commit.isnot(None), RepoStat.last_commit.isnot(None))
+            .order_by(RepoStat.first_commit.asc())
+            .all()
+        )
+
+        timeline_items: list[ProjectTimelineItem] = []
+        for stat in repo_stats:
+            first_commit = stat.first_commit
+            last_commit = stat.last_commit
+            if not first_commit or not last_commit:
+                continue
+
+            if start_date and first_commit.date() < start_date:
+                continue
+            if end_date and first_commit.date() > end_date:
+                continue
+
+            was_active = last_commit >= six_months_ago
+            if active_only and not was_active:
+                continue
+
+            duration_days = (last_commit - first_commit).days
+
+            timeline_items.append(
+                ProjectTimelineItem(
+                    project_name=stat.project_name,
+                    first_commit=first_commit,
+                    last_commit=last_commit,
+                    duration_days=duration_days,
+                    was_active=was_active,
+                )
+            )
+
+        return timeline_items
 
     # Mount consent router
     app.include_router(consent_router)
