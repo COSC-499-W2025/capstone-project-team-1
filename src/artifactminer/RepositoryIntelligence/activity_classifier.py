@@ -27,6 +27,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
         has_docs = False
         has_config = False
         has_design = False
+        has_code_activity = False
 
         doc_like_lines = 0
         config_like_lines = 0
@@ -38,7 +39,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
 
             # Quick check for HTML comment-only docs (e.g. PR templates)
             if stripped.startswith("<!--"):
-                # Treat HTML comment blocks as doc-ish by default
                 doc_like_lines += 1
                 docs_keyword_hit = True
                 continue
@@ -65,12 +65,15 @@ def classify_commit_activities(additions: List[str]) -> dict:
             has_code = bool(code_part_stripped)
             has_comment_only = (not has_code) and bool(comment_part_stripped)
 
+            if has_code:
+                has_code_activity = True
+
             code_lower = code_part_stripped.lower()
             comment_lower = comment_part_stripped.lower()
             lower_whole = raw.strip().lower()
 
             # --------------------
-            # TEST detection (code-focused)
+            # TEST detection
             # --------------------
             if code_lower:
                 if (
@@ -88,14 +91,12 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_test = True
 
             # --------------------
-            # DOCS detection (comment-only / doc-style)
+            # DOCS detection
             # --------------------
             if has_comment_only:
-                # Markdown-style headings / bullet docs
                 if comment_lower.startswith("# ") or comment_lower.startswith("## "):
                     doc_like_lines += 1
                     docs_keyword_hit = True
-                # Common doc-ish words
                 elif any(
                     kw in comment_lower
                     for kw in [
@@ -117,16 +118,13 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 ):
                     doc_like_lines += 1
                     docs_keyword_hit = True
-                # Docstring-only lines (Python) like """Summary"""
                 elif stripped.startswith('"""') or stripped.startswith("'''"):
-                    # treat short triple-quoted lines as doc-ish
                     doc_like_lines += 1
                     docs_keyword_hit = True
 
             # --------------------
-            # CONFIG detection (config-like structure)
+            # CONFIG detection
             # --------------------
-            # env-style: FOO=bar (no '==' and uppercase key)
             if (
                 "=" in raw
                 and "==" not in raw
@@ -134,7 +132,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 and raw.split("=", 1)[0].strip().isupper()
             ):
                 config_like_lines += 1
-            # yaml-style: key: value (no trailing ';', no def/class)
             elif (
                 ":" in raw
                 and not raw.strip().endswith(";")
@@ -143,7 +140,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 key_part = raw.split(":", 1)[0].strip()
                 if key_part and key_part.replace("-", "_").replace(".", "").isalnum():
                     config_like_lines += 1
-            # obvious config keywords on simple lines
             elif any(
                 kw in lower_whole
                 for kw in ["toml", "yaml", "yml", "json", "settings", "config"]
@@ -152,7 +148,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     config_like_lines += 1
 
             # --------------------
-            # DESIGN detection (comment-only or doc-style references)
+            # DESIGN detection
             # --------------------
             if has_comment_only:
                 if any(
@@ -171,14 +167,11 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_design = True
 
         # Decide docs/config based on thresholds
-        # Docs: either clear doc keywords or a big chunk of comment-only lines
         if doc_like_lines >= 3 and (doc_like_lines / lines_added) >= 0.2:
             has_docs = True
         elif docs_keyword_hit and doc_like_lines >= 1:
-            # a small amount of clearly doc-ish text
             has_docs = True
 
-        # Config: multiple config-like lines and decent proportion
         if config_like_lines >= 3 and (config_like_lines / lines_added) >= 0.2:
             has_config = True
 
@@ -204,8 +197,13 @@ def classify_commit_activities(additions: List[str]) -> dict:
             activity_summary["design"]["lines_added"] += lines_added
             classified_any = True
 
-        # Default bucket → code
-        if not classified_any:
+        # NEW: count code when code exists
+        if has_code_activity:
+            activity_summary["code"]["commits"] += 1
+            activity_summary["code"]["lines_added"] += lines_added
+
+        # Fallback only if nothing classified AND no code detected
+        if not classified_any and not has_code_activity:
             activity_summary["code"]["commits"] += 1
             activity_summary["code"]["lines_added"] += lines_added
 
