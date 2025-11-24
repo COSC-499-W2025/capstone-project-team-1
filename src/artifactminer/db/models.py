@@ -35,7 +35,7 @@ class Consent(Base):
     __tablename__ = "consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    consent_level = Column(String, default="none", nullable=False)
+    consent_level = Column(String, default="none", nullable=False) # e.g., "none", "full"
     accepted_at = Column(DateTime, nullable=True)
 
 class RepoStat(Base):#model for storing repository statistics
