@@ -15,6 +15,10 @@ import src.artifactminer.directorycrawler.directory_walk as dw
 a = StoreFileDict() #single instance
 
 def test_user_based_directory_walk():
+
+    a.remove_all_dict() #remove all elements from dictionary
+    dw.userKeepFileName = [] #reset user config list manually 
+    dw.userExcludeFileName = [] 
     
     dw.MOCKNAME = "mockdirectory1" #change to a new mock directory
     
@@ -29,6 +33,7 @@ def test_user_based_directory_walk():
     #NOTE the function add user is for TESTING ONLY. 
     #we should use keynames not id's 
 
+
     add_user_answer(db, 5, "keep.log, *.avi") #include
     add_user_answer(db, 6, "*.c") #exclude (remove all c files from mock)
     get_user_data(db)
@@ -37,7 +42,5 @@ def test_user_based_directory_walk():
     crawl_directory() #crawl the mock directory
     assert a.get_dict_len() == 2 #assuming we are getting all files from mock directory
     
-    a.remove_all_dict() #remove all elements from dictionary
-    dw.userKeepFileName = [] #reset user config list manually 
-    dw.userExcludeFileName = [] 
+
 

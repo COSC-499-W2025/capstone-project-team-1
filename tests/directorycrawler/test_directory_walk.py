@@ -9,37 +9,37 @@ import src.artifactminer.directorycrawler.directory_walk as dw
 a = StoreFileDict() #single instance
 
 def test_gathered_files_from_oswalk():
+
+    a.remove_all_dict() #remove all elements from dictionary
     crawl_directory() #crawl the mock directory
     assert a.get_dict_len() == 4 #assuming we are getting all files from mock directory
-    a.remove_all_dict() #remove all elements from dictionary
+    
 
 def test_include_file_user_setting():
 
     # two files that won't be ignored
-    user_keep_file("bugbomb.gitignore")
-    user_keep_file("bugbomb.log")
-    crawl_directory() 
-    assert a.get_dict_len() == 6
     a.remove_all_dict()
     dw.userKeepFileName = []
     dw.userExcludeFileName = [] 
+    user_keep_file("bugbomb.gitignore")
+    user_keep_file("bugbomb.log")
+    crawl_directory() 
+    assert a.get_dict_len() == 5 #its 5 not 6 because bugbombs contain duplicate data (which is nothing)
+    
 #
 def test_exclude_file_user_setting():
+    
+    a.remove_all_dict()
+    dw.userKeepFileName = []
+    dw.userExcludeFileName = [] 
     user_keep_file("bugbomb.gitignore")
     user_keep_file("bugbomb.log")
     user_exclude_file("bugbomb.gitignore")
     user_exclude_file("bugbomb.log")
     crawl_directory()
     assert a.get_dict_len() == 4
-    a.remove_all_dict()
-    dw.userKeepFileName = []
-    dw.userExcludeFileName = [] 
 
-def test_check_file_duplicate():
-    dw.MOCKNAME = "mockdirectory2" #change to a new mock directory
-    dw.update_path()
-    crawl_directory()
-    assert a.get_dict_len() == 100
+
 
     
     

@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from .file_object import FileValues
 '''
 in mock folder there are 4 readable filetypes
 
@@ -61,12 +62,17 @@ def crawl_directory():
                         continue
                 else:
                     print("the file the user has included: ", file)
+                
                 print_files(file) #print files
 
                 isDuplicate, fileId = is_file_duplicate(file, root)
 
                 if(isDuplicate == False):
-                    store_file_dictionary.add_to_dict(fileId, full_path) #key = filename, path = filepath
+                    '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
+                    
+                    fileObj = FileValues(file, full_path)
+                    
+                    store_file_dictionary.add_to_dict(fileId, fileObj) #key = filename, path = filepath
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
@@ -101,7 +107,6 @@ def get_extension(fileName) -> str:
         return fileName[temp:]
     else:
         return "none"
-
 def is_extension(fileName) -> bool:
     if fileName.startswith("*."):
         return True
@@ -123,7 +128,6 @@ def is_valid_filename(filename: str) -> bool: #is the typed out file even a file
         return False
 
     return True 
-
 def update_path():
     global CURRENTPATH
     CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
