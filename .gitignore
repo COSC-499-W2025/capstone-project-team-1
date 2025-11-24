@@ -81,6 +81,9 @@ artifactminer.db
 # Uploaded files
 uploads/
 
+# Test fixtures (already packaged in tests/data/mock_projects.zip)
+projects/
+
 # Others
 .claude
 .ruff_cache
