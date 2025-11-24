@@ -1,15 +1,17 @@
 import os
 import subprocess
+import re
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict
 
-def rank_projects(projects_dir: str, user_name: str = "Shlok Shah") -> List[Dict]:
+def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
     """
-    Ranks projects in the given directory based on the user's contribution percentage.
+    Ranks projects in the given directory based on the user's contribution percentage,
+    identified strictly by their email address.
 
     Args:
         projects_dir: Path to the directory containing project subdirectories.
-        user_name: The name of the user to calculate contributions for.
+        user_email: The email of the user to calculate contributions for.
 
     Returns:
         A list of dictionaries, each containing:
@@ -20,6 +22,7 @@ def rank_projects(projects_dir: str, user_name: str = "Shlok Shah") -> List[Dict
     """
     projects = []
     base_path = Path(projects_dir)
+    target_email = user_email.lower().strip()
 
     if not base_path.exists() or not base_path.is_dir():
         return []
@@ -27,11 +30,11 @@ def rank_projects(projects_dir: str, user_name: str = "Shlok Shah") -> List[Dict
     for project_path in base_path.iterdir():
         if project_path.is_dir() and (project_path / ".git").exists():
             try:
-                # Get commit counts per author
-                # git shortlog -s -n --all
-                # Output format: "   10  Author Name"
+                # Get commit counts per author with email
+                # git shortlog -s -n -e --all
+                # Output format: "   10  Author Name <email@example.com>"
                 output = subprocess.check_output(
-                    ["git", "shortlog", "-s", "-n", "--all"],
+                    ["git", "shortlog", "-s", "-n", "-e", "--all"],
                     cwd=str(project_path),
                     text=True,
                     stderr=subprocess.DEVNULL
@@ -43,20 +46,30 @@ def rank_projects(projects_dir: str, user_name: str = "Shlok Shah") -> List[Dict
                 for line in output.strip().split('\n'):
                     if not line.strip():
                         continue
-                    
-                    parts = line.strip().split('\t', 1)
-                    if len(parts) != 2:
-                        # Handle cases where split by tab might fail, though shortlog usually uses tab
-                        # Fallback to splitting by first space if tab fails, but shortlog -s is reliable
-                        parts = line.strip().split(maxsplit=1)
-                    
-                    if len(parts) == 2:
+
+                    # Expected format: "   10\tAuthor Name <email@example.com>"
+                    # We want to extract the email inside < >
+
+                    # First get the count
+                    parts = line.strip().split(maxsplit=1)
+                    if len(parts) < 2:
+                        continue
+
+                    try:
                         count = int(parts[0])
-                        author = parts[1]
-                        
+                        rest = parts[1]
+
                         total_commits += count
-                        if author.lower() == user_name.lower():
-                            user_commits += count
+
+                        # Extract email
+                        email_match = re.search(r'<([^>]+)>', rest)
+                        if email_match:
+                            author_email = email_match.group(1).lower().strip()
+                            if author_email == target_email:
+                                user_commits += count
+
+                    except ValueError:
+                        continue
 
                 score = (user_commits / total_commits * 100) if total_commits > 0 else 0.0
 
@@ -68,12 +81,10 @@ def rank_projects(projects_dir: str, user_name: str = "Shlok Shah") -> List[Dict
                 })
 
             except subprocess.CalledProcessError:
-                # Skip if git command fails
                 continue
             except Exception as e:
                 print(f"Error processing {project_path.name}: {e}")
                 continue
 
-    # Sort by score descending
     projects.sort(key=lambda x: x["score"], reverse=True)
     return projects
