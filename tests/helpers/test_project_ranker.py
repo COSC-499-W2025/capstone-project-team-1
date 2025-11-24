@@ -1,6 +1,8 @@
 import zipfile
 from pathlib import Path
 import pytest
+import unittest.mock
+import subprocess
 from artifactminer.helpers.project_ranker import rank_projects
 
 
@@ -65,3 +67,114 @@ def test_rank_projects_invalid_email(real_projects_data):
 
     assert len(results) > 0
     assert all(p["score"] == 0.0 for p in results)
+
+
+def test_rank_projects_invalid_path():
+    """Test that a non-existent path returns an empty list."""
+    results = rank_projects("/path/to/nowhere", "user@example.com")
+    assert results == []
+
+
+def test_rank_projects_empty_directory(tmp_path):
+    """Test that an empty directory returns an empty list."""
+    results = rank_projects(str(tmp_path), "user@example.com")
+    assert results == []
+
+
+def test_rank_projects_skip_non_git(tmp_path):
+    """Test that directories without a .git folder are skipped."""
+    # Create a project folder without .git
+    project_dir = tmp_path / "no-git-project"
+    project_dir.mkdir()
+    (project_dir / "file.txt").touch()
+
+    results = rank_projects(str(tmp_path), "user@example.com")
+    assert results == []
+
+
+def test_rank_projects_zero_commits(tmp_path):
+    """Test that a repository with zero commits is handled gracefully."""
+    project_dir = tmp_path / "zero-commit-project"
+    project_dir.mkdir()
+    (project_dir / ".git").mkdir()
+
+    # Mock subprocess to return empty string (no commits)
+    with unittest.mock.patch("subprocess.check_output", return_value=""):
+        results = rank_projects(str(tmp_path), "user@example.com")
+
+    assert len(results) == 1
+    assert results[0]["name"] == "zero-commit-project"
+    assert results[0]["score"] == 0.0
+    assert results[0]["total_commits"] == 0
+    assert results[0]["user_commits"] == 0
+
+
+def test_rank_projects_git_failure(tmp_path):
+    """Test that git command failure is handled gracefully."""
+    project_dir = tmp_path / "broken-git-project"
+    project_dir.mkdir()
+    (project_dir / ".git").mkdir()
+
+    # Mock subprocess to raise CalledProcessError
+    with unittest.mock.patch(
+        "subprocess.check_output", side_effect=subprocess.CalledProcessError(1, "git")
+    ):
+        results = rank_projects(str(tmp_path), "user@example.com")
+
+    assert results == []
+
+
+def test_rank_projects_malformed_output(tmp_path):
+    """Test that malformed git output is ignored."""
+    project_dir = tmp_path / "malformed-output-project"
+    project_dir.mkdir()
+    (project_dir / ".git").mkdir()
+
+    # Mock output with some valid and some invalid lines
+    mock_output = """
+       10\tValid User <user@example.com>
+       invalid line without tab or email
+       5\tAnother User <other@example.com>
+    """
+
+    with unittest.mock.patch("subprocess.check_output", return_value=mock_output):
+        results = rank_projects(str(tmp_path), "user@example.com")
+
+    assert len(results) == 1
+    assert results[0]["score"] == 66.67  # 10 / 15 * 100
+    assert results[0]["total_commits"] == 15
+    assert results[0]["user_commits"] == 10
+
+
+def test_rank_projects_case_insensitivity(tmp_path):
+    """Test that email matching is case-insensitive."""
+    project_dir = tmp_path / "case-test-project"
+    project_dir.mkdir()
+    (project_dir / ".git").mkdir()
+
+    mock_output = "   10\tUser Name <USER@EXAMPLE.COM>"
+
+    with unittest.mock.patch("subprocess.check_output", return_value=mock_output):
+        # Pass lowercase email to function
+        results = rank_projects(str(tmp_path), "user@example.com")
+
+    assert len(results) == 1
+    assert results[0]["score"] == 100.0
+    assert results[0]["user_commits"] == 10
+
+
+def test_rank_projects_no_user_commits(tmp_path):
+    """Test handling when user has zero commits in a repo with other commits."""
+    project_dir = tmp_path / "no-user-commits-project"
+    project_dir.mkdir()
+    (project_dir / ".git").mkdir()
+
+    mock_output = "   20\tOther User <other@example.com>"
+
+    with unittest.mock.patch("subprocess.check_output", return_value=mock_output):
+        results = rank_projects(str(tmp_path), "user@example.com")
+
+    assert len(results) == 1
+    assert results[0]["score"] == 0.0
+    assert results[0]["total_commits"] == 20
+    assert results[0]["user_commits"] == 0
