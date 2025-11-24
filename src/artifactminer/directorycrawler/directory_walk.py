@@ -159,7 +159,7 @@ def print_values_in_dict():
         2) run directory walk function
 
         3) get values to be transfered to LLM, it has the name/path. 
-        store_file_dictionary.values()
+        store_file_dictionary.get_values()
       
         '''
     print(store_file_dictionary.get_values())
