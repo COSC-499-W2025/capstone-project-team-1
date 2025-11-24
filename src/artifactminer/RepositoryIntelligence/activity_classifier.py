@@ -33,11 +33,48 @@ def classify_commit_activities(additions: List[str]) -> dict:
         config_like_lines = 0
         docs_keyword_hit = False  # track if we saw doc-ish text at all
 
+        # NEW: track if we're inside a multi-line Python docstring block
+        in_docstring_block = False
+
         for line in non_blank_lines:
             raw = line.rstrip("\n")
-            stripped = raw.lstrip()
+            stripped = raw.strip()
 
-            # Quick check for HTML comment-only docs (e.g. PR templates)
+            # --------------------
+            # DOCSTRING handling (Python triple-quoted strings)
+            # --------------------
+            # If we're already in a docstring block, this whole line is docs
+            if in_docstring_block:
+                doc_like_lines += 1
+                docs_keyword_hit = True
+
+                # Close block if this line ends with a triple quote
+                if stripped.endswith('"""') or stripped.endswith("'''"):
+                    in_docstring_block = False
+
+                # Don't treat this line as code/config/etc.
+                continue
+
+            # Opening triple-quoted docstring line
+            if stripped.startswith('"""') or stripped.startswith("'''"):
+                doc_like_lines += 1
+                docs_keyword_hit = True
+
+                # If it doesn't also close on the same line, mark we're in a block.
+                # Handles:
+                #   """Summary"""
+                #   """Summary
+                #   continued
+                #   """
+                if not (stripped.endswith('"""') or stripped.endswith("'''")) or len(stripped) == 3:
+                    in_docstring_block = True
+
+                # Even one-line docstrings are treated as docs, not code.
+                continue
+
+            # --------------------
+            # HTML comment-only docs (e.g. PR templates)
+            # --------------------
             if stripped.startswith("<!--"):
                 # Treat HTML comment blocks as doc-ish by default
                 doc_like_lines += 1
@@ -92,7 +129,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_test = True
 
             # --------------------
-            # DOCS detection (comment-only / doc-style)
+            # DOCS detection (comment-only / doc-style, non-docstring)
             # --------------------
             if has_comment_only:
                 # Markdown-style headings / bullet docs
@@ -119,11 +156,6 @@ def classify_commit_activities(additions: List[str]) -> dict:
                         "release notes",
                     ]
                 ):
-                    doc_like_lines += 1
-                    docs_keyword_hit = True
-                # Docstring-only lines (Python) like """Summary"""
-                elif stripped.startswith('"""') or stripped.startswith("'''"):
-                    # treat short triple-quoted lines as doc-ish
                     doc_like_lines += 1
                     docs_keyword_hit = True
 

@@ -22,5 +22,15 @@ def test_classify_commit_activities():
     stats = getUserRepoStats(root, user_email)
     print_activity_summary(stats.commitActivities)
     assert isinstance(stats.commitActivities, dict)
+def test_single_line_docstring_counts_as_docs():
+    additions = ['"""Short summary for this module."""\n']
+    summary = classify_commit_activities(additions)
+    assert summary["docs"]["lines_added"] > 0
+    assert summary["code"]["lines_added"] == 0
+
+def test_multiline_docstring_counts_all_lines_as_docs():
+    additions = ['"""\nSummary line\nAnother line\n"""\n']
+    summary = classify_commit_activities(additions)
+    assert summary["docs"]["lines_added"] == 4  # 4 non-blank lines
 
 
