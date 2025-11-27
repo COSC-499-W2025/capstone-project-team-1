@@ -9,6 +9,7 @@ import git
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
+from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createSummaryFromUserAdditions, saveUserIntelligenceSummary
 from email_validator import validate_email, EmailNotValidError
 from sqlalchemy.orm import Session
 from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
@@ -171,3 +172,90 @@ def saveUserRepoStats(stats: UserRepoStats):
         db.refresh(user_repo_stat)
     finally:
         db.close()
+
+def generate_summaries_for_ranked(db: Session) -> list[dict]:
+    """
+    Summarize the top-ranked repositories for the current user.
+
+    Expected flow (called by Nathan's orchestrator):
+    - Shlok's ranking code has already set RepoStat.ranking_score.
+    - We pick the top 3, check consent, and either:
+      * use LLM summaries from diffs, or
+      * fall back to a simple template.
+    - We persist results into UserAIntelligenceSummary.
+    """
+    # Pick a ranking column: prefer ranking_score, fall back to total_commits
+    ranking_column = RepoStat.total_commits
+    if hasattr(RepoStat, "ranking_score"):
+        ranking_column = RepoStat.ranking_score
+
+    top_repos: list[RepoStat] = (
+        db.query(RepoStat)
+        .order_by(ranking_column.desc())
+        .limit(3)
+        .all()
+    )
+
+    if not top_repos:
+        return []
+
+    # Get the user's email from config answers (question_id = 1)
+    email_answer = (
+        db.query(UserAnswer)
+        .filter(UserAnswer.question_id == 1)
+        .order_by(UserAnswer.answered_at.desc())
+        .first()
+    )
+    user_email = email_answer.answer_text.strip() if email_answer else None
+
+    results: list[dict] = []
+
+    for repo in top_repos:
+        # Default summary uses template
+        user_stats = (
+            db.query(UserRepoStat)
+            .filter(UserRepoStat.project_name == repo.project_name)
+            .order_by(UserRepoStat.id.desc())
+            .first()
+        )
+        pct = user_stats.userStatspercentages if user_stats and user_stats.userStatspercentages is not None else 0
+
+        languages = repo.languages or []
+        if isinstance(languages, list):
+            languages_text = ", ".join(languages) if languages else "unknown languages"
+        else:
+            languages_text = str(languages)
+
+        summary_text = (
+            f"User contributed {pct:.1f}% to {repo.project_name} "
+            f"using {languages_text}."
+        )
+
+        # If we have consent + a valid email, try the LLM-based summary instead
+        if user_allows_llm() and user_email:
+            try:
+                additions = collect_user_additions(
+                    repo_path=repo.project_name,  # currently we only store project_name; can swap to full path later
+                    user_email=user_email,
+                )
+                if additions:
+                    summary_text = createSummaryFromUserAdditions(additions)
+            except Exception:
+                # Fail soft: keep the fallback template summary
+                pass
+
+        # Persist into UserAIntelligenceSummary
+        saveUserIntelligenceSummary(
+            repo_path=repo.path if hasattr(repo, "path") else repo.project_name,
+            user_email=user_email or "",
+            summary_text=summary_text,
+        )
+
+        results.append(
+            {
+                "project_name": repo.project_name,
+                "summary": summary_text,
+            }
+        )
+
+    return results
