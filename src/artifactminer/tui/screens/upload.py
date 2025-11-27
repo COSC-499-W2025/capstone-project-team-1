@@ -110,9 +110,13 @@ class UploadScreen(Screen[None]):
                 status.update(f"Error: {exc}")
                 return
 
-        def reset_form(_result: None = None) -> None:
-            status.update("Waiting for a file...")
-            field.value = ""
+        def handle_selection(result: list[str] | None) -> None:
+            if result:
+                count = len(result)
+                noun = "file" if count == 1 else "files"
+                status.update(f"Selected {count} {noun} from archive.")
+            else:
+                status.update("Waiting for a file...")
             field.focus()
 
-        await self.app.push_screen(ListContentsScreen(dirs), callback=reset_form)
+        await self.app.push_screen(ListContentsScreen(dirs), callback=handle_selection)

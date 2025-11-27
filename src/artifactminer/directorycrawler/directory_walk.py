@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from .file_object import FileValues
 '''
 in mock folder there are 4 readable filetypes
 
@@ -9,10 +10,12 @@ in mock folder there are 4 readable filetypes
 #change this for a path that you choose
 root = Path(__file__).resolve() #get current file path
 project = root.parents[3] #gets project folder (../../../)
+
 MOCKNAME = "mockdirectory"
 CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
 from .store_file_dict import StoreFileDict
+from .check_file_duplicate import is_file_duplicate
 
 readableFileTypes = [] #TODO
 
@@ -60,8 +63,17 @@ def crawl_directory():
                         continue
                 else:
                     print("the file the user has included: ", file)
+                
                 print_files(file) #print files
-                store_file_dictionary.add_to_dict(file, full_path) #key = filename, path = filepath
+
+                isDuplicate, fileId = is_file_duplicate(file, root)
+
+                if(isDuplicate == False):
+                    '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
+                    
+                    fileObj = FileValues(file, full_path)
+                    
+                    store_file_dictionary.add_to_dict(fileId, fileObj) #key = filename, path = filepath
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
@@ -96,7 +108,6 @@ def get_extension(fileName) -> str:
         return fileName[temp:]
     else:
         return "none"
-
 def is_extension(fileName) -> bool:
     if fileName.startswith("*."):
         return True
@@ -118,7 +129,6 @@ def is_valid_filename(filename: str) -> bool: #is the typed out file even a file
         return False
 
     return True 
-
 def update_path():
     global CURRENTPATH
     CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
@@ -139,4 +149,18 @@ def user_exclude_extension(exName):
 def print_files(file):
     print("\n>",file)
 
-#crawl_directory()
+def print_values_in_dict():
+    print("here are the files in the dictionary: \n")
+    '''This message is specific to SHLOK: if you would like to get the files from my system please first
+
+        1) get the dictionary:
+        store_file_dictionary = StoreFileDict()
+
+        2) run directory walk function
+
+        3) get values to be transfered to LLM, it has the name/path. 
+        store_file_dictionary.get_values()
+      
+        '''
+    print(store_file_dictionary.get_values())
+

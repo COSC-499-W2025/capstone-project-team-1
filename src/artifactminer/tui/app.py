@@ -50,6 +50,15 @@ class ArtifactMinerApp(App):
         content-align: center middle;
     }
 
+    .list-screen #card {
+        width: 85%;
+        max-width: 120;
+        min-height: 34;
+        border: heavy $surface;
+        background: $panel 80%;
+        align: center top;
+    }
+
     #title, #subtitle {
         text-align: center;
     }
@@ -122,18 +131,48 @@ class ArtifactMinerApp(App):
         margin: 0 1;
     }
 
-    #zip-contents {
-        border: round $surface;
-        height: 20;
-        width: 100%;
-        overflow: auto;
-    }
-
     #list-container {
         width: 100%;
-        align: center middle;
-        content-align: center middle;
-        margin: 1 0;
+        align: center top;
+        content-align: center top;
+        margin: 1 0 2 0;
+    }
+
+    .list-screen #list-container {
+        height: 1fr;
+    }
+
+    #zip-contents {
+        border: round $surface;
+        height: 22;
+        width: 100%;
+        padding: 0 1;
+        background: $boost 5%;
+    }
+
+    #selection-count {
+        width: 100%;
+        text-align: center;
+        margin-top: 1;
+        color: $text-muted;
+    }
+
+    .zip-checkbox {
+        width: 100%;
+        padding: 1 1;
+        border-bottom: solid $surface;
+    }
+
+    .zip-checkbox:last-child {
+        border-bottom: none;
+    }
+
+    .zip-checkbox:hover {
+        background: $surface 20%;
+    }
+
+    .zip-checkbox.-checked {
+        background: $primary 20%;
     }
 
     #list-actions {
@@ -145,6 +184,7 @@ class ArtifactMinerApp(App):
 
     #list-actions Button {
         margin: 0 1;
+        min-width: 16;
     }
 
     """

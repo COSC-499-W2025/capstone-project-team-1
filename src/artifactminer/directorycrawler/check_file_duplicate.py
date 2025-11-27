@@ -19,6 +19,7 @@ def chunk_reader(fobj, chunk_size=1024):
 def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1):
     hashobj = hash()
     fullPath = os.path.join(dirPath, fileName)
+<<<<<<< HEAD
     for chunck in chunk_reader(open(fullPath, 'rb')):
         hashobj.update(chunck)
     file_id = (hashobj.digest(), os.path.getsize(fullPath))
@@ -27,6 +28,14 @@ def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1):
         return True, None
     
     return False, file_id
+=======
+    
+    with open(fullPath, 'rb') as f:
+        for chunk in chunk_reader(f):
+            hashobj.update(chunk)
+    
+    return hashobj.hexdigest()
+>>>>>>> origin/development
 
     
     
