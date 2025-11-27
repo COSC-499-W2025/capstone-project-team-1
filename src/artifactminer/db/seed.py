@@ -1,7 +1,9 @@
 """Database seeding functions."""
 
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from .models import Question
+
+from .models import Question, RepoStat
 
 
 def seed_questions(db: Session) -> None:
@@ -66,6 +68,66 @@ def seed_questions(db: Session) -> None:
     ]
     
     db.add_all(questions)
+    db.commit()
+
+
+def seed_repo_stats(db: Session) -> None:
+    """Populate sample repository stats to support timeline features."""
+
+    existing_count = db.query(RepoStat).count()
+    if existing_count > 0:
+        return
+
+    now = datetime.utcnow()
+
+    sample_stats = [
+        RepoStat(
+            project_name="Platform Core Services",
+            is_collaborative=True,
+            primary_language="Python",
+            languages=["Python", "YAML"],
+            language_percentages=[70.0, 30.0],
+            first_commit=datetime(2018, 7, 1),
+            last_commit=now - timedelta(days=5),
+            total_commits=1860,
+            frameworks=["FastAPI"],
+        ),
+        RepoStat(
+            project_name="Legacy Data Pipeline",
+            is_collaborative=False,
+            primary_language="Java",
+            languages=["Java", "SQL"],
+            language_percentages=[80.0, 20.0],
+            first_commit=datetime(2020, 2, 10),
+            last_commit=datetime(2020, 9, 25),
+            total_commits=240,
+            frameworks=["Spring"],
+        ),
+        RepoStat(
+            project_name="Analytics Dashboard",
+            is_collaborative=True,
+            primary_language="TypeScript",
+            languages=["TypeScript", "Python"],
+            language_percentages=[65.0, 35.0],
+            first_commit=now - timedelta(days=400),
+            last_commit=now - timedelta(days=190),
+            total_commits=520,
+            frameworks=["React", "FastAPI"],
+        ),
+        RepoStat(
+            project_name="Mobile Experience",
+            is_collaborative=True,
+            primary_language="Kotlin",
+            languages=["Kotlin", "Swift"],
+            language_percentages=[55.0, 45.0],
+            first_commit=now - timedelta(days=60),
+            last_commit=now - timedelta(days=2),
+            total_commits=310,
+            frameworks=["Jetpack Compose"],
+        ),
+    ]
+
+    db.add_all(sample_stats)
     db.commit()
 
 
