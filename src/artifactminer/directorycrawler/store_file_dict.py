@@ -18,11 +18,16 @@ class StoreFileDict:
         if key in self.file_dict:
             del self.file_dict[key]
 
+<<<<<<< HEAD
     def get_dict_key(self, key): #get value from dictionary
         return self.file_dict.get(key)
     
     def get_dict(self):
         return self.file_dict
+=======
+    def get_dict(self, key): #get value from dictionary
+        return self.file_dict.get(key)
+>>>>>>> origin/development
 
     def get_dict_len(self):
         return len(self.file_dict)
