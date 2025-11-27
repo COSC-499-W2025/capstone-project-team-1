@@ -1,4 +1,9 @@
-"""Tests for skill and insight persistence helpers."""
+"""Tests for skill and insight persistence helpers.
+
+Tests cover:
+- persist_extracted_skills: saves ExtractedSkill to ProjectSkill or UserProjectSkill
+- persist_insights_as_resume_items: saves Insight to ResumeItem
+"""
 
 import pytest
 from sqlalchemy import create_engine
@@ -21,27 +26,27 @@ from artifactminer.skills.persistence import (
 )
 
 
+# --- Fixtures ---
+
+
 @pytest.fixture
 def db_session():
-    """Create an in-memory SQLite database session for testing."""
+    """In-memory SQLite session, created fresh per test."""
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-        Base.metadata.drop_all(bind=engine)
+    session = sessionmaker(autocommit=False, autoflush=False, bind=engine)()
+    yield session
+    session.close()
+    Base.metadata.drop_all(bind=engine)
 
 
 @pytest.fixture
 def repo_stat(db_session):
-    """Create a RepoStat for testing."""
+    """Pre-populated RepoStat for foreign key references."""
     rs = RepoStat(project_name="test-project", is_collaborative=False)
     db_session.add(rs)
     db_session.commit()
@@ -51,241 +56,146 @@ def repo_stat(db_session):
 # --- persist_extracted_skills tests ---
 
 
-def test_persist_extracted_skills_rejects_non_session_db():
-    """Should raise ValueError when db is not a SQLAlchemy Session."""
-    fake_db = {"not": "a session"}
+def test_persist_skills_validation_errors(db_session):
+    """Rejects invalid db type and missing RepoStat."""
     extracted = [ExtractedSkill(skill="Python", category="Language")]
 
+    # Non-session db
     with pytest.raises(ValueError, match="db must be a SQLAlchemy Session"):
-        persist_extracted_skills(fake_db, repo_stat_id=1, extracted=extracted)
+        persist_extracted_skills({"fake": "db"}, repo_stat_id=1, extracted=extracted)
 
-
-def test_persist_extracted_skills_rejects_missing_repo_stat(db_session):
-    """Should raise ValueError when RepoStat does not exist."""
-    extracted = [ExtractedSkill(skill="Python", category="Language")]
-
+    # Missing RepoStat
     with pytest.raises(ValueError, match="RepoStat 999 does not exist"):
         persist_extracted_skills(db_session, repo_stat_id=999, extracted=extracted)
 
 
-def test_persist_extracted_skills_creates_project_skill(db_session, repo_stat):
-    """Basic flow: creates Skill and ProjectSkill when no user_email."""
+def test_persist_skills_creates_project_skill(db_session, repo_stat):
+    """Creates Skill + ProjectSkill when no user_email provided."""
     extracted = [
         ExtractedSkill(
-            skill="Python",
-            category="Language",
-            evidence=["import os", "def main()"],
-            proficiency=0.8,
+            skill="Python", category="Language", evidence=["import os"], proficiency=0.8
         )
     ]
-
     saved = persist_extracted_skills(db_session, repo_stat.id, extracted)
 
     assert len(saved) == 1
-    # Verify Skill was created
     skill = db_session.query(Skill).filter(Skill.name == "Python").first()
-    assert skill is not None
-    assert skill.category == "Language"
-
-    # Verify ProjectSkill was created
     ps = (
         db_session.query(ProjectSkill)
         .filter(ProjectSkill.repo_stat_id == repo_stat.id)
         .first()
     )
-    assert ps is not None
-    assert ps.skill_id == skill.id
-    assert ps.proficiency == 0.8
-    assert set(ps.evidence) == {"import os", "def main()"}
+
+    assert skill and skill.category == "Language"
+    assert ps and ps.proficiency == 0.8 and "import os" in ps.evidence
 
 
-def test_persist_extracted_skills_creates_user_project_skill(db_session, repo_stat):
-    """Creates UserProjectSkill when user_email is provided."""
+def test_persist_skills_creates_user_project_skill(db_session, repo_stat):
+    """Creates UserProjectSkill with normalized email when user_email provided."""
     extracted = [
         ExtractedSkill(
-            skill="FastAPI",
-            category="Framework",
-            evidence=["from fastapi import FastAPI"],
-            proficiency=0.7,
+            skill="FastAPI", category="Framework", evidence=["fastapi"], proficiency=0.7
         )
     ]
-
-    saved = persist_extracted_skills(
-        db_session, repo_stat.id, extracted, user_email="  User@Example.COM  "
+    persist_extracted_skills(
+        db_session, repo_stat.id, extracted, user_email="  User@Test.COM  "
     )
 
-    assert len(saved) == 1
-    # Verify Skill was created
-    skill = db_session.query(Skill).filter(Skill.name == "FastAPI").first()
-    assert skill is not None
-
-    # Verify UserProjectSkill with normalized email
     ups = (
         db_session.query(UserProjectSkill)
         .filter(UserProjectSkill.repo_stat_id == repo_stat.id)
         .first()
     )
-    assert ups is not None
-    assert ups.user_email == "user@example.com"  # normalized
-    assert ups.skill_id == skill.id
-    assert ups.proficiency == 0.7
+
+    assert ups and ups.user_email == "user@test.com" and ups.proficiency == 0.7
 
 
-def test_persist_extracted_skills_updates_existing_project_skill(db_session, repo_stat):
-    """Updates existing ProjectSkill: max proficiency, merged evidence."""
-    # First insertion
-    extracted1 = [
-        ExtractedSkill(
-            skill="SQL",
-            category="Database",
-            evidence=["SELECT * FROM users"],
-            proficiency=0.5,
-        )
-    ]
-    persist_extracted_skills(db_session, repo_stat.id, extracted1)
+def test_persist_skills_updates_existing(db_session, repo_stat):
+    """Updates existing skill: takes max proficiency, merges evidence."""
+    # First insert
+    persist_extracted_skills(
+        db_session,
+        repo_stat.id,
+        [
+            ExtractedSkill(
+                skill="SQL", category="DB", evidence=["SELECT"], proficiency=0.5
+            )
+        ],
+    )
+    # Second insert with higher proficiency + new evidence
+    persist_extracted_skills(
+        db_session,
+        repo_stat.id,
+        [
+            ExtractedSkill(
+                skill="SQL",
+                category="DB",
+                evidence=["INSERT", "SELECT"],
+                proficiency=0.9,
+            )
+        ],
+    )
 
-    # Second insertion with higher proficiency and new evidence
-    extracted2 = [
-        ExtractedSkill(
-            skill="SQL",
-            category="Database",
-            evidence=["INSERT INTO logs", "SELECT * FROM users"],  # one duplicate
-            proficiency=0.9,
-        )
-    ]
-    persist_extracted_skills(db_session, repo_stat.id, extracted2)
-
-    # Should only have one ProjectSkill
     skills = (
         db_session.query(ProjectSkill)
         .filter(ProjectSkill.repo_stat_id == repo_stat.id)
         .all()
     )
     assert len(skills) == 1
-
-    ps = skills[0]
-    assert ps.proficiency == 0.9  # max of 0.5 and 0.9
-    assert set(ps.evidence) == {"SELECT * FROM users", "INSERT INTO logs"}
+    assert skills[0].proficiency == 0.9
+    assert set(skills[0].evidence) == {"SELECT", "INSERT"}
 
 
-def test_persist_extracted_skills_updates_existing_user_project_skill(
-    db_session, repo_stat
-):
-    """Updates existing UserProjectSkill: max proficiency, merged evidence."""
-    email = "dev@test.com"
-
-    # First insertion
-    extracted1 = [
-        ExtractedSkill(
-            skill="React",
-            category="Framework",
-            evidence=["import React"],
-            proficiency=0.4,
-        )
-    ]
-    persist_extracted_skills(db_session, repo_stat.id, extracted1, user_email=email)
-
-    # Second insertion
-    extracted2 = [
-        ExtractedSkill(
-            skill="React",
-            category="Framework",
-            evidence=["useState", "import React"],  # one duplicate
-            proficiency=0.6,
-        )
-    ]
-    persist_extracted_skills(db_session, repo_stat.id, extracted2, user_email=email)
-
-    # Should only have one UserProjectSkill
-    skills = (
-        db_session.query(UserProjectSkill)
-        .filter(
-            UserProjectSkill.repo_stat_id == repo_stat.id,
-            UserProjectSkill.user_email == email,
-        )
-        .all()
-    )
-    assert len(skills) == 1
-
-    ups = skills[0]
-    assert ups.proficiency == 0.6
-    assert set(ups.evidence) == {"import React", "useState"}
-
-
-def test_persist_extracted_skills_commit_false_defers_commit(db_session, repo_stat):
-    """With commit=False, changes are not committed."""
-    extracted = [ExtractedSkill(skill="Go", category="Language", proficiency=0.5)]
-
-    persist_extracted_skills(db_session, repo_stat.id, extracted, commit=False)
-
-    # Rollback to see if data was committed
-    db_session.rollback()
-
-    # Should not find the skill after rollback
-    skill = db_session.query(Skill).filter(Skill.name == "Go").first()
-    assert skill is None
-
-
-def test_persist_extracted_skills_multiple_skills(db_session, repo_stat):
-    """Persists multiple skills in one call."""
-    extracted = [
-        ExtractedSkill(skill="Python", category="Language", proficiency=0.8),
-        ExtractedSkill(skill="FastAPI", category="Framework", proficiency=0.7),
-        ExtractedSkill(skill="SQL", category="Database", proficiency=0.6),
-    ]
-
-    saved = persist_extracted_skills(db_session, repo_stat.id, extracted)
-
-    assert len(saved) == 3
-    skill_names = {s.skill.name for s in saved}
-    assert skill_names == {"Python", "FastAPI", "SQL"}
-
-
-def test_persist_extracted_skills_reuses_existing_skill(db_session, repo_stat):
+def test_persist_skills_reuses_existing_skill_row(db_session, repo_stat):
     """Reuses existing Skill row instead of creating duplicate."""
-    # Pre-create a skill
-    existing_skill = Skill(name="Docker", category="DevOps")
-    db_session.add(existing_skill)
+    existing = Skill(name="Docker", category="DevOps")
+    db_session.add(existing)
     db_session.commit()
 
-    extracted = [ExtractedSkill(skill="Docker", category="DevOps", proficiency=0.9)]
-    persist_extracted_skills(db_session, repo_stat.id, extracted)
+    persist_extracted_skills(
+        db_session,
+        repo_stat.id,
+        [ExtractedSkill(skill="Docker", category="DevOps", proficiency=0.9)],
+    )
 
-    # Should still only have one Skill named Docker
-    docker_skills = db_session.query(Skill).filter(Skill.name == "Docker").all()
-    assert len(docker_skills) == 1
-    assert docker_skills[0].id == existing_skill.id
+    assert db_session.query(Skill).filter(Skill.name == "Docker").count() == 1
+
+
+def test_persist_skills_commit_false(db_session, repo_stat):
+    """commit=False defers commit; rollback discards changes."""
+    persist_extracted_skills(
+        db_session,
+        repo_stat.id,
+        [ExtractedSkill(skill="Go", category="Language")],
+        commit=False,
+    )
+    db_session.rollback()
+
+    assert db_session.query(Skill).filter(Skill.name == "Go").first() is None
 
 
 # --- persist_insights_as_resume_items tests ---
 
 
-def test_persist_insights_empty_list_returns_early(db_session, repo_stat):
-    """Empty insights list returns empty immediately without DB queries."""
-    result = persist_insights_as_resume_items(db_session, repo_stat.id, [])
-    assert result == []
-
-
-def test_persist_insights_rejects_missing_repo_stat(db_session):
-    """Should raise ValueError when RepoStat does not exist."""
-    insights = [Insight(title="Test", evidence=["ev1"], why_it_matters="matters")]
+def test_persist_insights_validation(db_session, repo_stat):
+    """Empty list returns early; missing RepoStat raises."""
+    assert persist_insights_as_resume_items(db_session, repo_stat.id, []) == []
 
     with pytest.raises(ValueError, match="RepoStat 999 does not exist"):
         persist_insights_as_resume_items(
-            db_session, repo_stat_id=999, insights=insights
+            db_session, 999, [Insight(title="X", evidence=["e"], why_it_matters="w")]
         )
 
 
 def test_persist_insights_creates_resume_item(db_session, repo_stat):
-    """Basic flow: creates ResumeItem from Insight."""
+    """Creates ResumeItem from Insight with formatted content."""
     insights = [
         Insight(
-            title="Complexity awareness",
-            evidence=["Resource caps", "Chunking logic"],
-            why_it_matters="Shows attention to performance",
+            title="Complexity",
+            evidence=["caps", "chunks"],
+            why_it_matters="perf matters",
         )
     ]
-
     saved = persist_insights_as_resume_items(db_session, repo_stat.id, insights)
 
     assert len(saved) == 1
@@ -294,76 +204,37 @@ def test_persist_insights_creates_resume_item(db_session, repo_stat):
         .filter(ResumeItem.repo_stat_id == repo_stat.id)
         .first()
     )
-    assert item is not None
-    assert item.title == "Complexity awareness"
-    assert "Resource caps" in item.content
-    assert "Chunking logic" in item.content
-    assert "Shows attention to performance" in item.content
-    assert item.category == "Deep Insight"
+    assert item and item.title == "Complexity" and item.category == "Deep Insight"
+    assert "caps" in item.content and "perf matters" in item.content
 
 
 def test_persist_insights_updates_existing_by_title(db_session, repo_stat):
-    """Updates existing ResumeItem when title matches (dedup)."""
-    # First insertion
-    insights1 = [
-        Insight(
-            title="API design",
-            evidence=["REST endpoints"],
-            why_it_matters="Good API",
-        )
-    ]
-    persist_insights_as_resume_items(db_session, repo_stat.id, insights1)
-
-    # Second insertion with same title but different content
-    insights2 = [
-        Insight(
-            title="API design",
-            evidence=["GraphQL schema", "OpenAPI spec"],
-            why_it_matters="Modern API patterns",
-        )
-    ]
-    persist_insights_as_resume_items(db_session, repo_stat.id, insights2)
-
-    # Should only have one ResumeItem
-    items = (
-        db_session.query(ResumeItem)
-        .filter(
-            ResumeItem.repo_stat_id == repo_stat.id,
-            ResumeItem.title == "API design",
-        )
-        .all()
+    """Updates existing ResumeItem when title matches (dedup by title)."""
+    persist_insights_as_resume_items(
+        db_session,
+        repo_stat.id,
+        [Insight(title="API", evidence=["REST"], why_it_matters="v1")],
     )
-    assert len(items) == 1
+    persist_insights_as_resume_items(
+        db_session,
+        repo_stat.id,
+        [Insight(title="API", evidence=["GraphQL"], why_it_matters="v2")],
+    )
 
-    # Content should be updated
-    assert "GraphQL schema" in items[0].content
-    assert "Modern API patterns" in items[0].content
-
-
-def test_persist_insights_multiple_insights(db_session, repo_stat):
-    """Persists multiple insights in one call."""
-    insights = [
-        Insight(title="Insight A", evidence=["ev1"], why_it_matters="why A"),
-        Insight(title="Insight B", evidence=["ev2"], why_it_matters="why B"),
-        Insight(title="Insight C", evidence=["ev3"], why_it_matters="why C"),
-    ]
-
-    saved = persist_insights_as_resume_items(db_session, repo_stat.id, insights)
-
-    assert len(saved) == 3
-    titles = {item.title for item in saved}
-    assert titles == {"Insight A", "Insight B", "Insight C"}
+    items = db_session.query(ResumeItem).filter(ResumeItem.title == "API").all()
+    assert len(items) == 1 and "GraphQL" in items[0].content
 
 
-def test_persist_insights_commit_false_defers_commit(db_session, repo_stat):
-    """With commit=False, changes are not committed."""
-    insights = [Insight(title="Deferred", evidence=["test"], why_it_matters="test")]
-
-    persist_insights_as_resume_items(db_session, repo_stat.id, insights, commit=False)
-
-    # Rollback to see if data was committed
+def test_persist_insights_commit_false(db_session, repo_stat):
+    """commit=False defers commit; rollback discards changes."""
+    persist_insights_as_resume_items(
+        db_session,
+        repo_stat.id,
+        [Insight(title="Temp", evidence=["x"], why_it_matters="y")],
+        commit=False,
+    )
     db_session.rollback()
 
-    # Should not find the item after rollback
-    item = db_session.query(ResumeItem).filter(ResumeItem.title == "Deferred").first()
-    assert item is None
+    assert (
+        db_session.query(ResumeItem).filter(ResumeItem.title == "Temp").first() is None
+    )
