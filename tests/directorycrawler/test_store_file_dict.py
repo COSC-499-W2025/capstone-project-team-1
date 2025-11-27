@@ -23,7 +23,7 @@ def test_remove():
 def test_get():
     a.remove_all_dict()
     a.add_to_dict(100, "hundred")
-    x = a.get_dict(100)
+    x = a.get_dict_key(100)
     assert x == "hundred"
 
 
