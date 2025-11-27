@@ -1,11 +1,16 @@
-"""Persistence helpers for extracted skills and resume items."""
+"""Persistence helpers for extracted skills and resume items.
+
+This module provides functions to save skill extraction and deep analysis
+results to the database. It handles both repository-level skills (ProjectSkill)
+and user-attributed skills (UserProjectSkill) for collaborative repos.
+"""
 
 from __future__ import annotations
 
 from typing import List
 
 from artifactminer.skills.models import ExtractedSkill
-from artifactminer.skills.deep_analysis import Insight 
+from artifactminer.skills.deep_analysis import Insight
 from artifactminer.db.models import ResumeItem, RepoStat
 
 
@@ -17,7 +22,26 @@ def persist_extracted_skills(
     user_email: str | None = None,
     commit: bool = True,
 ):
-    """Persist extracted skills to Skill/ProjectSkill or UserProjectSkill tables."""
+    """Persist extracted skills to the database.
+
+    Saves skills to either ProjectSkill (repo-level) or UserProjectSkill
+    (user-attributed) based on whether user_email is provided.
+
+    Args:
+        db: SQLAlchemy Session instance.
+        repo_stat_id: Foreign key to the RepoStat being analyzed.
+        extracted: List of ExtractedSkill objects from skill extraction.
+        user_email: If provided, skills are attributed to this user via
+            UserProjectSkill. Email is normalized (lowercase, stripped).
+        commit: If True (default), commits the transaction. Set False to
+            batch multiple operations before committing.
+
+    Returns:
+        List of created/updated ProjectSkill or UserProjectSkill objects.
+
+    Raises:
+        ValueError: If db is not a SQLAlchemy Session or RepoStat doesn't exist.
+    """
     from sqlalchemy.orm import Session
     from artifactminer.db.models import Skill, ProjectSkill, RepoStat, UserProjectSkill
 
@@ -29,18 +53,17 @@ def persist_extracted_skills(
 
     normalized_email = user_email.strip().lower() if user_email else None
     saved = []
-    
+
     for sk in extracted:
-        # 1. Ensure the Master Skill exists
+        # Ensure the master Skill row exists (shared across all projects)
         skill_row = db.query(Skill).filter(Skill.name == sk.skill).first()
         if not skill_row:
             skill_row = Skill(name=sk.skill, category=sk.category)
             db.add(skill_row)
-            db.flush() # Flush to get the ID
+            db.flush()  # Get the ID before creating junction record
 
-        # 2. Save to UserProjectSkill (if email provided) or ProjectSkill
+        # Route to UserProjectSkill or ProjectSkill based on email
         if normalized_email:
-            # User-Specific Skill
             proj_skill = (
                 db.query(UserProjectSkill)
                 .filter(
@@ -52,13 +75,13 @@ def persist_extracted_skills(
             )
 
             if proj_skill:
-                # Update existing
-                proj_skill.proficiency = max((proj_skill.proficiency or 0.0), sk.proficiency)
+                # Merge: keep highest proficiency, union evidence
+                proj_skill.proficiency = max(
+                    (proj_skill.proficiency or 0.0), sk.proficiency
+                )
                 existing_evidence = set(proj_skill.evidence or [])
-                merged = list(existing_evidence.union(sk.evidence))
-                proj_skill.evidence = merged
+                proj_skill.evidence = list(existing_evidence.union(sk.evidence))
             else:
-                # Create new
                 proj_skill = UserProjectSkill(
                     repo_stat_id=repo_stat_id,
                     skill_id=skill_row.id,
@@ -68,7 +91,7 @@ def persist_extracted_skills(
                 )
                 db.add(proj_skill)
         else:
-            # Generic Repo Skill
+            # Generic repo-level skill (no user attribution)
             proj_skill = (
                 db.query(ProjectSkill)
                 .filter(
@@ -79,10 +102,12 @@ def persist_extracted_skills(
             )
 
             if proj_skill:
-                proj_skill.proficiency = max((proj_skill.proficiency or 0.0), sk.proficiency)
+                # Merge: keep highest proficiency, union evidence
+                proj_skill.proficiency = max(
+                    (proj_skill.proficiency or 0.0), sk.proficiency
+                )
                 existing_evidence = set(proj_skill.evidence or [])
-                merged = list(existing_evidence.union(sk.evidence))
-                proj_skill.evidence = merged
+                proj_skill.evidence = list(existing_evidence.union(sk.evidence))
             else:
                 proj_skill = ProjectSkill(
                     repo_stat_id=repo_stat_id,
@@ -91,6 +116,7 @@ def persist_extracted_skills(
                     evidence=list(sk.evidence),
                 )
                 db.add(proj_skill)
+
         saved.append(proj_skill)
 
     if commit:
@@ -98,38 +124,55 @@ def persist_extracted_skills(
     return saved
 
 
-# --- NEW FUNCTION FOR RESUME ITEMS ---
-
 def persist_insights_as_resume_items(
     db,
     repo_stat_id: int,
     insights: List[Insight],
-    commit: bool = True
+    commit: bool = True,
 ):
-    """Persist deep analysis insights to the ResumeItem table."""
+    """Persist deep analysis insights as resume items.
 
+    Converts Insight objects (from DeepRepoAnalyzer) into ResumeItem rows
+    that can be used for resume generation.
+
+    Args:
+        db: SQLAlchemy Session instance.
+        repo_stat_id: Foreign key to the RepoStat being analyzed.
+        insights: List of Insight objects from deep analysis.
+        commit: If True (default), commits the transaction.
+
+    Returns:
+        List of created/updated ResumeItem objects, or empty list if
+        insights is empty.
+
+    Raises:
+        ValueError: If RepoStat doesn't exist.
+    """
     if not insights:
         return []
 
-    # Verify Repo exists
     if not db.query(RepoStat).filter(RepoStat.id == repo_stat_id).first():
         raise ValueError(f"RepoStat {repo_stat_id} does not exist")
 
     saved_items = []
-    
+
     for insight in insights:
-        # Create a formatted string for the content
-        # e.g. "Complexity Awareness: Resource caps... (Why: This matters because...)"
-        content_text = f"{insight.title}: {' '.join(insight.evidence)}. {insight.why_it_matters}"
-        
-        # Check for duplicates (simple check based on title + repo)
-        existing = db.query(ResumeItem).filter(
-            ResumeItem.repo_stat_id == repo_stat_id,
-            ResumeItem.title == insight.title
-        ).first()
+        # Format: "Title: evidence1 evidence2. Why it matters"
+        content_text = (
+            f"{insight.title}: {' '.join(insight.evidence)}. {insight.why_it_matters}"
+        )
+
+        # Deduplicate by title within the same repo
+        existing = (
+            db.query(ResumeItem)
+            .filter(
+                ResumeItem.repo_stat_id == repo_stat_id,
+                ResumeItem.title == insight.title,
+            )
+            .first()
+        )
 
         if existing:
-            # Update content if needed, or skip
             existing.content = content_text
             saved_items.append(existing)
         else:
@@ -137,12 +180,12 @@ def persist_insights_as_resume_items(
                 repo_stat_id=repo_stat_id,
                 title=insight.title,
                 content=content_text,
-                category="Deep Insight" # Or map from insight rules
+                category="Deep Insight",
             )
             db.add(new_item)
             saved_items.append(new_item)
 
     if commit:
         db.commit()
-    
+
     return saved_items
