@@ -9,6 +9,7 @@ import git
 from artifactminer.db.models import UserRepoStat
 from artifactminer.db.database import SessionLocal
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
+from src.artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
 from email_validator import validate_email, EmailNotValidError
 
 @dataclass
@@ -19,6 +20,7 @@ class UserRepoStats:
     total_commits: Optional[int] = None 
     userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
+    commitActivities: Optional[dict] = None # New field to store activity breakdown
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -51,6 +53,9 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
     else:
         commitFrequency = total_commits / weeks #average commits per week
 
+
+    commitActivities = classify_commit_activities(collect_user_additions(repo_path, user_email, max_commits=5000)) #get the user's commit activities breakdown
+
     return UserRepoStats( #return the populated UserRepoStats dataclass
         project_name=project_name,
         first_commit=first_commit,
@@ -58,6 +63,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
         total_commits=total_commits,
         userStatspercentages=userStatspercentages,
         commitFrequency=commitFrequency,
+        commitActivities=commitActivities
     )
 
 # Extract added lines from a unified diff
@@ -136,6 +142,17 @@ def collect_user_additions(
 
     return additions_per_commit
 
+def split_text_into_chunks(text: str, max_chunk_size: int) -> List[str]:
+    """Split text into chunks of at most `max_chunk_size` characters."""
+    chunks: List[str] = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chunk_size, len(text))
+        chunks.append(text[start:end])
+        start = end
+    return chunks
+
+
 def saveUserRepoStats(stats: UserRepoStats):
     db = SessionLocal()
     try:
@@ -146,6 +163,7 @@ def saveUserRepoStats(stats: UserRepoStats):
             total_commits=stats.total_commits,
             userStatspercentages=stats.userStatspercentages,
             commitFrequency=stats.commitFrequency,
+            activity_breakdown=stats.commitActivities
         )
         db.add(user_repo_stat)
         db.commit()
