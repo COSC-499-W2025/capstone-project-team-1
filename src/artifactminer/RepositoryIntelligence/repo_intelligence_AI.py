@@ -4,7 +4,7 @@
 from typing import List
 from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
+from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.helpers.openai import get_gpt5_nano_response
 
 

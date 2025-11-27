@@ -6,11 +6,12 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from artifactminer.db.models import UserRepoStat
 from artifactminer.db.database import SessionLocal
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
-from src.artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
+from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
+from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
 from email_validator import validate_email, EmailNotValidError
+from sqlalchemy.orm import Session
+from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
 
 @dataclass
 class UserRepoStats:
