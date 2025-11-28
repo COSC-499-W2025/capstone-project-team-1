@@ -76,6 +76,83 @@ def create_app() -> FastAPI:
     ) -> List[UserAnswer]:
         """Save user answers to configuration questions using a keyed payload."""
 
+        # Prefetch active questions into a mapping for lookups and validation
+        questions: list[Question] = (
+            db.query(Question)
+            .filter(Question.is_active == True)
+            .order_by(Question.order)
+            .all()
+        )
+        key_to_q = {q.key or str(q.id): q for q in questions}
+
+        saved_answers: list[UserAnswer] = []
+
+        # Normalize incoming answers: coerce to str and strip whitespace
+        raw_answers = request.answers or {}
+        answers = {k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()}
+
+        # Validate required fields and answer types
+        required_missing = [
+            k
+            for k, q in key_to_q.items()
+            if (
+                q.required and (k not in answers or not str(answers.get(k, "")).strip())
+            )
+        ]
+        if required_missing:
+            # Generic validation error for missing required fields
+            raise HTTPException(
+                status_code=422, detail="Please fill in all required fields."
+            )
+
+        # Type-specific validation (email)
+        for k, v in answers.items():
+            q = key_to_q.get(k)
+            if not q:
+                # Generic error for unknown fields
+                raise HTTPException(status_code=422, detail="Invalid field provided.")
+            if (q.answer_type or "text") == "email":
+                try:
+                    # Validate format only; avoid DNS/network checks
+                    validate_email(v, check_deliverability=False)
+                except EmailNotValidError:
+                    # Generic error for invalid email format
+                    raise HTTPException(
+                        status_code=422, detail="Invalid email provided."
+                    )
+            elif (q.answer_type or "text") == "comma_separated":
+                # Allow empty string (required=False questions)
+                if v.strip():
+                    # Split by comma, strip whitespace from each item
+                    items = [item.strip() for item in v.split(",")]
+                    # Reject if any empty items (e.g., "*.py,,*.js" or ",*.py")
+                    if any(not item for item in items):
+                        raise HTTPException(
+                            status_code=422,
+                            detail="Invalid comma-separated format. Use: *.py,*.js"
+                        )
+
+        # Persist (upsert: update existing or create new)
+        for k, v in answers.items():
+            q = key_to_q[k]
+            # Check if answer already exists for this question
+            existing = db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            if existing:
+                # Update existing answer
+                existing.answer_text = str(v).strip()
+                existing.answered_at = datetime.now()
+                saved_answers.append(existing)
+            else:
+                # Create new answer
+                ua = UserAnswer(question_id=q.id, answer_text=str(v).strip())
+                db.add(ua)
+                saved_answers.append(ua)
+
+        db.commit()
+        for ans in saved_answers:
+            db.refresh(ans)
+        return saved_answers
+
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
         repo_path: str,
