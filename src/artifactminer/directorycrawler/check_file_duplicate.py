@@ -24,11 +24,11 @@ def is_file_duplicate(fileName, dirPath, hash=hashlib.sha1):
         for chunk in chunk_reader(f):
             hashobj.update(chunk)
 
-    hash = hashobj.hexdigest()
+    file_hash = hashobj.hexdigest()
     
-    isDup = hash in dict.get_dict()
+    isDup = file_hash in dict.get_dict()
     
-    return isDup, hash #order? 
+    return isDup, file_hash 
 
     
     
