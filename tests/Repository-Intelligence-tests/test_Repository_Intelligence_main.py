@@ -54,8 +54,8 @@ def test_save_repo_stats(): #checks that we can save the repo stats to the datab
         assert False, f"save_repo_stats raised an exception: {e}"
 
 def test_select_repo_stats_from_db(): #checks that we can select the saved repo stats from the database
-    from src.artifactminer.db.database import SessionLocal
-    from src.artifactminer.db.models import RepoStat
+    from artifactminer.db.database import SessionLocal
+    from artifactminer.db.models import RepoStat
 
     root = Path(__file__).resolve().parents[2]
     stats = getRepoStats(root)

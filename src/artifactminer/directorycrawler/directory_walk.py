@@ -16,6 +16,8 @@ CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCK
 
 from .store_file_dict import StoreFileDict
 from .check_file_duplicate import is_file_duplicate
+from ..RepositoryIntelligence.repo_intelligence_main import getRepoStats,saveRepoStats
+
 
 readableFileTypes = [] #TODO
 
@@ -44,13 +46,25 @@ def crawl_directory():
         print("path does not exist")
         return
 
-    for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
-        if(files):
-            current_folder = os.path.basename(root)
+    for (full_dir_path,dirs,files) in os.walk(CURRENTPATH, topdown=True):
+            current_folder = os.path.basename(full_dir_path)
             print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
             for file in files: 
-               
-                full_path = os.path.join(root, file)
+                print(current_folder)
+
+                full_path = os.path.join(full_dir_path, file)
+
+                if(current_folder == ".git"):
+                    print("git folder found")
+                    repoStats = getRepoStats(CURRENTPATH)
+                    saveRepoStats(repoStats)
+                    continue
+
+                #getRepoStats(full_dir_path)
+                #its a git folder
+
+                
+
                 if file in userExcludeFileName or get_extension(file) in userExcludeFileExtension: #user 
                     print("the file the user has excluded: ", file)
                     continue
@@ -66,7 +80,7 @@ def crawl_directory():
                 
                 print_files(file) #print files
 
-                isDuplicate, fileId = is_file_duplicate(file, root)
+                isDuplicate, fileId = is_file_duplicate(file, full_dir_path)
 
                 if(isDuplicate == False):
                     '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
@@ -164,3 +178,4 @@ def print_values_in_dict():
         '''
     print(store_file_dictionary.get_values())
 
+crawl_directory()
