@@ -9,6 +9,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from sqlalchemy import or_
+
 from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse
 from ..db import (
     get_db,
@@ -38,6 +40,7 @@ async def get_skill_chronology(
         db.query(ProjectSkill, Skill, RepoStat)
         .join(Skill, ProjectSkill.skill_id == Skill.id)
         .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(RepoStat.deleted_at.is_(None))  # Exclude soft-deleted projects
         .order_by(RepoStat.first_commit.asc())
         .all()
     )
@@ -74,6 +77,9 @@ async def get_resume_items(
     query = db.query(ResumeItem, RepoStat).outerjoin(
         RepoStat, ResumeItem.repo_stat_id == RepoStat.id
     )
+
+    # Exclude soft-deleted projects (but keep items with no repo_stat)
+    query = query.filter(or_(RepoStat.deleted_at.is_(None), RepoStat.id.is_(None)))
 
     if project_id is not None:
         query = query.filter(ResumeItem.repo_stat_id == project_id)
