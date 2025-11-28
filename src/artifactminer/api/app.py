@@ -160,16 +160,21 @@ def create_app() -> FastAPI:
         db: Session = Depends(get_db)
     ):
         """Analyze a single git repository and store RepoStat + UserRepoStat."""
-        repo_stats = getRepoStats(repo_path)
-        saveRepoStats(repo_stats)
+        try:
+            repo_stats = getRepoStats(repo_path)
+            saveRepoStats(repo_stats)
 
-        user_stats = getUserRepoStats(repo_path, user_email)
-        saveUserRepoStats(user_stats)
+            user_stats = getUserRepoStats(repo_path, user_email)
+            saveUserRepoStats(user_stats)
 
-        return {
-            "repo_stats": repo_stats.__dict__,
-            "user_stats": user_stats.__dict__
-        }
+            return {
+                "repo_stats": repo_stats.__dict__,
+                "user_stats": user_stats.__dict__
+            }
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     # Mount routers (unchanged)
     app.include_router(consent_router)
