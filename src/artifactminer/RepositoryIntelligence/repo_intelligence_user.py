@@ -156,8 +156,17 @@ def split_text_into_chunks(text: str, max_chunk_size: int) -> List[str]:
     return chunks
 
 
-def saveUserRepoStats(stats: UserRepoStats):
-    db = SessionLocal()
+def saveUserRepoStats(stats: UserRepoStats, db=None):
+    """Save user repository statistics to database.
+    
+    Args:
+        stats: UserRepoStats object to save
+        db: Optional SQLAlchemy session. If None, creates a new session.
+    """
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    
     try:
         user_repo_stat = UserRepoStat(
             project_name=stats.project_name,
@@ -170,10 +179,17 @@ def saveUserRepoStats(stats: UserRepoStats):
             activity_breakdown=stats.commitActivities
         )
         db.add(user_repo_stat)
-        db.commit()
-        db.refresh(user_repo_stat)
+        if own_session:
+            db.commit()
+            db.refresh(user_repo_stat)
+        return user_repo_stat
+    except Exception as e:
+        if own_session:
+            db.rollback()
+        raise
     finally:
-        db.close()
+        if own_session:
+            db.close()
 
 def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     """

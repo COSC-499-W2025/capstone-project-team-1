@@ -90,8 +90,17 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         frameworks=frameworks,
     )
 
-def saveRepoStats(stats):
-    db = SessionLocal()
+def saveRepoStats(stats, db=None):
+    """Save repository statistics to database.
+    
+    Args:
+        stats: RepoStats object to save
+        db: Optional SQLAlchemy session. If None, creates a new session.
+    """
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    
     try:
         repo_stat = RepoStat(
             project_name=stats.project_name,
@@ -106,11 +115,16 @@ def saveRepoStats(stats):
             frameworks=stats.frameworks,
         )
         db.add(repo_stat)
-        db.commit()
-        db.refresh(repo_stat)
+        if own_session:
+            db.commit()
+            db.refresh(repo_stat)
         print(f"Saved repo stats: {repo_stat.project_name}")
+        return repo_stat
     except Exception as e:
-        db.rollback()
+        if own_session:
+            db.rollback()
         print(f"Error saving repo stats: {e}")
+        raise
     finally:
-        db.close()
+        if own_session:
+            db.close()

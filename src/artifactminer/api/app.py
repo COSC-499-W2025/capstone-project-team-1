@@ -159,21 +159,28 @@ def create_app() -> FastAPI:
         user_email: str,
         db: Session = Depends(get_db)
     ):
-        """Analyze a single git repository and store RepoStat + UserRepoStat."""
+        """Analyze a single git repository and store RepoStat + UserRepoStat.
+        
+        Both saves are performed in a single transaction for atomicity.
+        """
         try:
             repo_stats = getRepoStats(repo_path)
-            saveRepoStats(repo_stats)
-
             user_stats = getUserRepoStats(repo_path, user_email)
-            saveUserRepoStats(user_stats)
+            
+            # Save both within the same transaction
+            saveRepoStats(repo_stats, db=db)
+            saveUserRepoStats(user_stats, db=db)
+            db.commit()
 
             return {
                 "repo_stats": repo_stats.__dict__,
                 "user_stats": user_stats.__dict__
             }
         except ValueError as e:
+            db.rollback()
             raise HTTPException(status_code=400, detail=str(e))
         except Exception as e:
+            db.rollback()
             raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
 
     # Mount routers (unchanged)
