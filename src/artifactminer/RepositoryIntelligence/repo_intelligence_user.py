@@ -9,7 +9,7 @@ import git
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
-from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createSummaryFromUserAdditions, saveUserIntelligenceSummary
+from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createSummaryFromUserAdditions, saveUserIntelligenceSummary, group_additions_into_blocks
 from email_validator import validate_email, EmailNotValidError
 from sqlalchemy.orm import Session
 from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
@@ -17,6 +17,7 @@ from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
 @dataclass
 class UserRepoStats:
     project_name: str 
+    project_path: str
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
@@ -37,12 +38,11 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
     repo = git.Repo(repo_path) #initialize the git repo object
 
     project_name = Path(repo_path).name #Get project name from the folder name
-
+    project_path = str(repo_path) # Get the full project path
     commits = list(repo.iter_commits(author=user_email)) #Get all commits by the specified user email
     total_repo_commits = list(repo.iter_commits()) #Get all commits in the repo
     if not commits:
-        return UserRepoStats(project_name=project_name) #return empty stats if no commits by user
-
+        return UserRepoStats(project_name=project_name, project_path=project_path) #return empty stats if no commits by user
     first_commit = datetime.fromtimestamp(commits[-1].committed_date)
     last_commit = datetime.fromtimestamp(commits[0].committed_date)
     total_commits = len(commits) #total number of commits by the user not the repo
@@ -60,6 +60,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
 
     return UserRepoStats( #return the populated UserRepoStats dataclass
         project_name=project_name,
+        project_path=str(repo_path),
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=total_commits,
@@ -160,6 +161,7 @@ def saveUserRepoStats(stats: UserRepoStats):
     try:
         user_repo_stat = UserRepoStat(
             project_name=stats.project_name,
+            project_path=stats.project_path,
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
@@ -173,7 +175,7 @@ def saveUserRepoStats(stats: UserRepoStats):
     finally:
         db.close()
 
-def generate_summaries_for_ranked(db: Session) -> list[dict]:
+def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     """
     Summarize the top-ranked repositories for the current user.
 
@@ -192,7 +194,7 @@ def generate_summaries_for_ranked(db: Session) -> list[dict]:
     top_repos: list[RepoStat] = (
         db.query(RepoStat)
         .order_by(ranking_column.desc())
-        .limit(3)
+        .limit(top)
         .all()
     )
 
@@ -234,19 +236,28 @@ def generate_summaries_for_ranked(db: Session) -> list[dict]:
         # If we have consent + a valid email, try the LLM-based summary instead
         if user_allows_llm() and user_email:
             try:
+                # Ensure path is absolute for git operations
+                repo_path_absolute = str(Path(repo.project_path).resolve())
                 additions = collect_user_additions(
-                    repo_path=repo.project_name,  # currently we only store project_name; can swap to full path later
+                    repo_path=repo_path_absolute,
                     user_email=user_email,
                 )
                 if additions:
-                    summary_text = createSummaryFromUserAdditions(additions)
-            except Exception:
+                    grouped = group_additions_into_blocks(additions, max_chars_per_block=1000, max_blocks=1)
+                    ai_summary = createSummaryFromUserAdditions(grouped)
+                    print("AI Summary Generated for", repo.project_name, ":", ai_summary)
+                    summary_text += " AI summary: " + ai_summary
+            except Exception as e:
+                # Log the actual error for debugging
+                print(f"ERROR generating AI summary for {repo.project_name}: {type(e).__name__}: {e}")
+                import traceback
+                traceback.print_exc()
                 # Fail soft: keep the fallback template summary
                 pass
 
         # Persist into UserAIntelligenceSummary
         saveUserIntelligenceSummary(
-            repo_path=repo.path if hasattr(repo, "path") else repo.project_name,
+            repo_path=repo.project_path,
             user_email=user_email or "",
             summary_text=summary_text,
         )

@@ -15,6 +15,7 @@ from artifactminer.RepositoryIntelligence.framework_detector import detect_frame
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
     project_name: str #store project name as a string
+    project_path: str #store project path as a string
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
     Languages: List[str] = field(default_factory=list) #Languages as a string list to store the languages used in the repo
     language_percentages: List[float] = field(default_factory=list)# Language percentages as a float list to store the percentage of each language used in the repo
@@ -78,6 +79,7 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     return RepoStats(
         project_name=project_name,
+        project_path=str(repo_path),
         is_collaborative=is_collaborative,
         primary_language=primary_language,
         Languages=languages,
@@ -93,6 +95,7 @@ def saveRepoStats(stats):
     try:
         repo_stat = RepoStat(
             project_name=stats.project_name,
+            project_path=stats.project_path,
             is_collaborative=stats.is_collaborative,
             primary_language=stats.primary_language,
             languages=stats.Languages,
