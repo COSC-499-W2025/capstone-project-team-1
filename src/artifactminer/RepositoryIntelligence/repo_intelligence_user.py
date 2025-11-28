@@ -245,7 +245,7 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
                 if additions:
                     grouped = group_additions_into_blocks(additions, max_chars_per_block=1000, max_blocks=1)
                     ai_summary = createSummaryFromUserAdditions(grouped)
-                    print("AI Summary Generated for", repo.project_name, ":", ai_summary)
+                    print("\n AI Summary Generated for", repo.project_name, ":", ai_summary)
                     summary_text += " AI summary: " + ai_summary
             except Exception as e:
                 # Log the actual error for debugging

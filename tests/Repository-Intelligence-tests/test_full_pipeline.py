@@ -45,7 +45,7 @@ def test_full_pipeline_zip_to_summaries():
         db.query(UserAnswer).delete()
         db.commit()
         
-        set_user_consent("none")  # Disable LLM calls for testing
+        set_user_consent("full")  # Disable LLM calls for testing
 
 
         # 1. Insert user config (email)

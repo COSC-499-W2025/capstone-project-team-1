@@ -7,7 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_main import RepoStats, isGitRepo, getRepoStats, saveRepoStats
 
 def test_create_RepoStats():
-    mytestproject = RepoStats(project_name="test-project", primary_language="Python", is_collaborative=True)
+    mytestproject = RepoStats(project_name="test-project",project_path="path/to/project", primary_language="Python", is_collaborative=True)
 
     assert mytestproject.project_name == "test-project" #test to see if the name is correct
     assert mytestproject.primary_language == "Python" #test to see if the language is correct
@@ -15,7 +15,7 @@ def test_create_RepoStats():
     assert isinstance(mytestproject.frameworks, list) #test to see if frameworks is initialized as a list
 
 def test_create_RepoStats_false():
-    mytestproject_wrong = RepoStats(project_name="test-project-wrong", primary_language="Java", is_collaborative=False)
+    mytestproject_wrong = RepoStats(project_name="test-project-wrong",project_path="path/to/project", primary_language="Java", is_collaborative=False)
     
     assert mytestproject_wrong.project_name != "test-project" #test to see if the name does not match the last test, and that the variable is being set correctly
     assert mytestproject_wrong.primary_language != "Python" #test to see if the language does not match the last test, and that the variable is being set correctly
