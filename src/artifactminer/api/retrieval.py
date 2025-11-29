@@ -6,7 +6,7 @@ All are GET-only with no side effects.
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from sqlalchemy import or_
