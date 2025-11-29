@@ -91,9 +91,15 @@ class ProjectTimelineItem(BaseModel):
 
     project_name: str = Field(description="Display name of the project.")
     first_commit: datetime = Field(description="Timestamp of the first commit seen.")
-    last_commit: datetime = Field(description="Timestamp of the most recent commit seen.")
-    duration_days: int = Field(description="Number of days between first and last commit.")
-    was_active: bool = Field(description="Whether the project was active in the last 6 months.")
+    last_commit: datetime = Field(
+        description="Timestamp of the most recent commit seen."
+    )
+    duration_days: int = Field(
+        description="Number of days between first and last commit."
+    )
+    was_active: bool = Field(
+        description="Whether the project was active in the last 6 months."
+    )
 
 
 class OpenAIRequest(BaseModel):
@@ -106,3 +112,48 @@ class OpenAIResponse(BaseModel):
     """Response shape for OpenAI API calls."""
 
     response: str = Field(..., description="The model's response text.")
+
+
+class SkillChronologyItem(BaseModel):
+    """Chronological skill entry showing when a skill was first demonstrated."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: datetime | None = Field(
+        description="Date skill was first used (from project's first commit)."
+    )
+    skill: str = Field(description="Name of the skill.")
+    project: str = Field(description="Project where skill was demonstrated.")
+    proficiency: float | None = Field(
+        default=None, description="Proficiency level 0.0-1.0."
+    )
+    category: str | None = Field(
+        default=None, description="Skill category (e.g., 'Programming Languages')."
+    )
+
+
+class ResumeItemResponse(BaseModel):
+    """Response shape for resume/portfolio items."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    content: str
+    category: str | None = None
+    project_name: str | None = Field(
+        default=None, description="Associated project name."
+    )
+    created_at: datetime
+
+
+class SummaryResponse(BaseModel):
+    """Response shape for AI-generated user contribution summaries."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    repo_path: str
+    user_email: str
+    summary_text: str
+    generated_at: datetime

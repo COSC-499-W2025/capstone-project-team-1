@@ -10,11 +10,13 @@ a = StoreFileDict() #getting a single instance because we are using a singleton 
 
 def test_add():
     a.remove_all_dict()
+    a.remove_all_dict()
     a.add_to_dict(1, "one") 
     a.add_to_dict(2, "two")
     assert a.get_dict_len() == 2
 
 def test_remove():
+    a.remove_all_dict()
     a.remove_all_dict()
     a.remove_from_dict(1)
     a.remove_from_dict(2)
@@ -22,8 +24,9 @@ def test_remove():
 
 def test_get():
     a.remove_all_dict()
+    a.remove_all_dict()
     a.add_to_dict(100, "hundred")
-    x = a.get_dict(100)
+    x = a.get_dict_key(100)
     assert x == "hundred"
 
 
