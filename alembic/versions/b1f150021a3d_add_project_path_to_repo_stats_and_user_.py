@@ -21,22 +21,22 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     
-    # Add project_path column to repo_stat table
-    op.add_column('repo_stat', sa.Column('project_path', sa.String(), nullable=True))
+    # Add project_path column to repo_stats table
+    op.add_column('repo_stats', sa.Column('project_path', sa.String(), nullable=True))
     
-    # Add project_path column to user_repo_stat table
-    op.add_column('user_repo_stat', sa.Column('project_path', sa.String(), nullable=True))
+    # Add project_path column to user_repo_stats table
+    op.add_column('user_repo_stats', sa.Column('project_path', sa.String(), nullable=True))
     
     # Update existing rows with a placeholder value (can be updated later)
     # or set to the project_name as a fallback
-    op.execute("UPDATE repo_stat SET project_path = '/unknown/' || project_name WHERE project_path IS NULL")
-    op.execute("UPDATE user_repo_stat SET project_path = '/unknown/' || project_name WHERE project_path IS NULL")
+    op.execute("UPDATE repo_stats SET project_path = '/unknown/' || project_name WHERE project_path IS NULL")
+    op.execute("UPDATE user_repo_stats SET project_path = '/unknown/' || project_name WHERE project_path IS NULL")
     
     # Now make the columns non-nullable
-    with op.batch_alter_table('repo_stat') as batch_op:
+    with op.batch_alter_table('repo_stats') as batch_op:
         batch_op.alter_column('project_path', nullable=False)
     
-    with op.batch_alter_table('user_repo_stat') as batch_op:
+    with op.batch_alter_table('user_repo_stats') as batch_op:
         batch_op.alter_column('project_path', nullable=False)
     # ### end Alembic commands ###
 
@@ -44,10 +44,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
 
-    # Remove project_path column from user_repo_stat table
-    with op.batch_alter_table('user_repo_stat') as batch_op:
+    # Remove project_path column from user_repo_stats table
+    with op.batch_alter_table('user_repo_stats') as batch_op:
         batch_op.drop_column('project_path')
     
-    # Remove project_path column from repo_stat table
-    with op.batch_alter_table('repo_stat') as batch_op:
+    # Remove project_path column from repo_stats table
+    with op.batch_alter_table('repo_stats') as batch_op:
         batch_op.drop_column('project_path')
