@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 
 import pytest
-from sqlalchemy.orm import Session
 
-from artifactminer.db.models import RepoStat, Skill, ProjectSkill, ResumeItem
 
 
 def test_delete_project_success(client):
