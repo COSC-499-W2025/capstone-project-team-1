@@ -30,8 +30,8 @@ def test_repo_intelligence():
     sql ="SELECT * FROM repo_stats;"
     res = db.execute(text(sql)).all()
     objects = [dict(row._mapping) for row in res]
-    assert objects[0]["project_name"] == "mockdirectory-git"
+    assert objects[0]["project_name"] == "mockdirectory-git" 
     assert objects[1]["project_name"] == "mock-git_2" 
-    '''This proves that our repo can analyse multiple '''
+    '''This proves that our repo can get multiple folders with .git from a root folder (mockdirectory-git) '''
 
 
