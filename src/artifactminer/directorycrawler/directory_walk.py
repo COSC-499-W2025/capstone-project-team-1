@@ -48,17 +48,19 @@ def crawl_directory():
 
     for (full_dir_path,dirs,files) in os.walk(CURRENTPATH, topdown=True):
             current_folder = os.path.basename(full_dir_path)
+            
+            if(current_folder == ".git"):
+                print("git folder found")
+                repoStats = getRepoStats(Path(full_dir_path), True)
+                saveRepoStats(repoStats)
+            
             print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
             for file in files: 
                 print(current_folder)
 
                 full_path = os.path.join(full_dir_path, file)
 
-                if(current_folder == ".git"):
-                    print("git folder found")
-                    repoStats = getRepoStats(CURRENTPATH)
-                    saveRepoStats(repoStats)
-                    continue
+                
 
                 #getRepoStats(full_dir_path)
                 #its a git folder

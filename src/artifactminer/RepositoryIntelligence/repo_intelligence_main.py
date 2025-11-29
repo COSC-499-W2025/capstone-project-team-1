@@ -24,6 +24,7 @@ class RepoStats: #This is the basic Repo class for storing the results of the gi
     total_commits: Optional[int] = None # Optional addition is the total number of commits in the repo
     frameworks: List[str] = field(default_factory=list) # List of detected frameworks in the repo
 
+#isRelative: does there exist a .git folder?
 def isGitRepo(path :os.PathLike | str) -> bool:#This function checks whether the git directory exists inside of the given path
     p = Path(path)
     return (p / ".git").is_dir()
@@ -42,14 +43,20 @@ def runGit(repo_path: Pathish, args: Iterable[str]) -> str: #This function will 
     )
     return result.stdout #return gits printed output
 
-def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the basic repo stats for a given git repo path
-    if not isGitRepo(repo_path): #check if its a git repo
+
+def getRepoStats(repo_path: Pathish, is_relativePath = False) -> RepoStats: #This function will get the basic repo stats for a given git repo path
+    
+   
+    if not isGitRepo(repo_path) and not is_relativePath: #check if its a git repo
         raise ValueError(f"The path {repo_path} is not a git repository.") #raise error if not
 
     repo = git.Repo(repo_path) #initialize the git repo object
 
     # Get project name from the folder name
     project_name = Path(repo_path).name
+    if is_relativePath: # NOTE, is there a relative path? A path like src/mock/.git? get the parent (in the example claim "mock")
+        project_name = Path(repo_path).parent.name 
+    
 
     # Get primary language by analyzing file extensions
     language_counter = Counter()
