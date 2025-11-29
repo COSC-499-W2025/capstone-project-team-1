@@ -7,10 +7,10 @@ def classify_commit_activities(additions: List[str]) -> dict:
     """
     Classify commit activity based on added text blobs.
 
-    - A single commit can contribute to multiple categories (test + docs + config, etc.)
-    - Docs are detected from comment-only / doc-style lines, and from doc-ish inline comments in the comment portion.
-    - Code+comment lines always count as code; their comments may also contribute to docs.
-    - Percentages are based on lines_added and normalized to sum to 100 when there is activity.
+    - A single commit can contribute to multiple categories (code + test + docs + config, etc.)
+    - Docs are detected from comment-only lines, inline comments, and Python/HTML doc-like blocks.
+    - A line with both code and a comment counts as one code line AND one docs line.
+    - Percentages are based on category line counts and normalized to sum to 100.
     """
     activity_summary: Dict[str, dict] = {
         key: {"commits": 0, "lines_added": 0} for key in ActivityKey
@@ -27,24 +27,55 @@ def classify_commit_activities(additions: List[str]) -> dict:
         has_docs = False
         has_config = False
         has_design = False
-        has_code_activity = False
 
+
+        code_lines = 0
         doc_like_lines = 0
         config_like_lines = 0
-        docs_keyword_hit = False  # track if we saw doc-ish text at all
+
+        # Track multi-line Python docstrings
+        in_docstring_block = False
 
         for line in non_blank_lines:
             raw = line.rstrip("\n")
-            stripped = raw.lstrip()
+            stripped = raw.strip()
 
-            # Quick check for HTML comment-only docs (e.g. PR templates)
-            if stripped.startswith("<!--"):
-                # Treat HTML comment blocks as doc-ish by default
+            # --------------------
+            # DOCSTRING handling (Python triple-quoted strings)
+            # --------------------
+            if in_docstring_block:
+                # Entire line is considered docs
                 doc_like_lines += 1
-                docs_keyword_hit = True
+
+                if stripped.endswith('"""') or stripped.endswith("'''"):
+                    in_docstring_block = False
+
+                # Don't treat as code/config
                 continue
 
-            # Split into code vs comment part for languages with #, //, /*.
+            if stripped.startswith('"""') or stripped.startswith("'''"):
+                # Opening (or one-line) docstring: docs++
+                doc_like_lines += 1
+
+                # Multi-line block if it doesn't close here
+                if not (stripped.endswith('"""') or stripped.endswith("'''")) or len(
+                    stripped
+                ) == 3:
+                    in_docstring_block = True
+
+                # Docstrings are treated as docs only, not code
+                continue
+
+            # --------------------
+            # HTML comment-only docs (e.g. PR templates)
+            # --------------------
+            if stripped.startswith("<!--"):
+                doc_like_lines += 1
+                continue
+
+            # --------------------
+            # Split into code vs comment part for #, //, /*, etc.
+            # --------------------
             comment_markers = ["#", "//", "/*"]
             split_index = None
 
@@ -65,9 +96,10 @@ def classify_commit_activities(additions: List[str]) -> dict:
 
             has_code = bool(code_part_stripped)
             has_comment_only = (not has_code) and bool(comment_part_stripped)
+            has_inline_comment = has_code and bool(comment_part_stripped)
 
             if has_code:
-                has_code_activity = True
+                code_lines += 1
 
             code_lower = code_part_stripped.lower()
             comment_lower = comment_part_stripped.lower()
@@ -92,69 +124,23 @@ def classify_commit_activities(additions: List[str]) -> dict:
                     has_test = True
 
             # --------------------
-            # DOCS detection (comment-only / doc-style)
+            # DOCS detection (comments / inline docs)
             # --------------------
+            # Pure comment-only lines → docs
             if has_comment_only:
-                # Markdown-style headings / bullet docs
-                if comment_lower.startswith("# ") or comment_lower.startswith("## "):
-                    doc_like_lines += 1
-                    docs_keyword_hit = True
-                # Common doc-ish words
-                elif any(
-                    kw in comment_lower
-                    for kw in [
-                        "readme",
-                        "documentation",
-                        "user guide",
-                        "usage:",
-                        "example:",
-                        "examples:",
-                        "parameters",
-                        "returns",
-                        "notes:",
-                        "note:",
-                        "warning:",
-                        "api reference",
-                        "changelog",
-                        "release notes",
-                    ]
-                ):
-                    doc_like_lines += 1
-                    docs_keyword_hit = True
-                # Docstring-only lines (Python) like """Summary"""
-                elif stripped.startswith('"""') or stripped.startswith("'''"):
-                    # treat short triple-quoted lines as doc-ish
-                    doc_like_lines += 1
-                    docs_keyword_hit = True
+                doc_like_lines += 1
 
-            # Inline comments may also contain doc-like text
-            if comment_part_stripped and not has_comment_only:
-                if any(
-                    kw in comment_lower
-                    for kw in [
-                        "readme",
-                        "documentation",
-                        "user guide",
-                        "usage:",
-                        "example:",
-                        "examples:",
-                        "parameters",
-                        "returns",
-                        "notes:",
-                        "note:",
-                        "warning:",
-                        "api reference",
-                        "changelog",
-                        "release notes",
-                    ]
-                ):
-                    doc_like_lines += 1
-                    docs_keyword_hit = True
+            # Inline comments on code lines → count as docs too
+            if has_inline_comment:
+                doc_like_lines += 1
 
             # --------------------
             # CONFIG detection (config-like structure)
             # --------------------
             # env-style: FOO=bar (no '==' and uppercase key)
+            if "environ" in raw and "=" in raw:
+                config_like_lines += 1
+
             if (
                 "=" in raw
                 and "==" not in raw
@@ -198,46 +184,35 @@ def classify_commit_activities(additions: List[str]) -> dict:
                 ):
                     has_design = True
 
-        # Decide docs/config based on thresholds
-        # Docs: either clear doc keywords or a big chunk of comment-only lines
-        if doc_like_lines >= 3 and (doc_like_lines / lines_added) >= 0.2:
-            has_docs = True
-        elif docs_keyword_hit and doc_like_lines >= 1:
-            # a small amount of clearly doc-ish text
+        # Decide docs/config based on line counts
+        if doc_like_lines > 0:
             has_docs = True
 
-        # Config: multiple config-like lines and decent proportion
-        if config_like_lines >= 3 and (config_like_lines / lines_added) >= 0.2:
+        if config_like_lines > 0:
             has_config = True
 
-        classified_any = False
-
+        # --- accumulate per-category stats ---
         if has_test:
             activity_summary["test"]["commits"] += 1
-            activity_summary["test"]["lines_added"] += lines_added
-            classified_any = True
+            activity_summary["test"]["lines_added"] += lines_added  # commit-level
 
         if has_docs:
             activity_summary["docs"]["commits"] += 1
-            activity_summary["docs"]["lines_added"] += lines_added
-            classified_any = True
+            activity_summary["docs"]["lines_added"] += doc_like_lines
 
         if has_config:
             activity_summary["config"]["commits"] += 1
-            activity_summary["config"]["lines_added"] += lines_added
-            classified_any = True
+            activity_summary["config"]["lines_added"] += config_like_lines
 
         if has_design:
             activity_summary["design"]["commits"] += 1
             activity_summary["design"]["lines_added"] += lines_added
-            classified_any = True
 
-        # Default bucket → code
-        if not classified_any or has_code_activity:
+        if code_lines > 0:
             activity_summary["code"]["commits"] += 1
-            activity_summary["code"]["lines_added"] += lines_added
+            activity_summary["code"]["lines_added"] += code_lines
 
-    # --- percentages based on lines_added ---
+    # --- percentages based on category line counts ---
     total_lines = sum(v["lines_added"] for v in activity_summary.values())
 
     if total_lines > 0:
@@ -259,7 +234,7 @@ def classify_commit_activities(additions: List[str]) -> dict:
             idx += 1
 
         for k in ActivityKey:
-            activity_summary[k]["percentage"] = floored[k]
+            activity_summary[k]["percentage"] = floored.get(k, 0)
     else:
         for k in ActivityKey:
             activity_summary[k]["percentage"] = 0
