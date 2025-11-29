@@ -34,6 +34,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     getUserRepoStats, saveUserRepoStats
 )
+from .retrieval import router as retrieval_router
 
 
 def create_app() -> FastAPI:
@@ -89,7 +90,9 @@ def create_app() -> FastAPI:
 
         # Normalize incoming answers: coerce to str and strip whitespace
         raw_answers = request.answers or {}
-        answers = {k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()}
+        answers = {
+            k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()
+        }
 
         # Validate required fields and answer types
         required_missing = [
@@ -129,14 +132,16 @@ def create_app() -> FastAPI:
                     if any(not item for item in items):
                         raise HTTPException(
                             status_code=422,
-                            detail="Invalid comma-separated format. Use: *.py,*.js"
+                            detail="Invalid comma-separated format. Use: *.py,*.js",
                         )
 
         # Persist (upsert: update existing or create new)
         for k, v in answers.items():
             q = key_to_q[k]
             # Check if answer already exists for this question
-            existing = db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            existing = (
+                db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            )
             if existing:
                 # Update existing answer
                 existing.answer_text = str(v).strip()
@@ -188,6 +193,7 @@ def create_app() -> FastAPI:
     app.include_router(zip_router)
     app.include_router(projects_router)
     app.include_router(openai_router)
+    app.include_router(retrieval_router)
     return app
 
 
