@@ -28,11 +28,14 @@ from .consent import router as consent_router
 from .zip import router as zip_router
 from .openai import router as openai_router
 from .projects import router as projects_router
+from .analyze import router as analyze_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
-    getRepoStats, saveRepoStats
+    getRepoStats,
+    saveRepoStats,
 )
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
-    getUserRepoStats, saveUserRepoStats
+    getUserRepoStats,
+    saveUserRepoStats,
 )
 from .retrieval import router as retrieval_router
 
@@ -160,18 +163,16 @@ def create_app() -> FastAPI:
 
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
-        repo_path: str,
-        user_email: str,
-        db: Session = Depends(get_db)
+        repo_path: str, user_email: str, db: Session = Depends(get_db)
     ):
         """Analyze a single git repository and store RepoStat + UserRepoStat.
-        
+
         Both saves are performed in a single transaction for atomicity.
         """
         try:
             repo_stats = getRepoStats(repo_path)
             user_stats = getUserRepoStats(repo_path, user_email)
-            
+
             # Save both within the same transaction
             saveRepoStats(repo_stats, db=db)
             saveUserRepoStats(user_stats, db=db)
@@ -179,7 +180,7 @@ def create_app() -> FastAPI:
 
             return {
                 "repo_stats": repo_stats.__dict__,
-                "user_stats": user_stats.__dict__
+                "user_stats": user_stats.__dict__,
             }
         except ValueError as e:
             db.rollback()
@@ -194,6 +195,7 @@ def create_app() -> FastAPI:
     app.include_router(projects_router)
     app.include_router(openai_router)
     app.include_router(retrieval_router)
+    app.include_router(analyze_router)  # Master orchestration endpoint
     return app
 
 
