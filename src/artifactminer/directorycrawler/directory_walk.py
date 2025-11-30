@@ -35,14 +35,18 @@ userKeepFileName = []    #["include_file.log"] #even though its 'log' the user h
 userExcludeFileExtension = [] #user file extension that will be excluded
 userIncludeFileExtension = [] #user file extension that will be included 
 
-userIncludeAllFiles = False 
-
 store_file_dictionary = StoreFileDict()
+
+
 #storing files from mock folder to dictionary
 def crawl_directory(): 
+    global STORE_GIT_REPO
     if os.path.exists(CURRENTPATH) == False:
         print("path does not exist")
         return
+    
+    STORE_GIT_REPO = get_git_repos(CURRENTPATH) #get can get the repositories by calling STORE_GIT_REPO
+    print("git folders in project: ",  STORE_GIT_REPO)
 
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         if(files):
@@ -133,6 +137,14 @@ def update_path():
     global CURRENTPATH
     CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
+def get_git_repos(path: str) -> list:
+    p_path = Path(path)
+    return [
+        p for p in p_path.rglob("*")
+        if p.is_dir() and (p / ".git").exists()
+    ]
+
+
 #USER FUNCTIONS============================
 def user_keep_file(fileName):
     userKeepFileName.append(fileName)
@@ -164,3 +176,5 @@ def print_values_in_dict():
         '''
     print(store_file_dictionary.get_values())
 
+
+crawl_directory()
