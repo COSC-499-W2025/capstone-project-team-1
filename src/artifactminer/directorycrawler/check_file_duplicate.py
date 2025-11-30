@@ -1,12 +1,12 @@
 import hashlib
 import os
 
-from .store_file_dict import StoreFileDict
+from .store_file_dict import store_file_dict
 
 '''
 This system will take a file from .
 '''
-dict = StoreFileDict()
+dict = store_file_dict
 
 def chunk_reader(fobj, chunk_size=1024):
     """Generator that reads a file in chunks of bytes"""

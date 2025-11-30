@@ -7,9 +7,10 @@ class StoreFileDict:
 
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(StoreFileDict, cls).__new__(cls)
+            cls._instance = super().__new__(cls)
             cls._instance.file_dict = {}  # Initialize dictionary
         return cls._instance
+    
 
     def add_to_dict(self, key, value): #add to dictionary
         self.file_dict[key] = value
@@ -33,8 +34,7 @@ class StoreFileDict:
     def remove_all_dict(self):
         self.file_dict.clear()
 
-
-
+store_file_dict = StoreFileDict()
 
 
  
