@@ -159,6 +159,13 @@ class SummaryResponse(BaseModel):
     generated_at: datetime
 
 
+class ProjectRankingItem(BaseModel):
+    """Ranked project based on user contribution."""
+
+    name: str = Field(description="Project directory name.")
+    score: float = Field(description="User's contribution percentage (0-100).")
+    total_commits: int = Field(description="Total commits in the project.")
+    user_commits: int = Field(description="Commits by the user.")
 class RepoAnalysisResult(BaseModel):
     """Result of analyzing a single repository."""
 
