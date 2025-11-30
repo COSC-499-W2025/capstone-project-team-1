@@ -1,12 +1,12 @@
-"""Project-related API endpoints (timeline, etc.)."""
+"""Project-related API endpoints (timeline, delete, etc.)."""
 
 from datetime import datetime, timedelta, date
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .schemas import ProjectTimelineItem
+from .schemas import ProjectTimelineItem, DeleteResponse
 from ..db import RepoStat, get_db
 
 
@@ -27,7 +27,11 @@ async def get_project_timeline(
 
     repo_stats: List[RepoStat] = (
         db.query(RepoStat)
-        .filter(RepoStat.first_commit.isnot(None), RepoStat.last_commit.isnot(None))
+        .filter(
+            RepoStat.first_commit.isnot(None),
+            RepoStat.last_commit.isnot(None),
+            RepoStat.deleted_at.is_(None),  # Exclude soft-deleted projects
+        )
         .order_by(RepoStat.first_commit.asc())
         .all()
     )
@@ -52,6 +56,7 @@ async def get_project_timeline(
 
         timeline_items.append(
             ProjectTimelineItem(
+                id=stat.id,
                 project_name=stat.project_name,
                 first_commit=first_commit,
                 last_commit=last_commit,
@@ -61,3 +66,39 @@ async def get_project_timeline(
         )
 
     return timeline_items
+
+
+@router.delete("/{project_id}", response_model=DeleteResponse)
+async def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> DeleteResponse:
+    """Soft-delete a project (RepoStat) record by ID.
+
+    Sets deleted_at timestamp rather than removing the record.
+    Related ProjectSkill, UserProjectSkill, and ResumeItem records
+    are preserved but filtered out by other endpoints.
+
+    No files on disk are affected - this only modifies the database.
+    """
+    # Find RepoStat by ID (only non-deleted)
+    repo_stat = (
+        db.query(RepoStat)
+        .filter(RepoStat.id == project_id, RepoStat.deleted_at.is_(None))
+        .first()
+    )
+
+    # Handle not found (or already deleted)
+    if not repo_stat:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Soft delete - set timestamp
+    project_name = repo_stat.project_name
+    repo_stat.deleted_at = datetime.utcnow()
+    db.commit()
+
+    return DeleteResponse(
+        success=True,
+        message=f"Project '{project_name}' deleted successfully",
+        deleted_id=project_id,
+    )

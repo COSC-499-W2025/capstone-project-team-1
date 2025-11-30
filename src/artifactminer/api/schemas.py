@@ -89,6 +89,7 @@ class DirectoriesResponse(BaseModel):
 class ProjectTimelineItem(BaseModel):
     """Aggregated activity window for a project repository."""
 
+    id: int = Field(description="Unique identifier for the project.")
     project_name: str = Field(description="Display name of the project.")
     first_commit: datetime = Field(description="Timestamp of the first commit seen.")
     last_commit: datetime = Field(
@@ -157,3 +158,11 @@ class SummaryResponse(BaseModel):
     user_email: str
     summary_text: str
     generated_at: datetime
+
+
+class DeleteResponse(BaseModel):
+    """Response shape for delete operations."""
+
+    success: bool = Field(description="Whether the delete operation succeeded.")
+    message: str = Field(description="Human-readable result message.")
+    deleted_id: int = Field(description="ID of the deleted resource.")
