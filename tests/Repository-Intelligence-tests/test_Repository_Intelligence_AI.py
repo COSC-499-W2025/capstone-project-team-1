@@ -55,8 +55,7 @@ def test_create_AI_summary_example():
     set_user_consent("full")  # Ensure consent is given for LLM usage
     additions = [
         "Fixed bug in user authentication module.",
-        "Refactored database connection logic for better performance.",
-        "Added unit tests for the payment processing feature."
+        "Refactored database connection logic for better performance."
     ]
     summary0 = createAIsummaryFromUserAdditions(additions) 
     print(f"AI Summary Example: {summary0}")
@@ -70,7 +69,7 @@ def test_user_additions_collection():
     # Replace with a valid email present in the commit history of the repo
     test_email = "ecrowl01@student.ubc.ca"
     additions = collect_user_additions(root, test_email, max_commits=100)
-    summarized_texts = group_additions_into_blocks(additions, max_blocks=2, max_chars_per_block=10000)
+    summarized_texts = group_additions_into_blocks(additions, max_blocks=1, max_chars_per_block=1000)
     summary1 = createAIsummaryFromUserAdditions(summarized_texts)
     print(f"Collected {len(additions)} additions, summarized into {len(summarized_texts)} blocks.")
     print(f"AI Summary from User Additions: {summary1}")

@@ -157,3 +157,43 @@ class SummaryResponse(BaseModel):
     user_email: str
     summary_text: str
     generated_at: datetime
+
+
+class RepoAnalysisResult(BaseModel):
+    """Result of analyzing a single repository."""
+
+    project_name: str
+    project_path: str
+    skills_count: int = 0
+    insights_count: int = 0
+    user_contribution_pct: float | None = None
+    error: str | None = None
+
+
+class RankingResult(BaseModel):
+    """Project ranking information."""
+
+    name: str
+    score: float = Field(description="User contribution percentage (0-100)")
+    total_commits: int
+    user_commits: int
+
+
+class SummaryResult(BaseModel):
+    """Generated summary for a project."""
+
+    project_name: str
+    summary: str
+
+
+class AnalyzeResponse(BaseModel):
+    """Response from the master analyze endpoint."""
+
+    zip_id: int
+    extraction_path: str
+    repos_found: int
+    repos_analyzed: list[RepoAnalysisResult]
+    rankings: list[RankingResult]
+    summaries: list[SummaryResult]
+    consent_level: str
+    user_email: str
