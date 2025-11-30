@@ -83,6 +83,7 @@ def seed_repo_stats(db: Session) -> None:
     sample_stats = [
         RepoStat(
             project_name="Platform Core Services",
+            project_path="/mock/platform-core-services",
             is_collaborative=True,
             primary_language="Python",
             languages=["Python", "YAML"],
@@ -94,6 +95,7 @@ def seed_repo_stats(db: Session) -> None:
         ),
         RepoStat(
             project_name="Legacy Data Pipeline",
+            project_path="/mock/legacy-data-pipeline",
             is_collaborative=False,
             primary_language="Java",
             languages=["Java", "SQL"],
@@ -105,6 +107,7 @@ def seed_repo_stats(db: Session) -> None:
         ),
         RepoStat(
             project_name="Analytics Dashboard",
+            project_path="/mock/analytics-dashboard",
             is_collaborative=True,
             primary_language="TypeScript",
             languages=["TypeScript", "Python"],
@@ -116,6 +119,7 @@ def seed_repo_stats(db: Session) -> None:
         ),
         RepoStat(
             project_name="Mobile Experience",
+            project_path="/mock/mobile-experience",
             is_collaborative=True,
             primary_language="Kotlin",
             languages=["Kotlin", "Swift"],
