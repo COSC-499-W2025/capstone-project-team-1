@@ -14,7 +14,7 @@ project = root.parents[3] #gets project folder (../../../)
 MOCKNAME = "mockdirectory"
 CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
-from .store_file_dict import StoreFileDict
+from .store_file_dict import store_file_dict
 from .check_file_duplicate import is_file_duplicate
 
 readableFileTypes = [] #TODO
@@ -35,7 +35,6 @@ userKeepFileName = []    #["include_file.log"] #even though its 'log' the user h
 userExcludeFileExtension = [] #user file extension that will be excluded
 userIncludeFileExtension = [] #user file extension that will be included 
 
-store_file_dictionary = StoreFileDict()
 
 
 #storing files from mock folder to dictionary
@@ -77,7 +76,7 @@ def crawl_directory():
                     
                     fileObj = FileValues(file, full_path)
                     
-                    store_file_dictionary.add_to_dict(fileId, fileObj) #key = filename, path = filepath
+                    store_file_dict.add_to_dict(fileId, fileObj) #key = filename, path = filepath
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
@@ -174,7 +173,4 @@ def print_values_in_dict():
         store_file_dictionary.get_values()
       
         '''
-    print(store_file_dictionary.get_values())
-
-
-crawl_directory()
+    print(store_file_dict.get_values())

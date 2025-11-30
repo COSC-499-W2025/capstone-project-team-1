@@ -12,8 +12,9 @@ import src.artifactminer.directorycrawler.user_based_directory_walk as ubdw
 from src.artifactminer.directorycrawler.store_file_dict import StoreFileDict #getting class from store file dict
 from src.artifactminer.directorycrawler.directory_walk import crawl_directory,user_keep_file, user_exclude_file, CURRENTPATH,update_path #getting function from directory walk
 import src.artifactminer.directorycrawler.directory_walk as dw
+from src.artifactminer.directorycrawler.store_file_dict import store_file_dict 
 
-a = StoreFileDict() #single instance
+a = store_file_dict #single instance
 
 def test_user_based_directory_walk():
 

@@ -3,10 +3,10 @@ import os
 
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))) #goto project directory
-
+from src.artifactminer.directorycrawler.store_file_dict import store_file_dict 
 from src.artifactminer.directorycrawler.store_file_dict import StoreFileDict #getting class from store file dict
 
-a = StoreFileDict() #getting a single instance because we are using a singleton pattern!
+a = store_file_dict #getting a single instance because we are using a singleton pattern!
 
 def test_add():
     a.remove_all_dict()
