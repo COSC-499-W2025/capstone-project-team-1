@@ -43,6 +43,7 @@ class RepoStat(Base):#model for storing repository statistics
 
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String, nullable=False)
+    project_path = Column(String, nullable=False)
     is_collaborative = Column(Boolean, default=False)
     languages = Column(JSON, nullable=True)#list of languages used in the repo
     language_percentages = Column(JSON, nullable=True)#percentage of each language used
@@ -69,6 +70,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
 
     id = Column(Integer, primary_key=True, index=True)
     project_name = Column(String, nullable=False)
+    project_path = Column(String, nullable=False)
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)

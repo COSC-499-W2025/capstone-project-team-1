@@ -6,8 +6,9 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from .schemas import ProjectTimelineItem, DeleteResponse
+from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse
 from ..db import RepoStat, get_db
+from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -102,3 +103,11 @@ async def delete_project(
         message=f"Project '{project_name}' deleted successfully",
         deleted_id=project_id,
     )
+
+@router.get("/ranking", response_model=List[ProjectRankingItem])
+async def get_project_ranking(
+    projects_dir: str,
+    user_email: str,
+) -> list[ProjectRankingItem]:
+    """Rank projects by user contribution percentage."""
+    return rank_projects(projects_dir, user_email)

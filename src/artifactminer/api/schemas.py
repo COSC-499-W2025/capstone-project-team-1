@@ -158,11 +158,58 @@ class SummaryResponse(BaseModel):
     user_email: str
     summary_text: str
     generated_at: datetime
-
-
+      
 class DeleteResponse(BaseModel):
     """Response shape for delete operations."""
 
     success: bool = Field(description="Whether the delete operation succeeded.")
     message: str = Field(description="Human-readable result message.")
     deleted_id: int = Field(description="ID of the deleted resource.")
+
+class ProjectRankingItem(BaseModel):
+    """Ranked project based on user contribution."""
+
+    name: str = Field(description="Project directory name.")
+    score: float = Field(description="User's contribution percentage (0-100).")
+    total_commits: int = Field(description="Total commits in the project.")
+    user_commits: int = Field(description="Commits by the user.")
+      
+
+class RepoAnalysisResult(BaseModel):
+    """Result of analyzing a single repository."""
+
+    project_name: str
+    project_path: str
+    skills_count: int = 0
+    insights_count: int = 0
+    user_contribution_pct: float | None = None
+    error: str | None = None
+
+
+class RankingResult(BaseModel):
+    """Project ranking information."""
+
+    name: str
+    score: float = Field(description="User contribution percentage (0-100)")
+    total_commits: int
+    user_commits: int
+
+
+class SummaryResult(BaseModel):
+    """Generated summary for a project."""
+
+    project_name: str
+    summary: str
+
+
+class AnalyzeResponse(BaseModel):
+    """Response from the master analyze endpoint."""
+
+    zip_id: int
+    extraction_path: str
+    repos_found: int
+    repos_analyzed: list[RepoAnalysisResult]
+    rankings: list[RankingResult]
+    summaries: list[SummaryResult]
+    consent_level: str
+    user_email: str
