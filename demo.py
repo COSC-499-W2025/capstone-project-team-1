@@ -1,29 +1,27 @@
 """Rich-powered Artifact Miner demo script.
 
-This script exercises the FastAPI endpoints that exist on this branch using
-`httpx` for HTTP calls and `rich` for polished terminal output. It walks through
-the currently available flow end-to-end:
+This CLI runs through the full Artifact Miner API surface using real HTTP
+requests (via `httpx`) and friendly terminal output (via `rich`). The flow hits
+every major endpoint now available on the backend:
 
-1. Check `/health`.
-2. Inspect `/questions` and submit answers via `/answers`.
-3. Configure consent with `/consent`.
-4. Upload a ZIP file and list its directories via `/zip/upload` and
-   `/zip/{id}/directories`.
-5. Call the `/openai` helper (requires `OPENAI_API_KEY` in the environment).
-
-Design documents outline additional endpoints such as `/analyze/{zip_id}`,
-`/summaries`, `/resume`, `/skills/chronology`, `/projects/timeline`, and
-`DELETE /projects/{id}`. Those routes are not present on this branch, so this
-script includes placeholder helpers that clearly mark TODOs. Once the API grows,
-fill those helpers in with real requests.
+1. `GET /health` – confirm the API is live.
+2. `GET /questions` + `POST /answers` – seed questionnaire data.
+3. `PUT /consent` – record privacy mode (`full` when OPENAI_API_KEY is set).
+4. `POST /zip/upload` + `GET /zip/{id}/directories` – ingest a demo archive.
+5. `POST /openai` – optional helper call (skipped if OPENAI_API_KEY missing).
+6. `POST /analyze/{zip_id}` – trigger the full repository intelligence pipeline.
+7. `GET /summaries`, `/resume`, `/skills/chronology` – retrieve stored insights.
+8. `GET /projects/timeline` and `DELETE /projects/{id}` – lifecycle management.
 
 Usage:
     uv run python demo.py
 
 Environment overrides:
-    ARTIFACT_MINER_API_URL   - Base URL for the API (default 127.0.0.1:8000)
-    ARTIFACT_MINER_ZIP_PATH  - Path to the demo ZIP file
-    ARTIFACT_MINER_USER_EMAIL- Email stored in questionnaire answers
+    ARTIFACT_MINER_API_URL    Base URL for the API (default http://127.0.0.1:8000)
+    ARTIFACT_MINER_ZIP_PATH   Path to a zipped folder of git repos
+                              (default tests/data/mock_projects.zip)
+    ARTIFACT_MINER_USER_EMAIL Email used for questionnaire + analysis context
+    OPENAI_API_KEY            Enables the `/openai` helper if provided
 """
 
 from __future__ import annotations
@@ -48,7 +46,7 @@ API_URL = os.environ.get("ARTIFACT_MINER_API_URL", "http://127.0.0.1:8000")
 ZIP_FILE_PATH = Path(
     os.environ.get(
         "ARTIFACT_MINER_ZIP_PATH",
-        "tests/directorycrawler/mocks/mockdirectory_zip.zip",
+        "tests/data/mock_projects.zip",
     )
 )
 USER_EMAIL = os.environ.get("ARTIFACT_MINER_USER_EMAIL", "shlok10@student.ubc.ca")
@@ -58,6 +56,27 @@ DEMO_PROMPT = (
 )
 
 console = Console()
+
+
+# --------------------------------------------------------------------------- #
+# Utility helpers
+# --------------------------------------------------------------------------- #
+def truncate(value: Any, limit: int = 90) -> str:
+    """Trim long strings for table display."""
+    if value is None:
+        return "—"
+    text = str(value)
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def format_timestamp(value: Any) -> str:
+    """Render ISO timestamps in a compact format."""
+    if not value:
+        return "—"
+    text = str(value)
+    if "T" in text:
+        text = text.replace("T", " ").split(".")[0]
+    return text
 
 
 # --------------------------------------------------------------------------- #
@@ -154,6 +173,46 @@ def call_openai(client: httpx.Client, prompt: str) -> Dict[str, Any]:
     return response.json()
 
 
+def run_analysis(client: httpx.Client, zip_id: int) -> Dict[str, Any]:
+    response = client.post(f"/analyze/{zip_id}")
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_summaries(client: httpx.Client, user_email: str) -> List[Dict[str, Any]]:
+    response = client.get("/summaries", params={"user_email": user_email})
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_resume_items(
+    client: httpx.Client,
+    project_id: int | None = None,
+) -> List[Dict[str, Any]]:
+    params = {"project_id": project_id} if project_id is not None else None
+    response = client.get("/resume", params=params)
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_skill_chronology(client: httpx.Client) -> List[Dict[str, Any]]:
+    response = client.get("/skills/chronology")
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_project_timeline(client: httpx.Client) -> List[Dict[str, Any]]:
+    response = client.get("/projects/timeline")
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_project(client: httpx.Client, project_id: int) -> Dict[str, Any]:
+    response = client.delete(f"/projects/{project_id}")
+    response.raise_for_status()
+    return response.json()
+
+
 # --------------------------------------------------------------------------- #
 # Display helpers
 # --------------------------------------------------------------------------- #
@@ -241,65 +300,196 @@ def show_openai_placeholder() -> None:
     )
 
 
-# --------------------------------------------------------------------------- #
-# Placeholder helpers for future endpoints
-# --------------------------------------------------------------------------- #
-def run_analysis_placeholder(zip_id: int, user_email: str) -> None:
-    """Placeholder for POST /analyze/{zip_id} once implemented."""
-    console.print(
-        Panel(
-            f"[italic]TODO: POST /analyze/{zip_id} (user_email={user_email}).[/italic]\n"
-            "This route will trigger the ingestion pipeline and repository analysis.",
-            title="Analysis Pipeline",
-            border_style="yellow",
-        )
+def show_analysis_result(result: Dict[str, Any]) -> None:
+    """Display orchestration output (repos analyzed, rankings, etc.)."""
+    overview = Panel(
+        "[bold]ZIP ID:[/bold] {zip}\n"
+        "[bold]Extraction:[/bold] {path}\n"
+        "[bold]Repositories:[/bold] {repos}\n"
+        "[bold]Consent:[/bold] {consent}\n"
+        "[bold]Summaries Persisted:[/bold] {summaries}".format(
+            zip=result.get("zip_id"),
+            path=result.get("extraction_path"),
+            repos=result.get("repos_found"),
+            consent=result.get("consent_level"),
+            summaries=len(result.get("summaries") or []),
+        ),
+        title="Analysis Overview",
+        border_style="cyan",
     )
+    console.print(overview)
 
-
-def fetch_summaries_placeholder(user_email: str) -> None:
-    """Placeholder for GET /summaries."""
-    console.print(
-        Panel(
-            f"[italic]TODO: GET /summaries?user_email={user_email}.[/italic]\n"
-            "Once available, this section will display ranked project summaries.",
-            title="Summaries",
-            border_style="yellow",
-        )
+    repos_table = Table(
+        title="Repository Analysis",
+        box=box.MINIMAL_DOUBLE_HEAD,
+        border_style="cyan",
     )
+    repos_table.add_column("Project", style="bold white")
+    repos_table.add_column("Contribution", justify="right")
+    repos_table.add_column("Skills", justify="right")
+    repos_table.add_column("Insights", justify="right")
+    repos_table.add_column("Status", style="white")
 
-
-def fetch_resume_placeholder() -> None:
-    """Placeholder for GET /resume."""
-    console.print(
-        Panel(
-            "[italic]TODO: GET /resume.[/italic]\n"
-            "The response will populate generated résumé bullet points.",
-            title="Resume Items",
-            border_style="yellow",
+    for repo in result.get("repos_analyzed") or []:
+        pct = repo.get("user_contribution_pct")
+        contribution = f"{pct:.1f}%" if isinstance(pct, (int, float)) else "—"
+        status = (
+            "[green]OK[/green]" if not repo.get("error") else f"[red]{repo['error']}[/red]"
         )
-    )
-
-
-def fetch_skill_chronology_placeholder() -> None:
-    """Placeholder for GET /skills/chronology."""
-    console.print(
-        Panel(
-            "[italic]TODO: GET /skills/chronology.[/italic]\n"
-            "Chronological skill timelines will appear here once the endpoint exists.",
-            title="Skill Chronology",
-            border_style="yellow",
+        repos_table.add_row(
+            repo.get("project_name", repo.get("project_path", "unknown")),
+            contribution,
+            str(repo.get("skills_count", "0")),
+            str(repo.get("insights_count", "0")),
+            status,
         )
+
+    if repos_table.row_count:
+        console.print(repos_table)
+    else:
+        console.print(Panel("[dim]No repository data returned.[/dim]", border_style="yellow"))
+
+    if result.get("rankings"):
+        ranking_table = Table(
+            title="Ranked Projects",
+            box=box.SIMPLE_HEAVY,
+            border_style="magenta",
+        )
+        ranking_table.add_column("Project")
+        ranking_table.add_column("Score", justify="right")
+        ranking_table.add_column("Commits", justify="right")
+        ranking_table.add_column("User Commits", justify="right")
+        for item in result["rankings"]:
+            ranking_table.add_row(
+                item.get("name", "unknown"),
+                f"{item.get('score', 0):.1f}",
+                str(item.get("total_commits", 0)),
+                str(item.get("user_commits", 0)),
+            )
+        console.print(ranking_table)
+    else:
+        console.print(
+            Panel("[dim]Ranking skipped or unavailable.[/dim]", border_style="yellow")
+        )
+
+
+def show_summaries(summaries: List[Dict[str, Any]], limit: int = 3) -> None:
+    if not summaries:
+        console.print(
+            Panel("[dim]No summaries stored yet.[/dim]", border_style="yellow", title="Summaries")
+        )
+        return
+
+    for summary in summaries[:limit]:
+        console.print(
+            Panel(
+                summary.get("summary_text", ""),
+                title=f"Summary • {summary.get('repo_path')}",
+                border_style="green",
+            )
+        )
+    remaining = len(summaries) - min(len(summaries), limit)
+    if remaining > 0:
+        console.print(f"[dim]… {remaining} more summaries available via the API.[/dim]")
+
+
+def show_resume_items(items: List[Dict[str, Any]], limit: int = 5) -> None:
+    if not items:
+        console.print(
+            Panel("[dim]Resume store is empty.[/dim]", border_style="yellow", title="Resume Items")
+        )
+        return
+
+    table = Table(
+        title=f"Resume Items (showing {min(len(items), limit)} of {len(items)})",
+        border_style="green",
+        box=box.ROUNDED,
     )
+    table.add_column("Title", style="bold white")
+    table.add_column("Project", style="cyan")
+    table.add_column("Category", style="magenta")
+    table.add_column("Snippet", style="white")
+
+    for item in items[:limit]:
+        table.add_row(
+            item.get("title", "Untitled"),
+            item.get("project_name") or "—",
+            item.get("category") or "—",
+            truncate(item.get("content")),
+        )
+    console.print(table)
 
 
-def lifecycle_placeholder() -> None:
-    """Placeholder for project timeline and deletion endpoints."""
+def show_skill_chronology(skills: List[Dict[str, Any]], limit: int = 6) -> None:
+    if not skills:
+        console.print(
+            Panel("[dim]No skills extracted yet.[/dim]", border_style="yellow", title="Skill Chronology")
+        )
+        return
+
+    table = Table(
+        title=f"Skill Chronology (first {min(len(skills), limit)})",
+        border_style="cyan",
+        box=box.MINIMAL,
+    )
+    table.add_column("Date", style="white")
+    table.add_column("Skill", style="bold")
+    table.add_column("Project", style="cyan")
+    table.add_column("Category", style="magenta")
+    table.add_column("Proficiency", justify="right")
+
+    for entry in skills[:limit]:
+        prof = entry.get("proficiency")
+        prof_text = f"{prof:.2f}" if isinstance(prof, (int, float)) else "—"
+        table.add_row(
+            format_timestamp(entry.get("date")),
+            entry.get("skill", "unknown"),
+            entry.get("project", "—"),
+            entry.get("category") or "—",
+            prof_text,
+        )
+    console.print(table)
+
+
+def show_project_timeline(
+    timeline: List[Dict[str, Any]],
+    *,
+    title: str = "Project Timeline",
+    limit: int = 5,
+) -> None:
+    if not timeline:
+        console.print(Panel("[dim]Timeline is empty.[/dim]", border_style="yellow", title=title))
+        return
+
+    table = Table(title=title, border_style="blue", box=box.SIMPLE)
+    table.add_column("ID", justify="right")
+    table.add_column("Project", style="bold")
+    table.add_column("First Commit")
+    table.add_column("Last Commit")
+    table.add_column("Duration (days)", justify="right")
+    table.add_column("Active?", justify="center")
+
+    for item in timeline[:limit]:
+        table.add_row(
+            str(item.get("id")),
+            item.get("project_name", "—"),
+            format_timestamp(item.get("first_commit")),
+            format_timestamp(item.get("last_commit")),
+            str(item.get("duration_days", "—")),
+            "✅" if item.get("was_active") else "—",
+        )
+    console.print(table)
+
+
+def show_delete_result(payload: Dict[str, Any]) -> None:
     console.print(
         Panel(
-            "[italic]TODO: GET /projects/timeline and DELETE /projects/{id}.[/italic]\n"
-            "Future demos will show safe deletion and lifecycle management.",
-            title="Lifecycle Management",
-            border_style="yellow",
+            "[bold]Deleted ID:[/bold] {id}\n[bold]Message:[/bold] {msg}".format(
+                id=payload.get("deleted_id"),
+                msg=payload.get("message", ""),
+            ),
+            border_style="red",
+            title="Project Deletion",
         )
     )
 
@@ -324,13 +514,15 @@ def run_demo() -> int:
     ensure_zip_exists(ZIP_FILE_PATH)
 
     try:
-        with httpx.Client(base_url=API_URL, timeout=60.0) as client:
+        timeout = httpx.Timeout(120.0)
+        with httpx.Client(base_url=API_URL, timeout=timeout) as client:
             section("Health Check")
             health = check_health(client)
             show_health(health)
 
             section("Consent Management", "Configure deterministic vs LLM modes")
-            consent = update_consent(client, "no_llm")
+            consent_level = "full" if OPENAI_ENABLED else "no_llm"
+            consent = update_consent(client, consent_level)
             show_consent(consent)
 
             section("Questionnaire", "Load prompts and submit configuration")
@@ -370,17 +562,45 @@ def run_demo() -> int:
             else:
                 show_openai_placeholder()
 
-            section("Future Milestone Hooks", "Placeholder outputs until APIs land")
-            run_analysis_placeholder(upload_result["zip_id"], USER_EMAIL)
-            fetch_summaries_placeholder(USER_EMAIL)
-            fetch_resume_placeholder()
-            fetch_skill_chronology_placeholder()
-            lifecycle_placeholder()
+            section("Full Analysis Pipeline", "POST /analyze/{zip_id}")
+            analysis_result = run_analysis(client, upload_result["zip_id"])
+            show_analysis_result(analysis_result)
+
+            section("Summaries & Resume Builder")
+            summaries = fetch_summaries(client, USER_EMAIL)
+            show_summaries(summaries)
+            resume_items = fetch_resume_items(client)
+            show_resume_items(resume_items)
+
+            section("Skill Chronology", "GET /skills/chronology")
+            skills = fetch_skill_chronology(client)
+            show_skill_chronology(skills)
+
+            section("Project Timeline & Lifecycle")
+            timeline = fetch_project_timeline(client)
+            show_project_timeline(timeline)
+
+            project_to_delete = next((item for item in timeline if item.get("id")), None)
+            if project_to_delete:
+                delete_info = delete_project(client, project_to_delete["id"])
+                show_delete_result(delete_info)
+                updated_timeline = fetch_project_timeline(client)
+                show_project_timeline(
+                    updated_timeline,
+                    title="Project Timeline (after delete)",
+                )
+            else:
+                console.print(
+                    Panel(
+                        "[dim]No projects available to delete yet.[/dim]",
+                        border_style="yellow",
+                    )
+                )
 
         console.print()
         console.print(
             Panel(
-                Align.center("[bold green]✨ Demo complete for current API surface ✨[/bold green]"),
+                Align.center("[bold green]✨ Demo complete across the end-to-end API ✨[/bold green]"),
                 border_style="green",
             )
         )

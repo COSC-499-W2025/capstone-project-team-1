@@ -115,6 +115,8 @@ def saveRepoStats(stats, db=None):
             frameworks=stats.frameworks,
         )
         db.add(repo_stat)
+        # Ensure an ID is assigned even when the caller manages the session.
+        db.flush()
         if own_session:
             db.commit()
             db.refresh(repo_stat)

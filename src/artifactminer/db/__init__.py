@@ -10,6 +10,7 @@ from .models import (
     RepoStat,
     Skill,
     ProjectSkill,
+    UserProjectSkill,
     ResumeItem,
     UserAIntelligenceSummary,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "RepoStat",
     "Skill",
     "ProjectSkill",
+    "UserProjectSkill",
     "ResumeItem",
     "UserAIntelligenceSummary",
     "seed_questions",
