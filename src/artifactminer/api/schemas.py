@@ -180,9 +180,24 @@ class RepoAnalysisResult(BaseModel):
 
     project_name: str
     project_path: str
+    frameworks: list[str] | None = Field(
+        default=None, description="Frameworks detected in the repository."
+    )
     skills_count: int = 0
     insights_count: int = 0
     user_contribution_pct: float | None = None
+    user_total_commits: int | None = Field(
+        default=None, description="Number of commits authored by the user."
+    )
+    user_commit_frequency: float | None = Field(
+        default=None, description="Average commits per week by the user."
+    )
+    user_first_commit: datetime | None = Field(
+        default=None, description="Timestamp of the user's first commit in the repo."
+    )
+    user_last_commit: datetime | None = Field(
+        default=None, description="Timestamp of the user's last commit in the repo."
+    )
     error: str | None = None
 
 

@@ -328,6 +328,8 @@ def show_analysis_result(result: Dict[str, Any]) -> None:
     repos_table.add_column("Contribution", justify="right")
     repos_table.add_column("Skills", justify="right")
     repos_table.add_column("Insights", justify="right")
+    repos_table.add_column("Frameworks", style="cyan")
+    repos_table.add_column("User Stats", style="white")
     repos_table.add_column("Status", style="white")
 
     for repo in result.get("repos_analyzed") or []:
@@ -336,11 +338,23 @@ def show_analysis_result(result: Dict[str, Any]) -> None:
         status = (
             "[green]OK[/green]" if not repo.get("error") else f"[red]{repo['error']}[/red]"
         )
+        frameworks = repo.get("frameworks") or []
+        frameworks_text = ", ".join(frameworks) if frameworks else "—"
+        total_commits = repo.get("user_total_commits")
+        freq = repo.get("user_commit_frequency")
+        freq_text = f"{freq:.1f}/wk" if isinstance(freq, (int, float)) else "—/wk"
+        first = format_timestamp(repo.get("user_first_commit"))
+        last = format_timestamp(repo.get("user_last_commit"))
+        user_stats_text = (
+            f"{total_commits or '—'} commits\n{freq_text}\n{first} → {last}"
+        )
         repos_table.add_row(
             repo.get("project_name", repo.get("project_path", "unknown")),
             contribution,
             str(repo.get("skills_count", "0")),
             str(repo.get("insights_count", "0")),
+            frameworks_text,
+            user_stats_text,
             status,
         )
 

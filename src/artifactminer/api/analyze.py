@@ -319,9 +319,14 @@ async def analyze_zip(zip_id: int, db: Session = Depends(get_db)):
                 RepoAnalysisResult(
                     project_name=repo_stats.project_name,
                     project_path=str(repo_path),
+                    frameworks=repo_stats.frameworks,
                     skills_count=skills_count,
                     insights_count=insights_count,
                     user_contribution_pct=user_contribution_pct,
+                    user_total_commits=user_stats.total_commits,
+                    user_commit_frequency=user_stats.commitFrequency,
+                    user_first_commit=user_stats.first_commit,
+                    user_last_commit=user_stats.last_commit,
                 )
             )
 
