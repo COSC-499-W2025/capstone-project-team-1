@@ -393,15 +393,17 @@ def show_summaries(summaries: List[Dict[str, Any]], limit: int = 3) -> None:
         console.print(f"[dim]… {remaining} more summaries available via the API.[/dim]")
 
 
-def show_resume_items(items: List[Dict[str, Any]], limit: int = 5) -> None:
+def show_resume_items(items: List[Dict[str, Any]], limit: int | None = None) -> None:
     if not items:
         console.print(
             Panel("[dim]Resume store is empty.[/dim]", border_style="yellow", title="Resume Items")
         )
         return
 
+    visible_items = items if limit is None else items[:limit]
+    showing = len(visible_items)
     table = Table(
-        title=f"Resume Items (showing {min(len(items), limit)} of {len(items)})",
+        title=f"Resume Items (showing {showing} of {len(items)})",
         border_style="green",
         box=box.ROUNDED,
     )
@@ -410,7 +412,7 @@ def show_resume_items(items: List[Dict[str, Any]], limit: int = 5) -> None:
     table.add_column("Category", style="magenta")
     table.add_column("Snippet", style="white")
 
-    for item in items[:limit]:
+    for item in visible_items:
         table.add_row(
             item.get("title", "Untitled"),
             item.get("project_name") or "—",
@@ -420,15 +422,16 @@ def show_resume_items(items: List[Dict[str, Any]], limit: int = 5) -> None:
     console.print(table)
 
 
-def show_skill_chronology(skills: List[Dict[str, Any]], limit: int = 6) -> None:
+def show_skill_chronology(skills: List[Dict[str, Any]], limit: int | None = None) -> None:
     if not skills:
         console.print(
             Panel("[dim]No skills extracted yet.[/dim]", border_style="yellow", title="Skill Chronology")
         )
         return
 
+    visible_skills = skills if limit is None else skills[:limit]
     table = Table(
-        title=f"Skill Chronology (first {min(len(skills), limit)})",
+        title=f"Skill Chronology (showing {len(visible_skills)} of {len(skills)})",
         border_style="cyan",
         box=box.MINIMAL,
     )
@@ -438,7 +441,7 @@ def show_skill_chronology(skills: List[Dict[str, Any]], limit: int = 6) -> None:
     table.add_column("Category", style="magenta")
     table.add_column("Proficiency", justify="right")
 
-    for entry in skills[:limit]:
+    for entry in visible_skills:
         prof = entry.get("proficiency")
         prof_text = f"{prof:.2f}" if isinstance(prof, (int, float)) else "—"
         table.add_row(

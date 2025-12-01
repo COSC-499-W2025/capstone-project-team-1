@@ -1,7 +1,19 @@
 import subprocess
 import re
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List, Set
+
+
+def _discover_git_projects(base_path: Path) -> Set[Path]:
+    """Return all directories under base_path that contain a `.git` folder."""
+    repo_dirs: Set[Path] = set()
+    if not base_path.exists():
+        return repo_dirs
+
+    for git_dir in base_path.rglob(".git"):
+        if git_dir.is_dir():
+            repo_dirs.add(git_dir.parent)
+    return repo_dirs
 
 
 def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
@@ -27,68 +39,60 @@ def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
     if not base_path.exists() or not base_path.is_dir():
         return []
 
-    for project_path in base_path.iterdir():
-        if project_path.is_dir() and (project_path / ".git").exists():
-            try:
-                # Get commit counts per author with email
-                # git shortlog -s -n -e --all
-                # Output format: "   10  Author Name <email@example.com>"
-                output = subprocess.check_output(
-                    ["git", "shortlog", "-s", "-n", "-e", "--all"],
-                    cwd=str(project_path),
-                    text=True,
-                    stderr=subprocess.DEVNULL,
-                )
+    repo_paths = _discover_git_projects(base_path)
 
-                total_commits = 0
-                user_commits = 0
+    for project_path in repo_paths:
+        try:
+            # Get commit counts per author with email
+            output = subprocess.check_output(
+                ["git", "shortlog", "-s", "-n", "-e", "--all"],
+                cwd=str(project_path),
+                text=True,
+                stderr=subprocess.DEVNULL,
+            )
 
-                for line in output.strip().split("\n"):
-                    if not line.strip():
-                        continue
+            total_commits = 0
+            user_commits = 0
 
-                    # Expected format: "   10\tAuthor Name <email@example.com>"
-                    # We want to extract the email inside < >
+            for line in output.strip().split("\n"):
+                if not line.strip():
+                    continue
 
-                    # First get the count
-                    parts = line.strip().split(maxsplit=1)
-                    if len(parts) < 2:
-                        continue
+                parts = line.strip().split(maxsplit=1)
+                if len(parts) < 2:
+                    continue
 
-                    try:
-                        count = int(parts[0])
-                        rest = parts[1]
+                try:
+                    count = int(parts[0])
+                    rest = parts[1]
 
-                        total_commits += count
+                    total_commits += count
 
-                        # Extract email
-                        email_match = re.search(r"<([^>]+)>", rest)
-                        if email_match:
-                            author_email = email_match.group(1).lower().strip()
-                            if author_email == target_email:
-                                user_commits += count
+                    email_match = re.search(r"<([^>]+)>", rest)
+                    if email_match:
+                        author_email = email_match.group(1).lower().strip()
+                        if author_email == target_email:
+                            user_commits += count
 
-                    except ValueError:
-                        continue
+                except ValueError:
+                    continue
 
-                score = (
-                    (user_commits / total_commits * 100) if total_commits > 0 else 0.0
-                )
+            score = (user_commits / total_commits * 100) if total_commits else 0.0
 
-                projects.append(
-                    {
-                        "name": project_path.name,
-                        "score": round(score, 2),
-                        "total_commits": total_commits,
-                        "user_commits": user_commits,
-                    }
-                )
+            projects.append(
+                {
+                    "name": project_path.name,
+                    "score": round(score, 2),
+                    "total_commits": total_commits,
+                    "user_commits": user_commits,
+                }
+            )
 
-            except subprocess.CalledProcessError:
-                continue
-            except Exception as e:
-                print(f"Error processing {project_path.name}: {e}")
-                continue
+        except subprocess.CalledProcessError:
+            continue
+        except Exception as e:
+            print(f"Error processing {project_path.name}: {e}")
+            continue
 
     projects.sort(key=lambda x: x["score"], reverse=True)
     return projects
