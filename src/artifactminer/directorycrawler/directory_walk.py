@@ -25,7 +25,7 @@ ignoredExtensions = [ #current list of file types that shouldn't be read. unless
     ".tar", ".tar.gz", ".rar", ".7z",".bmp", ".tiff",
     ".mp3", ".wav", ".flac", ".ogg", ".mp4", ".mkv", ".avi",
     ".sqlite", ".db", ".mdb", ".cache", ".pyc", ".class", ".jar",
-    ".DS_Store", ".tmp", ".swp", ".swo", ".lock", ".bak"
+    ".DS_Store", ".tmp", ".swp", ".swo", ".lock", ".bak", ".ds_store"
     ]
 
 #USER INFORMATION: 
@@ -39,7 +39,8 @@ userIncludeAllFiles = False
 
 store_file_dictionary = StoreFileDict()
 #storing files from mock folder to dictionary
-def crawl_directory(): 
+def crawl_directory() -> dict: 
+    temp_dict = []
     if os.path.exists(CURRENTPATH) == False:
         print("path does not exist")
         return
@@ -71,9 +72,9 @@ def crawl_directory():
                 if(isDuplicate == False):
                     '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
                     
-                    fileObj = FileValues(file, full_path)
-                    
-                    store_file_dictionary.add_to_dict(fileId, fileObj) #key = filename, path = filepath
+                    store_file_dictionary.add_to_dict(fileId, (file, full_path)) #key = filename, path = filepath
+    return store_file_dictionary.get_dict()
+
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
@@ -92,11 +93,15 @@ def is_file_ignored(file_name: str) -> bool:
 
     if file_name in ignoredFileNames:
         return False
+    if file_name.startswith(".") and file_name.lower() in ignoredExtensions:
+        return False
+
     # Skip ignored extensions
+    
     _, ext = os.path.splitext(file_name)
     if ext.lower() in ignoredExtensions:
         return False
-    
+        
     # Might add this filter for later.
     #If readableFileTypes is not empty, enforce filter
     if readableFileTypes and ext.lower() not in readableFileTypes:
