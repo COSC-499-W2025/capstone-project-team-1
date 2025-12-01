@@ -320,6 +320,7 @@ async def analyze_zip(zip_id: int, db: Session = Depends(get_db)):
                     project_name=repo_stats.project_name,
                     project_path=str(repo_path),
                     frameworks=repo_stats.frameworks,
+                    languages=repo_stats.Languages,
                     skills_count=skills_count,
                     insights_count=insights_count,
                     user_contribution_pct=user_contribution_pct,

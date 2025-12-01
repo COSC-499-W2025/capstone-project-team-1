@@ -183,6 +183,9 @@ class RepoAnalysisResult(BaseModel):
     frameworks: list[str] | None = Field(
         default=None, description="Frameworks detected in the repository."
     )
+    languages: list[str] | None = Field(
+        default=None, description="Languages detected in the repository."
+    )
     skills_count: int = 0
     insights_count: int = 0
     user_contribution_pct: float | None = None

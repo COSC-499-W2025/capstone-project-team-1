@@ -329,6 +329,7 @@ def show_analysis_result(result: Dict[str, Any]) -> None:
     repos_table.add_column("Skills", justify="right")
     repos_table.add_column("Insights", justify="right")
     repos_table.add_column("Frameworks", style="cyan")
+    repos_table.add_column("Languages", style="cyan")
     repos_table.add_column("User Stats", style="white")
     repos_table.add_column("Status", style="white")
 
@@ -340,6 +341,8 @@ def show_analysis_result(result: Dict[str, Any]) -> None:
         )
         frameworks = repo.get("frameworks") or []
         frameworks_text = ", ".join(frameworks) if frameworks else "—"
+        languages = repo.get("languages") or []
+        languages_text = ", ".join(languages) if languages else "—"
         total_commits = repo.get("user_total_commits")
         freq = repo.get("user_commit_frequency")
         freq_text = f"{freq:.1f}/wk" if isinstance(freq, (int, float)) else "—/wk"
@@ -354,6 +357,7 @@ def show_analysis_result(result: Dict[str, Any]) -> None:
             str(repo.get("skills_count", "0")),
             str(repo.get("insights_count", "0")),
             frameworks_text,
+            languages_text,
             user_stats_text,
             status,
         )
