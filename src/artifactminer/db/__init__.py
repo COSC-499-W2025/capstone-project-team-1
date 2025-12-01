@@ -10,6 +10,9 @@ from .models import (
     RepoStat,
     Skill,
     ProjectSkill,
+    UserProjectSkill,
+    ResumeItem,
+    UserAIntelligenceSummary,
 )
 from .seed import seed_questions, seed_repo_stats
 
@@ -26,6 +29,9 @@ __all__ = [
     "RepoStat",
     "Skill",
     "ProjectSkill",
+    "UserProjectSkill",
+    "ResumeItem",
+    "UserAIntelligenceSummary",
     "seed_questions",
     "seed_repo_stats",
 ]

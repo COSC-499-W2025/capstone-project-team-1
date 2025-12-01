@@ -28,6 +28,17 @@ from .consent import router as consent_router
 from .zip import router as zip_router
 from .openai import router as openai_router
 from .projects import router as projects_router
+from .analyze import router as analyze_router
+from .crawler import router as crawler_router
+from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
+    getRepoStats,
+    saveRepoStats,
+)
+from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
+    getUserRepoStats,
+    saveUserRepoStats,
+)
+from .retrieval import router as retrieval_router
 
 
 def create_app() -> FastAPI:
@@ -83,7 +94,9 @@ def create_app() -> FastAPI:
 
         # Normalize incoming answers: coerce to str and strip whitespace
         raw_answers = request.answers or {}
-        answers = {k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()}
+        answers = {
+            k: ("" if v is None else str(v).strip()) for k, v in raw_answers.items()
+        }
 
         # Validate required fields and answer types
         required_missing = [
@@ -123,14 +136,16 @@ def create_app() -> FastAPI:
                     if any(not item for item in items):
                         raise HTTPException(
                             status_code=422,
-                            detail="Invalid comma-separated format. Use: *.py,*.js"
+                            detail="Invalid comma-separated format. Use: *.py,*.js",
                         )
 
         # Persist (upsert: update existing or create new)
         for k, v in answers.items():
             q = key_to_q[k]
             # Check if answer already exists for this question
-            existing = db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            existing = (
+                db.query(UserAnswer).filter(UserAnswer.question_id == q.id).first()
+            )
             if existing:
                 # Update existing answer
                 existing.answer_text = str(v).strip()
@@ -147,13 +162,43 @@ def create_app() -> FastAPI:
             db.refresh(ans)
         return saved_answers
 
-    # Mount consent router
+    @app.post("/repos/analyze", tags=["repositories"])
+    async def analyze_repo(
+        repo_path: str, user_email: str, db: Session = Depends(get_db)
+    ):
+        """Analyze a single git repository and store RepoStat + UserRepoStat.
+
+        Both saves are performed in a single transaction for atomicity.
+        """
+        try:
+            repo_stats = getRepoStats(repo_path)
+            user_stats = getUserRepoStats(repo_path, user_email)
+
+            # Save both within the same transaction
+            saveRepoStats(repo_stats, db=db)
+            saveUserRepoStats(user_stats, db=db)
+            db.commit()
+
+            return {
+                "repo_stats": repo_stats.__dict__,
+                "user_stats": user_stats.__dict__,
+            }
+        except ValueError as e:
+            db.rollback()
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+
+    # Mount routers (unchanged)
     app.include_router(consent_router)
     app.include_router(zip_router)
     app.include_router(projects_router)
     app.include_router(openai_router)
+    app.include_router(retrieval_router)
+    app.include_router(analyze_router)  
+    app.include_router(crawler_router) # Master orchestration endpoint
     return app
 
 
-# Module-level application instance for ASGI servers (e.g., uvicorn).
 app = create_app()
