@@ -231,3 +231,14 @@ class AnalyzeResponse(BaseModel):
     summaries: list[SummaryResult]
     consent_level: str
     user_email: str
+
+
+class FileValues(BaseModel):
+    file_path : str
+    file_name : str
+    
+class CrawlerFiles(BaseModel):
+    """gets the according file and path data from the crawler"""
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    zip_id : int
+    crawl_path_and_file_name : list[FileValues]
