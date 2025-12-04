@@ -19,6 +19,8 @@ from demo.components import (
     print_how_banner,
     show_final_scorecard,
 )
+from demo.api import APIClient
+from demo.keyboard import wait_for_enter
 
 __all__ = [
     # Requirements
@@ -42,4 +44,7 @@ __all__ = [
     "print_requirement_banner",
     "print_how_banner",
     "show_final_scorecard",
+    # API & Input
+    "APIClient",
+    "wait_for_enter",
 ]
