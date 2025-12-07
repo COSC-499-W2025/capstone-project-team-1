@@ -6,7 +6,6 @@ Usage: uv run python demo.py
 
 import os
 import sys
-import tempfile
 from pathlib import Path
 
 from rich.panel import Panel
@@ -93,26 +92,6 @@ def demo_consent(api: APIClient) -> str:
     return consent_level
 
 
-def demo_wrong_format(api: APIClient):
-    print_requirement_banner([3], "File Format Validation")
-    section_header("Wrong Format Error")
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write("not a zip")
-        tmp = Path(f.name)
-    try:
-        resp = api.upload_file_raw(tmp)
-        if resp.status_code == 400:
-            console.print(
-                Panel(
-                    f"[green]Correctly rejected![/green]\nStatus: {resp.status_code}\nError: {resp.json().get('detail')}",
-                    border_style="green",
-                )
-            )
-    finally:
-        tmp.unlink()
-    print_how_banner([3])
-    wait_for_enter()
-
 
 def demo_questionnaire(api: APIClient) -> str:
     from rich.prompt import Prompt
@@ -157,7 +136,7 @@ def demo_zip_upload(api: APIClient) -> int:
     from rich.prompt import Prompt, Confirm
     from rich.table import Table
     
-    print_requirement_banner([2], "ZIP Parsing")
+    print_requirement_banner([2, 3], "ZIP Parsing & Validation")
     section_header("ZIP Upload")
     
     # Show default path and allow user to change it
@@ -399,8 +378,7 @@ def run_demo() -> int:
 
             console.clear()
             demo_consent(api)
-            console.clear()
-            demo_wrong_format(api)
+
             console.clear()
             email = demo_questionnaire(api)
             console.clear()
