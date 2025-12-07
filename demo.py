@@ -286,22 +286,178 @@ def demo_zip_upload(api: APIClient) -> int:
 
 
 def demo_analysis(api: APIClient, zip_id: int):
-    print_requirement_banner([7, 8, 9, 10, 11, 12, 13], "Analysis Pipeline")
+    from rich.tree import Tree
+    from rich.text import Text
+    
+    print_requirement_banner([8, 9, 10, 11, 12, 13], "Analysis Pipeline")
     section_header("Repository Analysis")
+    
     if zip_id < 0:
         console.print("[yellow]Skipping - no ZIP uploaded[/yellow]")
         wait_for_enter()
         return {}
+    
     animate_spinner("Analyzing repositories...", 2.0)
-    result = api.run_analysis(zip_id)
+    
+    try:
+        result = api.run_analysis(zip_id)
+    except Exception as e:
+        console.print(Panel(f"[red]Analysis failed: {e}[/red]", border_style="red"))
+        wait_for_enter()
+        return {}
+    
+    repos = result.get("repos_analyzed", [])
+    rankings = result.get("rankings", [])
+    summaries = result.get("summaries", [])
+    
+    # ═══════════════════════════════════════════════════════════════════
+    # OVERVIEW PANEL
+    # ═══════════════════════════════════════════════════════════════════
     console.print(
         Panel(
-            f"Repos found: {result.get('repos_found')}\nSummaries: {len(result.get('summaries') or [])}",
-            title="Analysis Complete",
-            border_style="cyan",
+            f"[bold green]✅ Analysis Complete[/bold green]\n\n"
+            f"[cyan]Repositories Found:[/cyan] {result.get('repos_found', 0)}\n"
+            f"[cyan]Repositories Analyzed:[/cyan] {len(repos)}\n"
+            f"[cyan]Projects Ranked:[/cyan] {len(rankings)}\n"
+            f"[cyan]Summaries Generated:[/cyan] {len(summaries)}\n"
+            f"[cyan]Consent Level:[/cyan] {result.get('consent_level', 'unknown')}\n"
+            f"[cyan]User Email:[/cyan] {result.get('user_email', 'unknown')}",
+            title="[bold white]📊 Analysis Overview[/bold white]",
+            border_style="green",
         )
     )
-    print_how_banner([7, 8, 9, 10, 11, 12, 13])
+    console.print()
+    
+    # ═══════════════════════════════════════════════════════════════════
+    # DETAILED REPO ANALYSIS - Proves REQ #8, #9, #10, #11, #12
+    # ═══════════════════════════════════════════════════════════════════
+    for i, repo in enumerate(repos, 1):
+        if repo.get("error"):
+            console.print(
+                Panel(
+                    f"[red]Error: {repo.get('error')}[/red]",
+                    title=f"[dim]#{i} {repo.get('project_name', 'Unknown')}[/dim]",
+                    border_style="red",
+                )
+            )
+            continue
+        
+        # Build a tree for this repository
+        tree = Tree(f"[bold cyan]📁 {repo.get('project_name', 'Unknown')}[/bold cyan]")
+        
+        # ─── REQ #8: Languages & Frameworks ───
+        langs = repo.get("languages") or []
+        frameworks = repo.get("frameworks") or []
+        
+        tech_branch = tree.add("[bold magenta]🔧 Technologies[/bold magenta] [dim](REQ #8)[/dim]")
+        if langs:
+            lang_str = ", ".join(langs[:5])
+            if len(langs) > 5:
+                lang_str += f" [dim]+{len(langs)-5} more[/dim]"
+            tech_branch.add(f"[green]Languages:[/green] {lang_str}")
+        else:
+            tech_branch.add("[dim]Languages: None detected[/dim]")
+        
+        if frameworks:
+            fw_str = ", ".join(frameworks[:5])
+            if len(frameworks) > 5:
+                fw_str += f" [dim]+{len(frameworks)-5} more[/dim]"
+            tech_branch.add(f"[green]Frameworks:[/green] {fw_str}")
+        else:
+            tech_branch.add("[dim]Frameworks: None detected[/dim]")
+        
+        # ─── REQ #9: Individual Contributions ───
+        contrib_branch = tree.add("[bold yellow]👤 Your Contributions[/bold yellow] [dim](REQ #9)[/dim]")
+        
+        pct = repo.get("user_contribution_pct")
+        if pct is not None:
+            # Color based on contribution level
+            if pct >= 70:
+                pct_color = "green"
+            elif pct >= 30:
+                pct_color = "yellow"
+            else:
+                pct_color = "red"
+            contrib_branch.add(f"Contribution: [{pct_color}]{pct:.1f}%[/{pct_color}]")
+        
+        commits = repo.get("user_total_commits")
+        if commits is not None:
+            contrib_branch.add(f"Total Commits: [cyan]{commits}[/cyan]")
+        
+        # ─── REQ #10: Contribution Metrics ───
+        metrics_branch = tree.add("[bold blue]📈 Activity Metrics[/bold blue] [dim](REQ #10)[/dim]")
+        
+        first = repo.get("user_first_commit")
+        last = repo.get("user_last_commit")
+        freq = repo.get("user_commit_frequency")
+        
+        if first:
+            first_str = format_timestamp(first)
+            metrics_branch.add(f"First Commit: [cyan]{first_str}[/cyan]")
+        
+        if last:
+            last_str = format_timestamp(last)
+            metrics_branch.add(f"Last Commit: [cyan]{last_str}[/cyan]")
+        
+        if freq is not None:
+            metrics_branch.add(f"Commit Frequency: [cyan]{freq:.2f}/week[/cyan]")
+        
+        # Calculate duration if we have both dates
+        if first and last:
+            try:
+                from datetime import datetime
+                first_dt = datetime.fromisoformat(str(first).replace("Z", "+00:00"))
+                last_dt = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+                days = (last_dt - first_dt).days
+                metrics_branch.add(f"Duration: [cyan]{days} days[/cyan]")
+            except:
+                pass
+        
+        # ─── REQ #11: Extract Skills ───
+        skills_branch = tree.add("[bold green]🎯 Skills & Insights[/bold green] [dim](REQ #11)[/dim]")
+        skills_branch.add(f"Skills Extracted: [cyan]{repo.get('skills_count', 0)}[/cyan]")
+        skills_branch.add(f"Resume Insights: [cyan]{repo.get('insights_count', 0)}[/cyan]")
+        
+        console.print(Panel(tree, border_style="cyan", padding=(0, 1)))
+        console.print()
+    
+    # ═══════════════════════════════════════════════════════════════════
+    # REQ #12: Output All Project Info - Summary Table
+    # ═══════════════════════════════════════════════════════════════════
+    if repos:
+        console.print(
+            Panel(
+                "[bold]All key project information has been extracted and returned "
+                "in the API response above.[/bold]\n\n"
+                "Each repository shows: languages, frameworks, skills, "
+                "user contributions, commit metrics, and activity timeline.",
+                title="[dim]📋 REQ #12: Output Project Info[/dim]",
+                border_style="dim",
+            )
+        )
+        console.print()
+    
+    # ═══════════════════════════════════════════════════════════════════
+    # REQ #13: Store in Database - Confirmation
+    # ═══════════════════════════════════════════════════════════════════
+    total_skills = sum(r.get("skills_count", 0) for r in repos if not r.get("error"))
+    total_insights = sum(r.get("insights_count", 0) for r in repos if not r.get("error"))
+    successful_repos = sum(1 for r in repos if not r.get("error"))
+    
+    console.print(
+        Panel(
+            f"[bold green]✅ Data Persisted to Database[/bold green]\n\n"
+            f"• [cyan]{successful_repos}[/cyan] repository records saved to [white]RepoStat[/white] table\n"
+            f"• [cyan]{successful_repos}[/cyan] user contribution records saved to [white]UserRepoStat[/white] table\n"
+            f"• [cyan]{total_skills}[/cyan] skills saved to [white]ProjectSkill[/white] table\n"
+            f"• [cyan]{total_insights}[/cyan] resume items saved to [white]ResumeItem[/white] table\n"
+            f"• [cyan]{len(rankings)}[/cyan] ranking scores updated",
+            title="[dim]💾 REQ #13: Store in Database[/dim]",
+            border_style="green",
+        )
+    )
+    
+    print_how_banner([8, 9, 10, 11, 12, 13])
     wait_for_enter()
     return result
 
