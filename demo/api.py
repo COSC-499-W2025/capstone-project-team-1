@@ -42,6 +42,10 @@ class APIClient:
     def submit_answers(self, answers: Dict[str, str]) -> List[Dict[str, Any]]:
         return self.client.post("/answers", json={"answers": answers}).json()
 
+    def submit_answers_raw(self, answers: Dict[str, str]) -> httpx.Response:
+        """Submit answers and return raw response for error handling."""
+        return self.client.post("/answers", json={"answers": answers})
+
     def upload_zip(self, path: Path) -> Dict[str, Any]:
         with path.open("rb") as f:
             return self.client.post(

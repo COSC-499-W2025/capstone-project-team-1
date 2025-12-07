@@ -94,42 +94,82 @@ def demo_consent(api: APIClient) -> str:
 
 
 def demo_questionnaire(api: APIClient) -> str:
-    from rich.prompt import Prompt
+    from rich.prompt import Prompt, Confirm
     
     print_requirement_banner([6], "User Configuration")
     section_header("Questionnaire")
     
     questions = api.get_questions()
-    answers = {}
     
     if not questions:
         console.print("[dim]No questions configured[/dim]")
         wait_for_enter()
         return "demo@example.com"
     
-    console.print("[cyan]Please answer the following questions:[/cyan]\n")
-    
-    for q in questions:
-        key = q.get("key", str(q.get("id")))
-        question_text = q.get("question", q.get("text", key))
-        default = q.get("default", "")
+    while True:  # Loop until successful submission
+        answers = {}
+        console.print("[cyan]Please answer the following questions:[/cyan]\n")
         
-        # Provide helpful defaults based on question type
-        if "email" in key.lower():
-            default = default or "demo@example.com"
+        for q in questions:
+            key = q.get("key", str(q.get("id")))
+            question_text = q.get("question", q.get("text", key))
+            default = q.get("default", "")
+            
+            # Provide helpful defaults based on question type
+            if "email" in key.lower():
+                default = default or "demo@example.com"
+            
+            answer = Prompt.ask(
+                f"  [white]{question_text}[/white]",
+                default=default if default else None
+            )
+            answers[key] = answer
+            console.print()
         
-        answer = Prompt.ask(
-            f"  [white]{question_text}[/white]",
-            default=default if default else None
-        )
-        answers[key] = answer
-        console.print()
-    
-    api.submit_answers(answers)
-    console.print(Panel("[green]Configuration saved![/green]", border_style="green"))
-    print_how_banner([6])
-    wait_for_enter()
-    return answers.get("email", answers.get("user_email", "demo@example.com"))
+        # Try to submit answers
+        animate_spinner("Saving configuration...", 0.5)
+        
+        try:
+            resp = api.submit_answers_raw(answers)
+            
+            if resp.status_code in (400, 422):
+                error_detail = resp.json().get("detail", "Validation error")
+                console.print(
+                    Panel(
+                        f"[red]❌ Configuration failed![/red]\n"
+                        f"Status: {resp.status_code}\n"
+                        f"Error: {error_detail}",
+                        border_style="red",
+                    )
+                )
+                if not Confirm.ask("\n[yellow]Re-enter your answers?[/yellow]", default=True):
+                    console.print("[dim]Skipping questionnaire...[/dim]")
+                    wait_for_enter()
+                    return "demo@example.com"
+                console.print()
+                continue  # Retry
+            
+            elif resp.status_code >= 400:
+                console.print(f"\n[red]❌ Server error: {resp.status_code}[/red]")
+                if not Confirm.ask("[yellow]Try again?[/yellow]", default=True):
+                    wait_for_enter()
+                    return "demo@example.com"
+                console.print()
+                continue
+            
+            # Success!
+            console.print(Panel("[green]✅ Configuration saved![/green]", border_style="green"))
+            print_how_banner([6])
+            wait_for_enter()
+            return answers.get("email", answers.get("user_email", "demo@example.com"))
+            
+        except Exception as e:
+            console.print(f"\n[red]❌ Error: {e}[/red]")
+            if not Confirm.ask("[yellow]Try again?[/yellow]", default=True):
+                wait_for_enter()
+                return "demo@example.com"
+            console.print()
+            continue
 
 
 def demo_zip_upload(api: APIClient) -> int:
