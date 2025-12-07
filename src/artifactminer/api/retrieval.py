@@ -4,15 +4,19 @@ These endpoints serve data for the final portfolio/resume generation.
 All are GET-only with no side effects.
 """
 
+from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+
+from sqlalchemy import or_
 
 from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse
 from ..db import (
     get_db,
     ProjectSkill,
+    UserProjectSkill,
     Skill,
     RepoStat,
     ResumeItem,
@@ -34,24 +38,48 @@ async def get_skill_chronology(
 
     Milestone Req #19: Chronological list of skills.
     """
-    results = (
+    items: list[SkillChronologyItem] = []
+
+    project_results = (
         db.query(ProjectSkill, Skill, RepoStat)
         .join(Skill, ProjectSkill.skill_id == Skill.id)
         .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
-        .order_by(RepoStat.first_commit.asc())
+        .filter(RepoStat.deleted_at.is_(None))
         .all()
     )
 
-    return [
-        SkillChronologyItem(
-            date=repo_stat.first_commit,
-            skill=skill.name,
-            project=repo_stat.project_name,
-            proficiency=project_skill.proficiency,
-            category=skill.category,
+    user_results = (
+        db.query(UserProjectSkill, Skill, RepoStat)
+        .join(Skill, UserProjectSkill.skill_id == Skill.id)
+        .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(RepoStat.deleted_at.is_(None))
+        .all()
+    )
+
+    for project_skill, skill, repo_stat in project_results:
+        items.append(
+            SkillChronologyItem(
+                date=repo_stat.first_commit,
+                skill=skill.name,
+                project=repo_stat.project_name,
+                proficiency=project_skill.proficiency,
+                category=skill.category,
+            )
         )
-        for project_skill, skill, repo_stat in results
-    ]
+
+    for user_skill, skill, repo_stat in user_results:
+        items.append(
+            SkillChronologyItem(
+                date=repo_stat.first_commit,
+                skill=skill.name,
+                project=repo_stat.project_name,
+                proficiency=user_skill.proficiency,
+                category=skill.category,
+            )
+        )
+
+    items.sort(key=lambda item: item.date or datetime.max)
+    return items
 
 
 @router.get("/resume", response_model=List[ResumeItemResponse])
@@ -74,6 +102,9 @@ async def get_resume_items(
     query = db.query(ResumeItem, RepoStat).outerjoin(
         RepoStat, ResumeItem.repo_stat_id == RepoStat.id
     )
+
+    # Exclude soft-deleted projects (but keep items with no repo_stat)
+    query = query.filter(or_(RepoStat.deleted_at.is_(None), RepoStat.id.is_(None)))
 
     if project_id is not None:
         query = query.filter(ResumeItem.repo_stat_id == project_id)

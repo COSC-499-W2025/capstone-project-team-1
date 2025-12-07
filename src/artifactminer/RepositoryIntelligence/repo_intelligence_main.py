@@ -15,6 +15,7 @@ from artifactminer.RepositoryIntelligence.framework_detector import detect_frame
 @dataclass
 class RepoStats: #This is the basic Repo class for storing the results of the git files.
     project_name: str #store project name as a string
+    project_path: str #store project path as a string
     is_collaborative: bool #Is collaborative as a boolean to see whether the user is the only one to edit this file or had help.
     Languages: List[str] = field(default_factory=list) #Languages as a string list to store the languages used in the repo
     language_percentages: List[float] = field(default_factory=list)# Language percentages as a float list to store the percentage of each language used in the repo
@@ -78,6 +79,7 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     return RepoStats(
         project_name=project_name,
+        project_path=str(repo_path),
         is_collaborative=is_collaborative,
         primary_language=primary_language,
         Languages=languages,
@@ -88,11 +90,21 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
         frameworks=frameworks,
     )
 
-def saveRepoStats(stats):
-    db = SessionLocal()
+def saveRepoStats(stats, db=None):
+    """Save repository statistics to database.
+    
+    Args:
+        stats: RepoStats object to save
+        db: Optional SQLAlchemy session. If None, creates a new session.
+    """
+    own_session = db is None
+    if own_session:
+        db = SessionLocal()
+    
     try:
         repo_stat = RepoStat(
             project_name=stats.project_name,
+            project_path=stats.project_path,
             is_collaborative=stats.is_collaborative,
             primary_language=stats.primary_language,
             languages=stats.Languages,
@@ -103,11 +115,18 @@ def saveRepoStats(stats):
             frameworks=stats.frameworks,
         )
         db.add(repo_stat)
-        db.commit()
-        db.refresh(repo_stat)
+        # Ensure an ID is assigned even when the caller manages the session.
+        db.flush()
+        if own_session:
+            db.commit()
+            db.refresh(repo_stat)
         print(f"Saved repo stats: {repo_stat.project_name}")
+        return repo_stat
     except Exception as e:
-        db.rollback()
+        if own_session:
+            db.rollback()
         print(f"Error saving repo stats: {e}")
+        raise
     finally:
-        db.close()
+        if own_session:
+            db.close()
