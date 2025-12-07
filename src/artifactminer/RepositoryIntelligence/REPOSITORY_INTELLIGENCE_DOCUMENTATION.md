@@ -93,6 +93,94 @@ print(f"Frameworks: {stats.frameworks}")
 
 ---
 
+### `calculateRepoHealth(repo_path, last_commit, total_commits)`
+
+**Description:** Calculates a comprehensive repository health score (0-100) based on documentation quality, commit recency, commit activity, test presence, and configuration files. This metric helps identify well-maintained, professional projects suitable for portfolios or academic evaluation.
+
+**Parameters:**
+- `repo_path` (Pathish): Path to the Git repository
+- `last_commit` (Optional[datetime]): Timestamp of the most recent commit
+- `total_commits` (int): Total number of commits in the repository
+
+**Returns:** `float` - Health score from 0.0 to 100.0 (rounded to 2 decimal places)
+
+**Scoring Breakdown:**
+
+The health score is distributed across five categories totaling 100 points:
+
+**Documentation (30 points maximum)**
+- README.md: 12 points
+- README: 8 points
+- LICENSE: 8 points
+- CONTRIBUTING.md: 5 points
+- CHANGELOG.md: 3 points
+- docs/ directory: 2 points
+
+Rationale: Documentation is weighted highest for student portfolios as it demonstrates communication skills, professionalism, and project presentation abilities critical for academic and employment evaluation.
+
+**Commit Recency (25 points maximum)**
+- Within 7 days: 25 points (Active)
+- Within 30 days: 20 points (Recent)
+- Within 90 days: 15 points (Moderate)
+- Within 180 days: 10 points (Older)
+- Within 365 days: 5 points (Old)
+- Over 365 days: 0 points
+
+Rationale: Recent activity indicates the project is actively maintained or recently completed, distinguishing current work from abandoned projects. Time-sensitive for job applications and demonstrates ongoing engagement.
+
+**Commit Activity (20 points maximum)**
+- 100+ commits: 20 points (Mature project)
+- 50-99 commits: 15 points (Good activity)
+- 20-49 commits: 10 points (Moderate activity)
+- 10-19 commits: 5 points (Some activity)
+- Under 10 commits: 0 points
+
+Rationale: Total commit count serves as a proxy for project maturity, complexity, and sustained effort over time. Important for capstone projects requiring demonstrated depth and iteration.
+
+**Test Presence (15 points maximum)**
+- Detects test directories: tests/, test/, __tests__, spec/, specs/
+- Detects test configuration files: pytest.ini, jest.config.js, karma.conf.js
+- Detects test file patterns: test_*.py, *_test.py, *.test.js, *.spec.js
+
+Rationale: Testing demonstrates software engineering best practices and professional development skills. Many student projects omit tests, making this a key differentiator.
+
+**Configuration Files (10 points maximum)**
+- 2 points each for: .gitignore, .editorconfig, .prettierrc, .eslintrc, pyproject.toml
+- Maximum 10 points total
+
+Rationale: Configuration files indicate attention to development environment setup and code quality standards, though they are often auto-generated and less indicative of actual student work.
+
+**Example:**
+```python
+from artifactminer.RepositoryIntelligence.repo_intelligence_main import getRepoStats, calculateRepoHealth
+
+stats = getRepoStats("/path/to/repo")
+health_score = calculateRepoHealth(
+    repo_path="/path/to/repo",
+    last_commit=stats.last_commit,
+    total_commits=stats.total_commits
+)
+
+print(f"Repository Health Score: {health_score}/100.0")
+
+# Interpret the score
+if health_score >= 80:
+    print("Excellent - Well-maintained, documented, and active project")
+elif health_score >= 60:
+    print("Good - Solid project with good practices")
+elif health_score >= 40:
+    print("Fair - Room for improvement in documentation or activity")
+else:
+    print("Poor - Needs significant improvement")
+```
+
+**Notes:**
+- A repository can score points for documentation, tests, and configuration even with zero commits
+- The scoring system is optimized for student portfolios and capstone projects
+- Health scores help identify projects that follow best practices and demonstrate professional development maturity
+
+---
+
 ### `saveRepoStats(stats)`
 
 **Description:** Persists a `RepoStats` object to the database in the `RepoStat` table.
@@ -621,6 +709,7 @@ Repository-level statistics dataclass returned by `getRepoStats()`.
 - `last_commit` (datetime): Newest commit timestamp
 - `total_commits` (int): Total commit count
 - `frameworks` (List[str]): Detected frameworks
+- `health_score` (float): Repository health indicator (0-100)
 
 ---
 
