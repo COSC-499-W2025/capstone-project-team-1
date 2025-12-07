@@ -39,13 +39,15 @@ userIncludeAllFiles = False
 
 store_file_dictionary = StoreFileDict()
 #storing files from mock folder to dictionary
-def crawl_directory() -> dict: 
-    temp_dict = []
+def crawl_directory() -> tuple[dict, list[str]]: 
+    listforalldirs = []
     if os.path.exists(CURRENTPATH) == False:
         print("path does not exist")
         return
 
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
+        for single_directory in dirs:
+            listforalldirs.append(single_directory)
         if(files):
             current_folder = os.path.basename(root)
             print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
@@ -73,7 +75,7 @@ def crawl_directory() -> dict:
                     '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
                     
                     store_file_dictionary.add_to_dict(fileId, (file, full_path)) #key = filename, path = filepath
-    return store_file_dictionary.get_dict()
+    return store_file_dictionary.get_dict(), listforalldirs
 
                 
 def is_file_readable(full_path: str) -> bool:

@@ -84,6 +84,9 @@ class DirectoriesResponse(BaseModel):
     directories: list[str] = Field(
         description="List of top-level directories in the ZIP file."
     )
+    cleanedfilespath : list[str] = Field(
+        description="Get the file path(s) from a zip direcotry."
+    )
 
 
 class ProjectTimelineItem(BaseModel):
