@@ -52,19 +52,45 @@ def demo_health(api: APIClient) -> bool:
 
 
 def demo_consent(api: APIClient) -> str:
+    from rich.prompt import Prompt
+    
     print_requirement_banner([1, 4, 5], "Consent & Privacy")
     section_header("Consent Management")
-    console.print("[dim]Setting consent to NO_LLM (deterministic analysis)...[/dim]")
-    result = api.update_consent("no_llm")
+    
+    # Show consent options with descriptions
+    console.print("[cyan]Select your consent level for data processing:[/cyan]\n")
+    console.print("  [bold green]1. full[/bold green]    - Full LLM access for AI-powered summaries")
+    console.print("  [bold yellow]2. no_llm[/bold yellow]  - Deterministic analysis only (no external AI)")
+    console.print("  [bold red]3. none[/bold red]    - No data processing\n")
+    
+    consent_map = {"1": "full", "2": "no_llm", "3": "none", "full": "full", "no_llm": "no_llm", "none": "none"}
+    
+    while True:
+        choice = Prompt.ask(
+            "[cyan]Enter choice (1/2/3 or full/no_llm/none)[/cyan]",
+            default="2"
+        ).strip().lower()
+        
+        if choice in consent_map:
+            consent_level = consent_map[choice]
+            break
+        else:
+            console.print("[red]Invalid choice. Please enter 1, 2, 3 or full, no_llm, none[/red]\n")
+    
+    animate_spinner("Setting consent...", 0.5)
+    result = api.update_consent(consent_level)
+    
+    # Color based on consent level
+    color = "green" if consent_level == "full" else "yellow" if consent_level == "no_llm" else "red"
     console.print(
         Panel(
-            f"[yellow]Consent: {result.get('consent_level', '').upper()}[/yellow]",
-            border_style="yellow",
+            f"[{color}]Consent set to: {result.get('consent_level', consent_level).upper()}[/{color}]",
+            border_style=color,
         )
     )
     print_how_banner([1, 4, 5])
     wait_for_enter()
-    return "no_llm"
+    return consent_level
 
 
 def demo_wrong_format(api: APIClient):
@@ -89,40 +115,155 @@ def demo_wrong_format(api: APIClient):
 
 
 def demo_questionnaire(api: APIClient) -> str:
+    from rich.prompt import Prompt
+    
     print_requirement_banner([6], "User Configuration")
     section_header("Questionnaire")
+    
     questions = api.get_questions()
-    answers = {
-        q.get("key", str(q.get("id"))): "demo@example.com"
-        if "email" in str(q.get("key", "")).lower()
-        else "demo"
-        for q in questions
-    }
+    answers = {}
+    
+    if not questions:
+        console.print("[dim]No questions configured[/dim]")
+        wait_for_enter()
+        return "demo@example.com"
+    
+    console.print("[cyan]Please answer the following questions:[/cyan]\n")
+    
+    for q in questions:
+        key = q.get("key", str(q.get("id")))
+        question_text = q.get("question", q.get("text", key))
+        default = q.get("default", "")
+        
+        # Provide helpful defaults based on question type
+        if "email" in key.lower():
+            default = default or "demo@example.com"
+        
+        answer = Prompt.ask(
+            f"  [white]{question_text}[/white]",
+            default=default if default else None
+        )
+        answers[key] = answer
+        console.print()
+    
     api.submit_answers(answers)
     console.print(Panel("[green]Configuration saved![/green]", border_style="green"))
     print_how_banner([6])
     wait_for_enter()
-    return answers.get("email", "demo@example.com")
+    return answers.get("email", answers.get("user_email", "demo@example.com"))
 
 
 def demo_zip_upload(api: APIClient) -> int:
+    from rich.prompt import Prompt, Confirm
+    from rich.table import Table
+    
     print_requirement_banner([2], "ZIP Parsing")
     section_header("ZIP Upload")
-    if not ZIP_PATH.exists():
-        console.print(f"[red]ZIP not found: {ZIP_PATH}[/red]")
-        wait_for_enter()
-        return -1
-    animate_spinner("Uploading...", 1.0)
-    result = api.upload_zip(ZIP_PATH)
-    console.print(
-        Panel(
-            f"[green]Uploaded![/green]\nZIP ID: {result.get('zip_id')}",
-            border_style="green",
+    
+    # Show default path and allow user to change it
+    default_path = str(ZIP_PATH)
+    console.print(f"[dim]Default ZIP path: {default_path}[/dim]\n")
+    
+    while True:
+        zip_path_str = Prompt.ask(
+            "[cyan]Enter ZIP file path[/cyan]",
+            default=default_path
         )
-    )
-    print_how_banner([2])
-    wait_for_enter()
-    return result.get("zip_id", -1)
+        zip_path = Path(zip_path_str.strip())
+        
+        # Check if file exists locally first
+        if not zip_path.exists():
+            console.print(f"\n[red]❌ File not found: {zip_path}[/red]")
+            if not Confirm.ask("[yellow]Try a different path?[/yellow]", default=True):
+                return -1
+            console.print()
+            continue
+        
+        # Check if it's a file (not directory)
+        if not zip_path.is_file():
+            console.print(f"\n[red]❌ Not a file: {zip_path}[/red]")
+            if not Confirm.ask("[yellow]Try a different path?[/yellow]", default=True):
+                return -1
+            console.print()
+            continue
+        
+        # Attempt upload
+        animate_spinner("Uploading...", 1.0)
+        
+        try:
+            # Use raw upload to get response status
+            resp = api.upload_file_raw(zip_path)
+            
+            if resp.status_code in (400, 404, 422):
+                error_detail = resp.json().get("detail", "Unknown error")
+                console.print(
+                    Panel(
+                        f"[red]❌ Upload failed![/red]\n"
+                        f"Status: {resp.status_code}\n"
+                        f"Error: {error_detail}",
+                        border_style="red",
+                    )
+                )
+                if not Confirm.ask("\n[yellow]Try a different ZIP file?[/yellow]", default=True):
+                    return -1
+                console.print()
+                continue
+            
+            elif resp.status_code >= 400:
+                console.print(f"\n[red]❌ Server error: {resp.status_code}[/red]")
+                if not Confirm.ask("[yellow]Try again?[/yellow]", default=True):
+                    return -1
+                console.print()
+                continue
+            
+            # Success!
+            result = resp.json()
+            zip_id = result.get("zip_id", -1)
+            
+            console.print(
+                Panel(
+                    f"[green]✅ Uploaded successfully![/green]\nZIP ID: {zip_id}",
+                    border_style="green",
+                )
+            )
+            
+            # Show directories in the uploaded ZIP
+            console.print("\n[cyan]Fetching directories...[/cyan]")
+            animate_spinner("Loading...", 0.5)
+            
+            try:
+                dirs_result = api.list_directories(zip_id)
+                directories = dirs_result.get("directories", [])
+                
+                if directories:
+                    table = Table(title="📁 Directories Found", box=box.ROUNDED)
+                    table.add_column("#", style="dim", width=4)
+                    table.add_column("Directory Path", style="cyan")
+                    
+                    for i, d in enumerate(directories[:20], 1):  # Show max 20
+                        dir_path = d if isinstance(d, str) else d.get("path", str(d))
+                        table.add_row(str(i), dir_path)
+                    
+                    if len(directories) > 20:
+                        table.add_row("...", f"[dim]+{len(directories) - 20} more[/dim]")
+                    
+                    console.print(table)
+                else:
+                    console.print("[dim]No directories found in ZIP[/dim]")
+                    
+            except Exception as e:
+                console.print(f"[dim]Could not fetch directories: {e}[/dim]")
+            
+            print_how_banner([2])
+            wait_for_enter()
+            return zip_id
+            
+        except Exception as e:
+            console.print(f"\n[red]❌ Error: {e}[/red]")
+            if not Confirm.ask("[yellow]Try again?[/yellow]", default=True):
+                return -1
+            console.print()
+            continue
 
 
 def demo_analysis(api: APIClient, zip_id: int):
