@@ -55,8 +55,6 @@ async def get_directories(
     uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
     if not uploaded_zip:
         raise HTTPException(status_code=404, detail="ZIP file not found.")
-
-    uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
     extraction_path = extract_zip_to_persistent_location(uploaded_zip.path, zip_id) #extract the zip file.
     directory_walk.CURRENTPATH = extraction_path #set path to crawler
     file_dict, dir_list = directory_walk.crawl_directory() 
