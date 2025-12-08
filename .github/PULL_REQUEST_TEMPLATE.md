@@ -55,4 +55,8 @@ Thank you for contributing! Please fill out this template to help us review your
 
 <!-- Add your screenshots here -->
 
+<<<<<<< HEAD
 </details>
+=======
+</details>
+>>>>>>> origin
