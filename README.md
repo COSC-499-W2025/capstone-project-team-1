@@ -14,13 +14,43 @@
 **Typical scenario:** The user launches the TUI then selects the folder/s they wish to parse. The user can set their preferences, then hit scan. The system will crawl the selected folder and once the process is complete it will bundle a summary resume or portfolio.
 
 
+Team Contract link: **[Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)**
 
+### System Architecture Diagram
 
-[System Architecture diagram](https://github.com/COSC-499-W2025/capstone-project-team-1/blob/docs/plan/system-architecture-diagram.png?raw=true)
+```mermaid
+flowchart TB
+    subgraph User["👤 User Layer"]
+        TUI["Terminal User Interface<br/>(Textual)"]
+    end
 
-**![System-Architecture](https://github.com/COSC-499-W2025/capstone-project-team-1/blob/docs/plan/system-architecture-diagram.png?raw=true)**
+    subgraph API["🔌 API Layer"]
+        FastAPI["FastAPI Gateway<br/>/health, /consent, /zip, /analyze"]
+    end
 
-**System Architecture diagram:**
+    subgraph Core["⚙️ Core Processing"]
+        Crawler["Directory Crawler"]
+        RepoIntel["Repository Intelligence"]
+        Skills["Skills Extractor"]
+        OpenAI["LLM Integration<br/>(Optional)"]
+    end
+
+    subgraph Data["💾 Data Layer"]
+        SQLite[("SQLite Database")]
+        FileSystem[("File System<br/>(ZIP uploads)")]
+    end
+
+    TUI <-->|HTTP| FastAPI
+    FastAPI --> Crawler
+    FastAPI --> RepoIntel
+    FastAPI --> Skills
+    FastAPI -.->|If consented| OpenAI
+    Crawler --> FileSystem
+    RepoIntel --> SQLite
+    Skills --> SQLite
+    FastAPI --> SQLite
+```
+
 
 This diagram outlines the proposed structure. It illustrates the core components and how it interacts to transform the users data into a resume.
 
@@ -40,9 +70,49 @@ This diagram outlines the proposed structure. It illustrates the core components
 
 **Analysis Dashboard:**  Main part of the TUI that is where all progress and final information is sent, interacts with the analysis process to share the progress, and interacts with the end result in order to display the resume/portfolio.
 
-[DFD Diagram.png](https://github.com/COSC-499-W2025/capstone-project-team-1/blob/docs/plan/DFD-10-12-25.png)
+### Data Flow Diagram (Level 0)
 
-**![DFD Diagram.png](https://github.com/COSC-499-W2025/capstone-project-team-1/blob/docs/plan/DFD-10-12-25.png?raw=true)**
+```mermaid
+flowchart LR
+    User(("👤 User")) -->|"1. Upload ZIP &<br/>Set Preferences"| System["Artifact Miner<br/>System"]
+    System -->|"2. Analyze &<br/>Extract Skills"| System
+    System -->|"3. Resume/<br/>Portfolio"| User
+```
+
+### Data Flow Diagram (Level 1)
+
+```mermaid
+flowchart TB
+    User(("👤 User"))
+    
+    subgraph TUI["1.0 TUI"]
+        Consent["Consent Dialog"]
+        Upload["ZIP Upload"]
+        Results["Results View"]
+    end
+    
+    subgraph Processing["2.0 Processing"]
+        Crawler["2.1 Crawler"]
+        RepoIntel["2.2 Repo Intelligence"]
+        Skills["2.3 Skills Extraction"]
+    end
+    
+    subgraph Storage["3.0 Storage"]
+        DB[("Database")]
+        FS[("File System")]
+    end
+    
+    LLM["4.0 LLM<br/>(Optional)"]
+    
+    User -->|"Preferences"| TUI
+    TUI -->|"API Calls"| Processing
+    Crawler -->|"Read Files"| FS
+    Processing -->|"Store Stats"| DB
+    Skills -.->|"If Consented"| LLM
+    LLM -.->|"Summaries"| Skills
+    Processing -->|"Results"| TUI
+    TUI -->|"Display"| User
+```
 
 
 ## DFD explanation:
