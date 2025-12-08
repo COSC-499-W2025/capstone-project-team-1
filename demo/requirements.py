@@ -43,7 +43,7 @@ REQUIREMENTS: List[Requirement] = [
         full="Return an error if the specified file is in the wrong format",
         status="FULLY MET",
         coverage=100,
-        how="Upload validates .zip extension, returns HTTP 400 'Only .zip files accepted' for invalid formats.",
+        how="Upload validates file format, returns HTTP 422 'Only ZIP files are allowed.' for invalid formats.",
         demo_sections=["wrong_format"],
     ),
     Requirement(
