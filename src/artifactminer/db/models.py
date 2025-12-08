@@ -57,6 +57,7 @@ class RepoStat(Base):#model for storing repository statistics
     ranking_score = Column(Float, nullable=True)
     ranked_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
+    health_score = Column(Float, nullable=True)  # Repository health indicator (0-100)
 
     # Relationships
     project_skills = relationship("ProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan")

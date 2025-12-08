@@ -1,636 +1,295 @@
-"""Rich-powered Artifact Miner demo script.
+#!/usr/bin/env python3
+"""Artifact Miner Demo - Requirements Compliance Showcase.
 
-This CLI runs through the full Artifact Miner API surface using real HTTP
-requests (via `httpx`) and friendly terminal output (via `rich`). The flow hits
-every major endpoint now available on the backend:
-
-1. `GET /health` – confirm the API is live.
-2. `GET /questions` + `POST /answers` – seed questionnaire data.
-3. `PUT /consent` – record privacy mode (`full` when OPENAI_API_KEY is set).
-4. `POST /zip/upload` + `GET /zip/{id}/directories` – ingest a demo archive.
-5. `POST /openai` – optional helper call (skipped if OPENAI_API_KEY missing).
-6. `POST /analyze/{zip_id}` – trigger the full repository intelligence pipeline.
-7. `GET /summaries`, `/resume`, `/skills/chronology` – retrieve stored insights.
-8. `GET /projects/timeline` and `DELETE /projects/{id}` – lifecycle management.
-
-Usage:
-    uv run python demo.py
-
-Environment overrides:
-    ARTIFACT_MINER_API_URL    Base URL for the API (default http://127.0.0.1:8000)
-    ARTIFACT_MINER_ZIP_PATH   Path to a zipped folder of git repos
-                              (default tests/data/mock_projects.zip)
-    ARTIFACT_MINER_USER_EMAIL Email used for questionnaire + analysis context
-    OPENAI_API_KEY            Enables the `/openai` helper if provided
+Usage: uv run python demo.py
 """
-
-from __future__ import annotations
 
 import os
 import sys
+import tempfile
 from pathlib import Path
-from typing import Any, Dict, List
 
-import httpx
-from rich import box
-from rich.align import Align
-from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
+from rich import box
 
-# --------------------------------------------------------------------------- #
-# Configuration
-# --------------------------------------------------------------------------- #
+from demo import (
+    console,
+    print_splash_screen,
+    print_requirement_banner,
+    print_how_banner,
+    section_header,
+    show_final_scorecard,
+    animate_spinner,
+    truncate,
+    format_timestamp,
+)
+from demo.api import APIClient
+from demo.keyboard import wait_for_enter
+
 API_URL = os.environ.get("ARTIFACT_MINER_API_URL", "http://127.0.0.1:8000")
-ZIP_FILE_PATH = Path(
-    os.environ.get(
-        "ARTIFACT_MINER_ZIP_PATH",
-        "tests/data/mock_projects.zip",
-    )
-)
-USER_EMAIL = os.environ.get("ARTIFACT_MINER_USER_EMAIL", "shlok10@student.ubc.ca")
-OPENAI_ENABLED = bool(os.environ.get("OPENAI_API_KEY"))
-DEMO_PROMPT = (
-    "Summarize how Artifact Miner highlights a student's strongest projects."
+ZIP_PATH = Path(
+    os.environ.get("ARTIFACT_MINER_ZIP_PATH", "tests/data/mock_projects.zip")
 )
 
-console = Console()
+
+def demo_health(api: APIClient) -> bool:
+    section_header("Health Check", "Verifying API connectivity")
+    animate_spinner("Connecting...", 0.5)
+    try:
+        h = api.health_check()
+        console.print(
+            Panel(
+                f"[green]Status: {h.get('status')}[/green]\nAPI: {API_URL}",
+                title="API Online",
+                border_style="green",
+            )
+        )
+        return True
+    except Exception as e:
+        console.print(Panel(f"[red]Failed: {e}[/red]", border_style="red"))
+        return False
 
 
-# --------------------------------------------------------------------------- #
-# Utility helpers
-# --------------------------------------------------------------------------- #
-def truncate(value: Any, limit: int = 90) -> str:
-    """Trim long strings for table display."""
-    if value is None:
-        return "—"
-    text = str(value)
-    return text if len(text) <= limit else text[: limit - 1] + "…"
-
-
-def format_timestamp(value: Any) -> str:
-    """Render ISO timestamps in a compact format."""
-    if not value:
-        return "—"
-    text = str(value)
-    if "T" in text:
-        text = text.replace("T", " ").split(".")[0]
-    return text
-
-
-# --------------------------------------------------------------------------- #
-# Rich helpers
-# --------------------------------------------------------------------------- #
-def print_banner() -> None:
-    """Render the demo banner once at startup."""
-    banner_text = r"""
-    _         _   _  __            _     __  __ _                  
-   / \   _ __| |_(_)/ _| __ _  ___| |_  |  \/  (_)_ __   ___ _ __  
-  / _ \ | '__| __| | |_ / _` |/ __| __| | |\/| | | '_ \ / _ \ '__| 
- / ___ \| |  | |_| |  _| (_| | (__| |_  | |  | | | | | |  __/ |    
-/_/   \_\_|   \__|_|_|  \__,_|\___|\__| |_|  |_|_|_| |_|\___|_|    
-    """
-    console.clear()
+def demo_consent(api: APIClient) -> str:
+    print_requirement_banner([1, 4, 5], "Consent & Privacy")
+    section_header("Consent Management")
+    console.print("[dim]Setting consent to NO_LLM (deterministic analysis)...[/dim]")
+    result = api.update_consent("no_llm")
     console.print(
         Panel(
-            Align.center(Text(banner_text, style="bold cyan")),
-            subtitle="[bold]Artifact Miner Milestone Demo[/bold]",
-            subtitle_align="center",
-            border_style="blue",
-        )
-    )
-    console.print(Align.center("[dim]Team 1 • Automated Portfolio Generation[/dim]\n"))
-
-
-def section(title: str, subtitle: str | None = None) -> None:
-    """Print a section divider."""
-    console.print()
-    console.print(f"[bold magenta]━━━ {title} ━━━[/bold magenta]")
-    if subtitle:
-        console.print(f"[dim italic]{subtitle}[/dim italic]")
-    console.print()
-
-
-def exit_with_error(message: str) -> None:
-    """Fail fast with a stylized error message."""
-    console.print(Panel(f"[bold red]{message}[/bold red]", border_style="red"))
-    raise SystemExit(1)
-
-
-def ensure_zip_exists(zip_path: Path) -> Path:
-    """Validate that the default ZIP file exists before uploading."""
-    if not zip_path.exists():
-        exit_with_error(f"Missing test ZIP file: {zip_path}")
-    return zip_path
-
-
-# --------------------------------------------------------------------------- #
-# HTTP helpers
-# --------------------------------------------------------------------------- #
-def check_health(client: httpx.Client) -> Dict[str, Any]:
-    response = client.get("/health")
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_questions(client: httpx.Client) -> List[Dict[str, Any]]:
-    response = client.get("/questions")
-    response.raise_for_status()
-    return response.json()
-
-
-def submit_answers(client: httpx.Client, answers: Dict[str, str]) -> List[Dict[str, Any]]:
-    payload = {"answers": answers}
-    response = client.post("/answers", json=payload)
-    response.raise_for_status()
-    return response.json()
-
-
-def update_consent(client: httpx.Client, consent_level: str) -> Dict[str, Any]:
-    response = client.put("/consent", json={"consent_level": consent_level})
-    response.raise_for_status()
-    return response.json()
-
-
-def upload_zip(client: httpx.Client, zip_path: Path) -> Dict[str, Any]:
-    with zip_path.open("rb") as fp:
-        files = {"file": (zip_path.name, fp, "application/zip")}
-        response = client.post("/zip/upload", files=files)
-    response.raise_for_status()
-    return response.json()
-
-
-def list_directories(client: httpx.Client, zip_id: int) -> Dict[str, Any]:
-    response = client.get(f"/zip/{zip_id}/directories")
-    response.raise_for_status()
-    return response.json()
-
-
-def call_openai(client: httpx.Client, prompt: str) -> Dict[str, Any]:
-    response = client.post("/openai", json={"prompt": prompt})
-    response.raise_for_status()
-    return response.json()
-
-
-def run_analysis(client: httpx.Client, zip_id: int) -> Dict[str, Any]:
-    response = client.post(f"/analyze/{zip_id}")
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_summaries(client: httpx.Client, user_email: str) -> List[Dict[str, Any]]:
-    response = client.get("/summaries", params={"user_email": user_email})
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_resume_items(
-    client: httpx.Client,
-    project_id: int | None = None,
-) -> List[Dict[str, Any]]:
-    params = {"project_id": project_id} if project_id is not None else None
-    response = client.get("/resume", params=params)
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_skill_chronology(client: httpx.Client) -> List[Dict[str, Any]]:
-    response = client.get("/skills/chronology")
-    response.raise_for_status()
-    return response.json()
-
-
-def fetch_project_timeline(client: httpx.Client) -> List[Dict[str, Any]]:
-    response = client.get("/projects/timeline")
-    response.raise_for_status()
-    return response.json()
-
-
-def delete_project(client: httpx.Client, project_id: int) -> Dict[str, Any]:
-    response = client.delete(f"/projects/{project_id}")
-    response.raise_for_status()
-    return response.json()
-
-
-# --------------------------------------------------------------------------- #
-# Display helpers
-# --------------------------------------------------------------------------- #
-def show_health(status: Dict[str, Any]) -> None:
-    panel = Panel.fit(
-        f"[bold green]Status:[/bold green] {status.get('status', 'unknown')}\n"
-        f"[bold]Timestamp:[/bold] {status.get('timestamp')}",
-        title="Healthcheck",
-        border_style="green",
-    )
-    console.print(panel)
-
-
-def show_questions(questions: List[Dict[str, Any]]) -> None:
-    table = Table(title="Configuration Questions", box=box.ROUNDED, border_style="blue")
-    table.add_column("Key", style="cyan", no_wrap=True)
-    table.add_column("Prompt", style="white")
-    table.add_column("Required", justify="center")
-    for question in questions:
-        table.add_row(
-            question.get("key") or str(question.get("id")),
-            question.get("question_text", ""),
-            "✅" if question.get("required") else "—",
-        )
-    console.print(table)
-
-
-def show_answers(answers: List[Dict[str, Any]]) -> None:
-    table = Table(
-        title="Saved Answers",
-        box=box.SIMPLE_HEAVY,
-        border_style="green",
-        show_lines=True,
-    )
-    table.add_column("Question ID", justify="center")
-    table.add_column("Answer", style="white")
-    for answer in answers:
-        table.add_row(str(answer.get("question_id")), answer.get("answer_text", ""))
-    console.print(table)
-
-
-def show_consent(consent: Dict[str, Any]) -> None:
-    panel = Panel(
-        Align.center(
-            f"[bold yellow]{consent.get('consent_level', '').upper()}[/bold yellow]\n"
-            f"[dim]{consent.get('accepted_at') or 'Not accepted yet'}[/dim]"
-        ),
-        title="Consent Mode",
-        border_style="yellow",
-    )
-    console.print(panel)
-
-
-def show_directories_listing(directory_payload: Dict[str, Any]) -> None:
-    directories = directory_payload.get("directories", [])
-    table = Table(title="ZIP Directory Listing", border_style="cyan", box=box.SQUARE)
-    table.add_column("Directory", style="white")
-    if not directories:
-        table.add_row("[dim]No directories reported.[/dim]")
-    else:
-        for entry in directories:
-            table.add_row(f"[bold]{entry}[/bold]")
-    console.print(table)
-
-
-def show_openai_response(response: Dict[str, Any]) -> None:
-    panel = Panel(
-        response.get("response", "[dim]No response text provided[/dim]"),
-        title="OpenAI Helper",
-        border_style="blue",
-    )
-    console.print(panel)
-
-
-def show_openai_placeholder() -> None:
-    """Explain how to enable the OpenAI helper when API keys are absent."""
-    console.print(
-        Panel(
-            "[italic]Skipping /openai call because OPENAI_API_KEY is not set.[/italic]\n"
-            "Export your API key and re-run the demo to see an actual response.\n"
-            "Example:\n[bold]export OPENAI_API_KEY=sk-yourkey[/bold]",
-            title="OpenAI Helper (Disabled)",
+            f"[yellow]Consent: {result.get('consent_level', '').upper()}[/yellow]",
             border_style="yellow",
         )
     )
+    print_how_banner([1, 4, 5])
+    wait_for_enter()
+    return "no_llm"
 
 
-def show_analysis_result(result: Dict[str, Any]) -> None:
-    """Display orchestration output (repos analyzed, rankings, etc.)."""
-    overview = Panel(
-        "[bold]ZIP ID:[/bold] {zip}\n"
-        "[bold]Extraction:[/bold] {path}\n"
-        "[bold]Repositories:[/bold] {repos}\n"
-        "[bold]Consent:[/bold] {consent}\n"
-        "[bold]Summaries Persisted:[/bold] {summaries}".format(
-            zip=result.get("zip_id"),
-            path=result.get("extraction_path"),
-            repos=result.get("repos_found"),
-            consent=result.get("consent_level"),
-            summaries=len(result.get("summaries") or []),
-        ),
-        title="Analysis Overview",
-        border_style="cyan",
-    )
-    console.print(overview)
-
-    repos_table = Table(
-        title="Repository Analysis",
-        box=box.MINIMAL_DOUBLE_HEAD,
-        border_style="cyan",
-    )
-    repos_table.add_column("Project", style="bold white")
-    repos_table.add_column("Contribution", justify="right")
-    repos_table.add_column("Skills", justify="right")
-    repos_table.add_column("Insights", justify="right")
-    repos_table.add_column("Frameworks", style="cyan")
-    repos_table.add_column("Languages", style="cyan")
-    repos_table.add_column("User Stats", style="white")
-    repos_table.add_column("Status", style="white")
-
-    for repo in result.get("repos_analyzed") or []:
-        pct = repo.get("user_contribution_pct")
-        contribution = f"{pct:.1f}%" if isinstance(pct, (int, float)) else "—"
-        status = (
-            "[green]OK[/green]" if not repo.get("error") else f"[red]{repo['error']}[/red]"
-        )
-        frameworks = repo.get("frameworks") or []
-        frameworks_text = ", ".join(frameworks) if frameworks else "—"
-        languages = repo.get("languages") or []
-        languages_text = ", ".join(languages) if languages else "—"
-        total_commits = repo.get("user_total_commits")
-        freq = repo.get("user_commit_frequency")
-        freq_text = f"{freq:.1f}/wk" if isinstance(freq, (int, float)) else "—/wk"
-        first = format_timestamp(repo.get("user_first_commit"))
-        last = format_timestamp(repo.get("user_last_commit"))
-        user_stats_text = (
-            f"{total_commits or '—'} commits\n{freq_text}\n{first} → {last}"
-        )
-        repos_table.add_row(
-            repo.get("project_name", repo.get("project_path", "unknown")),
-            contribution,
-            str(repo.get("skills_count", "0")),
-            str(repo.get("insights_count", "0")),
-            frameworks_text,
-            languages_text,
-            user_stats_text,
-            status,
-        )
-
-    if repos_table.row_count:
-        console.print(repos_table)
-    else:
-        console.print(Panel("[dim]No repository data returned.[/dim]", border_style="yellow"))
-
-    if result.get("rankings"):
-        ranking_table = Table(
-            title="Ranked Projects",
-            box=box.SIMPLE_HEAVY,
-            border_style="magenta",
-        )
-        ranking_table.add_column("Project")
-        ranking_table.add_column("Score", justify="right")
-        ranking_table.add_column("Commits", justify="right")
-        ranking_table.add_column("User Commits", justify="right")
-        for item in result["rankings"]:
-            ranking_table.add_row(
-                item.get("name", "unknown"),
-                f"{item.get('score', 0):.1f}",
-                str(item.get("total_commits", 0)),
-                str(item.get("user_commits", 0)),
+def demo_wrong_format(api: APIClient):
+    print_requirement_banner([3], "File Format Validation")
+    section_header("Wrong Format Error")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write("not a zip")
+        tmp = Path(f.name)
+    try:
+        resp = api.upload_file_raw(tmp)
+        if resp.status_code == 400:
+            console.print(
+                Panel(
+                    f"[green]Correctly rejected![/green]\nStatus: {resp.status_code}\nError: {resp.json().get('detail')}",
+                    border_style="green",
+                )
             )
-        console.print(ranking_table)
+    finally:
+        tmp.unlink()
+    print_how_banner([3])
+    wait_for_enter()
+
+
+def demo_questionnaire(api: APIClient) -> str:
+    print_requirement_banner([6], "User Configuration")
+    section_header("Questionnaire")
+    questions = api.get_questions()
+    answers = {
+        q.get("key", str(q.get("id"))): "demo@example.com"
+        if "email" in str(q.get("key", "")).lower()
+        else "demo"
+        for q in questions
+    }
+    api.submit_answers(answers)
+    console.print(Panel("[green]Configuration saved![/green]", border_style="green"))
+    print_how_banner([6])
+    wait_for_enter()
+    return answers.get("email", "demo@example.com")
+
+
+def demo_zip_upload(api: APIClient) -> int:
+    print_requirement_banner([2], "ZIP Parsing")
+    section_header("ZIP Upload")
+    if not ZIP_PATH.exists():
+        console.print(f"[red]ZIP not found: {ZIP_PATH}[/red]")
+        wait_for_enter()
+        return -1
+    animate_spinner("Uploading...", 1.0)
+    result = api.upload_zip(ZIP_PATH)
+    console.print(
+        Panel(
+            f"[green]Uploaded![/green]\nZIP ID: {result.get('zip_id')}",
+            border_style="green",
+        )
+    )
+    print_how_banner([2])
+    wait_for_enter()
+    return result.get("zip_id", -1)
+
+
+def demo_analysis(api: APIClient, zip_id: int):
+    print_requirement_banner([7, 8, 9, 10, 11, 12, 13], "Analysis Pipeline")
+    section_header("Repository Analysis")
+    if zip_id < 0:
+        console.print("[yellow]Skipping - no ZIP uploaded[/yellow]")
+        wait_for_enter()
+        return {}
+    animate_spinner("Analyzing repositories...", 2.0)
+    result = api.run_analysis(zip_id)
+    console.print(
+        Panel(
+            f"Repos found: {result.get('repos_found')}\nSummaries: {len(result.get('summaries') or [])}",
+            title="Analysis Complete",
+            border_style="cyan",
+        )
+    )
+    print_how_banner([7, 8, 9, 10, 11, 12, 13])
+    wait_for_enter()
+    return result
+
+
+def demo_summaries(api: APIClient, email: str):
+    print_requirement_banner([14, 17], "Portfolio Summaries")
+    section_header("Summaries")
+    summaries = api.get_summaries(email)
+    if summaries:
+        for s in summaries[:2]:
+            console.print(
+                Panel(
+                    truncate(s.get("summary_text", ""), 200),
+                    title=s.get("repo_path", "Project"),
+                    border_style="green",
+                )
+            )
     else:
+        console.print("[dim]No summaries yet[/dim]")
+    print_how_banner([14, 17])
+    wait_for_enter()
+
+
+def demo_resume(api: APIClient):
+    print_requirement_banner([15], "Resume Items")
+    section_header("Resume Items")
+    items = api.get_resume_items()
+    if items:
+        t = Table(box=box.SIMPLE)
+        t.add_column("Title")
+        t.add_column("Content")
+        for i in items[:3]:
+            t.add_row(i.get("title", "-"), truncate(i.get("content", ""), 50))
+        console.print(t)
+    else:
+        console.print("[dim]No resume items yet[/dim]")
+    print_how_banner([15])
+    wait_for_enter()
+
+
+def demo_ranking(api: APIClient, result: dict):
+    print_requirement_banner([16], "Project Ranking")
+    section_header("Rankings")
+    rankings = result.get("rankings") or []
+    for i, r in enumerate(rankings[:3], 1):
         console.print(
-            Panel("[dim]Ranking skipped or unavailable.[/dim]", border_style="yellow")
+            f"  #{i} [bold]{r.get('name')}[/bold] - Score: {r.get('score', 0):.1f}"
         )
+    if not rankings:
+        console.print("[dim]No rankings yet[/dim]")
+    print_how_banner([16])
+    wait_for_enter()
 
 
-def show_summaries(summaries: List[Dict[str, Any]], limit: int = 3) -> None:
-    if not summaries:
+def demo_timeline(api: APIClient):
+    print_requirement_banner([19], "Chronological Projects")
+    section_header("Timeline")
+    timeline = api.get_project_timeline()
+    for p in timeline[:3]:
         console.print(
-            Panel("[dim]No summaries stored yet.[/dim]", border_style="yellow", title="Summaries")
+            f"  {p.get('project_name')} | {format_timestamp(p.get('first_commit'))} - {format_timestamp(p.get('last_commit'))}"
         )
-        return
+    if not timeline:
+        console.print("[dim]No projects yet[/dim]")
+    print_how_banner([19])
+    wait_for_enter()
+    return timeline
 
-    for summary in summaries[:limit]:
+
+def demo_skills(api: APIClient):
+    print_requirement_banner([20], "Chronological Skills")
+    section_header("Skills")
+    skills = api.get_skill_chronology()
+    for s in skills[:5]:
+        console.print(
+            f"  {s.get('skill')} - {s.get('project', '-')} ({format_timestamp(s.get('date'))})"
+        )
+    if not skills:
+        console.print("[dim]No skills yet[/dim]")
+    print_how_banner([20])
+    wait_for_enter()
+
+
+def demo_delete(api: APIClient, timeline: list):
+    print_requirement_banner([18], "Safe Deletion")
+    section_header("Delete Project")
+    if timeline:
+        pid = timeline[0].get("id")
+        console.print(f"[dim]Soft-deleting project {pid}...[/dim]")
+        result = api.delete_project(pid)
         console.print(
             Panel(
-                summary.get("summary_text", ""),
-                title=f"Summary • {summary.get('repo_path')}",
+                f"[green]Deleted ID: {result.get('deleted_id')}[/green]",
                 border_style="green",
             )
         )
-    remaining = len(summaries) - min(len(summaries), limit)
-    if remaining > 0:
-        console.print(f"[dim]… {remaining} more summaries available via the API.[/dim]")
-
-
-def show_resume_items(items: List[Dict[str, Any]], limit: int | None = None) -> None:
-    if not items:
-        console.print(
-            Panel("[dim]Resume store is empty.[/dim]", border_style="yellow", title="Resume Items")
-        )
-        return
-
-    visible_items = items if limit is None else items[:limit]
-    showing = len(visible_items)
-    table = Table(
-        title=f"Resume Items (showing {showing} of {len(items)})",
-        border_style="green",
-        box=box.ROUNDED,
-    )
-    table.add_column("Title", style="bold white")
-    table.add_column("Project", style="cyan")
-    table.add_column("Category", style="magenta")
-    table.add_column("Snippet", style="white")
-
-    for item in visible_items:
-        table.add_row(
-            item.get("title", "Untitled"),
-            item.get("project_name") or "—",
-            item.get("category") or "—",
-            truncate(item.get("content")),
-        )
-    console.print(table)
-
-
-def show_skill_chronology(skills: List[Dict[str, Any]], limit: int | None = None) -> None:
-    if not skills:
-        console.print(
-            Panel("[dim]No skills extracted yet.[/dim]", border_style="yellow", title="Skill Chronology")
-        )
-        return
-
-    visible_skills = skills if limit is None else skills[:limit]
-    table = Table(
-        title=f"Skill Chronology (showing {len(visible_skills)} of {len(skills)})",
-        border_style="cyan",
-        box=box.MINIMAL,
-    )
-    table.add_column("Date", style="white")
-    table.add_column("Skill", style="bold")
-    table.add_column("Project", style="cyan")
-    table.add_column("Category", style="magenta")
-    table.add_column("Proficiency", justify="right")
-
-    for entry in visible_skills:
-        prof = entry.get("proficiency")
-        prof_text = f"{prof:.2f}" if isinstance(prof, (int, float)) else "—"
-        table.add_row(
-            format_timestamp(entry.get("date")),
-            entry.get("skill", "unknown"),
-            entry.get("project", "—"),
-            entry.get("category") or "—",
-            prof_text,
-        )
-    console.print(table)
-
-
-def show_project_timeline(
-    timeline: List[Dict[str, Any]],
-    *,
-    title: str = "Project Timeline",
-    limit: int = 5,
-) -> None:
-    if not timeline:
-        console.print(Panel("[dim]Timeline is empty.[/dim]", border_style="yellow", title=title))
-        return
-
-    table = Table(title=title, border_style="blue", box=box.SIMPLE)
-    table.add_column("ID", justify="right")
-    table.add_column("Project", style="bold")
-    table.add_column("First Commit")
-    table.add_column("Last Commit")
-    table.add_column("Duration (days)", justify="right")
-    table.add_column("Active?", justify="center")
-
-    for item in timeline[:limit]:
-        table.add_row(
-            str(item.get("id")),
-            item.get("project_name", "—"),
-            format_timestamp(item.get("first_commit")),
-            format_timestamp(item.get("last_commit")),
-            str(item.get("duration_days", "—")),
-            "✅" if item.get("was_active") else "—",
-        )
-    console.print(table)
-
-
-def show_delete_result(payload: Dict[str, Any]) -> None:
-    console.print(
-        Panel(
-            "[bold]Deleted ID:[/bold] {id}\n[bold]Message:[/bold] {msg}".format(
-                id=payload.get("deleted_id"),
-                msg=payload.get("message", ""),
-            ),
-            border_style="red",
-            title="Project Deletion",
-        )
-    )
-
-
-# --------------------------------------------------------------------------- #
-# Demo runner
-# --------------------------------------------------------------------------- #
-def build_answers(email: str) -> Dict[str, str]:
-    """Construct questionnaire answers for the demo."""
-    return {
-        "email": email,
-        "artifacts_focus": "Code Quality & Architecture",
-        "end_goal": "Generate a compelling co-op portfolio",
-        "repository_priority": "Focus on git repositories first",
-        "file_patterns_include": "*.py,*.md",
-        "file_patterns_exclude": "*.log,*.tmp",
-    }
+    else:
+        console.print("[dim]No projects to delete[/dim]")
+    print_how_banner([18])
+    wait_for_enter()
 
 
 def run_demo() -> int:
-    print_banner()
-    ensure_zip_exists(ZIP_FILE_PATH)
+    console.clear()
+    print_splash_screen()
+    wait_for_enter("Press Enter to begin...")
 
     try:
-        timeout = httpx.Timeout(120.0)
-        with httpx.Client(base_url=API_URL, timeout=timeout) as client:
-            section("Health Check")
-            health = check_health(client)
-            show_health(health)
+        with APIClient(API_URL) as api:
+            console.clear()
+            if not demo_health(api):
+                return 1
+            wait_for_enter()
 
-            section("Consent Management", "Configure deterministic vs LLM modes")
-            consent_level = "full" if OPENAI_ENABLED else "no_llm"
-            consent = update_consent(client, consent_level)
-            show_consent(consent)
+            console.clear()
+            demo_consent(api)
+            console.clear()
+            demo_wrong_format(api)
+            console.clear()
+            email = demo_questionnaire(api)
+            console.clear()
+            zip_id = demo_zip_upload(api)
+            console.clear()
+            result = demo_analysis(api, zip_id)
+            console.clear()
+            demo_summaries(api, email)
+            console.clear()
+            demo_resume(api)
+            console.clear()
+            demo_ranking(api, result)
+            console.clear()
+            timeline = demo_timeline(api)
+            console.clear()
+            demo_skills(api)
+            console.clear()
+            demo_delete(api, timeline)
 
-            section("Questionnaire", "Load prompts and submit configuration")
-            questions = fetch_questions(client)
-            show_questions(questions)
-            answer_payload = build_answers(USER_EMAIL)
-            saved_answers = submit_answers(client, answer_payload)
-            show_answers(saved_answers)
-
-            section("ZIP Upload & Directory Listing")
-            upload_result = upload_zip(client, ZIP_FILE_PATH)
-            console.print(
-                Panel(
-                    f"[bold]Uploaded:[/bold] {upload_result['filename']}\n"
-                    f"[bold]zip_id:[/bold] {upload_result['zip_id']}",
-                    border_style="green",
-                    title="Upload Complete",
-                )
-            )
-            directories = list_directories(client, upload_result["zip_id"])
-            show_directories_listing(directories)
-
-            section("OpenAI Helper", "Demonstrate prompt/response flow")
-            if OPENAI_ENABLED:
-                try:
-                    openai_response = call_openai(client, DEMO_PROMPT)
-                    show_openai_response(openai_response)
-                except httpx.HTTPStatusError as exc:
-                    console.print(
-                        Panel(
-                            f"OpenAI helper failed ({exc.response.status_code}). "
-                            "Double-check your OPENAI_API_KEY and rerun the demo.",
-                            border_style="red",
-                            title="OpenAI Error",
-                        )
-                    )
-            else:
-                show_openai_placeholder()
-
-            section("Full Analysis Pipeline", "POST /analyze/{zip_id}")
-            analysis_result = run_analysis(client, upload_result["zip_id"])
-            show_analysis_result(analysis_result)
-
-            section("Summaries & Resume Builder")
-            summaries = fetch_summaries(client, USER_EMAIL)
-            show_summaries(summaries)
-            resume_items = fetch_resume_items(client)
-            show_resume_items(resume_items)
-
-            section("Skill Chronology", "GET /skills/chronology")
-            skills = fetch_skill_chronology(client)
-            show_skill_chronology(skills)
-
-            section("Project Timeline & Lifecycle")
-            timeline = fetch_project_timeline(client)
-            show_project_timeline(timeline)
-
-            project_to_delete = next((item for item in timeline if item.get("id")), None)
-            if project_to_delete:
-                delete_info = delete_project(client, project_to_delete["id"])
-                show_delete_result(delete_info)
-                updated_timeline = fetch_project_timeline(client)
-                show_project_timeline(
-                    updated_timeline,
-                    title="Project Timeline (after delete)",
-                )
-            else:
-                console.print(
-                    Panel(
-                        "[dim]No projects available to delete yet.[/dim]",
-                        border_style="yellow",
-                    )
-                )
-
-        console.print()
-        console.print(
-            Panel(
-                Align.center("[bold green]✨ Demo complete across the end-to-end API ✨[/bold green]"),
-                border_style="green",
-            )
-        )
+        console.clear()
+        show_final_scorecard()
+        wait_for_enter()
+        console.print("\n[bold green]Demo Complete![/bold green]\n")
         return 0
-    except httpx.HTTPError as exc:
-        exit_with_error(f"HTTP error: {exc}")
-    except Exception as exc:  # pylint: disable=broad-except
-        exit_with_error(f"Unexpected error: {exc}")
-    return 1
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Interrupted[/yellow]")
+        return 0
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+        return 1
 
 
 if __name__ == "__main__":
