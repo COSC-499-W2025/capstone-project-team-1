@@ -7,6 +7,9 @@ import shutil
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
+from artifactminer.api.analyze import extract_zip_to_persistent_location
+from artifactminer.directorycrawler import directory_walk
+
 from .schemas import ZipUploadResponse, DirectoriesResponse
 from ..db import UploadedZip, get_db
 
@@ -52,17 +55,18 @@ async def get_directories(
     uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
     if not uploaded_zip:
         raise HTTPException(status_code=404, detail="ZIP file not found.")
+    extraction_path = extract_zip_to_persistent_location(uploaded_zip.path, zip_id) #extract the zip file.
+    directory_walk.CURRENTPATH = extraction_path #set path to crawler
+    file_dict, dir_list = directory_walk.crawl_directory() 
+    file_value_list = []
+    for filePath in file_dict.values():
+        path = filePath[1] #get the file path, not name (even though its stored)
+        file_value_list.append(path)
 
-    mock_directories = [
-        "cs320_project/",
-        "cs540_ai_project/",
-        "hackathon_2024/",
-        "personal_website/",
-        "senior_design/",
-    ]
 
     return DirectoriesResponse(
         zip_id=uploaded_zip.id,
         filename=uploaded_zip.filename,
-        directories=mock_directories,
+        directories=dir_list,
+        cleanedfilespath=file_value_list
     )
