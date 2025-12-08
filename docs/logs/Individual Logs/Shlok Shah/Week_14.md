@@ -7,6 +7,7 @@
 - Implemented a few non-trivial tests on the `/answers` endpoint to handle edge cases
 - Reviewed and provided feedback on PRs
 - Took notes of other team's work and what we can borrow/ get inspired by during their demos
+- I also drafted the team contract
 
 ### What's next:
 
