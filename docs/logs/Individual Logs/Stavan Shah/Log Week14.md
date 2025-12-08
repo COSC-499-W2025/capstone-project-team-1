@@ -6,8 +6,6 @@
 
 * Defined all 20 requirements with detailed `how` fields explaining the implementation (e.g., "PUT /consent endpoint with 3-tier levels: full, no_llm, none").
 
-* Added helper functions `get_requirement()` and `get_requirements_by_section()` for easy lookup, plus a `demonstrated_requirements` set to track which requirements have been shown during the demo.
-
 * Fixed ZIP upload to return HTTP 422 instead of 400 for invalid file formats.
 
 * This is PR 1/3 for the demo refactor - next PRs will add theme-styling and main-runner.
