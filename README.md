@@ -51,7 +51,6 @@ flowchart TB
     FastAPI --> SQLite
 ```
 
-**System Architecture diagram:**
 
 This diagram outlines the proposed structure. It illustrates the core components and how it interacts to transform the users data into a resume.
 
