@@ -1,3 +1,34 @@
+from contextlib import contextmanager
+
+from artifactminer.db import Question, UserAnswer, get_db
+
+
+def _valid_answers_payload(**overrides):
+    """Return a canonical answers payload with overrides applied."""
+    answers = {
+        "email": "test@example.com",
+        "artifacts_focus": "Focus on Python files",
+        "end_goal": "Analyze code quality",
+        "repository_priority": "Git repository",
+        "file_patterns_include": "*.py,*.js",
+        "file_patterns_exclude": "*.log,*.tmp",
+    }
+    answers.update(overrides)
+    return {"answers": answers}
+
+
+@contextmanager
+def _db_session(client):
+    """Yield the current test DB session from the FastAPI dependency override."""
+    override = client.app.dependency_overrides[get_db]
+    generator = override()
+    db = next(generator)
+    try:
+        yield db
+    finally:
+        generator.close()
+
+
 def test_get_questions_returns_list(client):
     response = client.get("/questions")
 
@@ -34,16 +65,7 @@ def test_questions_are_ordered(client):
 
 def test_submit_answers_success(client):
     """Test successful answer submission with valid email."""
-    answers_payload = {
-        "answers": {
-            "email": "test@example.com",
-            "artifacts_focus": "Focus on Python files",
-            "end_goal": "Analyze code quality",
-            "repository_priority": "Git repository",
-            "file_patterns_include": "*.py,*.js",
-            "file_patterns_exclude": "*.log,*.tmp",
-        }
-    }
+    answers_payload = _valid_answers_payload()
 
     response = client.post("/answers", json=answers_payload)
     assert response.status_code == 200
@@ -145,16 +167,84 @@ def test_submit_answers_invalid_comma_separated(client):
 
 def test_submit_answers_empty_comma_separated_allowed(client):
     """Test that empty comma-separated fields are allowed (required=False)."""
-    answers_payload = {
-        "answers": {
-            "email": "test@example.com",
-            "artifacts_focus": "Focus on files",
-            "end_goal": "Analyze code",
-            "repository_priority": "Git",
-            "file_patterns_include": "",  # Empty is allowed
-            "file_patterns_exclude": "",  # Empty is allowed
-        }
-    }
+    answers_payload = _valid_answers_payload(
+        file_patterns_include="",
+        file_patterns_exclude="",
+        artifacts_focus="Focus on files",
+        end_goal="Analyze code",
+        repository_priority="Git",
+    )
 
     response = client.post("/answers", json=answers_payload)
     assert response.status_code == 200
+
+
+def test_submit_answers_upsert_updates_existing_entries(client):
+    """Ensure posting twice updates existing answers instead of duplicating rows."""
+    initial_payload = _valid_answers_payload()
+    response = client.post("/answers", json=initial_payload)
+    assert response.status_code == 200
+
+    with _db_session(client) as db:
+        total_before = db.query(UserAnswer).count()
+        focus_question = (
+            db.query(Question).filter(Question.key == "artifacts_focus").one()
+        )
+        focus_question_id = focus_question.id
+        focus_answer_before = (
+            db.query(UserAnswer)
+            .filter(UserAnswer.question_id == focus_question_id)
+            .one()
+        )
+
+    updated_payload = _valid_answers_payload(
+        artifacts_focus="Emphasize architecture review documents"
+    )
+    response = client.post("/answers", json=updated_payload)
+    assert response.status_code == 200
+
+    with _db_session(client) as db:
+        total_after = db.query(UserAnswer).count()
+        focus_answer_after = (
+            db.query(UserAnswer)
+            .filter(UserAnswer.question_id == focus_question_id)
+            .one()
+        )
+
+    assert total_after == total_before
+    assert (
+        focus_answer_after.answer_text
+        == "Emphasize architecture review documents"
+    )
+    assert focus_answer_after.answered_at != focus_answer_before.answered_at
+
+
+def test_submit_answers_rejects_unknown_keys(client):
+    """Unknown question keys should raise a validation error."""
+    payload = _valid_answers_payload()
+    payload["answers"]["unexpected_field"] = "extra data"
+
+    response = client.post("/answers", json=payload)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid field provided."
+
+
+def test_submit_answers_missing_required_field_is_rejected(client):
+    """Omitting a required field entirely should fail validation."""
+    payload = _valid_answers_payload()
+    payload["answers"].pop("email")
+
+    response = client.post("/answers", json=payload)
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Please fill in all required fields."
+
+
+def test_submit_answers_optional_fields_can_be_omitted(client):
+    """Optional comma-separated questions can be left out entirely."""
+    payload = _valid_answers_payload()
+    payload["answers"].pop("file_patterns_include")
+    payload["answers"].pop("file_patterns_exclude")
+
+    response = client.post("/answers", json=payload)
+    assert response.status_code == 200
+    assert len(response.json()) == len(payload["answers"])
