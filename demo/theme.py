@@ -1,15 +1,5 @@
 """Theme constants and styling for the demo."""
 
-# Color palette
-THEME = {
-    "primary": "cyan",
-    "secondary": "magenta",
-    "success": "green",
-    "warning": "yellow",
-    "error": "red",
-    "muted": "dim white",
-}
-
 # ASCII banner
 BANNER_ART = r"""
     _         _   _  __            _     __  __ _                 

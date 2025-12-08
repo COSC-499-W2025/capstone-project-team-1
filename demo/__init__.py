@@ -7,7 +7,7 @@ from demo.requirements import (
     get_requirement,
     get_requirements_by_section,
 )
-from demo.theme import THEME, BANNER_ART, TEAM_INFO, NAV_HINTS, STATUS_ICONS
+from demo.theme import BANNER_ART, TEAM_INFO, NAV_HINTS, STATUS_ICONS
 from demo.components import (
     console,
     truncate,
@@ -28,7 +28,6 @@ __all__ = [
     "get_requirement",
     "get_requirements_by_section",
     # Theme
-    "THEME",
     "BANNER_ART",
     "TEAM_INFO",
     "NAV_HINTS",

@@ -13,7 +13,7 @@ from rich.text import Text
 from rich.tree import Tree
 
 from demo.requirements import REQUIREMENTS, demonstrated_requirements
-from demo.theme import THEME, BANNER_ART, TEAM_INFO, STATUS_ICONS
+from demo.theme import BANNER_ART, TEAM_INFO, STATUS_ICONS
 
 console = Console()
 
