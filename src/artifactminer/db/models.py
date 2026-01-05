@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
+
+from artifactminer.helpers.time import utcnow
 from .database import Base
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
@@ -10,7 +12,7 @@ class Artifact(Base):#basic model for artifacts, this will be used to store arti
     name = Column(String)#name of the artifact
     path = Column(String, unique=True)#file system path to the artifact
     type = Column(String)#type of the artifact like file or directory
-    scanned_at = Column(DateTime, default=datetime.utcnow) #timestamp when the artifact was scanned
+    scanned_at = Column(DateTime, default=utcnow) #timestamp when the artifact was scanned
 
 class Question(Base):
     __tablename__ = "questions"
@@ -22,7 +24,7 @@ class Question(Base):
     question_text = Column(String, nullable=False)
     order = Column(Integer, default=0)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     # Basic validation/UX metadata
     required = Column(Boolean, default=True)
     answer_type = Column(String, default="text")  # e.g., "text", "email", "choice"
@@ -51,7 +53,7 @@ class RepoStat(Base):#model for storing repository statistics
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     frameworks = Column(JSON, nullable=True)
     collaboration_metadata = Column(JSON, nullable=True)
     ranking_score = Column(Float, nullable=True)
@@ -77,7 +79,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     total_commits = Column(Integer, nullable=True)
     userStatspercentages = Column(Float, nullable=True) # Percentage of user's contributions compared to total repo activity
     commitFrequency = Column(Float, nullable=True) # Average number of commits per week by the user
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     activity_breakdown = Column(JSON, nullable=True)
 
 class UserAIntelligenceSummary(Base):
@@ -87,7 +89,7 @@ class UserAIntelligenceSummary(Base):
     repo_path = Column(String, nullable=False)
     user_email = Column(String, nullable=False)
     summary_text = Column(Text, nullable=False)
-    generated_at = Column(DateTime, default=datetime.utcnow)
+    generated_at = Column(DateTime, default=utcnow)
 
 class UserAnswer(Base):
     """Store user responses to configuration questions.
@@ -112,7 +114,7 @@ class UserAnswer(Base):
     id = Column(Integer, primary_key=True, index=True)
     question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
     answer_text = Column(Text, nullable=False)
-    answered_at = Column(DateTime, default=datetime.utcnow)
+    answered_at = Column(DateTime, default=utcnow)
 
     # Relationship to question
     question = relationship("Question", back_populates="answers")
@@ -136,7 +138,7 @@ class UploadedZip(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)  # Original filename
     path = Column(String, nullable=False)  # Server filesystem path
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    uploaded_at = Column(DateTime, default=utcnow)
     extraction_path = Column(String, nullable=True)
 
 
@@ -146,7 +148,7 @@ class Skill(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     category = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationships
     project_skills = relationship("ProjectSkill", back_populates="skill", cascade="all, delete-orphan")
@@ -165,7 +167,7 @@ class ProjectSkill(Base):
     weight = Column(Float, nullable=True)
     proficiency = Column(Float, nullable=True)
     evidence = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationships
     repo_stat = relationship("RepoStat", back_populates="project_skills")
@@ -186,7 +188,7 @@ class UserProjectSkill(Base):
     user_email = Column(String, nullable=False)
     proficiency = Column(Float, nullable=True)
     evidence = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationships
     repo_stat = relationship("RepoStat", back_populates="user_project_skills")
@@ -201,7 +203,7 @@ class ResumeItem(Base):
     content = Column(Text, nullable=False)
     category = Column(String, nullable=True)
     repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
 
     # Relationships
     repo_stat = relationship("RepoStat", back_populates="resume_items")
@@ -214,5 +216,5 @@ class Export(Base):
     export_type = Column(String, nullable=False)
     path = Column(String, nullable=False)
     status = Column(String, default="pending")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)

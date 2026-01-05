@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from .models import Question, RepoStat
+from ..helpers.time import utcnow
 
 
 def seed_questions(db: Session) -> None:
@@ -78,7 +79,7 @@ def seed_repo_stats(db: Session) -> None:
     if existing_count > 0:
         return
 
-    now = datetime.utcnow()
+    now = utcnow()
 
     sample_stats = [
         RepoStat(

@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..helpers.time import utcnow
 
 class HealthStatus(BaseModel):
     """Response shape for service health and readiness checks."""
@@ -13,7 +14,7 @@ class HealthStatus(BaseModel):
         default="ok", description="Overall service health indicator."
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description="UTC timestamp when the status was generated.",
     )
 
