@@ -134,6 +134,39 @@ def discover_git_repos(base_path: Path) -> List[Path]:
     return git_repos
 
 
+def discover_git_repos_from_multiple_paths(base_paths: List[Path]) -> List[Path]:
+    """
+    Discover git repositories across multiple extraction paths.
+    
+    Used for incremental portfolio uploads where multiple ZIPs contribute
+    to the same portfolio. Deduplicates repositories by name to avoid
+    analyzing the same project twice.
+
+    Args:
+        base_paths: List of extraction directories to search
+
+    Returns:
+        List of unique paths to git repositories
+    """
+    all_repos = []
+    seen_repo_names = set()
+    
+    for base_path in base_paths:
+        if not base_path.exists():
+            print(f"[analyze] Skipping non-existent path: {base_path}")
+            continue
+            
+        repos = discover_git_repos(base_path)
+        for repo in repos:
+            if repo.name not in seen_repo_names:
+                all_repos.append(repo)
+                seen_repo_names.add(repo.name)
+            else:
+                print(f"[analyze] Skipping duplicate repo: {repo.name}")
+    
+    return all_repos
+
+
 def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
     """
     Extract ZIP file to a persistent location for later access.
