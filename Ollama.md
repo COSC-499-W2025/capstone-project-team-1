@@ -13,22 +13,13 @@
 
 ### Step 3: Install the LLM
 - After installing Ollama, you need to install the Llama3 model. This can typically be done by running the following command in your terminal:
-    ```bash
-    python ollama.py install llama3
-    ```
+    ```ollama pull llama3```
+* It is required for you to have at least 8gb of RAM, and recommended to have a dedicated GPU
 
 ### Step 4: Start Ollama
-- Once installed, you can start Ollama by launching the application from your applications menu or command line.
-
-### Step 5: Access Ollama
-- Open your web browser and navigate to `http://localhost:8080` to access the Ollama interface.
-
-### Step 6: Using Ollama
-- You can now interact with Ollama through the web interface, similar to how you would use ChatGPT.
+- Once installed, you can start Ollama by launching the application from your applications menu or command line using
+```ollama run llama3```
 
 ### Additional Resources
 - For more detailed instructions and advanced configurations, refer to the [Ollama documentation](https://ollama.com/docs).
 - Join the community on [Discord](https://discord.gg/ollama) for support and discussions.
-
-### Conclusion
-You are now ready to use Ollama as an alternative to ChatGPT!
