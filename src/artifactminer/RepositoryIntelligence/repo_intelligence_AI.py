@@ -13,12 +13,23 @@ def getUserLLMSelection() -> str:
     db = SessionLocal() #create a new database session
     try:
         consent = db.get(Consent, 1)
-        if consent is None: #no consent row means no consent given
+        if consent is None: #no consent row means default to ollama
             consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
+        return consent.LLM_model if consent and consent.LLM_model else "chatGPT"#return user's LLM selection or default to "chatGPT"
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+                
+def setUserLLMSelection(model: str):
+    db = SessionLocal()
+    try:
+        consent = db.get(Consent, 1)
         if consent:
-            return consent.consent_level or "none"
+            consent.LLM_model = model
         else:
-            return "none"
+            consent = Consent(id=1, consent_level="none", LLM_model=model)
+        db.merge(consent)   # merge = insert or update
+        db.commit()
     finally:
         db.close()
 
@@ -127,7 +138,7 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
 
         intermediate_summary += getLLMResponse(prompt)
 
-    final_summary = getLLMResponse(
+    final_summary = "LLM model used: " + getUserLLMSelection() + "\n\n" + getLLMResponse(
     "Create a polished, portfolio-ready summary of this student's overall code contributions. "
     "Only highlight strengths, technical skills, and positive impact. "
     "Do not mention weaknesses, issues, inconsistencies, or anything negative. "
