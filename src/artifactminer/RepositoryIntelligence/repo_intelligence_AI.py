@@ -6,7 +6,27 @@ from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.helpers.openai import get_gpt5_nano_response
+from artifactminer.helpers.ollama import get_ollama_response
 
+
+def getUserLLMSelection() -> str:
+    db = SessionLocal() #create a new database session
+    try:
+        consent = db.get(Consent, 1)
+        if consent is None: #no consent row means no consent given
+            consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
+        if consent:
+            return consent.consent_level or "none"
+        else:
+            return "none"
+    finally:
+        db.close()
+
+def getLLMResponse(prompt: str) -> str:
+    if getUserLLMSelection() == "chatGPT":
+        return get_gpt5_nano_response(prompt)
+    else:
+        return get_ollama_response(prompt)
 
 # Check if user has allowed LLM usage via consent
 def user_allows_llm() -> bool:
@@ -104,8 +124,10 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
         )
 
         prompt += f"{addition}\n\n"
-        intermediate_summary += get_gpt5_nano_response(prompt)
-    final_summary = get_gpt5_nano_response(
+
+        intermediate_summary += getLLMResponse(prompt)
+
+    final_summary = getLLMResponse(
     "Create a polished, portfolio-ready summary of this student's overall code contributions. "
     "Only highlight strengths, technical skills, and positive impact. "
     "Do not mention weaknesses, issues, inconsistencies, or anything negative. "
