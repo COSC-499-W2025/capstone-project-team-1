@@ -26,9 +26,10 @@ async def get_crawler_contents(zip_id: int, db: Session = Depends(get_db)) -> Cr
     
     directory_walk.CURRENTPATH = extraction_path #set path to crawler
     filedict = directory_walk.crawl_directory() #crawl and get dictionary of file names
+
     file_value_list = [
     FileValues(file_path=v[1], file_name=v[0])
-    for v in filedict.values()
+    for v in filedict[0].values()
     ]
         
     return CrawlerFiles(zip_id=zip_id, 
