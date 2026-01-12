@@ -43,7 +43,7 @@ def crawl_directory() -> tuple[dict, list[str]]:
     listforalldirs = []
     if os.path.exists(CURRENTPATH) == False:
         print("path does not exist")
-        return
+        return {}, []
 
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         for single_directory in dirs:
