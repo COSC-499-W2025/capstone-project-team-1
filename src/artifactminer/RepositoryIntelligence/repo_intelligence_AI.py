@@ -9,7 +9,7 @@ from artifactminer.helpers.openai import get_gpt5_nano_response
 from artifactminer.helpers.ollama import get_ollama_response
 
 
-def getUserLLMSelection() -> str:
+def get_user_llm_selection() -> str:
     db = SessionLocal() #create a new database session
     try:
         consent = db.get(Consent, 1)
@@ -18,9 +18,9 @@ def getUserLLMSelection() -> str:
         return consent.LLM_model if consent and consent.LLM_model else "chatGPT"#return user's LLM selection or default to "chatGPT"
     except Exception as e:
         print(f"An error occurred: {e}")
-        return None
+        return "chatGPT"
                 
-def setUserLLMSelection(model: str):
+def set_user_llm_selection(model: str):
     db = SessionLocal()
     try:
         consent = db.get(Consent, 1)
@@ -34,7 +34,7 @@ def setUserLLMSelection(model: str):
         db.close()
 
 def getLLMResponse(prompt: str) -> str:
-    if getUserLLMSelection() == "chatGPT":
+    if get_user_llm_selection() == "chatGPT":
         return get_gpt5_nano_response(prompt)
     else:
         return get_ollama_response(prompt)
@@ -138,7 +138,7 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
 
         intermediate_summary += getLLMResponse(prompt)
 
-    final_summary = "LLM model used: " + getUserLLMSelection() + "\n\n" + getLLMResponse(
+    final_summary = "LLM model used: " + get_user_llm_selection() + "\n\n" + getLLMResponse(
     "Create a polished, portfolio-ready summary of this student's overall code contributions. "
     "Only highlight strengths, technical skills, and positive impact. "
     "Do not mention weaknesses, issues, inconsistencies, or anything negative. "
