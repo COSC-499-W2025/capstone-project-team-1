@@ -9,7 +9,7 @@ from datetime import datetime
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createAIsummaryFromUserAdditions, group_additions_into_blocks, set_user_consent, setUserLLMSelection
+from src.artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createAIsummaryFromUserAdditions, group_additions_into_blocks, set_user_consent, set_user_llm_selection
 from src.artifactminer.RepositoryIntelligence.repo_intelligence_user import collect_user_additions
 from src.artifactminer.db.database import SessionLocal
 from src.artifactminer.db.models import Consent
@@ -52,7 +52,7 @@ def test_user_allows_llm_false():
     assert user_allows_llm() is False
 
 def test_create_AI_summary_example():
-    setUserLLMSelection("ollama")
+    set_user_llm_selection("ollama")
     set_user_consent("full")  # Ensure consent is given for LLM usage
     additions = [
         "Fixed bug in user authentication module.",
@@ -65,7 +65,7 @@ def test_create_AI_summary_example():
 
 
 def test_user_additions_collection():
-    setUserLLMSelection("ollama")
+    set_user_llm_selection("ollama")
     set_user_consent("full")  # Ensure consent is given for LLM usage
     root = Path(__file__).resolve().parents[2]
     # Replace with a valid email present in the commit history of the repo
