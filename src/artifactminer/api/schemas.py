@@ -246,3 +246,14 @@ class CrawlerFiles(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     zip_id : int
     crawl_path_and_file_name : list[FileValues]
+
+
+class RepresentationPreferences(BaseModel):
+    """User preferences for portfolio representation."""
+
+    showcase_project_ids: list[str] = Field(
+        default_factory=list, description="Project IDs to showcase."
+    )
+    project_order: list[str] = Field(
+        default_factory=list, description="Manual project ordering override."
+    )

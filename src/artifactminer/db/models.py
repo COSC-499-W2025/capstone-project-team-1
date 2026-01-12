@@ -1,8 +1,6 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
-from datetime import datetime
-
-from artifactminer.helpers.time import utcnow
+from datetime import datetime, UTC
 from .database import Base
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
@@ -38,6 +36,7 @@ class Consent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     consent_level = Column(String, default="none", nullable=False) # e.g., "none", "full"
+    LLM_model = Column(String, default="chatGPT", nullable=False) # e.g., "ollama", "chatGPT"
     accepted_at = Column(DateTime, nullable=True)
 
 class RepoStat(Base):#model for storing repository statistics
@@ -218,3 +217,15 @@ class Export(Base):
     status = Column(String, default="pending")
     created_at = Column(DateTime, default=utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+
+class RepresentationPrefs(Base):
+    """Stores representation preferences per portfolio."""
+
+    __tablename__ = "representation_prefs"
+
+    portfolio_id = Column(String, primary_key=True)
+    prefs_json = Column(Text, nullable=False, default="{}")
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
