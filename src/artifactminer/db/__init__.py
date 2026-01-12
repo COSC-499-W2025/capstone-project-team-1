@@ -13,6 +13,7 @@ from .models import (
     UserProjectSkill,
     ResumeItem,
     UserAIntelligenceSummary,
+    RepresentationPrefs,
 )
 from .seed import seed_questions, seed_repo_stats
 
@@ -32,6 +33,7 @@ __all__ = [
     "UserProjectSkill",
     "ResumeItem",
     "UserAIntelligenceSummary",
+    "RepresentationPrefs",
     "seed_questions",
     "seed_repo_stats",
 ]

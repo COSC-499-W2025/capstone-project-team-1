@@ -215,3 +215,13 @@ class Export(Base):
     status = Column(String, default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+
+class RepresentationPrefs(Base):
+    """Stores representation preferences per portfolio."""
+
+    __tablename__ = "representation_prefs"
+
+    portfolio_id = Column(String, primary_key=True)
+    prefs_json = Column(Text, nullable=False, default="{}")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
