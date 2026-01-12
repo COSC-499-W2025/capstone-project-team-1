@@ -39,6 +39,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     saveUserRepoStats,
 )
 from .retrieval import router as retrieval_router
+from .views import router as views_router
 
 
 def create_app() -> FastAPI:
@@ -198,6 +199,7 @@ def create_app() -> FastAPI:
     app.include_router(retrieval_router)
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
+    app.include_router(views_router)
     return app
 
 

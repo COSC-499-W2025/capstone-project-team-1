@@ -6,92 +6,38 @@ from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.helpers.openai import get_gpt5_nano_response
+from artifactminer.helpers.ollama import get_ollama_response
 
 
-
-
-
-
-# Check if user has allowed LLM usage via consent
-def user_allows_llm() -> bool:
+def get_user_llm_selection() -> str:
     db = SessionLocal() #create a new database session
     try:
         consent = db.get(Consent, 1)
-        if consent is None: #no consent row means no consent given
+        if consent is None: #no consent row means default to ollama
             consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
-        return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
+        return consent.LLM_model if consent and consent.LLM_model else "chatGPT"#return user's LLM selection or default to "chatGPT"
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return "chatGPT"
+                
+def set_user_llm_selection(model: str):
+    db = SessionLocal()
+    try:
+        consent = db.get(Consent, 1)
+        if consent:
+            consent.LLM_model = model
+        else:
+            consent = Consent(id=1, consent_level="none", LLM_model=model)
+        db.merge(consent)   # merge = insert or update
+        db.commit()
     finally:
         db.close()
 
-# Create a summary of user additions using LLM
-def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
-    #Each addition in additions is a string of added lines from a single commit
-    if not additions:
-        return "No additions found for the specified user."
-    if not user_allows_llm():
-        return "User has not consented to LLM usage."
-    intermediate_summary = ""
-    #A for loop that goes through every addition and asks the AI to summarize it, then combines all summaries into one final summary, and asks the AI to summarize that final summary.
-    for addition in additions:
-        prompt = (
-        "You are evaluating a student's code contribution from a single commit."
-        "Analyze the added lines below and produce a focused, evidence-based critique."
-
-        "For this commit, cover:"
-        "- Functional intent: what changed and why it likely matters"
-        "- CS concepts observed: OOP (abstraction/encapsulation/inheritance/polymorphism), data structures, algorithms"
-        "- Complexity/performance notes: any Big-O implications, memory or latency tradeoffs"
-        "- Software engineering practices: modularity, testing, error handling, naming, logging, docs"
-        "- Risks/edge cases/security: call out anything suspicious or fragile"
-
-        "Constraints:"
-        "- Be concise: 4–6 bullets. No fluff, no speculation beyond the diff."
-        "- Don’t restate the code—explain what it implies about skill and decisions."
-
-        "ADDED LINES (unified diff subset, additions only):"
-        )
-        prompt += f"{addition}\n\n"
-        intermediate_summary += get_gpt5_nano_response(prompt)
-    final_summary = get_gpt5_nano_response(
-        "Summarize the following summaries of code additions made by the user in the repository into a single concise summary:\n\n"
-        + intermediate_summary)
-    return final_summary
-
-
-# Create a summary of user additions using LLM if consented and without LLM if not
-def createSummaryFromUserAdditions(additions: List[str]) -> str:
-    summary: str
-    if not additions:
-        return "No additions found for the specified user."
-    if not user_allows_llm():
-        #User has not consented to LLM usage we will create a summary without LLM, placeholder for now
-        summary = "User has not consented to LLM usage. Summary generation without LLM is not yet implemented."
+def getLLMResponse(prompt: str) -> str:
+    if get_user_llm_selection() == "chatGPT":
+        return get_gpt5_nano_response(prompt)
     else:
-        #User has consented to LLM usage we will create a summary with LLM
-        summary = createAIsummaryFromUserAdditions(additions)
-    return summary
-
-
-def saveUserIntelligenceSummary(repo_path: str, user_email: str, summary_text: str):
-    db = SessionLocal()
-    try:
-        user_summary = UserAIntelligenceSummary(
-            repo_path=repo_path,
-            user_email=user_email,
-            summary_text=summary_text,
-        )
-        db.add(user_summary)
-        db.commit()
-        db.refresh(user_summary)
-    finally:
-        db.close()#Part of the Repository Intelligence Module
-#Owner: Evan/van-cpu
-
-
-
-
-
-
+        return get_ollama_response(prompt)
 
 # Check if user has allowed LLM usage via consent
 def user_allows_llm() -> bool:
@@ -189,8 +135,10 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
         )
 
         prompt += f"{addition}\n\n"
-        intermediate_summary += get_gpt5_nano_response(prompt)
-    final_summary = get_gpt5_nano_response(
+
+        intermediate_summary += getLLMResponse(prompt)
+
+    final_summary = "LLM model used: " + get_user_llm_selection() + "\n\n" + getLLMResponse(
     "Create a polished, portfolio-ready summary of this student's overall code contributions. "
     "Only highlight strengths, technical skills, and positive impact. "
     "Do not mention weaknesses, issues, inconsistencies, or anything negative. "

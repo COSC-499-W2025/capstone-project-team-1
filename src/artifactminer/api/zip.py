@@ -3,14 +3,20 @@
 from datetime import datetime
 from pathlib import Path
 import shutil
+import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from artifactminer.api.analyze import extract_zip_to_persistent_location
 from artifactminer.directorycrawler import directory_walk
 
-from .schemas import ZipUploadResponse, DirectoriesResponse
+from .schemas import (
+    ZipUploadResponse,
+    DirectoriesResponse,
+    PortfolioResponse,
+    PortfolioZipItem,
+)
 from ..db import UploadedZip, get_db
 
 
@@ -22,9 +28,18 @@ router = APIRouter(prefix="/zip", tags=["zip"])
 
 @router.post("/upload", response_model=ZipUploadResponse)
 async def upload_zip(
-    file: UploadFile = File(...), db: Session = Depends(get_db)
+    file: UploadFile = File(...),
+    portfolio_id: str | None = Query(
+        default=None,
+        description="Optional portfolio UUID to link this ZIP to an existing portfolio.",
+    ),
+    db: Session = Depends(get_db),
 ) -> ZipUploadResponse:
-    """Accept a ZIP file upload and track metadata in the database."""
+    """Accept a ZIP file upload and track metadata in the database.
+
+    If portfolio_id is provided, links the ZIP to an existing portfolio.
+    If not provided, generates a new portfolio UUID.
+    """
     if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(status_code=422, detail="Only ZIP files are allowed.")
 
@@ -39,12 +54,52 @@ async def upload_zip(
     with file_path.open("wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    uploaded_zip = UploadedZip(filename=file.filename, path=str(file_path))
+    # Generate new portfolio_id if not provided
+    if portfolio_id is None:
+        portfolio_id = str(uuid.uuid4())
+
+    uploaded_zip = UploadedZip(
+        filename=file.filename,
+        path=str(file_path),
+        portfolio_id=portfolio_id,
+    )
     db.add(uploaded_zip)
     db.commit()
     db.refresh(uploaded_zip)
 
-    return ZipUploadResponse(zip_id=uploaded_zip.id, filename=uploaded_zip.filename)
+    return ZipUploadResponse(
+        zip_id=uploaded_zip.id,
+        filename=uploaded_zip.filename,
+        portfolio_id=uploaded_zip.portfolio_id,
+    )
+
+
+@router.get("/portfolios/{portfolio_id}", response_model=PortfolioResponse)
+async def get_portfolio_zips(
+    portfolio_id: str,
+    db: Session = Depends(get_db),
+) -> PortfolioResponse:
+    """Return all ZIPs linked to a portfolio."""
+    zips = (
+        db.query(UploadedZip)
+        .filter(UploadedZip.portfolio_id == portfolio_id)
+        .all()
+    )
+
+    if not zips:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    return PortfolioResponse(
+        portfolio_id=portfolio_id,
+        zips=[
+            PortfolioZipItem(
+                zip_id=z.id,
+                filename=z.filename,
+                uploaded_at=z.uploaded_at,
+            )
+            for z in zips
+        ],
+    )
 
 
 @router.get("/{zip_id}/directories", response_model=DirectoriesResponse)
@@ -70,3 +125,4 @@ async def get_directories(
         directories=dir_list,
         cleanedfilespath=file_value_list
     )
+

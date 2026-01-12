@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..helpers.time import utcnow
 
 class HealthStatus(BaseModel):
     """Response shape for service health and readiness checks."""
@@ -13,7 +14,7 @@ class HealthStatus(BaseModel):
         default="ok", description="Overall service health indicator."
     )
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=utcnow,
         description="UTC timestamp when the status was generated.",
     )
 
@@ -74,6 +75,24 @@ class ZipUploadResponse(BaseModel):
 
     zip_id: int = Field(description="Unique identifier for the uploaded ZIP file.")
     filename: str = Field(description="Original filename of the uploaded ZIP.")
+    portfolio_id: str = Field(description="UUID linking this ZIP to a portfolio session.")
+
+
+class PortfolioZipItem(BaseModel):
+    """Single ZIP item within a portfolio."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    zip_id: int = Field(description="Unique identifier for the uploaded ZIP file.")
+    filename: str = Field(description="Original filename of the uploaded ZIP.")
+    uploaded_at: datetime = Field(description="Timestamp when the ZIP was uploaded.")
+
+
+class PortfolioResponse(BaseModel):
+    """Response shape for portfolio ZIP listing."""
+
+    portfolio_id: str = Field(description="UUID of the portfolio.")
+    zips: list[PortfolioZipItem] = Field(description="All ZIPs linked to this portfolio.")
 
 
 class DirectoriesResponse(BaseModel):
@@ -245,3 +264,14 @@ class CrawlerFiles(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     zip_id : int
     crawl_path_and_file_name : list[FileValues]
+
+
+class RepresentationPreferences(BaseModel):
+    """User preferences for portfolio representation."""
+
+    showcase_project_ids: list[str] = Field(
+        default_factory=list, description="Project IDs to showcase."
+    )
+    project_order: list[str] = Field(
+        default_factory=list, description="Manual project ordering override."
+    )

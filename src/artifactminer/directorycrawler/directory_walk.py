@@ -43,7 +43,7 @@ def crawl_directory() -> tuple[dict, list[str]]:
     listforalldirs = []
     if os.path.exists(CURRENTPATH) == False:
         print("path does not exist")
-        return
+        return {}, []
 
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         for single_directory in dirs:
@@ -76,6 +76,60 @@ def crawl_directory() -> tuple[dict, list[str]]:
                     
                     store_file_dictionary.add_to_dict(fileId, (file, full_path)) #key = filename, path = filepath
     return store_file_dictionary.get_dict(), listforalldirs
+
+
+def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]]:
+    """
+    Crawl multiple directories and merge the results.
+    
+    Used for incremental portfolio uploads where multiple ZIPs contribute
+    to the same portfolio analysis.
+    
+    Args:
+        paths: List of directory paths to crawl
+        
+    Returns:
+        Tuple of (merged file dict, merged directory list)
+    """
+    merged_dirs = []
+    seen_dirs = set()
+    
+    for path in paths:
+        path = Path(path) if isinstance(path, str) else path
+        if not path.exists():
+            print(f"path does not exist: {path}")
+            continue
+            
+        for (root, dirs, files) in os.walk(path, topdown=True):
+            for single_directory in dirs:
+                if single_directory not in seen_dirs:
+                    merged_dirs.append(single_directory)
+                    seen_dirs.add(single_directory)
+            if files:
+                current_folder = os.path.basename(root)
+                print(f"\n======================= GETTING FILES FROM FOLDER {current_folder} ======================================")
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    if file in userExcludeFileName or get_extension(file) in userExcludeFileExtension:
+                        print("the file the user has excluded: ", file)
+                        continue
+                    if file not in userKeepFileName and get_extension(file) not in userIncludeFileExtension:
+                        if not is_file_readable(full_path):
+                            print("file name: ", file, " is not readable")
+                            continue
+                        if not is_file_ignored(file):
+                            print("file name: ", file, " is ignored")
+                            continue
+                    else:
+                        print("the file the user has included: ", file)
+                    
+                    print_files(file)
+                    isDuplicate, fileId = is_file_duplicate(file, root)
+                    
+                    if not isDuplicate:
+                        store_file_dictionary.add_to_dict(fileId, (file, full_path))
+    
+    return store_file_dictionary.get_dict(), merged_dirs
 
                 
 def is_file_readable(full_path: str) -> bool:

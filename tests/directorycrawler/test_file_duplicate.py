@@ -15,3 +15,4 @@ def test_check_file_duplicate():
     crawl_directory()
     print_values_in_dict()
     assert a.get_dict_len() == 2 # 1 is readme text file, 2 is c file, other c file should be removed!
+

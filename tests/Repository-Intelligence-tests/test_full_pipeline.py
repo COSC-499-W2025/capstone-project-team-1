@@ -2,7 +2,7 @@
 
 import shutil
 import zipfile
-from datetime import datetime
+from artifactminer.helpers.time import utcnow
 from pathlib import Path
 
 from artifactminer.db.database import SessionLocal
@@ -102,7 +102,7 @@ def test_full_pipeline_zip_to_summaries():
 
             if repo_stat:
                 repo_stat.ranking_score = ranked["score"]
-                repo_stat.ranked_at = datetime.utcnow()
+                repo_stat.ranked_at = utcnow()
 
         db.commit()
 
@@ -125,4 +125,3 @@ def test_full_pipeline_zip_to_summaries():
         if extract_dir and extract_dir.exists():
             shutil.rmtree(extract_dir, ignore_errors=True)
         db.close()
-
