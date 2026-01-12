@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, UTC
 from .database import Base
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
@@ -226,4 +226,6 @@ class RepresentationPrefs(Base):
 
     portfolio_id = Column(String, primary_key=True)
     prefs_json = Column(Text, nullable=False, default="{}")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+    )
