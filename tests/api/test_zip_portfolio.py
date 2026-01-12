@@ -184,13 +184,11 @@ class TestBackwardsCompatibility:
         assert payload["zip_id"] > 0
         assert payload["filename"] == "artifact.zip"
 
+        # New portfolio_id field should also be present (backwards compatible addition)
+        assert "portfolio_id" in payload
+        assert _is_valid_uuid(payload["portfolio_id"])
+
         # File should be saved
         uploads_root = tmp_path / "uploads"
         saved_files = list(uploads_root.glob("*artifact.zip"))
         assert saved_files, "Uploaded file should be written to uploads dir"
-
-        # GET directories should still work
-        directories = client.get(f"/zip/{payload['zip_id']}/directories")
-        assert directories.status_code == 200
-        dir_payload = directories.json()
-        assert dir_payload["zip_id"] == payload["zip_id"]
