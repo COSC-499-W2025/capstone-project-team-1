@@ -2,6 +2,8 @@
 #the dictionary will eventually be sent to llm for further analysis
 #TODO use json instead? dictionary should be good for now
 
+from typing import Tuple
+
 class StoreFileDict:
     _instance = None  # Singleton instance
 
@@ -9,6 +11,7 @@ class StoreFileDict:
         if cls._instance is None:
             cls._instance = super(StoreFileDict, cls).__new__(cls)
             cls._instance.file_dict = {}  # Initialize dictionary
+            cls._instance.inodes = [] # Initialize dictionary 2, (a tuple dictionary)
         return cls._instance
 
     def add_to_dict(self, key, value): #add to dictionary
@@ -32,6 +35,16 @@ class StoreFileDict:
     
     def remove_all_dict(self):
         self.file_dict.clear()
+        self.inodes = [] 
+
+    def add_inode(self, value):
+        self.inodes.append(value) 
+
+    def has_inode(self, value):
+        return value in self.inodes
+
+
+    
 
 
 
