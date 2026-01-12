@@ -81,17 +81,17 @@ def is_inode(path: str) -> bool:
     Return (device, inode) tuple for Unix systems.
     """
     if not ENABLE_INODE_CHECK:
-        return False
+        return False #set to true: perform chunking instead. 
 
 
     try:
         stat = os.stat(path) #gets metadata from file.
         ino = (stat.st_dev, stat.st_ino) #1, device id #2 inode number
         if store.has_inode(ino): #a file that we crawled is already pointing the said area in disk, return false
-            return False
+            return True
         else: 
             store.add_inode(ino) 
-            return True       
+            return False  
     
     except OSError:
         return False
@@ -192,7 +192,7 @@ def is_file_duplicate(
 
     #check whether or not our file has metadata? 
     #code will likely not work on windows as its not UNIX/POSIX standard.
-    if inode_key is False: 
+    if inode_key is True: 
         #Optimization: here we are checking the inode before reading file chunks
         #if inodes exist in the same file, its a duplicate file.
        return True, None
