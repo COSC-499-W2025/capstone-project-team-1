@@ -200,10 +200,9 @@ def is_file_duplicate(
     # Hash computation
     else:
         file_hash = compute_file_hash(fullPath, hash_algo)
-
         #hash error.
-    if file_hash is None: 
-        return True, None
+        if file_hash is None: 
+            return True, None
 
 
     # Duplicate lookup
