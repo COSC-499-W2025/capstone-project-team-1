@@ -139,6 +139,7 @@ class UploadedZip(Base):
     path = Column(String, nullable=False)  # Server filesystem path
     uploaded_at = Column(DateTime, default=utcnow)
     extraction_path = Column(String, nullable=True)
+    portfolio_id = Column(String, nullable=True, index=True)  # UUID for linking multiple ZIPs
 
 
 class Skill(Base):
