@@ -142,7 +142,13 @@ def getRepoStats(repo_path: Pathish) -> RepoStats: #This function will get the b
 
     # Get primary language by analyzing file extensions
     language_counter = Counter()
-    for blob in repo.head.commit.tree.traverse(): #traverse all files in the repo
+    if repo.head.is_valid():
+        commit = repo.head.commit
+    else:
+        print("Repository has no commits")
+        raise ValueError("Repository has not commits.")
+    
+    for blob in commit.tree.traverse(): #traverse all files in the repo
         if blob.type == 'blob': #if its a file
             ext = Path(blob.path).suffix.lower() #get the file extension
             if ext: #if it has an extension
