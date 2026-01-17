@@ -81,6 +81,9 @@ artifactminer.db
 # Uploaded files
 uploads/
 
+# Extracted ZIP contents
+.extracted/
+
 # Test fixtures (already packaged in tests/data/mock_projects.zip)
 projects/
 
