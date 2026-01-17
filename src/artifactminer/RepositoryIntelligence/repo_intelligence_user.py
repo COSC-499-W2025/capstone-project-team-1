@@ -104,7 +104,9 @@ def collect_user_additions(
     if not isGitRepo(repo_path):
         raise ValueError(f"The path {repo_path} is not a git repository.")
     # validate email format
-    if not validate_email(user_email):
+    try:
+        validate_email(user_email, check_deliverability=False)
+    except EmailNotValidError:
         raise ValueError(f"The email {user_email} is not valid.")
     
     repo = git.Repo(repo_path)
