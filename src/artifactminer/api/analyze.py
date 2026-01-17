@@ -60,7 +60,7 @@ from ..skills.persistence import (
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
-EXTRACTION_BASE_DIR = Path("./extracted")
+EXTRACTION_BASE_DIR = Path("./.extracted")
 
 
 def get_user_email(db: Session) -> str:
