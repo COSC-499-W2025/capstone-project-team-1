@@ -23,7 +23,7 @@ from datetime import datetime, UTC
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -38,6 +38,7 @@ from .schemas import (
     RepoAnalysisResult,
     RankingResult,
     SummaryResult,
+    AnalyzeRequest,
     AnalyzeResponse,
 )
 from ..RepositoryIntelligence.repo_intelligence_main import (
@@ -117,6 +118,8 @@ def discover_git_repos(base_path: Path) -> List[Path]:
         List of paths to git repositories
     """
     git_repos = []
+    if base_path.is_dir() and isGitRepo(base_path):
+        git_repos.append(base_path)
 
     # Walk through all directories
     for path in base_path.rglob("*"):
@@ -167,6 +170,46 @@ def discover_git_repos_from_multiple_paths(base_paths: List[Path]) -> List[Path]
     return all_repos
 
 
+def resolve_selected_dirs(extraction_path: Path, directories: list[str]) -> list[Path]:
+    """Resolve user-selected directories into valid paths under extraction root."""
+    extraction_root = extraction_path.resolve()
+    base_paths: list[Path] = []
+    seen: set[Path] = set()
+
+    for raw in directories:
+        if not raw:
+            continue
+        name = str(raw).strip()
+        if not name:
+            continue
+
+        raw_path = Path(name)
+        candidate = raw_path if raw_path.is_absolute() else (extraction_root / raw_path)
+        candidate = candidate.resolve()
+
+        if not candidate.is_relative_to(extraction_root):
+            print(f"[analyze] Skipping out-of-root path: {raw}")
+            continue
+
+        if candidate.exists() and candidate.is_dir():
+            if candidate not in seen:
+                base_paths.append(candidate)
+                seen.add(candidate)
+            continue
+
+        # Fallback: match by directory name anywhere in extraction tree.
+        for match in extraction_root.rglob(raw_path.name):
+            if not match.is_dir() or ".git" in match.parts:
+                continue
+            resolved = match.resolve()
+            if resolved in seen or not resolved.is_relative_to(extraction_root):
+                continue
+            base_paths.append(resolved)
+            seen.add(resolved)
+
+    return base_paths
+
+
 def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
     """
     Extract ZIP file to a persistent location for later access.
@@ -214,7 +257,11 @@ def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
     return extraction_dir
 
 @router.post("/{zip_id}", response_model=AnalyzeResponse)
-async def analyze_zip(zip_id: int, db: Session = Depends(get_db)):
+async def analyze_zip(
+    zip_id: int,
+    request: AnalyzeRequest | None = Body(default=None),
+    db: Session = Depends(get_db),
+):
     """
     Master orchestration endpoint: analyze all git repos in an uploaded ZIP.
 
@@ -227,7 +274,7 @@ async def analyze_zip(zip_id: int, db: Session = Depends(get_db)):
 
     **Step 2 - Extraction:**
     - Extract ZIP to persistent location (./extracted/{zip_id}/)
-    - Discover all git repositories within
+    - Discover git repositories within (or within selected directories)
 
     **Step 3 - Analysis Loop (for each repo):**
     - Call Evan's getRepoStats() → save to RepoStat table
@@ -275,8 +322,21 @@ async def analyze_zip(zip_id: int, db: Session = Depends(get_db)):
     # Update the UploadedZip record with extraction path
     uploaded_zip.extraction_path = str(extraction_path)
 
-    # Find all git repositories
-    git_repos = discover_git_repos(extraction_path)
+    # Find all git repositories (optionally scoped by selected directories)
+    if request and request.directories is not None:
+        if not request.directories:
+            raise HTTPException(
+                status_code=400, detail="No directories provided for analysis"
+            )
+        selected_paths = resolve_selected_dirs(extraction_path, request.directories)
+        if not selected_paths:
+            raise HTTPException(
+                status_code=400,
+                detail="No selected directories found in extracted ZIP",
+            )
+        git_repos = discover_git_repos_from_multiple_paths(selected_paths)
+    else:
+        git_repos = discover_git_repos(extraction_path)
 
     if not git_repos:
         raise HTTPException(

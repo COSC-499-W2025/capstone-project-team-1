@@ -242,6 +242,18 @@ class SummaryResult(BaseModel):
     summary: str
 
 
+class AnalyzeRequest(BaseModel):
+    """Optional request payload for scoped analysis."""
+
+    directories: list[str] | None = Field(
+        default=None,
+        description=(
+            "Optional list of directories to scope analysis. "
+            "Paths are relative to the extracted ZIP root."
+        ),
+    )
+
+
 class AnalyzeResponse(BaseModel):
     """Response from the master analyze endpoint."""
 
