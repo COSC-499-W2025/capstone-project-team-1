@@ -9,6 +9,7 @@ from .screens.userconfig import UserConfigScreen
 from .screens.upload import UploadScreen
 from .screens.list_contents import ListContentsScreen
 from .screens.file_browser import FileBrowserScreen
+from .screens.resume import ResumeScreen
 
 
 class ArtifactMinerApp(App):
@@ -191,6 +192,8 @@ class ArtifactMinerApp(App):
     BINDINGS = [("q", "quit", "Quit")]
 
     consent_state: dict | None = None
+    user_email: str | None = None
+    consent_level: str | None = None
 
     async def on_mount(self) -> None:
         try:
@@ -209,6 +212,7 @@ class ArtifactMinerApp(App):
         self.install_screen(ConsentScreen(), "consent")
         self.install_screen(UserConfigScreen(), "userconfig")
         self.install_screen(UploadScreen(), "upload")
+        self.install_screen(ResumeScreen(), "resume")
         self.push_screen("welcome")
 
     def on_resize(self, event) -> None:

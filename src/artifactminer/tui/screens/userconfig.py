@@ -135,6 +135,10 @@ class UserConfigScreen(Screen):
                 )
                 response.raise_for_status()
 
+            # Save user_email to app state for use by ResumeScreen
+            if "email" in keyed_answers:
+                self.app.user_email = keyed_answers["email"]
+
             self.app.switch_screen("upload")
 
         except httpx.HTTPStatusError as e:
