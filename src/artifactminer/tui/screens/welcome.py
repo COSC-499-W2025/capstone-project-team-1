@@ -19,4 +19,4 @@ class WelcomeScreen(Screen[None]):
 
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "begin-btn":
-            self.app.switch_screen("consent")
+            self.app.switch_screen("consent") #when you click button with id begin-btn, you are taken to consent page. 

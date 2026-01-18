@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, UTC
+
+from artifactminer.helpers.time import utcnow
 from .database import Base
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
