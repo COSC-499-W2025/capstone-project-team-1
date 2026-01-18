@@ -191,7 +191,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
         if own_session:
             db.close()
 
-def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
+async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     """
     Summarize the top-ranked repositories for the current user.
 
@@ -260,7 +260,7 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
                 )
                 if additions:
                     grouped = group_additions_into_blocks(additions, max_chars_per_block=1000, max_blocks=1)
-                    ai_summary = createSummaryFromUserAdditions(grouped)
+                    ai_summary = await createSummaryFromUserAdditions(grouped)
                     print("\n AI Summary Generated for", repo.project_name, ":", ai_summary)
                     summary_text += " AI summary: " + ai_summary
             except Exception as e:

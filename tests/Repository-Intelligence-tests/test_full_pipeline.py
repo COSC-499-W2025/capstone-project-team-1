@@ -24,9 +24,11 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
 )
 from artifactminer.helpers.project_ranker import rank_projects
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import set_user_consent
+import pytest
 
 
-def test_full_pipeline_zip_to_summaries():
+@pytest.mark.asyncio
+async def test_full_pipeline_zip_to_summaries():
     """
     Full simulation of:
     ZIP → extract → discover repos → analyze → rank → summarize
@@ -107,7 +109,7 @@ def test_full_pipeline_zip_to_summaries():
         db.commit()
 
         # 8. Generate summaries
-        summaries = generate_summaries_for_ranked(db)
+        summaries = await generate_summaries_for_ranked(db)
 
         # 9. Assert summaries created
         assert len(summaries) > 0
