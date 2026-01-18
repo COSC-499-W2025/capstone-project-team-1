@@ -69,6 +69,12 @@ class UserAnswerResponse(BaseModel):
     answer_text: str
     answered_at: datetime
 
+class UserAnswerCreate(BaseModel):
+    """Response shape for email api request and response"""
+    question_id: int
+    answer_text: str  
+
+
 
 class ZipUploadResponse(BaseModel):
     """Response shape for ZIP file upload."""
@@ -244,7 +250,6 @@ class SummaryResult(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     """Response from the master analyze endpoint."""
-
     zip_id: int
     extraction_path: str
     repos_found: int
@@ -254,6 +259,8 @@ class AnalyzeResponse(BaseModel):
     consent_level: str
     user_email: str
 
+class SummaryResponse(BaseModel):
+    summaries: list[SummaryResult]
 
 class FileValues(BaseModel):
     file_path : str
