@@ -42,3 +42,35 @@ def client():
     
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(scope="function")
+def db_session():
+
+
+    """
+    This code creates a mock database for testing functions that require a database
+    """
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    # seed initial data
+    db = TestingSessionLocal()
+    try:
+        seed_questions(db)
+        seed_repo_stats(db)
+    finally:
+        db.close()
+    
+    session = TestingSessionLocal()
+    yield session
+    
+    session.close()
+    Base.metadata.drop_all(bind=engine)

@@ -71,8 +71,7 @@ class UserAnswerResponse(BaseModel):
 
 class UserAnswerCreate(BaseModel):
     """Response shape for email api request and response"""
-    question_id: int
-    answer_text: str  
+    email: str  
 
 
 

@@ -44,35 +44,48 @@ async def get_user_info(
 from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 @router.post(
-    "/useranswer",
+    "/postanswer/{zip_id}",
     response_model=UserAnswerResponse,
     tags=["user_info"],
 )
 async def create_user_answer(
-    payload: UserAnswerCreate,
+    email_payload : UserAnswerCreate,
     db: Session = Depends(get_db),
 ):
-    # Optional: validate question exists
-    question = db.query(Question).filter(Question.id == payload.question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-
-    ua = UserAnswer(
-        question_id=payload.question_id,
-        answer_text=payload.answer_text.strip(),
-    )
-
-    
-
-    db.add(ua)
-    db.commit()
-    db.refresh(ua)
+    answer = user_email_to_db(db, email_payload.email)
 
     response = UserAnswerResponse(
-    id=payload.question_id,
-    question_id=payload.question_id,
-    answer_text=payload.answer_text,
-    answered_at=datetime.utcnow,
-    )
+        id = answer.id,
+        question_id= answer.question_id,
+        answer_text= answer.answer_text,
+        answered_at=answer.answered_at,
+        )
+
 
     return response
+
+
+def user_email_to_db(db: Session, email: str) -> UserAnswer: 
+    
+    email_answer = (
+        db.query(UserAnswer)
+        .filter(UserAnswer.question_id == 1)
+        .first()
+    )
+
+    if not email_answer:
+        #if answer does not exist, 
+        email_answer = UserAnswer( question_id=1, # EMAIL QUESTION 
+                                  answer_text=email.strip().lower(), 
+                                  answered_at=datetime.utcnow(), ) 
+        db.add(email_answer) 
+        db.commit() 
+        db.refresh(email_answer)
+    else:   
+        email_answer.answer_text = email.strip().lower()
+        email_answer.answered_at = datetime.utcnow()
+
+        db.commit()
+        db.refresh(email_answer)
+
+    return email_answer
