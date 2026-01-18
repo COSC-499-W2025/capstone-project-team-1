@@ -11,7 +11,7 @@ __all__ = ["get_gpt5_nano_response", "get_gpt5_nano_response_sync"]
 
 
 async def get_gpt5_nano_response(prompt: str) -> str:
-    """Call the OpenAI Responses API with the gpt-5-nano model and return plain text.
+    """Call the OpenAI Responses API with the gpt-5-nano model and return plain text (async).
 
     Args:
         prompt: The string to send to the model.
