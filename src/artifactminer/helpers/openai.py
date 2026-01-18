@@ -3,14 +3,14 @@
 from typing import List
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 load_dotenv()
 
 __all__ = ["get_gpt5_nano_response"]
 
 
-def get_gpt5_nano_response(prompt: str) -> str:
+async def get_gpt5_nano_response(prompt: str) -> str:
     """Call the OpenAI Responses API with the gpt-5-nano model and return plain text.
 
     Args:
@@ -21,8 +21,8 @@ def get_gpt5_nano_response(prompt: str) -> str:
         empty string is returned.
     """
 
-    # Using just OpenAI() means that it picks up the API key from the environment
-    response = OpenAI().responses.create(
+    # Using just AsyncOpenAI() means that it picks up the API key from the environment
+    response = await AsyncOpenAI().responses.create(
         model="gpt-5-nano",
         input=prompt
     )
