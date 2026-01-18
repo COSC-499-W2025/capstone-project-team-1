@@ -201,7 +201,11 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
       * use LLM summaries from diffs, or
       * fall back to a simple template.
     - We persist results into UserAIntelligenceSummary.
+    
+    Note: Processes all repos concurrently for maximum performance.
     """
+    import asyncio
+    
     # Pick a ranking column: prefer ranking_score, fall back to total_commits
     ranking_column = RepoStat.total_commits
     if hasattr(RepoStat, "ranking_score"):
@@ -226,9 +230,8 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     )
     user_email = email_answer.answer_text.strip() if email_answer else None
 
-    results: list[dict] = []
-
-    for repo in top_repos:
+    async def process_repo(repo: RepoStat) -> dict:
+        """Process a single repo and return its summary."""
         # Default summary uses template
         user_stats = (
             db.query(UserRepoStat)
@@ -278,11 +281,12 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
             summary_text=summary_text,
         )
 
-        results.append(
-            {
-                "project_name": repo.project_name,
-                "summary": summary_text,
-            }
-        )
+        return {
+            "project_name": repo.project_name,
+            "summary": summary_text,
+        }
 
-    return results
+    # Process all repos concurrently
+    results = await asyncio.gather(*[process_repo(repo) for repo in top_repos])
+    
+    return list(results)
