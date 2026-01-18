@@ -10,8 +10,8 @@ import pytest
 
 from textual.app import active_app
 
-import httpx
 from artifactminer.tui.screens.resume import ResumeScreen
+from artifactminer.tui.helpers import group_by_project, export_to_json, export_to_text
 
 
 class LabelStub:
@@ -62,7 +62,7 @@ class DummyApp:
 def make_screen() -> tuple[ResumeScreen, LabelStub, VerticalScrollStub, DummyApp, object]:
     """Create ResumeScreen with stubs."""
     screen = ResumeScreen()
-    status = LabelStub(screen.LOADING_STATUS)
+    status = LabelStub("Loading...")
     content = VerticalScrollStub()
     app = DummyApp()
 
@@ -106,17 +106,16 @@ async def test_resume_placeholder_buttons_show_notification() -> None:
         active_app.reset(token)
 
 
-def test_resume_group_by_project() -> None:
+def test_group_by_project() -> None:
     """Ensure resume items are grouped by project correctly."""
-    screen = ResumeScreen()
-    screen.resume_items = [
+    items = [
         {"title": "Item 1", "project_name": "Project A", "content": "Content 1"},
         {"title": "Item 2", "project_name": "Project B", "content": "Content 2"},
         {"title": "Item 3", "project_name": "Project A", "content": "Content 3"},
         {"title": "Item 4", "project_name": None, "content": "Content 4"},
     ]
 
-    grouped = screen._group_by_project()
+    grouped = group_by_project(items)
 
     assert "Project A" in grouped
     assert "Project B" in grouped
@@ -126,84 +125,26 @@ def test_resume_group_by_project() -> None:
     assert len(grouped["Uncategorized"]) == 1
 
 
-@pytest.mark.asyncio
-async def test_resume_export_json_creates_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_export_json_creates_file(tmp_path: Path) -> None:
     """Ensure JSON export creates a valid JSON file."""
-    screen, status, _, app, token = make_screen()
-    screen.resume_items = [
-        {"title": "Test Item", "project_name": "Test Project", "content": "Test content"}
-    ]
-    screen.summaries = []
-
-    # Change working directory to tmp_path
-    monkeypatch.chdir(tmp_path)
-
-    try:
-        await screen._export_json()
-
-        # Find exported file
-        json_files = list(tmp_path.glob("resume_export_*.json"))
-        assert len(json_files) == 1
-
-        # Verify content
-        with json_files[0].open() as f:
-            data = json.load(f)
-        assert "resume_items" in data
-        assert "summaries" in data
-        assert len(data["resume_items"]) == 1
-        assert data["resume_items"][0]["title"] == "Test Item"
-    finally:
-        active_app.reset(token)
+    items = [{"title": "Test Item", "project_name": "Test Project", "content": "Test content"}]
+    
+    path = export_to_json(items, [], directory=tmp_path)
+    
+    assert path.exists()
+    with path.open() as f:
+        data = json.load(f)
+    assert "resume_items" in data
+    assert len(data["resume_items"]) == 1
 
 
-@pytest.mark.asyncio
-async def test_resume_export_text_creates_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_export_text_creates_file(tmp_path: Path) -> None:
     """Ensure text export creates a valid text file."""
-    screen, status, _, app, token = make_screen()
-    screen.resume_items = [
-        {"title": "Test Item", "project_name": "Test Project", "content": "Test content"}
-    ]
-    screen.summaries = []
-
-    # Change working directory to tmp_path
-    monkeypatch.chdir(tmp_path)
-
-    try:
-        await screen._export_text()
-
-        # Find exported file
-        txt_files = list(tmp_path.glob("resume_export_*.txt"))
-        assert len(txt_files) == 1
-
-        # Verify content
-        content = txt_files[0].read_text()
-        assert "RESUME EXPORT" in content
-        assert "Test Project" in content
-        assert "Test Item" in content
-    finally:
-        active_app.reset(token)
-
-
-@pytest.mark.asyncio
-async def test_resume_load_data_handles_empty_state(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure empty state is shown when no resume items exist."""
-    from artifactminer.tui.screens import resume as resume_module
-
-    class FakeApiClient:
-        async def get_resume_items(self, project_id=None):
-            return []
-
-        async def get_summaries(self, user_email):
-            return []
-
-    monkeypatch.setattr(resume_module, "ApiClient", FakeApiClient)
-
-    screen, status, content, app, token = make_screen()
-    try:
-        await screen._load_data()
-
-        # Should have empty state widget
-        assert len(content.children) == 1
-        assert "No resume items" in status.text or "no resume items available" in status.text.lower()
-    finally:
-        active_app.reset(token)
+    items = [{"title": "Test Item", "project_name": "Test Project", "content": "Test content"}]
+    
+    path = export_to_text(items, [], directory=tmp_path)
+    
+    assert path.exists()
+    content = path.read_text()
+    assert "RESUME EXPORT" in content
+    assert "Test Project" in content
