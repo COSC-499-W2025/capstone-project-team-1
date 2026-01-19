@@ -9,12 +9,25 @@ load_dotenv()
 
 __all__ = ["get_gpt5_nano_response", "get_gpt5_nano_response_sync"]
 
-# Create a single shared client instance for all async requests
-# This avoids the overhead of creating a new client for each query
-_async_client = AsyncOpenAI()
+# Lazy initialization - clients are created only when first used
+_async_client = None
+_sync_client = None
 
-# Create a single shared client instance for all sync requests
-_sync_client = OpenAI()
+
+def _get_async_client():
+    """Get or create the async OpenAI client."""
+    global _async_client
+    if _async_client is None:
+        _async_client = AsyncOpenAI()
+    return _async_client
+
+
+def _get_sync_client():
+    """Get or create the sync OpenAI client."""
+    global _sync_client
+    if _sync_client is None:
+        _sync_client = OpenAI()
+    return _sync_client
 
 
 async def get_gpt5_nano_response(prompt: str) -> str:
@@ -29,7 +42,7 @@ async def get_gpt5_nano_response(prompt: str) -> str:
     """
 
     # Use the shared async client instance
-    response = await _async_client.responses.create(
+    response = await _get_async_client().responses.create(
         model="gpt-5-nano",
         input=prompt
     )
@@ -59,7 +72,7 @@ def get_gpt5_nano_response_sync(prompt: str) -> str:
     """
 
     # Use the shared sync client instance
-    response = _sync_client.responses.create(
+    response = _get_sync_client().responses.create(
         model="gpt-5-nano",
         input=prompt
     )
