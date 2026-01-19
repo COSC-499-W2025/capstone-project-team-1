@@ -1,5 +1,6 @@
 """Utilities for interacting with the OpenAI Responses API."""
 
+import threading
 from typing import List
 
 from dotenv import load_dotenv
@@ -12,13 +13,18 @@ __all__ = ["get_gpt5_nano_response", "get_gpt5_nano_response_sync"]
 # Lazy initialization - clients are created only when first used
 _async_client = None
 _sync_client = None
+_lock = threading.Lock()
 
 
 def _get_async_client():
     """Get or create the async OpenAI client."""
     global _async_client
     if _async_client is None:
-        _async_client = AsyncOpenAI()
+        with _lock:
+            if _async_client is None:
+                _async_client = (
+                    AsyncOpenAI()
+                )  # Only 1 request can now create the global async client
     return _async_client
 
 
@@ -26,7 +32,11 @@ def _get_sync_client():
     """Get or create the sync OpenAI client."""
     global _sync_client
     if _sync_client is None:
-        _sync_client = OpenAI()
+        with _lock:
+            if _sync_client is None:
+                _sync_client = (
+                    OpenAI()
+                )  # Only 1 request can create the global sync client
     return _sync_client
 
 
@@ -43,8 +53,7 @@ async def get_gpt5_nano_response(prompt: str) -> str:
 
     # Use the shared async client instance
     response = await _get_async_client().responses.create(
-        model="gpt-5-nano",
-        input=prompt
+        model="gpt-5-nano", input=prompt
     )
 
     if getattr(response, "output_text", None):
@@ -72,10 +81,7 @@ def get_gpt5_nano_response_sync(prompt: str) -> str:
     """
 
     # Use the shared sync client instance
-    response = _get_sync_client().responses.create(
-        model="gpt-5-nano",
-        input=prompt
-    )
+    response = _get_sync_client().responses.create(model="gpt-5-nano", input=prompt)
 
     if getattr(response, "output_text", None):
         return response.output_text
