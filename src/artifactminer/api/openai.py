@@ -3,9 +3,9 @@ OpenAI API module: endpoints for interacting with OpenAI models.
 """
 
 from fastapi import APIRouter, HTTPException
-from .schemas import OpenAIRequest, OpenAIResponse
-from ..helpers.openai import get_gpt5_nano_response
 
+from ..helpers.openai import get_gpt5_nano_response_async
+from .schemas import OpenAIRequest, OpenAIResponse
 
 router = APIRouter(tags=["openai"])
 
@@ -18,7 +18,9 @@ async def call_openai(request: OpenAIRequest) -> OpenAIResponse:
         raise HTTPException(status_code=422, detail="Prompt cannot be empty")
 
     try:
-        response_text = get_gpt5_nano_response(request.prompt)
+        response_text = await get_gpt5_nano_response_async(request.prompt)
         return OpenAIResponse(response=response_text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to get response from OpenAI API") from e
+        raise HTTPException(
+            status_code=500, detail="Failed to get response from OpenAI API"
+        ) from e
