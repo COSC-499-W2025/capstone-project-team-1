@@ -64,23 +64,34 @@ def _available_models() -> List[str]:
 @pytest.mark.parametrize("model", _available_models())
 def test_structured_output_benchmark(model: str) -> None:
     prompt = _build_prompt()
-    start_time = time.monotonic()
-    response = chat(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        format=ResumeProjectSummary.model_json_schema(),
-        options={"temperature": 0},
+
+    timings: List[float] = []
+    last_parsed: ResumeProjectSummary | None = None
+
+    for _ in range(2):
+        start_time = time.monotonic()
+        response = chat(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            format=ResumeProjectSummary.model_json_schema(),
+            options={"temperature": 0},
+        )
+        timings.append(time.monotonic() - start_time)
+
+        message_content = response.message.content
+        assert message_content, "Ollama response content was empty."
+
+        parsed = ResumeProjectSummary.model_validate_json(message_content)
+        assert parsed.project_name.strip()
+        assert parsed.one_liner.strip()
+        assert parsed.highlights
+        assert parsed.skills
+
+        last_parsed = parsed
+
+    cold_seconds, warm_seconds = timings
+    print(
+        f"Model={model} cold_seconds={cold_seconds:.2f} warm_seconds={warm_seconds:.2f}"
     )
-    elapsed = time.monotonic() - start_time
-
-    message_content = response.message.content
-    assert message_content, "Ollama response content was empty."
-
-    parsed = ResumeProjectSummary.model_validate_json(message_content)
-    assert parsed.project_name.strip()
-    assert parsed.one_liner.strip()
-    assert parsed.highlights
-    assert parsed.skills
-
-    print(f"Model={model} elapsed_seconds={elapsed:.2f}")
-    print(parsed.model_dump_json(indent=2))
+    # if last_parsed is not None:
+    #     print(last_parsed.model_dump_json(indent=2))
