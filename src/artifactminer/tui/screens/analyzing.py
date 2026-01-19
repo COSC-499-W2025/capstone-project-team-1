@@ -28,7 +28,8 @@ class AnalyzingScreen(Screen[None]):
             with Container(id="card-wrapper"):
                 with Vertical(id="card"):
                     yield Static("Analyzing Repository", id="analyzing-title")
-                    yield Label(f"Processing ZIP ID: {self.zip_id}", id="analyzing-status")
+                    status_text = f"Processing ZIP ID: {self.zip_id}" if self.zip_id else "No ZIP selected - please upload first"
+                    yield Label(status_text, id="analyzing-status")
                     with Container(id="analyzing-actions"):
                         yield Button("Back", id="back-btn")
                         yield Button("Continue to Results", id="continue-btn", variant="primary")
