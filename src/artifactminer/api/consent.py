@@ -18,7 +18,7 @@ def _get_or_seed_consent(db: Session) -> Consent:
     """Return the single consent row; create a default if missing."""
     consent = db.get(Consent, 1)
     if consent is None:
-        consent = Consent(id=1, consent_level="none", accepted_at=None, LLM_model="chatGPT")
+        consent = Consent(id=1, consent_level="none", accepted_at=None)
         db.add(consent)
         db.commit()
         db.refresh(consent)

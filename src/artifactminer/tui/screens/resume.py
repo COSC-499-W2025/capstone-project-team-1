@@ -119,6 +119,12 @@ class ResumeScreen(Screen[None]):
         except httpx.ConnectError:
             await content.mount(Static("Cannot connect to API server.", id="empty-state"))
             self._update_status("Connection error.", error=True)
+        except httpx.TimeoutException:
+            await content.mount(Static("Request timed out.", id="empty-state"))
+            self._update_status("Timeout error.", error=True)
+        except httpx.HTTPStatusError as e:
+            await content.mount(Static(f"Server error: {e.response.status_code}", id="empty-state"))
+            self._update_status(f"HTTP {e.response.status_code} error.", error=True)
         except Exception as e:
             await content.mount(Static(f"Error: {e}", id="empty-state"))
             self._update_status(f"Error: {e}", error=True)
