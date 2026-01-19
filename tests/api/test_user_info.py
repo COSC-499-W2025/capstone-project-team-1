@@ -7,7 +7,7 @@ from conftest import get_db
 def test_post_user_answer(client):
     payload = {"email": "foo@example.com"}
 
-    response = client.post("/postanswer/1", json=payload)
+    response = client.post("/postanswer/", json=payload)
     assert response.status_code == 200
 
     data = response.json()
@@ -38,7 +38,7 @@ def test_get_user_answer(client):
     payload = {"email": "foo@example.com"}
 
     #post data...
-    response = client.post("/postanswer/1", json=payload)
+    response = client.post("/postanswer/", json=payload)
 
     responseJson = response.json()
     resId = responseJson["id"]

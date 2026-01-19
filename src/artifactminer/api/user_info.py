@@ -44,7 +44,7 @@ async def get_user_info(
 from fastapi import HTTPException, Depends
 from sqlalchemy.orm import Session
 @router.post(
-    "/postanswer/{zip_id}",
+    "/postanswer/",
     response_model=UserAnswerResponse,
     tags=["user_info"],
 )
