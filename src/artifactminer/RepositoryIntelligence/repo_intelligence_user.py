@@ -103,9 +103,10 @@ def collect_user_additions(
     # validate repo path
     if not isGitRepo(repo_path):
         raise ValueError(f"The path {repo_path} is not a git repository.")
-    # validate email format
+    # validate email format and get normalized version
     try:
-        validate_email(user_email, check_deliverability=False)
+        validated = validate_email(user_email, check_deliverability=False)
+        email_norm = validated.normalized
     except EmailNotValidError:
         raise ValueError(f"The email {user_email} is not valid.")
     
@@ -115,11 +116,6 @@ def collect_user_additions(
     commits = list(repo.iter_commits(rev=until, since=since, max_count=max_commits)) #get commits in range from since to until, up to max_commits, ordered newest -> oldest
     if skip_merges: #filter out merge commits, basically any commit with more than 1 parent in order to only get direct commits
         commits = [c for c in commits if len(getattr(c, "parents", [])) <= 1]
-    
-
-    
-    # filter to the author email (case-insensitive, exact match)
-    email_norm = user_email.strip().lower()
 
     commits = [c for c in commits if (getattr(c.author, "email", "") or "").lower() == email_norm]
 
