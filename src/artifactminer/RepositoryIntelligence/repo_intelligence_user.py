@@ -103,8 +103,11 @@ def collect_user_additions(
     # validate repo path
     if not isGitRepo(repo_path):
         raise ValueError(f"The path {repo_path} is not a git repository.")
-    # validate email format
-    if not validate_email(user_email):
+    # validate email format and get normalized version
+    try:
+        validated = validate_email(user_email, check_deliverability=False)
+        email_norm = validated.normalized
+    except EmailNotValidError:
         raise ValueError(f"The email {user_email} is not valid.")
     
     repo = git.Repo(repo_path)
@@ -113,11 +116,6 @@ def collect_user_additions(
     commits = list(repo.iter_commits(rev=until, since=since, max_count=max_commits)) #get commits in range from since to until, up to max_commits, ordered newest -> oldest
     if skip_merges: #filter out merge commits, basically any commit with more than 1 parent in order to only get direct commits
         commits = [c for c in commits if len(getattr(c, "parents", [])) <= 1]
-    
-
-    
-    # filter to the author email (case-insensitive, exact match)
-    email_norm = user_email.strip().lower()
 
     commits = [c for c in commits if (getattr(c.author, "email", "") or "").lower() == email_norm]
 
@@ -191,7 +189,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
         if own_session:
             db.close()
 
-def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
+async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     """
     Summarize the top-ranked repositories for the current user.
 
@@ -201,7 +199,11 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
       * use LLM summaries from diffs, or
       * fall back to a simple template.
     - We persist results into UserAIntelligenceSummary.
+    
+    Note: Processes all repos concurrently for maximum performance.
     """
+    import asyncio
+    
     # Pick a ranking column: prefer ranking_score, fall back to total_commits
     ranking_column = RepoStat.total_commits
     if hasattr(RepoStat, "ranking_score"):
@@ -226,9 +228,8 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     )
     user_email = email_answer.answer_text.strip() if email_answer else None
 
-    results: list[dict] = []
-
-    for repo in top_repos:
+    async def process_repo(repo: RepoStat) -> dict:
+        """Process a single repo and return its summary."""
         # Default summary uses template
         user_stats = (
             db.query(UserRepoStat)
@@ -260,7 +261,7 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
                 )
                 if additions:
                     grouped = group_additions_into_blocks(additions, max_chars_per_block=1000, max_blocks=1)
-                    ai_summary = createSummaryFromUserAdditions(grouped)
+                    ai_summary = await createSummaryFromUserAdditions(grouped)
                     print("\n AI Summary Generated for", repo.project_name, ":", ai_summary)
                     summary_text += " AI summary: " + ai_summary
             except Exception as e:
@@ -278,11 +279,12 @@ def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
             summary_text=summary_text,
         )
 
-        results.append(
-            {
-                "project_name": repo.project_name,
-                "summary": summary_text,
-            }
-        )
+        return {
+            "project_name": repo.project_name,
+            "summary": summary_text,
+        }
 
-    return results
+    # Process all repos concurrently
+    results = await asyncio.gather(*[process_repo(repo) for repo in top_repos])
+    
+    return list(results)

@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, UTC
+
+from artifactminer.helpers.time import utcnow
 from .database import Base
 from ..helpers.time import utcnow
 
