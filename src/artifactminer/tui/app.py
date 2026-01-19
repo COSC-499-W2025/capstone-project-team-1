@@ -192,6 +192,7 @@ class ArtifactMinerApp(App):
     BINDINGS = [("q", "quit", "Quit")]
 
     consent_state: dict | None = None
+    current_zip_id: int | None = None
     user_email: str | None = None
     consent_level: str | None = None
 
