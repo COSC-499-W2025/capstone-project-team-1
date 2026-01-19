@@ -1,12 +1,11 @@
-"""
-Consent API module: endpoints and helpers for consent state.
-"""
+
 
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+import artifactminer
 from artifactminer.db.models import UserAnswer
 
 from .schemas import UserAnswerCreate, UserAnswerResponse
@@ -65,6 +64,9 @@ async def create_user_answer(
 
 
 def user_email_to_db(db: Session, email: str) -> UserAnswer:
+    """
+     question id 1 = user's email
+    """
     email_answer = db.query(UserAnswer).filter(UserAnswer.question_id == 1).first()
 
     if not email_answer:
@@ -79,7 +81,7 @@ def user_email_to_db(db: Session, email: str) -> UserAnswer:
         db.refresh(email_answer)
     else:
         email_answer.answer_text = email.strip().lower()
-        email_answer.answered_at = datetime.utcnow()
+        email_answer.answered_at = artifactminer.helpers.time
 
         db.commit()
         db.refresh(email_answer)
