@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 from artifactminer.helpers.time import utcnow
 from .database import Base
-from ..helpers.time import utcnow
 
 class Artifact(Base):#basic model for artifacts, this will be used to store artifact information in the database
     __tablename__ = "artifacts"
