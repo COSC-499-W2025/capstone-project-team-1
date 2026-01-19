@@ -1,6 +1,7 @@
 #Part of the Repository Intelligence Module
 #Owner: Evan/van-cpu
 
+import asyncio
 from typing import List
 from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
@@ -33,9 +34,9 @@ def set_user_llm_selection(model: str):
     finally:
         db.close()
 
-def getLLMResponse(prompt: str) -> str:
+async def getLLMResponse(prompt: str) -> str:
     if get_user_llm_selection() == "chatGPT":
-        return get_gpt5_nano_response(prompt)
+        return await get_gpt5_nano_response(prompt)
     else:
         return get_ollama_response(prompt)
 
@@ -103,14 +104,15 @@ def group_additions_into_blocks(
 
 
 # Create a summary of user additions using LLM
-def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
+async def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
     #Each addition in additions is a string of added lines from a single commit
     if not additions:
         return "No additions found for the specified user."
     if not user_allows_llm():
         return "User has not consented to LLM usage."
-    intermediate_summary = ""
-    #A for loop that goes through every addition and asks the AI to summarize it, then combines all summaries into one final summary, and asks the AI to summarize that final summary.
+    
+    # Build all prompts for concurrent execution
+    prompts = []
     for addition in additions:
         prompt = (
         "You are evaluating a student's code contribution from a single commit. "
@@ -133,12 +135,14 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
 
         "ADDED LINES (unified diff subset, additions only):\n"
         )
-
         prompt += f"{addition}\n\n"
+        prompts.append(prompt)
+    
+    # Execute all LLM calls concurrently
+    intermediate_summaries = await asyncio.gather(*[getLLMResponse(p) for p in prompts])
+    intermediate_summary = "".join(intermediate_summaries)
 
-        intermediate_summary += getLLMResponse(prompt)
-
-    final_summary = "LLM model used: " + get_user_llm_selection() + "\n\n" + getLLMResponse(
+    final_summary = "LLM model used: " + get_user_llm_selection() + "\n\n" + await getLLMResponse(
     "Create a polished, portfolio-ready summary of this student's overall code contributions. "
     "Only highlight strengths, technical skills, and positive impact. "
     "Do not mention weaknesses, issues, inconsistencies, or anything negative. "
@@ -154,7 +158,7 @@ def createAIsummaryFromUserAdditions(additions: List[str]) -> str:
 
 
 # Create a summary of user additions using LLM if consented and without LLM if not
-def createSummaryFromUserAdditions(additions: List[str]) -> str:
+async def createSummaryFromUserAdditions(additions: List[str]) -> str:
     summary: str
     if not additions:
         return "No additions found for the specified user."
@@ -163,7 +167,7 @@ def createSummaryFromUserAdditions(additions: List[str]) -> str:
         summary = "User has not consented to LLM usage. Summary generation without LLM is not yet implemented."
     else:
         #User has consented to LLM usage we will create a summary with LLM
-        summary = createAIsummaryFromUserAdditions(additions)
+        summary = await createAIsummaryFromUserAdditions(additions)
     return summary
 
 

@@ -36,3 +36,22 @@ class ApiClient:
             resp = await client.get(url)
         resp.raise_for_status()
         return resp.json()
+
+    async def get_resume_items(self, project_id: int | None = None) -> list[dict[str, Any]]:
+        """GET /resume with optional project_id filter."""
+        url = f"{self.base_url}/resume"
+        params: dict[str, Any] = {}
+        if project_id is not None:
+            params["project_id"] = project_id
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url, params=params if params else None)
+        resp.raise_for_status()
+        return resp.json()
+
+    async def get_summaries(self, user_email: str) -> list[dict[str, Any]]:
+        """GET /summaries for a specific user."""
+        url = f"{self.base_url}/summaries"
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url, params={"user_email": user_email})
+        resp.raise_for_status()
+        return resp.json()

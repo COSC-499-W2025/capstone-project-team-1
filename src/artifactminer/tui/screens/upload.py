@@ -10,6 +10,7 @@ from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from .list_contents import ListContentsScreen
 from .file_browser import FileBrowserScreen
+from .analyzing import AnalyzingScreen
 from ..api import ApiClient
 
 USE_MOCK = False
@@ -89,6 +90,7 @@ class UploadScreen(Screen[None]):
         status.update("Uploading and fetching contents...")
 
         dirs: list[str]
+        zip_id: int | None = None  # Initialize before conditional
         if USE_MOCK:
             dirs = MOCK_DIRS
         else:
@@ -110,11 +112,13 @@ class UploadScreen(Screen[None]):
                 status.update(f"Error: {exc}")
                 return
 
+        # Store zip_id on app for AnalyzingScreen
+        self.app.current_zip_id = zip_id
+
         def handle_selection(result: list[str] | None) -> None:
             if result:
-                count = len(result)
-                noun = "file" if count == 1 else "files"
-                status.update(f"Selected {count} {noun} from archive.")
+                # Push AnalyzingScreen with the stored zip_id
+                self.app.push_screen(AnalyzingScreen(self.app.current_zip_id))
             else:
                 status.update("Waiting for a file...")
             field.focus()

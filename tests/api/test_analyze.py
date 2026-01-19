@@ -182,6 +182,43 @@ class TestAnalyzeWithRealRepos:
         # Verify extraction path was set
         assert "extracted" in data["extraction_path"]
 
+    def test_analyze_scopes_to_selected_directories(
+        self, client, tmp_path, monkeypatch, mock_projects_zip
+    ):
+        """Endpoint limits analysis to selected directories."""
+        if not mock_projects_zip.exists():
+            pytest.skip("mock_projects.zip not found")
+
+        uploads_dir, _ = _setup_test_dirs(monkeypatch, tmp_path)
+
+        from artifactminer.api import zip as zip_module
+
+        monkeypatch.setattr(zip_module, "UPLOADS_DIR", uploads_dir)
+
+        files = {
+            "file": (
+                "mock_projects.zip",
+                open(mock_projects_zip, "rb"),
+                "application/zip",
+            )
+        }
+        upload_response = client.post("/zip/upload", files=files)
+        zip_id = upload_response.json()["zip_id"]
+
+        _seed_user_email(client)
+        _set_consent(client, "none")
+
+        response = client.post(
+            f"/analyze/{zip_id}",
+            json={"directories": ["algorithms-toolkit"]},
+        )
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["repos_found"] == 1
+        assert len(data["repos_analyzed"]) == 1
+        assert Path(data["repos_analyzed"][0]["project_path"]).name == "algorithms-toolkit"
+
     def test_analyze_extracts_to_persistent_location(
         self, client, tmp_path, monkeypatch, mock_projects_zip
     ):
