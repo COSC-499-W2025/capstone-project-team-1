@@ -90,6 +90,7 @@ class UploadScreen(Screen[None]):
         status.update("Uploading and fetching contents...")
 
         dirs: list[str]
+        zip_id: int | None = None  # Initialize before conditional
         if USE_MOCK:
             dirs = MOCK_DIRS
         else:

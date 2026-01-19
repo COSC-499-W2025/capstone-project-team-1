@@ -42,7 +42,8 @@ class AnalyzingScreen(Screen[None]):
             # Navigate to Resume screen (will work once resume branch merges)
             try:
                 await self.app.switch_screen("resume")
-            except Exception:
+            except KeyError:
+                # Screen not installed yet
                 self.app.notify(
                     "Resume screen will be available after analysis completes.",
                     title="Coming Soon",
