@@ -8,7 +8,11 @@ from openai import AsyncOpenAI, OpenAI
 
 load_dotenv()
 
-__all__ = ["get_gpt5_nano_response", "get_gpt5_nano_response_sync"]
+__all__ = [
+    "get_gpt5_nano_response",
+    "get_gpt5_nano_response_async",
+    "get_gpt5_nano_response_sync",
+]
 
 # Lazy initialization - clients are created only when first used
 _async_client = None
@@ -67,6 +71,10 @@ async def get_gpt5_nano_response_async(prompt: str) -> str:
                 text_parts.append(text.value)
 
     return "".join(text_parts)
+
+
+# Alias for backward compatibility
+get_gpt5_nano_response = get_gpt5_nano_response_async
 
 
 def get_gpt5_nano_response_sync(prompt: str) -> str:
