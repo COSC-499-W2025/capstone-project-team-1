@@ -40,7 +40,7 @@ def _get_sync_client():
     return _sync_client
 
 
-async def get_gpt5_nano_response(prompt: str) -> str:
+async def get_gpt5_nano_response_async(prompt: str) -> str:
     """Call the OpenAI Responses API with the gpt-5-nano model and return plain text (async).
 
     Args:
