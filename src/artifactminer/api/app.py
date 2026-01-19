@@ -30,6 +30,7 @@ from .openai import router as openai_router
 from .projects import router as projects_router
 from .analyze import router as analyze_router
 from .crawler import router as crawler_router
+from .user_info import router as user_info_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
     getRepoStats,
     saveRepoStats,
@@ -162,16 +163,28 @@ def create_app() -> FastAPI:
         for ans in saved_answers:
             db.refresh(ans)
         return saved_answers
+        
 
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
-        repo_path: str, user_email: str, db: Session = Depends(get_db)
+        repo_path: str,
+        db: Session = Depends(get_db),
     ):
-        """Analyze a single git repository and store RepoStat + UserRepoStat.
+        """
+        Analyze a single git repository and store RepoStat + UserRepoStat.
 
         Both saves are performed in a single transaction for atomicity.
         """
         try:
+            email_answer = (
+                db.query(UserAnswer)
+                .filter(UserAnswer.question_id == 1)
+                .order_by(UserAnswer.answered_at.desc())
+                .first()
+            )
+
+            user_email = email_answer.answer_text.strip() if email_answer else None
+
             repo_stats = getRepoStats(repo_path)
             user_stats = getUserRepoStats(repo_path, user_email)
 
@@ -184,12 +197,19 @@ def create_app() -> FastAPI:
                 "repo_stats": repo_stats.__dict__,
                 "user_stats": user_stats.__dict__,
             }
+
         except ValueError as e:
             db.rollback()
             raise HTTPException(status_code=400, detail=str(e))
+
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Internal error: {str(e)}",
+            )
+
+
 
     # Mount routers (unchanged)
     app.include_router(consent_router)
@@ -200,6 +220,7 @@ def create_app() -> FastAPI:
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
     app.include_router(views_router)
+    app.include_router(user_info_router)
     return app
 
 

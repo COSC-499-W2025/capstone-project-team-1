@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
+from sqlalchemy import inspect
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
@@ -205,13 +206,10 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     import asyncio
     
     # Pick a ranking column: prefer ranking_score, fall back to total_commits
-    ranking_column = RepoStat.total_commits
-    if hasattr(RepoStat, "ranking_score"):
-        ranking_column = RepoStat.ranking_score
 
+   
     top_repos: list[RepoStat] = (
         db.query(RepoStat)
-        .order_by(ranking_column.desc())
         .limit(top)
         .all()
     )
@@ -226,6 +224,7 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
         .order_by(UserAnswer.answered_at.desc())
         .first()
     )
+
     user_email = email_answer.answer_text.strip() if email_answer else None
 
     async def process_repo(repo: RepoStat) -> dict:
