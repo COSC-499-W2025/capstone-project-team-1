@@ -191,6 +191,7 @@ class ArtifactMinerApp(App):
     BINDINGS = [("q", "quit", "Quit")]
 
     consent_state: dict | None = None
+    current_zip_id: int | None = None
 
     async def on_mount(self) -> None:
         try:
