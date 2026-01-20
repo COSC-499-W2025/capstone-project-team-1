@@ -20,8 +20,8 @@ const screenActions: Record<Screen, KeyAction[]> = {
     { key: "Esc", label: "Exit" },
   ],
   consent: [
-    { key: "Enter", label: "Next/Confirm" },
-    { key: "←/→", label: "Choose (Step 3)" },
+    { key: "←/→", label: "Navigate" },
+    { key: "Enter", label: "Confirm" },
     { key: "Esc", label: "Back" },
   ],
   "file-upload": [

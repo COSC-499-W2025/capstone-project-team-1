@@ -13,7 +13,7 @@ export function BottomBar({ actions }: BottomBarProps) {
       justifyContent="center"
       gap={4}
       padding={1}
-      backgroundColor={theme.bgMedium}
+      backgroundColor={theme.bgDark}
     >
       {actions.map((action, index) => (
         <box key={index} flexDirection="row" gap={1}>

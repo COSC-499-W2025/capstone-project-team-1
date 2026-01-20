@@ -7,479 +7,161 @@ interface ConsentScreenProps {
   onBack: () => void;
 }
 
-type WizardStep = 1 | 2 | 3;
+type Selection = "cloud" | "offline";
 
 export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-  const [step, setStep] = useState<WizardStep>(1);
-  const [selectedChoice, setSelectedChoice] = useState<0 | 1>(1); // Default to Basic
+  const [selected, setSelected] = useState<Selection>("offline");
 
   useKeyboard((key) => {
-    if (step === 3) {
-      if (key.name === "left" || key.name === "right") {
-        setSelectedChoice((prev) => (prev === 0 ? 1 : 0));
-      }
-      if (key.name === "return") {
-        onContinue(selectedChoice === 0);
-      }
+    if (key.name === "left" || key.name === "right") {
+      setSelected((prev) => (prev === "cloud" ? "offline" : "cloud"));
     }
-
-    if (key.name === "return" && step < 3) {
-      setStep((prev) => (prev + 1) as WizardStep);
+    if (key.name === "return") {
+      onContinue(selected === "cloud");
     }
-
-    if (key.name === "escape" || key.name === "backspace") {
-      if (step > 1) {
-        setStep((prev) => (prev - 1) as WizardStep);
-      } else {
-        onBack();
-      }
+    if (key.name === "escape") {
+      onBack();
     }
   });
 
-  const renderProgressBar = () => (
-    <box flexDirection="row" justifyContent="center" gap={2} paddingTop={1} paddingBottom={1}>
-      <text>
-        <span fg={step >= 1 ? theme.gold : theme.textDim}>
-          {step >= 1 ? "[x] Understand" : "[ ] Understand"}
-        </span>
-      </text>
-      <text>
-        <span fg={theme.textDim}>---</span>
-      </text>
-      <text>
-        <span fg={step >= 2 ? theme.gold : theme.textDim}>
-          {step >= 2 ? "[x] Privacy" : "[ ] Privacy"}
-        </span>
-      </text>
-      <text>
-        <span fg={theme.textDim}>---</span>
-      </text>
-      <text>
-        <span fg={step >= 3 ? theme.gold : theme.textDim}>
-          {step >= 3 ? "[x] Choose" : "[ ] Choose"}
-        </span>
-      </text>
-    </box>
-  );
-
-  const renderStep1 = () => (
-    <box flexDirection="column" alignItems="center" gap={2} padding={2}>
-      <text>
-        <span fg={theme.gold}>
-          <strong>How would you like us to analyze your projects?</strong>
-        </span>
-      </text>
-
-      <box flexDirection="column" alignItems="center" gap={1} marginTop={1}>
-        <text>
-          <span fg={theme.textPrimary}>
-            You can choose AI-Enhanced analysis or Basic analysis.
-          </span>
-        </text>
-        <text>
-          <span fg={theme.textSecondary}>
-            This choice controls whether project metadata is sent to OpenAI.
-          </span>
-        </text>
-      </box>
-
-      <box
-        flexDirection="column"
-        alignItems="center"
-        marginTop={2}
-        border
-        borderStyle="single"
-        borderColor={theme.bgLight}
-        padding={2}
-        width={86}
-      >
-        <box flexDirection="column" alignItems="center">
-          <box
-            border
-            borderStyle="rounded"
-            borderColor={theme.cyan}
-            paddingLeft={3}
-            paddingRight={3}
-          >
-            <text>
-              <span fg={theme.cyan}>Your Code Projects</span>
-            </text>
-          </box>
-        </box>
-
-        <text><span fg={theme.textDim}>|</span></text>
-        <text><span fg={theme.textDim}>v</span></text>
-
-        <box flexDirection="row" gap={8} marginTop={1}>
-          <box flexDirection="column" alignItems="center" gap={1}>
-            <box
-              border
-              borderStyle="rounded"
-              borderColor={theme.gold}
-              paddingLeft={2}
-              paddingRight={2}
-              backgroundColor={theme.bgMedium}
-            >
-              <text>
-                <span fg={theme.gold}>AI-Enhanced</span>
-              </text>
-            </box>
-            <text><span fg={theme.textDim}>|</span></text>
-            <text>
-              <span fg={theme.textSecondary}>Sends metadata</span>
-            </text>
-            <text>
-              <span fg={theme.textSecondary}>to OpenAI</span>
-            </text>
-            <text><span fg={theme.textDim}>|</span></text>
-            <text><span fg={theme.textDim}>v</span></text>
-            <text>
-              <span fg={theme.success}>Detailed insights</span>
-            </text>
-          </box>
-
-          <box flexDirection="column" justifyContent="center">
-            <text>
-              <span fg={theme.textDim}>OR</span>
-            </text>
-          </box>
-
-          <box flexDirection="column" alignItems="center" gap={1}>
-            <box
-              border
-              borderStyle="rounded"
-              borderColor={theme.cyan}
-              paddingLeft={2}
-              paddingRight={2}
-              backgroundColor={theme.bgMedium}
-            >
-              <text>
-                <span fg={theme.cyan}>Basic</span>
-              </text>
-            </box>
-            <text><span fg={theme.textDim}>|</span></text>
-            <text>
-              <span fg={theme.textSecondary}>Stays on your</span>
-            </text>
-            <text>
-              <span fg={theme.textSecondary}>computer only</span>
-            </text>
-            <text><span fg={theme.textDim}>|</span></text>
-            <text><span fg={theme.textDim}>v</span></text>
-            <text>
-              <span fg={theme.warning}>Basic insights</span>
-            </text>
-          </box>
-        </box>
-
-        <box flexDirection="row" justifyContent="center" marginTop={2}>
-          <text><span fg={theme.textDim}>--------------------------------------</span></text>
-        </box>
-        <text><span fg={theme.textDim}>v</span></text>
-        <box
-          border
-          borderStyle="rounded"
-          borderColor={theme.success}
-          paddingLeft={3}
-          paddingRight={3}
-          marginTop={1}
-        >
-          <text>
-            <span fg={theme.success}>Your Professional Resume</span>
-          </text>
-        </box>
-      </box>
-
-      <box marginTop={2}>
-        <text>
-          <span fg={theme.textDim}>Press </span>
-          <span fg={theme.gold}>Enter</span>
-          <span fg={theme.textDim}> to learn about privacy, or </span>
-          <span fg={theme.gold}>Esc</span>
-          <span fg={theme.textDim}> to go back</span>
-        </text>
-      </box>
-    </box>
-  );
-
-  const renderStep2 = () => (
-    <box flexDirection="column" alignItems="center" gap={2} padding={2}>
-      <text>
-        <span fg={theme.gold}>
-          <strong>Your Privacy Matters</strong>
-        </span>
-      </text>
-
-      <text>
-        <span fg={theme.textSecondary}>
-          This is exactly what AI can and cannot see.
-        </span>
-      </text>
-
-      <box flexDirection="row" gap={4} marginTop={2} justifyContent="center">
-        <box
-          flexDirection="column"
-          border
-          borderStyle="single"
-          borderColor={theme.success}
-          padding={2}
-          width={42}
-          gap={1}
-        >
-          <box flexDirection="row" gap={1} marginBottom={1}>
-            <text>
-              <span fg={theme.success}>OK</span>
-            </text>
-            <text>
-              <span fg={theme.success}>
-                <strong>AI Sees</strong>
-              </span>
-            </text>
-          </box>
-
-          <text>
-            <span fg={theme.textDim}>[FILES]</span>
-            <span fg={theme.textSecondary}> File names and folders</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[COMMITS]</span>
-            <span fg={theme.textSecondary}> Commit messages</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[TECH]</span>
-            <span fg={theme.textSecondary}> Technology names</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[STATS]</span>
-            <span fg={theme.textSecondary}> Code statistics</span>
-          </text>
-        </box>
-
-        <box
-          flexDirection="column"
-          border
-          borderStyle="single"
-          borderColor={theme.error}
-          padding={2}
-          width={42}
-          gap={1}
-        >
-          <box flexDirection="row" gap={1} marginBottom={1}>
-            <text>
-              <span fg={theme.error}>NO</span>
-            </text>
-            <text>
-              <span fg={theme.error}>
-                <strong>AI Never Sees</strong>
-              </span>
-            </text>
-          </box>
-
-          <text>
-            <span fg={theme.textDim}>[CODE]</span>
-            <span fg={theme.textSecondary}> Your actual code</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[SECRETS]</span>
-            <span fg={theme.textSecondary}> Passwords or API keys</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[PERSONAL]</span>
-            <span fg={theme.textSecondary}> Personal information</span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>[DATA]</span>
-            <span fg={theme.textSecondary}> Database contents</span>
-          </text>
-        </box>
-      </box>
-
-      <box
-        flexDirection="column"
-        alignItems="center"
-        marginTop={2}
-        border
-        borderStyle="single"
-        borderColor={theme.bgLight}
-        padding={1}
-        paddingLeft={3}
-        paddingRight={3}
-      >
-        <text>
-          <span fg={theme.textDim}>Provider: </span>
-          <span fg={theme.cyan}>OpenAI GPT-4</span>
-          <span fg={theme.textDim}> (data deleted after processing)</span>
-        </text>
-      </box>
-
-      <box
-        flexDirection="column"
-        alignItems="center"
-        marginTop={1}
-      >
-        <text>
-          <span fg={theme.textSecondary}>
-            Choosing AI means you explicitly allow sharing the items in "AI Sees".
-          </span>
-        </text>
-      </box>
-
-      <box marginTop={2}>
-        <text>
-          <span fg={theme.textDim}>Press </span>
-          <span fg={theme.gold}>Enter</span>
-          <span fg={theme.textDim}> to make your choice, or </span>
-          <span fg={theme.gold}>Esc</span>
-          <span fg={theme.textDim}> to go back</span>
-        </text>
-      </box>
-    </box>
-  );
-
-  const renderStep3 = () => (
-    <box flexDirection="column" alignItems="center" gap={3} padding={2}>
-      <text>
-        <span fg={theme.gold}>
-          <strong>Make Your Choice</strong>
-        </span>
-      </text>
-
-      <text>
-        <span fg={theme.textSecondary}>
-          Select how you'd like us to analyze your projects.
-        </span>
-      </text>
-
-      <box flexDirection="row" gap={4} marginTop={2}>
-        <box
-          flexDirection="column"
-          alignItems="center"
-          gap={1}
-          border
-          borderStyle="rounded"
-          borderColor={selectedChoice === 0 ? theme.gold : theme.bgLight}
-          backgroundColor={selectedChoice === 0 ? theme.bgMedium : theme.bgDark}
-          padding={2}
-          paddingLeft={4}
-          paddingRight={4}
-          width={42}
-        >
-          <text>
-            <span fg={selectedChoice === 0 ? theme.gold : theme.textDim}>
-              <strong>AI-Enhanced Analysis</strong>
-            </span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>--------------------</span>
-          </text>
-          <text>
-            <span fg={theme.success}>+</span>
-            <span fg={theme.textSecondary}> Sends metadata to OpenAI</span>
-          </text>
-          <text>
-            <span fg={theme.success}>+</span>
-            <span fg={theme.textSecondary}> Detailed skill detection</span>
-          </text>
-          <text>
-            <span fg={theme.success}>+</span>
-            <span fg={theme.textSecondary}> Better summaries</span>
-          </text>
-          <text>
-            <span fg={theme.warning}>-</span>
-            <span fg={theme.textSecondary}> Not fully private</span>
-          </text>
-          <box marginTop={1}>
-            <text>
-              <span fg={selectedChoice === 0 ? theme.gold : theme.textDim}>
-                {selectedChoice === 0 ? ">> SELECTED" : "   Press Left to select"}
-              </span>
-            </text>
-          </box>
-        </box>
-
-        <box
-          flexDirection="column"
-          alignItems="center"
-          gap={1}
-          border
-          borderStyle="rounded"
-          borderColor={selectedChoice === 1 ? theme.cyan : theme.bgLight}
-          backgroundColor={selectedChoice === 1 ? theme.bgMedium : theme.bgDark}
-          padding={2}
-          paddingLeft={4}
-          paddingRight={4}
-          width={42}
-        >
-          <text>
-            <span fg={selectedChoice === 1 ? theme.cyan : theme.textDim}>
-              <strong>Basic Analysis</strong>
-            </span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>--------------------</span>
-          </text>
-          <text>
-            <span fg={theme.success}>+</span>
-            <span fg={theme.textSecondary}> Stays on your computer</span>
-          </text>
-          <text>
-            <span fg={theme.success}>+</span>
-            <span fg={theme.textSecondary}> No data leaves your device</span>
-          </text>
-          <text>
-            <span fg={theme.warning}>-</span>
-            <span fg={theme.textSecondary}> Less detailed insights</span>
-          </text>
-          <box marginTop={1}>
-            <text>
-              <span fg={selectedChoice === 1 ? theme.cyan : theme.textDim}>
-                {selectedChoice === 1 ? ">> SELECTED" : "   Press Right to select"}
-              </span>
-            </text>
-          </box>
-        </box>
-      </box>
-
-      <box marginTop={2} flexDirection="column" alignItems="center" gap={1}>
-        <text>
-          <span fg={theme.textDim}>Use Left/Right arrows to switch, Enter to confirm.</span>
-        </text>
-        <text>
-          <span fg={theme.textDim}>Press Esc to review privacy details.</span>
-        </text>
-        <text>
-          <span fg={theme.textDim}>You can change this later in Settings.</span>
-        </text>
-      </box>
-    </box>
-  );
+  const isCloudSelected = selected === "cloud";
+  const isOfflineSelected = selected === "offline";
 
   return (
-    <box
-      flexGrow={1}
-      flexDirection="column"
-      backgroundColor={theme.bgDark}
-    >
-      <box
-        paddingLeft={2}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.bgMedium}
-      >
+    <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
+      {/* Header */}
+      <box flexDirection="column" paddingLeft={3} paddingTop={2} paddingBottom={2}>
         <text>
-          <span fg={theme.gold}>
-            <strong>Before We Begin</strong>
+          <span fg={theme.textPrimary}>
+            <strong>Privacy Settings</strong>
           </span>
-          <span fg={theme.textDim}> - Understanding Your Options</span>
+        </text>
+        <text>
+          <span fg={theme.textSecondary}>
+            Choose how your project metadata is analyzed.
+          </span>
         </text>
       </box>
 
-      {renderProgressBar()}
+      {/* Main split-screen container */}
+      <box flexGrow={1} flexDirection="row" gap={1} paddingLeft={2} paddingRight={2} paddingBottom={2}>
+        {/* Cloud Analysis Panel */}
+        <box
+          flexGrow={1}
+          flexDirection="column"
+          padding={2}
+          border
+          borderStyle={isCloudSelected ? "double" : "single"}
+          borderColor={isCloudSelected ? theme.gold : theme.textDim}
+          backgroundColor={isCloudSelected ? theme.bgMedium : theme.bgDark}
+          gap={1}
+        >
+          <text>
+            <span fg={isCloudSelected ? theme.gold : theme.textSecondary}>
+              <strong>Cloud Analysis</strong>
+            </span>
+          </text>
 
-      <box flexGrow={1} justifyContent="center" alignItems="center">
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
+          <box flexDirection="column" gap={1}>
+            <text>
+              <span fg={theme.textDim}>Pros:</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + Enhanced skill detection</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + Smarter summaries</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + Better project insights</span>
+            </text>
+          </box>
+
+          <box flexDirection="column" gap={1}>
+            <text>
+              <span fg={theme.textDim}>Cons:</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Requires network</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Metadata sent to OpenAI</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Less privacy</span>
+            </text>
+          </box>
+
+          <box marginTop={1} paddingTop={1}>
+            <text>
+              <span fg={theme.textDim}>─────────────────────────</span>
+            </text>
+            <text>
+              <span fg={theme.textDim}>
+                Sends: file names, commit messages, technology names
+              </span>
+            </text>
+          </box>
+        </box>
+
+        {/* Offline Analysis Panel */}
+        <box
+          flexGrow={1}
+          flexDirection="column"
+          padding={2}
+          border
+          borderStyle={isOfflineSelected ? "double" : "single"}
+          borderColor={isOfflineSelected ? theme.gold : theme.textDim}
+          backgroundColor={isOfflineSelected ? theme.bgMedium : theme.bgDark}
+          gap={1}
+        >
+          <text>
+            <span fg={isOfflineSelected ? theme.gold : theme.textSecondary}>
+              <strong>Offline</strong>
+            </span>
+          </text>
+
+          <box flexDirection="column" gap={1}>
+            <text>
+              <span fg={theme.textDim}>Pros:</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + All processing local</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + Complete privacy</span>
+            </text>
+            <text>
+              <span fg={theme.success}>  + No data transmitted</span>
+            </text>
+          </box>
+
+          <box flexDirection="column" gap={1}>
+            <text>
+              <span fg={theme.textDim}>Cons:</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Pattern-based analysis</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Less detailed insights</span>
+            </text>
+            <text>
+              <span fg={theme.warning}>  - Basic skill detection</span>
+            </text>
+          </box>
+
+          <box marginTop={1} paddingTop={1}>
+            <text>
+              <span fg={theme.textDim}>─────────────────────────</span>
+            </text>
+            <text>
+              <span fg={theme.textDim}>
+                All analysis happens on your machine. Zero external calls.
+              </span>
+            </text>
+          </box>
+        </box>
       </box>
     </box>
   );
