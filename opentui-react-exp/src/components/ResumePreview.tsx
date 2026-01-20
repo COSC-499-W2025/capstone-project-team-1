@@ -18,11 +18,11 @@ export function ResumePreview({ data, onBack, onRestart }: ResumePreviewProps) {
       flexDirection="column"
       backgroundColor={theme.bgDark}
     >
-      <TopBar 
+      {/* <TopBar 
         step="Done" 
         title="Resume Generated" 
         description="Analysis complete."
-      />
+      /> */}
 
       {/* Resume content */}
       <scrollbox
