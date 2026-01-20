@@ -1,129 +1,111 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TopBar } from "./TopBar";
 import { theme } from "../types";
+import { useKeyboard } from "@opentui/react";
 
 interface FileUploadProps {
   onSubmit: (path: string) => void;
   onBack: () => void;
 }
 
+// Mock file system data
+const mockFileSystem = {
+  name: "root",
+  type: "dir",
+  children: [
+    { name: "Users", type: "dir", children: [
+      { name: "shlok", type: "dir", children: [
+        { name: "projects", type: "dir", children: [
+          { name: "opentui-react", type: "dir" },
+          { name: "capstone-project.zip", type: "file", size: "12 MB" },
+          { name: "personal-site.zip", type: "file", size: "4.5 MB" },
+        ]},
+        { name: "Documents", type: "dir" },
+        { name: "Downloads", type: "dir", children: [
+          { name: "resume-data.zip", type: "file", size: "2 MB" },
+          { name: "images.zip", type: "file", size: "150 MB" },
+        ]},
+      ]}
+    ]},
+    { name: "var", type: "dir" },
+    { name: "tmp", type: "dir" },
+  ]
+};
+
 export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
-  const [filePath, setFilePath] = useState("");
-  const [isValid, setIsValid] = useState(false);
-
-  const handleChange = (value: string) => {
-    setFilePath(value);
-    // Simple validation: check if ends with .zip
-    setIsValid(value.trim().endsWith(".zip"));
-  };
-
+  const [selectedPath, setSelectedPath] = useState("/Users/shlok/projects/capstone-project.zip");
+  const [activePanel, setActivePanel] = useState<"tree" | "details">("tree");
+  
+  // Interaction handling would go here - simplified for visual demo
+  
   const handleSubmit = () => {
-    if (isValid) {
-      onSubmit(filePath);
-    }
+    onSubmit(selectedPath);
   };
 
   return (
-    <box
-      flexGrow={1}
-      flexDirection="column"
-      backgroundColor={theme.bgDark}
-    >
-      <TopBar 
-        step="Step 1" 
-        title="Select Your Projects" 
-        description="Enter the path to your zip file containing git repositories"
-      />
-
-      {/* Main content */}
-      <box
-        flexGrow={1}
-        flexDirection="column"
-        alignItems="center"
-        justifyContent="center"
-        gap={3}
-      >
-        {/* Icon/illustration */}
-        <box flexDirection="column" alignItems="center">
-          <text>
-            <span fg={theme.cyan}>
-              ┌─────────────────┐{"\n"}
-              │   📁  →  📄    │{"\n"}
-              │  .zip   resume │{"\n"}
-              └─────────────────┘
-            </span>
-          </text>
+    <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
+      <TopBar step="Step 1" title="Select Projects" description="Browse for your project zip file" />
+      
+      <box flexGrow={1} flexDirection="row" padding={1} gap={1}>
+        {/* Left Panel: Directory Tree */}
+        <box 
+          width="60%" 
+          border 
+          borderStyle="rounded" 
+          borderColor={activePanel === "tree" ? theme.cyan : theme.textDim}
+          flexDirection="column"
+          padding={1}
+        >
+          <text><span fg={theme.gold}><strong>File Browser</strong></span></text>
+          <text><span fg={theme.textDim}>/Users/shlok/projects/</span></text>
+          <box flexDirection="column" marginTop={1}>
+            <text>  📁 opentui-react</text>
+            <box backgroundColor={theme.cyanDim}>
+                <text>  📄 capstone-project.zip</text>
+            </box>
+            <text>  📄 personal-site.zip</text>
+          </box>
         </box>
 
-        {/* Instructions */}
-        <box flexDirection="column" alignItems="center" gap={1}>
-          <text>
-            <span fg={theme.textPrimary}>
-              Enter the path to your zip file containing git repositories
-            </span>
-          </text>
-          <text>
-            <span fg={theme.textDim}>
-              We'll analyze your code and extract skills, technologies, and project info
-            </span>
-          </text>
-        </box>
-
-        {/* Input field */}
-        <box flexDirection="column" alignItems="center" gap={1}>
-          <box flexDirection="row" alignItems="center" gap={2}>
-            <text>
-              <span fg={theme.goldDark}>Path:</span>
-            </text>
-            <input
-              value={filePath}
-              onChange={handleChange}
-              placeholder="/path/to/your/projects.zip"
-              width={50}
-              focused
-              backgroundColor={theme.bgMedium}
-              textColor={theme.textPrimary}
-              cursorColor={theme.cyan}
-              placeholderColor={theme.textDim}
-            />
+        {/* Right Panel: Details */}
+        <box 
+          flexGrow={1} 
+          border 
+          borderStyle="rounded" 
+          borderColor={activePanel === "details" ? theme.cyan : theme.textDim}
+          flexDirection="column"
+          padding={1}
+        >
+          <text><span fg={theme.gold}><strong>Details</strong></span></text>
+          <box flexDirection="column" marginTop={1} gap={1}>
+            <text>Name: <span fg={theme.textPrimary}>capstone-project.zip</span></text>
+            <text>Size: <span fg={theme.textPrimary}>12 MB</span></text>
+            <text>Type: <span fg={theme.textPrimary}>ZIP Archive</span></text>
+            
+            <box marginTop={2} border borderStyle="single" borderColor={theme.textDim} padding={1}>
+              <text>Contains:</text>
+              <text>• 4 git repositories</text>
+              <text>• 1,204 commits</text>
+              <text>• TypeScript, Rust</text>
+            </box>
           </box>
           
-          {filePath && (
-            <text>
-              {isValid ? (
-                <span fg={theme.success}>✓ Valid zip file path</span>
-              ) : (
-                <span fg={theme.error}>✗ Please enter a .zip file path</span>
-              )}
-            </text>
-          )}
+          <box marginTop={3}>
+             <text>
+                <span fg={theme.textDim}>Press </span>
+                <span fg={theme.cyan}>Enter</span>
+                <span fg={theme.textDim}> to select</span>
+             </text>
+          </box>
         </box>
-
-        {/* Submit button */}
-        <box
-          border
-          borderStyle="rounded"
-          borderColor={isValid ? theme.cyan : theme.textDim}
-          backgroundColor={isValid ? theme.cyanDim : theme.bgMedium}
-          paddingLeft={3}
-          paddingRight={3}
-          paddingTop={1}
-          paddingBottom={1}
-          onMouseDown={handleSubmit}
-        >
-          <text>
-            <span fg={isValid ? theme.textPrimary : theme.textDim}>
-              <strong>Analyze Projects</strong>
-            </span>
-          </text>
-        </box>
-
-        {/* Demo hint */}
-        <text>
-          <span fg={theme.textDim}>
-            Demo: Press Enter to continue with mock data
-          </span>
-        </text>
+      </box>
+      
+      <box height={3} border borderStyle="single" borderColor={theme.textDim} paddingLeft={2} alignItems="center">
+         <text>
+            <span fg={theme.cyan}>TAB</span> Switch Panel  |  
+            <span fg={theme.cyan}> ↑/↓</span> Navigate  |  
+            <span fg={theme.cyan}> ENTER</span> Select
+         </text>
       </box>
     </box>
   );
