@@ -61,7 +61,7 @@ export function Landing({ onGetStarted }: LandingProps) {
       alignItems="center"
       justifyContent="center"
       backgroundColor="#000000"
-      gap={2}
+      gap={10}
     >
       {/* Title Section with typewriter effect */}
       <box flexDirection="column" alignItems="center" gap={1}>
@@ -93,7 +93,7 @@ export function Landing({ onGetStarted }: LandingProps) {
       </box>
 
       {/* Feature highlights */}
-      <box flexDirection="column" alignItems="center" gap={0} marginTop={2}>
+      {/* <box flexDirection="column" alignItems="center" gap={0} marginTop={2}>
         <text>
           <span fg={theme.cyan}>Upload</span>
           <span fg={theme.textDim}> your projects </span>
@@ -102,7 +102,7 @@ export function Landing({ onGetStarted }: LandingProps) {
           <span fg={theme.cyan}>→</span>
           <span fg={theme.textDim}> Generate resume</span>
         </text>
-      </box>
+      </box> */}
     </box>
   );
 }
