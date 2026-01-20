@@ -29,6 +29,8 @@ dependencies = [
 dev = [
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
+    "pytest-timeout>=2.3.0",
+    "rich>=13.0.0",
 ]
 
 [project.scripts]
