@@ -7,6 +7,7 @@ import { mockProjects, mockResumeData } from "./data/mockProjects";
 
 import { BottomBar } from "./components/BottomBar";
 import { Landing } from "./components/Landing";
+import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
 import { ProjectList } from "./components/ProjectList";
 import { Analysis } from "./components/Analysis";
@@ -17,6 +18,11 @@ const screenActions: Record<Screen, KeyAction[]> = {
   landing: [
     { key: "Enter", label: "Get Started" },
     { key: "Esc", label: "Exit" },
+  ],
+  consent: [
+    { key: "Enter", label: "Next/Confirm" },
+    { key: "←/→", label: "Choose (Step 3)" },
+    { key: "Esc", label: "Back" },
   ],
   "file-upload": [
     { key: "Enter", label: "Continue" },
@@ -41,6 +47,7 @@ function App() {
   const renderer = useRenderer();
   const [screen, setScreen] = useState<Screen>("landing");
   const [filePath, setFilePath] = useState("");
+  const [useLLM, setUseLLM] = useState(false);
 
   // Global keyboard handler
   useKeyboard((key) => {
@@ -53,17 +60,21 @@ function App() {
     switch (screen) {
       case "landing":
         if (key.name === "return") {
-          setScreen("file-upload");
+          setScreen("consent");
         } else if (key.name === "escape") {
           renderer.destroy();
         }
+        break;
+
+      case "consent":
+        // Consent wizard handles its own keyboard events
         break;
 
       case "file-upload":
         if (key.name === "return") {
           setScreen("project-list");
         } else if (key.name === "escape") {
-          setScreen("landing");
+          setScreen("consent");
         }
         break;
 
@@ -92,7 +103,18 @@ function App() {
   const renderScreen = () => {
     switch (screen) {
       case "landing":
-        return <Landing onGetStarted={() => setScreen("file-upload")} />;
+        return <Landing onGetStarted={() => setScreen("consent")} />;
+
+      case "consent":
+        return (
+          <ConsentScreen
+            onContinue={(llmChoice) => {
+              setUseLLM(llmChoice);
+              setScreen("file-upload");
+            }}
+            onBack={() => setScreen("landing")}
+          />
+        );
 
       case "file-upload":
         return (
@@ -101,7 +123,7 @@ function App() {
               setFilePath(path);
               setScreen("project-list");
             }}
-            onBack={() => setScreen("landing")}
+            onBack={() => setScreen("consent")}
           />
         );
 

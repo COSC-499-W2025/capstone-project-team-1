@@ -1,6 +1,7 @@
 // Screen types
 export type Screen = 
   | "landing"
+  | "consent"
   | "file-upload"
   | "project-list"
   | "analysis"
