@@ -1,4 +1,5 @@
 import { theme, type ResumeData } from "../types";
+import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {
   data: ResumeData;
@@ -17,25 +18,11 @@ export function ResumePreview({ data, onBack, onRestart }: ResumePreviewProps) {
       flexDirection="column"
       backgroundColor={theme.bgDark}
     >
-      {/* Header */}
-      <box
-        paddingLeft={2}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.bgMedium}
-        flexDirection="row"
-        justifyContent="space-between"
-        paddingRight={2}
-      >
-        <text>
-          <span fg={theme.gold}>
-            <strong>Resume Generated!</strong>
-          </span>
-        </text>
-        <text>
-          <span fg={theme.success}>✓ Analysis complete</span>
-        </text>
-      </box>
+      <TopBar 
+        step="Done" 
+        title="Resume Generated" 
+        description="Analysis complete."
+      />
 
       {/* Resume content */}
       <scrollbox

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { TopBar } from "./TopBar";
 import { theme } from "../types";
 import { analysisSteps } from "../data/mockProjects";
 
@@ -56,20 +57,11 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
       flexDirection="column"
       backgroundColor={theme.bgDark}
     >
-      {/* Header */}
-      <box
-        paddingLeft={2}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.bgMedium}
-      >
-        <text>
-          <span fg={theme.gold}>
-            <strong>Step 3:</strong>
-          </span>
-          <span fg={theme.textPrimary}> Analyzing Your Projects</span>
-        </text>
-      </box>
+      <TopBar 
+        step="Step 3" 
+        title="Analysis" 
+        description="Mining artifacts and generating insights..."
+      />
 
       {/* Main content */}
       <box

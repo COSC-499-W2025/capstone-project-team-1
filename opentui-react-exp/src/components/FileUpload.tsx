@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TopBar } from "./TopBar";
 import { theme } from "../types";
 
 interface FileUploadProps {
@@ -28,20 +29,11 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
       flexDirection="column"
       backgroundColor={theme.bgDark}
     >
-      {/* Header */}
-      <box
-        paddingLeft={2}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.bgMedium}
-      >
-        <text>
-          <span fg={theme.gold}>
-            <strong>Step 1:</strong>
-          </span>
-          <span fg={theme.textPrimary}> Select Your Projects</span>
-        </text>
-      </box>
+      <TopBar 
+        step="Step 1" 
+        title="Select Your Projects" 
+        description="Enter the path to your zip file containing git repositories"
+      />
 
       {/* Main content */}
       <box

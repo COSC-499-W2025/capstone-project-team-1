@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useKeyboard } from "@opentui/react";
+import { TopBar } from "./TopBar";
 import { theme } from "../types";
 
 interface ConsentScreenProps {
@@ -29,19 +30,11 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 
   return (
     <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-      {/* Header */}
-      <box flexDirection="column" paddingLeft={3} paddingTop={2} paddingBottom={2}>
-        <text>
-          <span fg={theme.textPrimary}>
-            <strong>Privacy Settings</strong>
-          </span>
-        </text>
-        <text>
-          <span fg={theme.textSecondary}>
-            Choose how your project metadata is analyzed.
-          </span>
-        </text>
-      </box>
+      <TopBar 
+        step="Privacy" 
+        title="Settings" 
+        description="Choose how your project metadata is analyzed."
+      />
 
       {/* Main split-screen container */}
       <box flexGrow={1} flexDirection="row" gap={1} paddingLeft={2} paddingRight={2} paddingBottom={2}>

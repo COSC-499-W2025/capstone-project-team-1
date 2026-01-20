@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { TopBar } from "./TopBar";
 import { theme, type Project } from "../types";
 import { mockProjects } from "../data/mockProjects";
 
@@ -18,26 +19,11 @@ export function ProjectList({ projects, onContinue, onBack }: ProjectListProps) 
       flexDirection="column"
       backgroundColor={theme.bgDark}
     >
-      {/* Header */}
-      <box
-        paddingLeft={2}
-        paddingTop={1}
-        paddingBottom={1}
-        backgroundColor={theme.bgMedium}
-        flexDirection="row"
-        justifyContent="space-between"
-        paddingRight={2}
-      >
-        <text>
-          <span fg={theme.gold}>
-            <strong>Step 2:</strong>
-          </span>
-          <span fg={theme.textPrimary}> Review Detected Projects</span>
-        </text>
-        <text>
-          <span fg={theme.textDim}>{projects.length} projects found</span>
-        </text>
-      </box>
+      <TopBar 
+        step="Step 2" 
+        title="Review Detected Projects" 
+        description="Select a project to see details."
+      />
 
       {/* Split view */}
       <box flexGrow={1} flexDirection="row">

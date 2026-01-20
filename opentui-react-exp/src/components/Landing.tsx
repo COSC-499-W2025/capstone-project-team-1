@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+// import { TopBar } from "./TopBar";
 import { theme } from "../types";
 
 interface LandingProps {
@@ -58,12 +59,21 @@ export function Landing({ onGetStarted }: LandingProps) {
     <box
       flexGrow={1}
       flexDirection="column"
-      alignItems="center"
-      justifyContent="center"
       backgroundColor="#000000"
-      gap={10}
     >
-      {/* Title Section with typewriter effect */}
+      {/* <TopBar 
+        step="ARTIFACT MINER" 
+        title="Welcome" 
+        description="Transform your code into a professional resume"
+      /> */}
+      <box
+        flexGrow={1}
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        gap={10}
+      >
+        {/* Title Section with typewriter effect */}
       <box flexDirection="column" alignItems="center" gap={1}>
         <ascii-font font="block" text={revealedText + cursor} color={theme.gold} />
         <text>
@@ -103,6 +113,7 @@ export function Landing({ onGetStarted }: LandingProps) {
           <span fg={theme.textDim}> Generate resume</span>
         </text>
       </box> */}
+      </box>
     </box>
   );
 }
