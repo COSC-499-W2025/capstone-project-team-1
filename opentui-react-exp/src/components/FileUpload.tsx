@@ -34,7 +34,6 @@ const mockFileSystem = {
 
 export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
   const [selectedPath, setSelectedPath] = useState("/Users/shlok/projects/capstone-project.zip");
-  const [activePanel, setActivePanel] = useState<"tree" | "details">("tree");
   
   // Interaction handling would go here - simplified for visual demo
   
@@ -52,7 +51,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
           width="60%" 
           border 
           borderStyle="rounded" 
-          borderColor={activePanel === "tree" ? theme.cyan : theme.textDim}
+          borderColor={theme.gold}
           flexDirection="column"
           padding={1}
         >
@@ -72,7 +71,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
           flexGrow={1} 
           border 
           borderStyle="rounded" 
-          borderColor={activePanel === "details" ? theme.cyan : theme.textDim}
+          borderColor={theme.textDim}
           flexDirection="column"
           padding={1}
         >
@@ -97,15 +96,16 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
                 <span fg={theme.textDim}> to select</span>
              </text>
           </box>
+
+          <box marginTop={5} border borderStyle="single" borderColor={theme.goldDark} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
+             <text>
+                <span fg={theme.goldDark}>Demo Mode:</span>
+                <span fg={theme.textDim}> Press </span>
+                <span fg={theme.cyan}>Enter</span>
+                <span fg={theme.textDim}> to continue</span>
+             </text>
+          </box>
         </box>
-      </box>
-      
-      <box height={3} border borderStyle="single" borderColor={theme.textDim} paddingLeft={2} alignItems="center">
-         <text>
-            <span fg={theme.cyan}>TAB</span> Switch Panel  |  
-            <span fg={theme.cyan}> ↑/↓</span> Navigate  |  
-            <span fg={theme.cyan}> ENTER</span> Select
-         </text>
       </box>
     </box>
   );
