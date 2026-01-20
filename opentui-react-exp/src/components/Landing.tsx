@@ -8,6 +8,7 @@ interface LandingProps {
 
 const TITLE = "ARTIFACT MINER";
 const SUBTITLE = "Transform your code into a professional resume";
+const CTA_TEXT = "Get Started";
 
 // Gold color cycle for pulsing border glow
 const glowColors = [
@@ -27,7 +28,7 @@ export function Landing({ onGetStarted }: LandingProps) {
   // Pulsing border glow state
   const [glowIndex, setGlowIndex] = useState(0);
 
-  // Subtitle ripple state: which character index is currently "highlighted"
+  // CTA ripple state: which character index is currently "highlighted"
   const [rippleIndex, setRippleIndex] = useState(-1);
   const [showSubtitle, setShowSubtitle] = useState(false);
 
@@ -69,23 +70,23 @@ export function Landing({ onGetStarted }: LandingProps) {
     }
   }, [revealedChars, showSubtitle]);
 
-  // Ripple effect: cycle through subtitle characters
+  // Ripple effect: cycle through CTA characters
   useEffect(() => {
     if (!showSubtitle) {
       return;
     }
 
     const rippleInterval = setInterval(() => {
-      setRippleIndex((i) => (i + 1) % (SUBTITLE.length + 6)); // +6 for pause at end
+      setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
     }, 60);
 
     return () => clearInterval(rippleInterval);
   }, [showSubtitle]);
 
   const revealedText = TITLE.slice(0, revealedChars);
-  const cursor = showCursor && revealedChars < TITLE.length ? "▌" : "";
+  const cursor = showCursor ? "|" : " ";
 
-  // Render subtitle with ripple effect (color wave)
+  // Render subtitle without ripple effect
   const renderSubtitle = () => {
     if (!showSubtitle) {
       return null;
@@ -93,31 +94,32 @@ export function Landing({ onGetStarted }: LandingProps) {
 
     return (
       <text>
-        {SUBTITLE.split("").map((char, i) => {
-          // Calculate distance from ripple center
-          const distance = Math.abs(i - rippleIndex);
-          
-          // Determine color based on distance from ripple
-          let color: string;
-          if (distance === 0) {
-            color = theme.gold; // Brightest at center
-          } else if (distance === 1) {
-            color = "#E6C200"; // Slightly dimmer
-          } else if (distance === 2) {
-            color = "#CCAA00"; // More dim
-          } else {
-            color = theme.goldDark; // Default dim color
-          }
-
-          return (
-            <span key={i} fg={color}>
-              {char}
-            </span>
-          );
-        })}
+        <span fg={theme.goldDark}>{SUBTITLE}</span>
       </text>
     );
   };
+
+  const renderCtaText = () =>
+    CTA_TEXT.split("").map((char, i) => {
+      const distance = Math.abs(i - rippleIndex);
+
+      let color: string;
+      if (distance === 0) {
+        color = theme.gold;
+      } else if (distance === 1) {
+        color = "#E6C200";
+      } else if (distance === 2) {
+        color = "#CCAA00";
+      } else {
+        color = theme.goldDark;
+      }
+
+      return (
+        <span key={i} fg={color}>
+          {char}
+        </span>
+      );
+    });
 
   return (
     <box
@@ -156,9 +158,7 @@ export function Landing({ onGetStarted }: LandingProps) {
         onMouseDown={onGetStarted}
       >
         <text>
-          <span fg={theme.gold}>
-            <strong>Get Started</strong>
-          </span>
+          <strong>{renderCtaText()}</strong>
         </text>
       </box>
 
