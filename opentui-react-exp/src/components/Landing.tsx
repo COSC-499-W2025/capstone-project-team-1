@@ -6,8 +6,21 @@ interface LandingProps {
   onGetStarted: () => void;
 }
 
-const TITLE = "ARTIFACT MINER";
-const SUBTITLE = "Transform your code into a professional resume";
+const SUBTITLE_OPTIONS = [
+  "Projects become portfolio",
+  "Build your narrative",
+  "Your repos, rewritten by us",
+  "From terminal to timeline",
+  "Proof of work, now polished by us",
+  "Turning your TODOs to ta-das",
+];
+
+const getRandomSubtitle = () => {
+  const randomIndex = Math.floor(Math.random() * SUBTITLE_OPTIONS.length);
+  return SUBTITLE_OPTIONS[randomIndex];
+};
+
+const TITLE_SEQUENCE = [getRandomSubtitle(), "ARTIFACT MINER"];
 const CTA_TEXT = "Get Started";
 
 // Gold color cycle for pulsing border glow
@@ -21,34 +34,60 @@ const glowColors = [
 ];
 
 export function Landing({ onGetStarted }: LandingProps) {
-  // Typewriter reveal state
-  const [revealedChars, setRevealedChars] = useState(0);
-  const [showCursor, setShowCursor] = useState(true);
+  // Typewriter title state
+  const [titleText, setTitleText] = useState("");
+  const [titlePhase, setTitlePhase] = useState<
+    "typing" | "pause" | "deleting"
+  >("typing");
+  const [titleIndex, setTitleIndex] = useState(0);
 
-  // Pulsing border glow state
-  const [glowIndex, setGlowIndex] = useState(0);
-
-  // CTA ripple state: which character index is currently "highlighted"
   const [rippleIndex, setRippleIndex] = useState(-1);
-  const [showSubtitle, setShowSubtitle] = useState(false);
+  const [glowIndex, setGlowIndex] = useState(0);
+  const [enableCtaRipple, setEnableCtaRipple] = useState(false);
+  const [ctaOpacity, setCtaOpacity] = useState(0);
 
-  // Typewriter effect: reveal title letter by letter
+  // Typewriter effect for the title sequence
   useEffect(() => {
-    if (revealedChars < TITLE.length) {
-      const timer = setTimeout(() => {
-        setRevealedChars((c) => c + 1);
-      }, 80); // 80ms per character
-      return () => clearTimeout(timer);
+    const targetText = TITLE_SEQUENCE[titleIndex] ?? "";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    if (titlePhase === "typing") {
+      if (titleText.length < targetText.length) {
+        timer = setTimeout(() => {
+          setTitleText(targetText.slice(0, titleText.length + 1));
+        }, 80);
+      } else {
+        timer = setTimeout(() => {
+          setTitlePhase("pause");
+        }, 700);
+      }
+    } else if (titlePhase === "deleting") {
+      if (titleText.length > 0) {
+        timer = setTimeout(() => {
+          setTitleText(titleText.slice(0, -1));
+        }, 45);
+      } else {
+        setTitlePhase("typing");
+        setTitleIndex((index) => index + 1);
+      }
+    } else if (titlePhase === "pause") {
+      if (titleIndex >= TITLE_SEQUENCE.length - 1) {
+        setEnableCtaRipple(true);
+        return undefined;
+      }
+
+      timer = setTimeout(() => {
+        setTitlePhase("deleting");
+      }, 700);
     }
-  }, [revealedChars]);
 
-  // Blinking cursor effect
-  useEffect(() => {
-    const cursorInterval = setInterval(() => {
-      setShowCursor((c) => !c);
-    }, 500);
-    return () => clearInterval(cursorInterval);
-  }, []);
+    return () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+    };
+  }, [titleIndex, titlePhase, titleText]);
+
 
   // Pulsing glow effect on button border
   useEffect(() => {
@@ -58,46 +97,28 @@ export function Landing({ onGetStarted }: LandingProps) {
     return () => clearInterval(glowInterval);
   }, []);
 
-  // Show subtitle after title typewriter completes
-  useEffect(() => {
-    if (revealedChars >= TITLE.length && !showSubtitle) {
-      // Small delay before showing subtitle
-      const timer = setTimeout(() => {
-        setShowSubtitle(true);
-        setRippleIndex(0);
-      }, 200);
-      return () => clearTimeout(timer);
-    }
-  }, [revealedChars, showSubtitle]);
-
   // Ripple effect: cycle through CTA characters
   useEffect(() => {
-    if (!showSubtitle) {
+    if (!enableCtaRipple) {
       return;
     }
+
+    setCtaOpacity(0);
+    const fadeStep = 1 / 12;
+    const fadeInterval = setInterval(() => {
+      setCtaOpacity((value) => Math.min(1, value + fadeStep));
+    }, 50);
 
     const rippleInterval = setInterval(() => {
       setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
     }, 60);
 
-    return () => clearInterval(rippleInterval);
-  }, [showSubtitle]);
+    return () => {
+      clearInterval(rippleInterval);
+      clearInterval(fadeInterval);
+    };
+  }, [enableCtaRipple]);
 
-  const revealedText = TITLE.slice(0, revealedChars);
-  const cursor = showCursor ? "|" : " ";
-
-  // Render subtitle without ripple effect
-  const renderSubtitle = () => {
-    if (!showSubtitle) {
-      return null;
-    }
-
-    return (
-      <text>
-        <span fg={theme.goldDark}>{SUBTITLE}</span>
-      </text>
-    );
-  };
 
   const renderCtaText = () =>
     CTA_TEXT.split("").map((char, i) => {
@@ -121,6 +142,18 @@ export function Landing({ onGetStarted }: LandingProps) {
       );
     });
 
+  const renderTitle = () => {
+    if (titleIndex === 0) {
+      return (
+        <text>
+          <span fg={theme.gold}>{titleText}</span>
+        </text>
+      );
+    }
+
+    return <ascii-font font="block" text={titleText} color={theme.gold} />;
+  };
+
   return (
     <box
       flexGrow={1}
@@ -137,30 +170,44 @@ export function Landing({ onGetStarted }: LandingProps) {
         flexDirection="column"
         alignItems="center"
         justifyContent="center"
-        gap={10}
+        gap={3}
       >
         {/* Title Section with typewriter effect */}
-      <box flexDirection="column" alignItems="center" gap={1}>
-        <ascii-font font="block" text={revealedText + cursor} color={theme.gold} />
-        {renderSubtitle()}
-      </box>
+        <box
+          flexDirection="column"
+          alignItems="center"
+          justifyContent="center"
+          gap={1}
+          height={8}
+        >
+           <box
+             flexDirection="row"
+             alignItems="flex-end"
+             gap={1}
+           >
+             {renderTitle()}
+           </box>
+        </box>
 
       {/* Get Started Button with pulsing glow */}
-      <box
-        border
-        borderStyle="rounded"
-        borderColor={glowColors[glowIndex]}
-        backgroundColor="#1a1a00"
-        paddingLeft={4}
-        paddingRight={4}
-        paddingTop={1}
-        paddingBottom={1}
-        onMouseDown={onGetStarted}
-      >
-        <text>
-          <strong>{renderCtaText()}</strong>
-        </text>
-      </box>
+      {enableCtaRipple ? (
+        <box
+          border
+          borderStyle="rounded"
+          borderColor={glowColors[glowIndex]}
+          backgroundColor="#1a1a00"
+          paddingLeft={4}
+          paddingRight={4}
+          paddingTop={1}
+          paddingBottom={1}
+          onMouseDown={onGetStarted}
+          style={{ opacity: ctaOpacity }}
+        >
+          <text>
+            <strong>{renderCtaText()}</strong>
+          </text>
+        </box>
+      ) : null}
 
       {/* Feature highlights */}
       {/* <box flexDirection="column" alignItems="center" gap={0} marginTop={2}>
