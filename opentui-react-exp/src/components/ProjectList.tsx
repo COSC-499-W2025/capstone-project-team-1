@@ -151,6 +151,16 @@ export function ProjectList({ projects, onContinue, onBack }: ProjectListProps) 
           )}
         </box>
       </box>
+
+      {/* Demo Mode Banner */}
+      <box height={3} border borderStyle="single" borderColor={theme.error} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
+        <text>
+          <span fg={theme.goldDark}>Demo Mode:</span>
+          <span fg={theme.textDim}> Press </span>
+          <span fg={theme.cyan}>Enter</span>
+          <span fg={theme.textDim}> to continue</span>
+        </text>
+      </box>
     </box>
   );
 }

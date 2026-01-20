@@ -97,7 +97,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
              </text>
           </box>
 
-          <box marginTop={5} border borderStyle="single" borderColor={theme.goldDark} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
+          <box marginTop={5} border borderStyle="single" borderColor={theme.error} paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
              <text>
                 <span fg={theme.goldDark}>Demo Mode:</span>
                 <span fg={theme.textDim}> Press </span>
