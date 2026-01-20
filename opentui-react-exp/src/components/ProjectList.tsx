@@ -43,7 +43,7 @@ export function ProjectList({ projects, onContinue, onBack }: ProjectListProps) 
       <box flexGrow={1} flexDirection="row">
         {/* Left panel: Project list */}
         <box
-          width="40%"
+          width={45}
           flexDirection="column"
           border
           borderStyle="single"
