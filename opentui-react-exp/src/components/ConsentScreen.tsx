@@ -39,16 +39,16 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
       {/* Main split-screen container */}
       <box flexGrow={1} flexDirection="row" gap={1} paddingLeft={2} paddingRight={2} paddingBottom={2}>
         {/* Cloud Analysis Panel */}
-        <box
-          flexGrow={1}
-          flexDirection="column"
-          padding={2}
-          border
-          borderStyle={isCloudSelected ? "double" : "single"}
-          borderColor={isCloudSelected ? theme.gold : theme.textDim}
-          backgroundColor={isCloudSelected ? theme.bgMedium : theme.bgDark}
-          gap={1}
-        >
+         <box
+           flexGrow={1}
+           flexDirection="column"
+           padding={2}
+           border
+           borderStyle={isCloudSelected ? "rounded" : "rounded"}
+           borderColor={isCloudSelected ? theme.gold : theme.textDim}
+           backgroundColor={isCloudSelected ? theme.bgMedium : theme.bgDark}
+           gap={1}
+         >
           <text>
             <span fg={isCloudSelected ? theme.gold : theme.textSecondary}>
               <strong>Cloud Analysis</strong>
@@ -98,16 +98,16 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
         </box>
 
         {/* Offline Analysis Panel */}
-        <box
-          flexGrow={1}
-          flexDirection="column"
-          padding={2}
-          border
-          borderStyle={isOfflineSelected ? "double" : "single"}
-          borderColor={isOfflineSelected ? theme.gold : theme.textDim}
-          backgroundColor={isOfflineSelected ? theme.bgMedium : theme.bgDark}
-          gap={1}
-        >
+         <box
+           flexGrow={1}
+           flexDirection="column"
+           padding={2}
+           border
+           borderStyle={isOfflineSelected ? "rounded" : "rounded"}
+           borderColor={isOfflineSelected ? theme.gold : theme.textDim}
+           backgroundColor={isOfflineSelected ? theme.bgMedium : theme.bgDark}
+           gap={1}
+         >
           <text>
             <span fg={isOfflineSelected ? theme.gold : theme.textSecondary}>
               <strong>Offline</strong>
