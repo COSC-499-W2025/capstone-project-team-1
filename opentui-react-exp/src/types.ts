@@ -65,7 +65,7 @@ export const theme = {
   // Text
   textPrimary: "#FFFFFF",
   textSecondary: "#CCCCCC",
-  textDim: "#666666",
+  textDim: "#b2b0b0b4",
   
   // Accents
   success: "#32CD32",
