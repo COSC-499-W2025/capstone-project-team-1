@@ -72,7 +72,7 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
         gap={3}
       >
         {/* ASCII Art Animation */}
-        <box flexDirection="column" alignItems="center">
+        {/* <box flexDirection="column" alignItems="center">
           <text>
             <span fg={theme.cyan}>
               {"    "}╭─────────────────────────────╮{"\n"}
@@ -80,20 +80,8 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
               {"    "}╰─────────────────────────────╯
             </span>
           </text>
-        </box>
+        </box> */}
 
-        {/* Progress bar */}
-        <box flexDirection="column" alignItems="center" gap={1}>
-          <text>
-            <span fg={theme.gold}>{progressBar}</span>
-          </text>
-          <text>
-            <span fg={theme.textPrimary}>
-              <strong>{progress}%</strong>
-            </span>
-            <span fg={theme.textDim}> complete</span>
-          </text>
-        </box>
 
         {/* Step checklist */}
         <box
@@ -129,8 +117,21 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
           })}
         </box>
 
+        {/* Progress bar */}
+        <box flexDirection="column" alignItems="center" gap={1}>
+          <text>
+            <span fg={theme.gold}>{progressBar}</span>
+          </text>
+          <text>
+            <span fg={theme.textPrimary}>
+              <strong>{progress}%</strong>
+            </span>
+            <span fg={theme.textDim}> complete</span>
+          </text>
+        </box>
+
         {/* Live log */}
-        <box
+        {/* <box
           flexDirection="column"
           width={60}
           height={5}
@@ -150,7 +151,7 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
               <span fg={theme.textDim}>{log}</span>
             </text>
           ))}
-        </box>
+        </box> */}
       </box>
 
       {/* Demo Mode Banner */}
