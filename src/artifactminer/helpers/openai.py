@@ -4,7 +4,7 @@ from typing import List
 
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, OpenAI
-
+"""
 load_dotenv()
 
 __all__ = ["get_gpt5_nano_response", "get_gpt5_nano_response_sync"]
@@ -15,7 +15,7 @@ _async_client = AsyncOpenAI()
 
 # Create a single shared client instance for all sync requests
 _sync_client = OpenAI()
-
+"""
 
 async def get_gpt5_nano_response(prompt: str) -> str:
     """Call the OpenAI Responses API with the gpt-5-nano model and return plain text (async).
