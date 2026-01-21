@@ -1,148 +1,171 @@
-"""Reusable agent loop for Ollama models with tool calling."""
-
-from dataclasses import dataclass
-from typing import Callable, Dict, List, Any, Optional, Union
+import os
+from pathlib import Path
 from ollama import chat, ChatResponse
-import time
+
+# Global base directory - set at runtime
+BASE_DIR: str = ""
 
 
-@dataclass
-class AgentLoopResult:
-    """Result from an agent loop execution."""
-
-    model: str
-    final_answer: str
-    total_time_seconds: float
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    tool_calls_made: int
-    is_correct: Optional[bool] = None  # Set by test harness
+def resolve_path(path: str) -> str:
+    """Resolve a path relative to BASE_DIR if not absolute."""
+    if os.path.isabs(path):
+        return path
+    return os.path.join(BASE_DIR, path)
 
 
-class AgentLoop:
-    """Reusable agent loop for Ollama models with tool calling."""
+def list_directory(path: str) -> str:
+    """List all files and folders in a directory.
 
-    def __init__(
-        self,
-        model: str,
-        tools: List[Callable],
-        available_functions: Dict[str, Callable],
-        max_iterations: int = 10,
-    ):
-        """
-        Initialize the agent loop.
+    Args:
+        path: The path to the directory (can be relative to base directory or absolute).
 
-        Args:
-            model: The Ollama model name to use
-            tools: List of tool functions to make available
-            available_functions: Dict mapping function names to callables
-            max_iterations: Maximum number of agent loop iterations
-        """
-        self.model = model
-        self.tools = tools
-        self.available_functions = available_functions
-        self.max_iterations = max_iterations
-
-    def run(self, messages: List[Dict[str, Any]]) -> AgentLoopResult:
-        """
-        Execute the agent loop and return metrics.
-
-        Args:
-            messages: Initial conversation messages
-
-        Returns:
-            AgentLoopResult with timing, token counts, and final answer
-        """
-        messages_copy: List[Any] = [
-            msg.copy() for msg in messages
-        ]  # Don't mutate input
-        start_time = time.perf_counter()
-        total_prompt_tokens = 0
-        total_completion_tokens = 0
-        tool_calls_count = 0
-        final_content = ""
-
-        for _ in range(self.max_iterations):
-            response: ChatResponse = chat(
-                model=self.model,
-                messages=messages_copy,
-                tools=self.tools,
-            )
-            # Append the message object directly - Ollama handles it
-            messages_copy.append(response.message)
-            final_content = response.message.content or ""
-
-            # Accumulate token counts (if available from Ollama response)
-            if hasattr(response, "prompt_eval_count") and response.prompt_eval_count:
-                total_prompt_tokens += response.prompt_eval_count
-            if hasattr(response, "eval_count") and response.eval_count:
-                total_completion_tokens += response.eval_count
-
-            if response.message.tool_calls:
-                for tc in response.message.tool_calls:
-                    tool_calls_count += 1
-                    if tc.function.name in self.available_functions:
-                        result = self.available_functions[tc.function.name](
-                            **tc.function.arguments
-                        )
-                        messages_copy.append(
-                            {
-                                "role": "tool",
-                                "tool_name": tc.function.name,
-                                "content": str(result),
-                            }
-                        )
+    Returns:
+        A string containing the names of all files and folders in the directory,
+        with folders marked with a trailing slash.
+    """
+    try:
+        full_path = resolve_path(path)
+        entries = os.listdir(full_path)
+        result = []
+        for entry in sorted(entries):
+            entry_path = os.path.join(full_path, entry)
+            if os.path.isdir(entry_path):
+                result.append(f"{entry}/")
             else:
-                # No more tool calls, agent is done
-                break
-
-        elapsed = time.perf_counter() - start_time
-
-        return AgentLoopResult(
-            model=self.model,
-            final_answer=final_content,
-            total_time_seconds=elapsed,
-            prompt_tokens=total_prompt_tokens,
-            completion_tokens=total_completion_tokens,
-            total_tokens=total_prompt_tokens + total_completion_tokens,
-            tool_calls_made=tool_calls_count,
-        )
+                result.append(entry)
+        return "\n".join(result) if result else "Directory is empty"
+    except FileNotFoundError:
+        return f"Error: Directory '{path}' not found"
+    except PermissionError:
+        return f"Error: Permission denied for '{path}'"
 
 
-# --- Tool definitions (used for standalone execution) ---
-def add(a: int, b: int) -> int:
-    """Add two numbers."""
-    a = int(a) if isinstance(a, str) else a
-    b = int(b) if isinstance(b, str) else b
-    return a + b
+def read_file(path: str) -> str:
+    """Read and return the contents of a file.
+
+    Args:
+        path: The path to the file (can be relative to base directory or absolute).
+
+    Returns:
+        The contents of the file as a string.
+    """
+    try:
+        full_path = resolve_path(path)
+        with open(full_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        return f"Error: File '{path}' not found"
+    except PermissionError:
+        return f"Error: Permission denied for '{path}'"
+    except UnicodeDecodeError:
+        return f"Error: File '{path}' is not a text file or has encoding issues"
 
 
-def multiply(a: int, b: int) -> int:
-    """Multiply two numbers."""
-    a = int(a) if isinstance(a, str) else a
-    b = int(b) if isinstance(b, str) else b
-    return a * b
+def get_file_info(path: str) -> str:
+    """Get metadata information about a file.
 
+    Args:
+        path: The path to the file (can be relative to base directory or absolute).
+
+    Returns:
+        A string containing the file size in bytes and the file extension.
+    """
+    try:
+        full_path = resolve_path(path)
+        stat = os.stat(full_path)
+        size = stat.st_size
+        extension = Path(full_path).suffix or "(no extension)"
+        is_dir = os.path.isdir(full_path)
+        return f"Size: {size} bytes\nExtension: {extension}\nIs directory: {is_dir}"
+    except FileNotFoundError:
+        return f"Error: Path '{path}' not found"
+    except PermissionError:
+        return f"Error: Permission denied for '{path}'"
+
+
+available_functions = {
+    "list_directory": list_directory,
+    "read_file": read_file,
+    "get_file_info": get_file_info,
+}
+
+SYSTEM_PROMPT = """You are a code repository explorer. You MUST use tools to explore directories and read files.
+
+IMPORTANT: 
+- Always call tools. Never explain what you will do - just do it.
+- Use relative paths like "README.md", "main.py", "utils/helpers.py" (paths are resolved automatically)
+- To list root directory, use path "."
+
+Steps:
+1. Call list_directory with "." to see files in the root
+2. Call read_file on each important file (README.md, .py files)
+3. If you see subdirectories (marked with /), explore them with list_directory
+4. Read at least 4-5 files before summarizing
+
+When you have read enough files to understand the codebase, provide a detailed summary of:
+- What the repository does
+- Key components and their purposes
+- Technologies/frameworks used"""
 
 if __name__ == "__main__":
-    # Example standalone usage
-    available_functions = {
-        "add": add,
-        "multiply": multiply,
-    }
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    BASE_DIR = os.path.join(script_dir, "mock_repo")
 
-    agent = AgentLoop(
-        model="qwen3:1.7b",
-        tools=[add, multiply],
-        available_functions=available_functions,
-    )
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": "Explore this repository. Start by calling list_directory with path '.'"},
+    ]
 
-    messages = [{"role": "user", "content": "What is (11434+12341)*412?"}]
-    result = agent.run(messages)
+    print(f"Starting exploration of: {BASE_DIR}\n")
+    print("=" * 60)
 
-    print(f"Model: {result.model}")
-    print(f"Answer: {result.final_answer}")
-    print(f"Time: {result.total_time_seconds:.2f}s")
-    print(f"Tokens: {result.total_tokens}")
-    print(f"Tool calls: {result.tool_calls_made}")
+    MAX_ITERATIONS = 15
+    iteration = 0
+
+    while iteration < MAX_ITERATIONS:
+        iteration += 1
+        print(f"\n--- Iteration {iteration}/{MAX_ITERATIONS} ---")
+        response: ChatResponse = chat(
+            model="qwen3:4b",
+            messages=messages,
+            tools=[list_directory, read_file, get_file_info],
+            think=True,
+        )
+        messages.append(response.message)
+
+        if response.message.thinking:
+            thinking_preview = response.message.thinking[:500] + "..." if len(response.message.thinking) > 500 else response.message.thinking
+            print(f"Thinking: {thinking_preview}")
+        if response.message.content:
+            print(f"Content: {response.message.content}")
+
+        if response.message.tool_calls:
+            for tc in response.message.tool_calls:
+                func_name = tc.function.name
+                func_args = tc.function.arguments
+                print(f"\nTool Call: {func_name}({func_args})")
+
+                if func_name in available_functions:
+                    result = available_functions[func_name](**func_args)
+                    print(f"Result:\n{result}")
+                    messages.append({
+                        "role": "tool",
+                        "tool_name": func_name,
+                        "content": str(result),
+                    })
+                else:
+                    error_msg = f"Unknown function: {func_name}"
+                    print(error_msg)
+                    messages.append({
+                        "role": "tool",
+                        "tool_name": func_name,
+                        "content": error_msg,
+                    })
+        else:
+            print("\n" + "=" * 60)
+            print("Exploration complete!")
+            break
+
+    if iteration >= MAX_ITERATIONS:
+        print("\n" + "=" * 60)
+        print("Max iterations reached. Forcing summary.")
