@@ -95,17 +95,62 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             db=db
         )
         
-        print(f"Analyzed {len(analyze_result.repos_analyzed)} repositories")
+        print(f"\n{'='*80}")
+        print(f"ANALYSIS COMPLETE: {len(analyze_result.repos_analyzed)} repositories analyzed")
+        print(f"{'='*80}\n")
         
-        # Retrieve results from database
-        print("Fetching results...")
+        # Display detailed insights for each analyzed project
+        for idx, repo in enumerate(analyze_result.repos_analyzed, 1):
+            print(f"\n{'─'*80}")
+            print(f"[{idx}] {repo.project_name}")
+            print(f"{'─'*80}")
+            print(f"  Path: {repo.project_path}")
+            
+            if repo.error:
+                print(f"  ⚠ Error: {repo.error}")
+                continue
+            
+            # Languages and Frameworks
+            if repo.languages:
+                print(f"  Languages: {', '.join(repo.languages)}")
+            if repo.frameworks:
+                print(f"  Frameworks: {', '.join(repo.frameworks)}")
+            
+            # Skills and Insights
+            print(f"  Skills extracted: {repo.skills_count}")
+            print(f"  Insights generated: {repo.insights_count}")
+            
+            # User Contribution Metrics
+            if repo.user_contribution_pct is not None:
+                print(f"  User contribution: {repo.user_contribution_pct:.1f}%")
+            if repo.user_total_commits is not None:
+                print(f"  User commits: {repo.user_total_commits}")
+            if repo.user_commit_frequency is not None:
+                print(f"  Commit frequency: {repo.user_commit_frequency:.2f} commits/week")
+            
+            # Timeline
+            if repo.user_first_commit and repo.user_last_commit:
+                first = repo.user_first_commit.strftime("%Y-%m-%d")
+                last = repo.user_last_commit.strftime("%Y-%m-%d")
+                print(f"  Activity period: {first} → {last}")
+        
+        print(f"\n{'='*80}\n")
+        
+        # Retrieve results from database - only for projects analyzed in this ZIP
+        print("\nFetching results from analyzed projects...")
         from artifactminer.db.models import ResumeItem, UserAIntelligenceSummary, RepoStat
         from sqlalchemy import or_
         
-        # Get resume items
-        resume_items_query = db.query(ResumeItem, RepoStat).outerjoin(
+        # Get the extraction path for this specific ZIP to avoid duplicates
+        extraction_path_str = str(uploaded_zip.extraction_path) if uploaded_zip.extraction_path else str(analyze_result.extraction_path)
+        
+        # Get resume items - only for repos in this specific extraction path
+        resume_items_query = db.query(ResumeItem, RepoStat).join(
             RepoStat, ResumeItem.repo_stat_id == RepoStat.id
-        ).filter(or_(RepoStat.deleted_at.is_(None), RepoStat.id.is_(None)))
+        ).filter(
+            RepoStat.deleted_at.is_(None),
+            RepoStat.project_path.like(f"{extraction_path_str}%")
+        )
         
         resume_items = [
             {
@@ -118,9 +163,10 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             for item, repo in resume_items_query.all()
         ]
         
-        # Get summaries
+        # Get summaries - only for projects in this specific extraction path
         summaries_query = db.query(UserAIntelligenceSummary).filter(
-            UserAIntelligenceSummary.user_email == user_email
+            UserAIntelligenceSummary.user_email == user_email,
+            UserAIntelligenceSummary.repo_path.like(f"{extraction_path_str}%")
         )
         
         summaries = [
@@ -131,14 +177,33 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             for s in summaries_query.all()
         ]
         
+        # Convert analyze_result.repos_analyzed to dict format for export
+        project_analyses = [
+            {
+                "project_name": repo.project_name,
+                "project_path": repo.project_path,
+                "languages": repo.languages,
+                "frameworks": repo.frameworks,
+                "skills_count": repo.skills_count,
+                "insights_count": repo.insights_count,
+                "user_contribution_pct": repo.user_contribution_pct,
+                "user_total_commits": repo.user_total_commits,
+                "user_commit_frequency": repo.user_commit_frequency,
+                "user_first_commit": repo.user_first_commit,
+                "user_last_commit": repo.user_last_commit,
+                "error": repo.error if hasattr(repo, 'error') else None,
+            }
+            for repo in analyze_result.repos_analyzed
+        ]
+        
         # Export based on file extension
         print(f"Exporting to: {output_path}")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
         if output_path.suffix == ".json":
-            result_path = export_to_json(resume_items, summaries, output_path.parent)
+            result_path = export_to_json(resume_items, summaries, output_path.parent, project_analyses)
         else:  # default to text
-            result_path = export_to_text(resume_items, summaries, output_path.parent)
+            result_path = export_to_text(resume_items, summaries, output_path.parent, project_analyses)
         
         # Rename to user-specified name
         if result_path.exists():
