@@ -1,4 +1,4 @@
-"""ArtifactMiner CLI for non-interactive portfolio analysis."""
+"""ArtifactMiner CLI for portfolio analysis (interactive and non-interactive)."""
 
 import argparse
 import sys
@@ -230,6 +230,161 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         db.close()
 
 
+def print_header() -> None:
+    """Print the interactive CLI header."""
+    print("\n" + "=" * 60)
+    print("                    ARTIFACT MINER")
+    print("           Student Portfolio Analysis Tool")
+    print("=" * 60 + "\n")
+
+
+def _strip_wrapping_quotes(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        return value[1:-1]
+    return value
+
+
+def _normalize_path_value(value):
+    if value is None:
+        return None
+    if isinstance(value, Path):
+        return value.expanduser().resolve()
+    return Path(_strip_wrapping_quotes(str(value))).expanduser().resolve()
+
+
+def _validate_input_path(path):
+    path = _normalize_path_value(path)
+    if path is None:
+        return None
+    if not path.exists():
+        print(f"File not found: {path}")
+        return None
+    if path.suffix.lower() != ".zip":
+        print("File must be a .zip archive.")
+        return None
+    return path
+
+
+def _confirm_overwrite(path: Path) -> bool:
+    while True:
+        response = input(f"Output file exists: {path}. Overwrite? [y/N]: ").strip().lower()
+        if response in ("y", "yes"):
+            return True
+        if response in ("", "n", "no"):
+            return False
+        print("Please enter y or n.")
+
+
+def _validate_output_path(path, confirm_overwrite: bool = False):
+    path = _normalize_path_value(path)
+    if path is None:
+        return None
+    if path.suffix.lower() not in (".json", ".txt"):
+        print("Output must be .json or .txt")
+        return None
+    if confirm_overwrite and path.exists():
+        if not _confirm_overwrite(path):
+            return None
+    return path
+
+
+def prompt_consent() -> str:
+    print("Step 1: Consent")
+    print("-" * 40)
+    print("Choose your consent level:")
+    print("  [1] Full   - Allow LLM processing for enhanced analysis")
+    print("  [2] No LLM - Local analysis only (no external AI)")
+    print("  [3] None   - Minimal analysis")
+    print()
+
+    choices = {"1": "full", "2": "no_llm", "3": "none"}
+    while True:
+        choice = input("Enter choice [1/2/3] (default: 2): ").strip() or "2"
+        if choice in choices:
+            print(f"Consent: {choices[choice]}\n")
+            return choices[choice]
+        print("Invalid choice. Enter 1, 2, or 3.")
+
+
+def prompt_email() -> str:
+    print("Step 2: User Information")
+    print("-" * 40)
+    while True:
+        email = input("Enter your email address: ").strip()
+        if "@" in email and "." in email:
+            print(f"Email: {email}\n")
+            return email
+        print("Please enter a valid email address.")
+
+
+def prompt_input_file(initial=None) -> Path:
+    print("Step 3: Input File")
+    print("-" * 40)
+    if initial is not None:
+        validated = _validate_input_path(initial)
+        if validated is not None:
+            size_mb = validated.stat().st_size / (1024 * 1024)
+            print(f"Found: {validated.name} ({size_mb:.1f} MB)\n")
+            return validated
+    while True:
+        path_str = _strip_wrapping_quotes(input("Enter path to ZIP file: "))
+        if not path_str:
+            print("Please enter a path.")
+            continue
+        validated = _validate_input_path(path_str)
+        if validated is None:
+            continue
+        size_mb = validated.stat().st_size / (1024 * 1024)
+        print(f"Found: {validated.name} ({size_mb:.1f} MB)\n")
+        return validated
+
+
+def prompt_output_file(initial=None) -> Path:
+    print("Step 4: Output File")
+    print("-" * 40)
+    if initial is not None:
+        validated = _validate_output_path(initial, confirm_overwrite=True)
+        if validated is not None:
+            print(f"Output: {validated.name}\n")
+            return validated
+    while True:
+        path_str = _strip_wrapping_quotes(input("Enter output path (.json or .txt): "))
+        if not path_str:
+            print("Please enter a path.")
+            continue
+        validated = _validate_output_path(path_str, confirm_overwrite=True)
+        if validated is None:
+            continue
+        print(f"Output: {validated.name}\n")
+        return validated
+
+
+def run_interactive(input_path=None, output_path=None, consent=None, email=None) -> None:
+    """Run CLI in interactive mode - collect inputs via prompts, then call run_analysis()."""
+    try:
+        print_header()
+
+        if consent is None:
+            consent = prompt_consent()
+        if email is None:
+            email = prompt_email()
+
+        input_path = prompt_input_file(input_path)
+        output_path = prompt_output_file(output_path)
+
+        print("Proceed with analysis? [Y/n]: ", end="")
+        if input().strip().lower() not in ("", "y", "yes"):
+            print("Cancelled.")
+            sys.exit(0)
+
+        print()
+        asyncio.run(run_analysis(input_path, output_path, consent, email))
+    except (KeyboardInterrupt, EOFError):
+        print("\nCancelled.")
+        sys.exit(0)
+
+
 def main():
     """CLI entry point for ArtifactMiner."""
     parser = argparse.ArgumentParser(
@@ -240,43 +395,45 @@ def main():
     parser.add_argument(
         "-i", "--input",
         type=Path,
-        required=True,
         help="Path to input ZIP file"
     )
     
     parser.add_argument(
         "-o", "--output",
         type=Path,
-        required=True,
         help="Path to output file (.json or .txt)"
     )
     
     parser.add_argument(
         "-c", "--consent",
         choices=["full", "no_llm", "none"],
-        default="no_llm",
+        default=None,
         help="Consent level for LLM usage (default: no_llm)"
     )
     
     parser.add_argument(
         "-u", "--user-email",
-        default="cli-user@example.com",
+        default=None,
         help="User email for analysis tracking (default: cli-user@example.com)"
     )
     
     args = parser.parse_args()
     
-    # Validate input
-    if not args.input.exists():
-        print(f"Error: Input file not found: {args.input}", file=sys.stderr)
-        sys.exit(1)
-    
-    if not args.input.suffix == ".zip":
-        print(f"Error: Input must be a ZIP file", file=sys.stderr)
-        sys.exit(1)
-    
-    # Run analysis
-    asyncio.run(run_analysis(args.input, args.output, args.consent, args.user_email))
+    if args.input and args.output:
+        input_path = _validate_input_path(args.input)
+        if input_path is None:
+            print(f"Error: Invalid input file: {args.input}", file=sys.stderr)
+            sys.exit(1)
+        consent = args.consent or "no_llm"
+        email = args.user_email or "cli-user@example.com"
+        asyncio.run(run_analysis(input_path, args.output, consent, email))
+    else:
+        run_interactive(
+            input_path=args.input,
+            output_path=args.output,
+            consent=args.consent,
+            email=args.user_email,
+        )
 
 
 if __name__ == "__main__":
