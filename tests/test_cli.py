@@ -7,10 +7,27 @@ import pytest
 def zip_file():
     return Path(__file__).parent / "data" / "mock_projects.zip"
 
-def test_cli_requires_input(tmp_path):
-    """CLI fails without --input argument."""
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-o", str(tmp_path / "out.txt")], capture_output=True)
-    assert result.returncode != 0
+def test_cli_interactive_mode(zip_file, tmp_path, monkeypatch):
+    """CLI runs in interactive mode when required args are missing."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.txt"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    user_input = "\n".join([
+        "2",
+        "student@example.com",
+        str(zip_file),
+        str(out),
+        "y",
+    ]) + "\n"
+    result = subprocess.run(
+        [sys.executable, "-m", "artifactminer.main"],
+        input=user_input,
+        text=True,
+        capture_output=True,
+        timeout=120,
+    )
+    assert result.returncode == 0 and out.exists()
 
 def test_cli_text_export(zip_file, tmp_path, monkeypatch):
     """CLI creates text output with project metrics."""
