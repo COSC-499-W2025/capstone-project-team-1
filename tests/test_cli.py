@@ -1,5 +1,7 @@
 """CLI tests for artifactminer.main"""
-import json, subprocess, sys
+import json
+import subprocess
+import sys
 from pathlib import Path
 import pytest
 
