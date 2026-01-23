@@ -101,9 +101,9 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         
         # Display detailed insights for each analyzed project
         for idx, repo in enumerate(analyze_result.repos_analyzed, 1):
-            print(f"\n{'─'*80}")
+            print(f"\n{'-'*80}")
             print(f"[{idx}] {repo.project_name}")
-            print(f"{'─'*80}")
+            print(f"{'-'*80}")
             print(f"  Path: {repo.project_path}")
             
             if repo.error:
