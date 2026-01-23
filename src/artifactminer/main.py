@@ -8,9 +8,7 @@ from pathlib import Path
 from datetime import datetime, UTC
 from sqlalchemy.orm import Session
 
-from artifactminer.db import SessionLocal, UploadedZip, Consent, Question, UserAnswer
-from artifactminer.api.zip import UPLOADS_DIR
-from artifactminer.api.analyze import extract_zip_to_persistent_location, router
+from artifactminer.db import Consent, Question, UserAnswer
 from artifactminer.tui.helpers import export_to_json, export_to_text
 
 
@@ -54,6 +52,9 @@ def setup_user_email(db: Session, email: str) -> None:
 
 async def run_analysis(input_path: Path, output_path: Path, consent_level: str, user_email: str) -> None:
     """Run non-interactive analysis pipeline."""
+    from artifactminer.db import SessionLocal, UploadedZip
+    from artifactminer.api.zip import UPLOADS_DIR
+    
     db = SessionLocal()
     
     try:
@@ -204,14 +205,19 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         print(f"Exporting to: {output_path}")
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # Validate output format
+        if output_path.suffix not in (".json", ".txt"):
+            print(f"Warning: Unsupported output format '{output_path.suffix}'. Supported formats are .json and .txt. Defaulting to .txt")
+            output_path = output_path.with_suffix(".txt")
+        
         if output_path.suffix == ".json":
             result_path = export_to_json(resume_items, summaries, output_path.parent, project_analyses)
-        else:  # default to text
+        else:
             result_path = export_to_text(resume_items, summaries, output_path.parent, project_analyses)
         
-        # Rename to user-specified name
+        # Move to user-specified name (handles existing files on Windows)
         if result_path.exists():
-            result_path.rename(output_path)
+            shutil.move(str(result_path), str(output_path))
         
         print(f"✓ Analysis complete! Results saved to: {output_path}")
         
