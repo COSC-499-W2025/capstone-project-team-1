@@ -190,7 +190,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
         if own_session:
             db.close()
 
-async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
+async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str = None) -> list[dict]:
     """
     Summarize the top-ranked repositories for the current user.
 
@@ -206,10 +206,15 @@ async def generate_summaries_for_ranked(db: Session, top=3) -> list[dict]:
     import asyncio
     
     # Pick a ranking column: prefer ranking_score, fall back to total_commits
-
+    query = db.query(RepoStat)
+    
+    # Filter by extraction path if provided
+    if extraction_path:
+        query = query.filter(RepoStat.project_path.like(f"{extraction_path}%"))
    
     top_repos: list[RepoStat] = (
-        db.query(RepoStat)
+        query
+        .order_by(RepoStat.ranking_score.desc())
         .limit(top)
         .all()
     )

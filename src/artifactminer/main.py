@@ -177,6 +177,9 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             for s in summaries_query.all()
         ]
         
+        # Build a lookup for summaries by project path
+        summary_by_path = {s["repo_path"]: s["summary_text"] for s in summaries}
+        
         # Convert analyze_result.repos_analyzed to dict format for export
         project_analyses = [
             {
@@ -191,6 +194,7 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
                 "user_commit_frequency": repo.user_commit_frequency,
                 "user_first_commit": repo.user_first_commit,
                 "user_last_commit": repo.user_last_commit,
+                "summary": summary_by_path.get(repo.project_path),
                 "error": repo.error if hasattr(repo, 'error') else None,
             }
             for repo in analyze_result.repos_analyzed

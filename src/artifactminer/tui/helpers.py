@@ -152,16 +152,39 @@ def export_to_text(
             
             lines.append("")
     
-    # Add resume items section
+    # Add AI Summaries section (separate from resume items)
+    if summaries:
+        lines.extend([
+            "\n" + "=" * 80,
+            "AI SUMMARIES",
+            "=" * 80,
+            "",
+        ])
+        
+        for summary in summaries:
+            repo_path = summary.get('repo_path', '')
+            project_name = Path(repo_path).name if repo_path else 'Unknown Project'
+            summary_text = summary.get('summary_text', '')
+            
+            if summary_text:
+                lines.extend([
+                    f"\n{'─' * 80}",
+                    f"PROJECT: {project_name}",
+                    f"{'─' * 80}",
+                    "",
+                    f"{summary_text}",
+                    "",
+                ])
+    
+    # Add resume items section (without summaries)
     lines.extend([
         "\n" + "=" * 80,
-        "RESUME ITEMS & SUMMARIES",
+        "RESUME ITEMS",
         "=" * 80,
         "",
     ])
 
     grouped = group_by_project(resume_items)
-    summaries_lookup = build_summaries_lookup(summaries)
 
     for project_name, items in grouped.items():
         lines.extend([
@@ -176,13 +199,6 @@ def export_to_text(
             if content:
                 lines.append(f"    {content}")
             lines.append("")
-
-        if project_name and project_name in summaries_lookup:
-            lines.extend([
-                "  [AI Summary]",
-                f"  {summaries_lookup[project_name]}",
-                "",
-            ])
 
     with path.open("w", encoding="utf-8") as f:
         f.write("\n".join(lines))
