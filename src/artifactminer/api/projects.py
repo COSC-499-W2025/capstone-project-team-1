@@ -1,6 +1,6 @@
 """Project-related API endpoints (timeline, delete, etc.)."""
 
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime, UTC
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse
 from ..db import RepoStat, get_db
-from ..helpers.time import utcnow
 from ..helpers.project_ranker import rank_projects
 
 
@@ -24,7 +23,7 @@ async def get_project_timeline(
 ) -> list[ProjectTimelineItem]:
     """Return stored project activity windows with optional filtering."""
 
-    now = utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
     six_months_ago = now - timedelta(days=180)
 
     repo_stats: List[RepoStat] = (
@@ -96,7 +95,7 @@ async def delete_project(
 
     # Soft delete - set timestamp
     project_name = repo_stat.project_name
-    repo_stat.deleted_at = utcnow()
+    repo_stat.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
 
     return DeleteResponse(
