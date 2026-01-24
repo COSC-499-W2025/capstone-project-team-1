@@ -38,12 +38,12 @@ def save_prefs(
         row = RepresentationPrefs(
             portfolio_id=portfolio_id,
             prefs_json=prefs_json,
-            updated_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(row)
     else:
         row.prefs_json = prefs_json
-        row.updated_at = datetime.now(UTC)
+        row.updated_at = datetime.now(UTC).replace(tzinfo=None)
 
     db.commit()
     db.refresh(row)
