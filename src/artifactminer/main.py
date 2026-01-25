@@ -9,6 +9,7 @@ from datetime import datetime, UTC
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
+from artifactminer.api.retrieval import get_AI_summaries, get_summaries
 from artifactminer.api.schemas import ConsentResponse, UserAnswerCreate, ZipUploadResponse
 from artifactminer.db import SessionLocal
 from artifactminer.db import Consent, UserAnswer
@@ -18,6 +19,7 @@ from artifactminer.tui.helpers import export_to_json, export_to_text
 
 async def setup_consent(db: Session, level: str) -> None:
     """Set consent level in database."""
+    #API: calling consent async
     from artifactminer.api.consent import update_consent
     db = SessionLocal()
     consent_created = ConsentResponse(consent_level=level, datetime=datetime.now(UTC))
@@ -27,8 +29,8 @@ async def setup_consent(db: Session, level: str) -> None:
 
 async def setup_user_email(db: Session, email: str) -> None:
     """Set user email in database."""
+    #API: calling user answer (email) async
     from artifactminer.api.user_info import create_user_answer 
-
     db = SessionLocal()
     user_answer_created = UserAnswerCreate(email=email)
     user_answer = await create_user_answer(user_answer_created,db)
@@ -37,7 +39,7 @@ async def setup_user_email(db: Session, email: str) -> None:
 
 
 async def upload_zip(input_path:Path) -> ZipUploadResponse:
-    #===calling await function upload zip===
+    #API: calling upload zip async
     from artifactminer.api.zip import upload_zip
   
     db = SessionLocal()
@@ -153,17 +155,16 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         ]
         
         # Get summaries - only for projects in this specific extraction path
-        summaries_query = db.query(UserAIntelligenceSummary).filter(
-            UserAIntelligenceSummary.user_email == user_email,
-            UserAIntelligenceSummary.repo_path.like(f"{extraction_path_str}%")
-        )
+        
+        #API: CALLS get_summaries async
+        summaries_all = await get_AI_summaries(user_email,extraction_path_str, db)
         
         summaries = [
             {
                 "repo_path": s.repo_path,
                 "summary_text": s.summary_text
             }
-            for s in summaries_query.all()
+            for s in summaries_all
         ]
         
         # Build a lookup for summaries by project path
