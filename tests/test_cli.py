@@ -15,12 +15,14 @@ def test_cli_interactive_mode(zip_file, tmp_path, monkeypatch):
         pytest.skip("mock_projects.zip not found")
     out = tmp_path / "out.txt"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    # Input sequence: consent, email, zip_path, repo_selection, output_path, confirm
     user_input = "\n".join([
-        "2",
-        "student@example.com",
-        str(zip_file),
-        str(out),
-        "y",
+        "2",                      # Step 1: Consent (no_llm)
+        "student@example.com",    # Step 2: Email
+        str(zip_file),            # Step 3: Input file
+        "all",                    # Step 4: Select repositories
+        str(out),                 # Step 5: Output file
+        "y",                      # Confirm
     ]) + "\n"
     result = subprocess.run(
         [sys.executable, "-m", "artifactminer.main"],
@@ -82,3 +84,39 @@ def test_cli_format_detection(zip_file, tmp_path, monkeypatch):
     assert result.returncode == 0
     data = json.loads(out.read_text())
     assert isinstance(data, dict)
+
+
+def test_parse_selection_all():
+    """parse_selection returns all indices for 'all'."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("all", 5) == [0, 1, 2, 3, 4]
+    assert parse_selection("ALL", 3) == [0, 1, 2]
+
+
+def test_parse_selection_single():
+    """parse_selection handles single numbers."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1", 5) == [0]
+    assert parse_selection("3", 5) == [2]
+    assert parse_selection("6", 5) == []  # Out of range
+
+
+def test_parse_selection_comma_separated():
+    """parse_selection handles comma-separated numbers."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1,3,5", 5) == [0, 2, 4]
+    assert parse_selection("2, 4", 5) == [1, 3]
+
+
+def test_parse_selection_range():
+    """parse_selection handles ranges like '1-3'."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1-3", 5) == [0, 1, 2]
+    assert parse_selection("2-4", 5) == [1, 2, 3]
+
+
+def test_parse_selection_mixed():
+    """parse_selection handles mixed formats."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1,3-5", 6) == [0, 2, 3, 4]
+    assert parse_selection("1-2,4,6", 6) == [0, 1, 3, 5]
