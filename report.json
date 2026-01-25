@@ -1,0 +1,235 @@
+{
+  "exported_at": "2026-01-25T13:41:32.833960",
+  "resume_items": [
+    {
+      "id": 49,
+      "title": "Complexity awareness",
+      "content": "Complexity awareness: Resource caps or chunking present in changes (2 matches). Resource caps and chunking show attention to cost/complexity under load.",
+      "category": "Deep Insight",
+      "project_name": "sensor-fleet-backend"
+    },
+    {
+      "id": 50,
+      "title": "Abstraction and encapsulation",
+      "content": "Abstraction and encapsulation: 1 occurrence(s) of 'pydantic' in user-edited manifests Pydantic models referenced (2 matches). Structured modeling and interfaces reflect design thinking beyond scripts.",
+      "category": "Deep Insight",
+      "project_name": "sensor-fleet-backend"
+    },
+    {
+      "id": 51,
+      "title": "Robustness and error handling",
+      "content": "Robustness and error handling: Context manager usage for resource safety in changes (2 matches). Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
+      "category": "Deep Insight",
+      "project_name": "sensor-fleet-backend"
+    },
+    {
+      "id": 52,
+      "title": "API design and architecture",
+      "content": "API design and architecture: 1 occurrence(s) of 'pydantic' in user-edited manifests Pydantic models referenced (2 matches). Clean API design with validation and DI shows architectural maturity.",
+      "category": "Deep Insight",
+      "project_name": "sensor-fleet-backend"
+    },
+    {
+      "id": 53,
+      "title": "Data structure and optimization",
+      "content": "Data structure and optimization: Specialized Python collections in changes (2 matches). Specialized collections and optimization tools indicate performance-minded choices.",
+      "category": "Deep Insight",
+      "project_name": "algorithms-toolkit"
+    },
+    {
+      "id": 54,
+      "title": "Robustness and error handling",
+      "content": "Robustness and error handling: Context manager usage for resource safety in changes (2 matches). Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
+      "category": "Deep Insight",
+      "project_name": "algorithms-toolkit"
+    }
+  ],
+  "summaries": [
+    {
+      "repo_path": ".extracted/29/projects/sensor-fleet-backend",
+      "summary_text": "User contributed 43.5% to sensor-fleet-backend using .py, .md, .txt, .json. AI summary: LLM model used: chatGPT\n\n- Engineering maturity and impact: Implements a robust in-memory data store with a minimal FastAPI API to ingest sensor readings, retrieve per-sensor history, and expose a dedicated liveness health endpoint, all with forward-compatible design that can scale to a real database without API changes.\n- Technical execution and tooling: Demonstrates strong Python capabilities using Pydantic models with default_factory for automatic timestamping, modern typing (list[SensorReading]), and clear, validated API routing that surfaces a clean, well-defined surface.\n- Architecture and maintainability: Clear separation of concerns between data models and route handlers, explicit error handling (HTTPException for missing sensors), and a modular structure that supports straightforward upgrades or substitutions of the persistence layer without impacting the API.\n- Performance and observability: Per-sensor readings are appended efficiently to in-memory lists, enabling fast ingestion and responsive per-sensor history retrieval for typical workloads; a lightweight health check enhances observability and reliability.\n- Readability, quality, and craftsmanship: Descriptive naming, concise data models, and straightforward control flow complemented by in-code documentation-style structure (app title) for quick comprehension, onboarding, and long-term maintainability."
+    },
+    {
+      "repo_path": ".extracted/29/projects/personal-portfolio-site",
+      "summary_text": "User contributed 100.0% to personal-portfolio-site using .js, .md, .html, .json, .css. AI summary: LLM model used: chatGPT\n\n- Semantic, accessible HTML: clearly organized hero header, main sections, and meaningful IDs (hero-name, cta, projects, contact) enable stable styling, navigation, and screen-reader friendly access.\n- Clean separation of concerns: external CSS wired via src/styles.css demonstrates a modular presentation layer decoupled from content markup, supporting maintainability.\n- Interactivity-ready markup: unique IDs provide ready-made hooks for JavaScript enhancements, facilitating straightforward DOM interactions and future dynamic features.\n- Lightweight, build-free workflow: design emphasizes portability and rapid iteration by running without a build step, improving agility and ease of deployment.\n- Scalable content architecture: grid-based projects area and a dedicated contact section set up for growth (projects, skills, coursework) with clean pathways for content updates.\n- Commitment to quality and validation: inclusion of a tests directive (node tests/links.test.js) signals automated validation practices and a disciplined, quality-focused development approach."
+    },
+    {
+      "repo_path": ".extracted/29/projects/algorithms-toolkit",
+      "summary_text": "User contributed 100.0% to algorithms-toolkit using .py, .txt, .md. AI summary: LLM model used: chatGPT\n\n- Impact and scope: Built a reusable graph loader that parses adjacency-list text into an in-memory dictionary, enabling immediate use of graphs for BFS, DFS, and shortest-path workflows directly from the CLI.\n- Technical execution: Demonstrates strong Python craftsmanship with type hints, context-managed file I/O, and idiomatic list comprehensions to convert raw text into a clean, typed adjacency list.\n- Architecture and API design: Establishes a clear public API surface via __all__ and modular imports, reflecting thoughtful packaging and reusability across graph algorithms and sorting utilities.\n- Reliability and performance: Uses line-by-line reading within a context manager to ensure safe, memory-conscious data loading and robust resource handling during graph ingestion.\n- Readability and maintainability: Names the loading pathway explicitly with load_graph, enforces a clean separation between data loading and algorithm execution, and features a structured CLI entry point with explicit argument validation for easy maintenance and onboarding.\n\nThese contributions collectively demonstrate engineering maturity, problem-solving acuity, and the ability to deliver production-grade, reusable components."
+    }
+  ],
+  "project_analyses": [
+    {
+      "project_name": "go-task-runner",
+      "project_path": ".extracted/29/projects/go-task-runner",
+      "languages": [
+        ".go",
+        ".json",
+        ".md",
+        ".mod"
+      ],
+      "frameworks": [],
+      "skills_count": 2,
+      "insights_count": 0,
+      "user_contribution_pct": 30.434782608695656,
+      "user_total_commits": 7,
+      "user_commit_frequency": 0.3025469513763828,
+      "user_first_commit": "2020-08-31 17:00:00",
+      "user_last_commit": "2021-02-09 16:00:00",
+      "summary": null,
+      "error": null
+    },
+    {
+      "project_name": "personal-portfolio-site",
+      "project_path": ".extracted/29/projects/personal-portfolio-site",
+      "languages": [
+        ".js",
+        ".md",
+        ".html",
+        ".json",
+        ".css"
+      ],
+      "frameworks": [],
+      "skills_count": 2,
+      "insights_count": 0,
+      "user_contribution_pct": 100.0,
+      "user_total_commits": 21,
+      "user_commit_frequency": 0.5652940233936868,
+      "user_first_commit": "2020-12-31 16:00:00",
+      "user_last_commit": "2021-09-17 17:00:00",
+      "summary": "User contributed 100.0% to personal-portfolio-site using .js, .md, .html, .json, .css. AI summary: LLM model used: chatGPT\n\n- Semantic, accessible HTML: clearly organized hero header, main sections, and meaningful IDs (hero-name, cta, projects, contact) enable stable styling, navigation, and screen-reader friendly access.\n- Clean separation of concerns: external CSS wired via src/styles.css demonstrates a modular presentation layer decoupled from content markup, supporting maintainability.\n- Interactivity-ready markup: unique IDs provide ready-made hooks for JavaScript enhancements, facilitating straightforward DOM interactions and future dynamic features.\n- Lightweight, build-free workflow: design emphasizes portability and rapid iteration by running without a build step, improving agility and ease of deployment.\n- Scalable content architecture: grid-based projects area and a dedicated contact section set up for growth (projects, skills, coursework) with clean pathways for content updates.\n- Commitment to quality and validation: inclusion of a tests directive (node tests/links.test.js) signals automated validation practices and a disciplined, quality-focused development approach.",
+      "error": null
+    },
+    {
+      "project_name": "sensor-fleet-backend",
+      "project_path": ".extracted/29/projects/sensor-fleet-backend",
+      "languages": [
+        ".py",
+        ".md",
+        ".txt",
+        ".json"
+      ],
+      "frameworks": [
+        "FastAPI",
+        "Data Validation",
+        "Testing"
+      ],
+      "skills_count": 7,
+      "insights_count": 4,
+      "user_contribution_pct": 43.47826086956522,
+      "user_total_commits": 10,
+      "user_commit_frequency": 0.33339948402460806,
+      "user_first_commit": "2021-06-30 17:00:00",
+      "user_last_commit": "2022-01-26 16:00:00",
+      "summary": "User contributed 43.5% to sensor-fleet-backend using .py, .md, .txt, .json. AI summary: LLM model used: chatGPT\n\n- Engineering maturity and impact: Implements a robust in-memory data store with a minimal FastAPI API to ingest sensor readings, retrieve per-sensor history, and expose a dedicated liveness health endpoint, all with forward-compatible design that can scale to a real database without API changes.\n- Technical execution and tooling: Demonstrates strong Python capabilities using Pydantic models with default_factory for automatic timestamping, modern typing (list[SensorReading]), and clear, validated API routing that surfaces a clean, well-defined surface.\n- Architecture and maintainability: Clear separation of concerns between data models and route handlers, explicit error handling (HTTPException for missing sensors), and a modular structure that supports straightforward upgrades or substitutions of the persistence layer without impacting the API.\n- Performance and observability: Per-sensor readings are appended efficiently to in-memory lists, enabling fast ingestion and responsive per-sensor history retrieval for typical workloads; a lightweight health check enhances observability and reliability.\n- Readability, quality, and craftsmanship: Descriptive naming, concise data models, and straightforward control flow complemented by in-code documentation-style structure (app title) for quick comprehension, onboarding, and long-term maintainability.",
+      "error": null
+    },
+    {
+      "project_name": "infra-terraform",
+      "project_path": ".extracted/29/projects/infra-terraform",
+      "languages": [
+        ".tf",
+        ".md",
+        ".tfvars"
+      ],
+      "frameworks": [],
+      "skills_count": 1,
+      "insights_count": 0,
+      "user_contribution_pct": 30.434782608695656,
+      "user_total_commits": 7,
+      "user_commit_frequency": 0.05587695613396294,
+      "user_first_commit": "2023-06-30 17:00:00",
+      "user_last_commit": "2025-11-23 15:14:35",
+      "summary": null,
+      "error": null
+    },
+    {
+      "project_name": "algorithms-toolkit",
+      "project_path": ".extracted/29/projects/algorithms-toolkit",
+      "languages": [
+        ".py",
+        ".txt",
+        ".md"
+      ],
+      "frameworks": [
+        "Testing"
+      ],
+      "skills_count": 6,
+      "insights_count": 2,
+      "user_contribution_pct": 100.0,
+      "user_total_commits": 18,
+      "user_commit_frequency": 0.7636363636363636,
+      "user_first_commit": "2021-03-31 17:00:00",
+      "user_last_commit": "2021-09-12 17:00:00",
+      "summary": "User contributed 100.0% to algorithms-toolkit using .py, .txt, .md. AI summary: LLM model used: chatGPT\n\n- Impact and scope: Built a reusable graph loader that parses adjacency-list text into an in-memory dictionary, enabling immediate use of graphs for BFS, DFS, and shortest-path workflows directly from the CLI.\n- Technical execution: Demonstrates strong Python craftsmanship with type hints, context-managed file I/O, and idiomatic list comprehensions to convert raw text into a clean, typed adjacency list.\n- Architecture and API design: Establishes a clear public API surface via __all__ and modular imports, reflecting thoughtful packaging and reusability across graph algorithms and sorting utilities.\n- Reliability and performance: Uses line-by-line reading within a context manager to ensure safe, memory-conscious data loading and robust resource handling during graph ingestion.\n- Readability and maintainability: Names the loading pathway explicitly with load_graph, enforces a clean separation between data loading and algorithm execution, and features a structured CLI entry point with explicit argument validation for easy maintenance and onboarding.\n\nThese contributions collectively demonstrate engineering maturity, problem-solving acuity, and the ability to deliver production-grade, reusable components.",
+      "error": null
+    },
+    {
+      "project_name": "java-chat-service",
+      "project_path": ".extracted/29/projects/java-chat-service",
+      "languages": [
+        ".java",
+        ".md",
+        ".log"
+      ],
+      "frameworks": [],
+      "skills_count": 2,
+      "insights_count": 0,
+      "user_contribution_pct": 30.434782608695656,
+      "user_total_commits": 7,
+      "user_commit_frequency": 0.34027777777777773,
+      "user_first_commit": "2020-03-31 17:00:00",
+      "user_last_commit": "2020-08-22 17:00:00",
+      "summary": null,
+      "error": null
+    },
+    {
+      "project_name": "campus-navigation-api",
+      "project_path": ".extracted/29/projects/campus-navigation-api",
+      "languages": [
+        ".ts",
+        ".js",
+        ".json",
+        ".md"
+      ],
+      "frameworks": [
+        "Express",
+        "TypeScript"
+      ],
+      "skills_count": 5,
+      "insights_count": 0,
+      "user_contribution_pct": 36.0,
+      "user_total_commits": 9,
+      "user_commit_frequency": 0.34607461661707484,
+      "user_first_commit": "2022-01-31 16:00:00",
+      "user_last_commit": "2022-08-01 17:00:00",
+      "summary": null,
+      "error": null
+    },
+    {
+      "project_name": "ml-lab-notebooks",
+      "project_path": ".extracted/29/projects/ml-lab-notebooks",
+      "languages": [
+        ".py",
+        ".md",
+        ".txt",
+        ".csv"
+      ],
+      "frameworks": [
+        "Numerical Computing",
+        "Data Analysis",
+        "Machine Learning",
+        "Testing"
+      ],
+      "skills_count": 6,
+      "insights_count": 0,
+      "user_contribution_pct": 31.818181818181817,
+      "user_total_commits": 7,
+      "user_commit_frequency": 0.32657595112468757,
+      "user_first_commit": "2023-02-28 16:00:00",
+      "user_last_commit": "2023-07-28 17:00:00",
+      "summary": null,
+      "error": null
+    }
+  ]
+}
