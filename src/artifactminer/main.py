@@ -6,92 +6,81 @@ import shutil
 import asyncio
 from pathlib import Path
 from datetime import datetime, UTC
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from artifactminer.db import Consent, Question, UserAnswer
+from artifactminer.api.schemas import ConsentResponse, UserAnswerCreate, ZipUploadResponse
+from artifactminer.db import SessionLocal
+from artifactminer.db import Consent, UserAnswer
+from artifactminer.db.models import Question
 from artifactminer.tui.helpers import export_to_json, export_to_text
 
 
-def setup_consent(db: Session, level: str) -> None:
+async def setup_consent(db: Session, level: str) -> None:
     """Set consent level in database."""
-    consent = db.get(Consent, 1)
-    if consent is None:
-        consent = Consent(id=1, consent_level=level, accepted_at=datetime.now(UTC))
-        db.add(consent)
-    else:
-        consent.consent_level = level
-        if level in ("full", "no_llm"):
-            consent.accepted_at = datetime.now(UTC)
-    db.commit()
+    from artifactminer.api.consent import update_consent
+    db = SessionLocal()
+    consent_created = ConsentResponse(consent_level=level, datetime=datetime.now(UTC))
+    consent = await update_consent(consent_created, db)
+    print("\nconsent response: ", consent.consent_level)
 
 
-def setup_user_email(db: Session, email: str) -> None:
+async def setup_user_email(db: Session, email: str) -> None:
     """Set user email in database."""
-    email_question = db.query(Question).filter(Question.key == "email").first()
-    if not email_question:
-        # Create email question if it doesn't exist
-        email_question = Question(
-            key="email",
-            text="What is your email?",
-            order=1
+    from artifactminer.api.user_info import create_user_answer 
+
+    db = SessionLocal()
+    user_answer_created = UserAnswerCreate(email=email)
+    user_answer = await create_user_answer(user_answer_created,db)
+    print("\nemail response: ", user_answer.answer_text)
+
+
+
+async def upload_zip(input_path:Path) -> ZipUploadResponse:
+    #===calling await function upload zip===
+    from artifactminer.api.zip import upload_zip
+  
+    db = SessionLocal()
+    with open(input_path, "rb") as f:
+        upload_file = UploadFile(
+            filename=input_path.name,
+            file=f,
         )
-        db.add(email_question)
-        db.commit()
-        db.refresh(email_question)
-    
-    # Delete existing answer and add new one
-    db.query(UserAnswer).filter(UserAnswer.question_id == email_question.id).delete()
-    answer = UserAnswer(
-        question_id=email_question.id,
-        answer_text=email,
-        answered_at=datetime.now(UTC)
-    )
-    db.add(answer)
-    db.commit()
+        upload_zip_payload = await upload_zip(file=upload_file,portfolio_id="cli-generated",db=db)
+        upload_zip_payload.json()
+
+    return upload_zip_payload
 
 
 async def run_analysis(input_path: Path, output_path: Path, consent_level: str, user_email: str) -> None:
-    """Run non-interactive analysis pipeline."""
-    from artifactminer.db import SessionLocal, UploadedZip
-    from artifactminer.api.zip import UPLOADS_DIR
+    """Run non-interactive analysis pipelixne."""
+    from artifactminer.db import SessionLocal
     
     db = SessionLocal()
+
+    upload_payload = await upload_zip(input_path)
     
     try:
+
         # Setup consent and user email
+        print(f"\n{'='*80}")
         print(f"Setting consent level: {consent_level}")
-        setup_consent(db, consent_level)
+        await setup_consent(db, consent_level)
         
         print(f"Setting user email: {user_email}")
-        setup_user_email(db, user_email)
-        
+        await setup_user_email(db, user_email)
+        print(f"\n{'='*80}")
         # Upload ZIP
         print(f"Uploading ZIP: {input_path}")
-        UPLOADS_DIR.mkdir(exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        safe_filename = f"{timestamp}_{input_path.name}"
-        dest_path = UPLOADS_DIR / safe_filename
-        
-        shutil.copy2(input_path, dest_path)
-        
-        uploaded_zip = UploadedZip(
-            filename=input_path.name,
-            path=str(dest_path),
-            portfolio_id="cli-generated"
-        )
-        db.add(uploaded_zip)
-        db.commit()
-        db.refresh(uploaded_zip)
-        
+
         # Extract and analyze using the API router function
-        print(f"Extracting and analyzing ZIP (ID: {uploaded_zip.id})...")
+        print(f"Extracting and analyzing ZIP (ID: {upload_payload.zip_id})...")
         
         # Call the async analyze_zip function directly
         from artifactminer.api.analyze import analyze_zip
-        from artifactminer.api.schemas import AnalyzeRequest
         
         analyze_result = await analyze_zip(
-            zip_id=uploaded_zip.id,
+            zip_id=upload_payload.zip_id,
             request=None,  # Auto-discover all repos
             db=db
         )
@@ -108,7 +97,7 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             print(f"  Path: {repo.project_path}")
             
             if repo.error:
-                print(f"  ⚠ Error: {repo.error}")
+                print(f"⚠ Error: {repo.error}")
                 continue
             
             # Languages and Frameworks
@@ -140,10 +129,9 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         # Retrieve results from database - only for projects analyzed in this ZIP
         print("\nFetching results from analyzed projects...")
         from artifactminer.db.models import ResumeItem, UserAIntelligenceSummary, RepoStat
-        from sqlalchemy import or_
         
         # Get the extraction path for this specific ZIP to avoid duplicates
-        extraction_path_str = str(uploaded_zip.extraction_path) if uploaded_zip.extraction_path else str(analyze_result.extraction_path)
+        extraction_path_str = str(analyze_result.extraction_path) if analyze_result.extraction_path else str(analyze_result.extraction_path)
         
         # Get resume items - only for repos in this specific extraction path
         resume_items_query = db.query(ResumeItem, RepoStat).join(
@@ -230,7 +218,11 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         db.close()
 
 
+
 def main():
+
+    """Adding arguments:"""
+
     """CLI entry point for ArtifactMiner."""
     parser = argparse.ArgumentParser(
         prog="artifactminer",
@@ -272,7 +264,7 @@ def main():
         sys.exit(1)
     
     if not args.input.suffix == ".zip":
-        print(f"Error: Input must be a ZIP file", file=sys.stderr)
+        print("Error: Input must be a ZIP file", file=sys.stderr)
         sys.exit(1)
     
     # Run analysis
