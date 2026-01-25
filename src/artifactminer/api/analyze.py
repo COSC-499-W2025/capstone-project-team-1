@@ -487,7 +487,9 @@ async def analyze_zip(
     try:
         # generate_summaries_for_ranked uses project_path from DB to access git repos
         # This is why we persist to ./extracted/ instead of using temp directory
-        summary_data = await generate_summaries_for_ranked(db, top=3)
+        summary_data = await generate_summaries_for_ranked(
+            db, top=3, extraction_path=str(extraction_path)
+        )
 
         for item in summary_data:
             summaries.append(
