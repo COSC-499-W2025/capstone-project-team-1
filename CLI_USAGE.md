@@ -1,14 +1,15 @@
 # ArtifactMiner CLI Usage
 
 ## Overview
-Non-interactive command-line tool to analyze student project portfolios and generate reports.
+CLI tool to analyze student project portfolios and generate reports. Supports interactive and non-interactive modes.
 
 ## Basic Usage
 ```bash
+python -m artifactminer.main
 python -m artifactminer.main -i <input.zip> -o <output.txt|json> [options]
 ```
 
-## Required Arguments
+## Required Arguments (Non-Interactive Mode)
 - `-i, --input` - Path to ZIP file containing projects
 - `-o, --output` - Output file path (`.txt` for text, `.json` for JSON)
 
@@ -16,7 +17,15 @@ python -m artifactminer.main -i <input.zip> -o <output.txt|json> [options]
 - `-c, --consent` - Consent level: `full`, `no_llm`, `none` (default: `no_llm`)
 - `-u, --user-email` - User email for tracking (default: `cli-user@example.com`)
 
+## Interactive Mode
+Run without `-i` and `-o` to enter guided prompts. If only one of `-i` or `-o` is provided, the CLI prompts for the missing values and uses any provided flags for the rest.
+
 ## Examples
+
+**Interactive mode:**
+```bash
+python -m artifactminer.main
+```
 
 **Text export with no LLM:**
 ```bash
