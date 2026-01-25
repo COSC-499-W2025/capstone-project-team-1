@@ -349,7 +349,7 @@ def prompt_output_file(initial=None) -> Path:
             print(f"Output: {validated.name}\n")
             return validated
     while True:
-        path_str = _strip_wrapping_quotes(input("Enter output path (.json or .txt): "))
+        path_str = _strip_wrapping_quotes(input("Enter your output path: write your filename and extension (filename.json or filename.txt): "))
         if not path_str:
             print("Please enter a path.")
             continue
