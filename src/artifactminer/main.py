@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 
 from artifactminer.api.retrieval import get_AI_summaries, get_summaries
 from artifactminer.api.schemas import ConsentResponse, UserAnswerCreate, ZipUploadResponse
-from artifactminer.db import SessionLocal
-from artifactminer.db import Consent, UserAnswer
-from artifactminer.db.models import Question
+from artifactminer.db import SessionLocal, Consent, UserAnswer, UploadedZip
 from artifactminer.tui.helpers import export_to_json, export_to_text
+from artifactminer.api.analyze import discover_git_repos, extract_zip_to_persistent_location
+from artifactminer.api.zip import UPLOADS_DIR
 
 
 async def setup_consent(db: Session, level: str) -> None:
@@ -35,7 +35,6 @@ async def setup_user_email(db: Session, email: str) -> None:
     print("\nemail response: ", user_answer.answer_text)
 
 
-
 async def upload_zip(input_path:Path,db) -> ZipUploadResponse:
     #API: calling upload zip async
     from artifactminer.api.zip import upload_zip
@@ -51,16 +50,29 @@ async def upload_zip(input_path:Path,db) -> ZipUploadResponse:
     return upload_zip_payload
 
 
-async def run_analysis(input_path: Path, output_path: Path, consent_level: str, user_email: str) -> None:
+async def run_analysis(
+    input_path: Path,
+    output_path: Path,
+    consent_level: str,
+    user_email: str,
+    selected_repos: list[Path] | None = None,
+    zip_id: int | None = None,
+) -> None:
     """Run non-interactive analysis pipeline."""
     from artifactminer.db import SessionLocal
-    
+    from artifactminer.api.schemas import AnalyzeRequest
+
     db = SessionLocal()
 
-    upload_payload = await upload_zip(input_path, db)
-    
     try:
-
+        if zip_id is None:
+            upload_payload = await upload_zip(input_path, db)
+            active_zip_id = upload_payload.zip_id
+            print(f"Uploading ZIP: {input_path}")
+        else:
+            active_zip_id = zip_id
+            print(f"Using existing ZIP (ID: {active_zip_id})")
+        
         # Setup consent and user email
         print(f"\n{'='*80}")
         print(f"Setting consent level: {consent_level}")
@@ -69,18 +81,23 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         print(f"Setting user email: {user_email}")
         await setup_user_email(db, user_email)
         print(f"\n{'='*80}")
-        # Upload ZIP
-        print(f"Uploading ZIP: {input_path}")
 
         # Extract and analyze using the API router function
-        print(f"Extracting and analyzing ZIP (ID: {upload_payload.zip_id})...")
+        print(f"Extracting and analyzing ZIP (ID: {active_zip_id})...")
         
         # Call the async analyze_zip function directly
         from artifactminer.api.analyze import analyze_zip
         
+        request = None
+        if selected_repos:
+            request = AnalyzeRequest(directories=[str(repo) for repo in selected_repos])
+            print(f"Analyzing {len(selected_repos)} selected repositories...")
+        else:
+            print("Analyzing all discovered repositories...")
+
         analyze_result = await analyze_zip(
-            zip_id=upload_payload.zip_id,
-            request=None,  # Auto-discover all repos
+            zip_id=active_zip_id,
+            request=request,
             db=db
         )
         
@@ -206,6 +223,10 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
             shutil.move(str(result_path), str(output_path))
         
         print(f"✓ Analysis complete! Results saved to: {output_path}")
+
+        # Display timeline and chronology views
+        display_project_timeline(db, extraction_path_str)
+        display_skills_chronology(db, extraction_path_str)
         
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -275,6 +296,202 @@ def _validate_output_path(path, confirm_overwrite: bool = False):
     return path
 
 
+def parse_selection(selection: str, max_idx: int) -> list[int]:
+    """Parse user selection string into list of indices.
+    
+    Supports:
+    - Single numbers: "1", "3"
+    - Comma-separated: "1,3,5"
+    - Ranges: "1-3" (expands to 1,2,3)
+    - Mixed: "1,3-5,7"
+    - "all" for all items
+    
+    Returns 0-indexed list of valid indices.
+    """
+    selection = selection.strip().lower()
+    if selection == "all":
+        return list(range(max_idx))
+    
+    indices: set[int] = set()
+    parts = selection.replace(" ", "").split(",")
+    
+    for part in parts:
+        if not part:
+            continue
+        if "-" in part:
+            try:
+                start, end = part.split("-", 1)
+                start_idx = int(start) - 1  # Convert to 0-indexed
+                end_idx = int(end) - 1
+                if 0 <= start_idx <= end_idx < max_idx:
+                    indices.update(range(start_idx, end_idx + 1))
+            except ValueError:
+                continue
+        else:
+            try:
+                idx = int(part) - 1  # Convert to 0-indexed
+                if 0 <= idx < max_idx:
+                    indices.add(idx)
+            except ValueError:
+                continue
+    
+    return sorted(indices)
+
+
+def prompt_repo_selection(repos: list[Path]) -> list[Path]:
+    """Display discovered repos and let user select which to analyze."""
+    print("Step 4: Select Repositories")
+    print("-" * 40)
+    print(f"Discovered {len(repos)} git repositories:\n")
+    
+    for idx, repo in enumerate(repos, 1):
+        print(f"  [{idx}] {repo.name}")
+    
+    print()
+    print("Enter selection (e.g., '1,3,5' or '1-3' or 'all'):")
+    
+    while True:
+        selection = input("Selection (default: all): ").strip() or "all"
+        indices = parse_selection(selection, len(repos))
+        
+        if not indices:
+            print("No valid selection. Please try again.")
+            continue
+        
+        selected = [repos[i] for i in indices]
+        print(f"\nSelected {len(selected)} repositories:")
+        for repo in selected:
+            print(f"  ✓ {repo.name}")
+        print()
+        return selected
+
+
+def display_progress(current: int, total: int, repo_name: str) -> None:
+    """Display analysis progress for a repository."""
+    print(f"  [{current}/{total}] Analyzing {repo_name}...")
+
+
+def display_project_timeline(db: Session, extraction_path: str) -> None:
+    """Display project timeline for analyzed repos."""
+    from datetime import timedelta
+    from artifactminer.helpers.time import utcnow
+    from artifactminer.db.models import RepoStat
+    
+    print("\n" + "=" * 60)
+    print("                  PROJECT TIMELINE")
+    print("=" * 60 + "\n")
+    
+    # Query repos from this extraction (similar to projects.py logic)
+    now = utcnow()
+    six_months_ago = now - timedelta(days=180)
+    
+    repo_stats = (
+        db.query(RepoStat)
+        .filter(
+            RepoStat.first_commit.isnot(None),
+            RepoStat.last_commit.isnot(None),
+            RepoStat.deleted_at.is_(None),
+            RepoStat.project_path.like(f"{extraction_path}%")
+        )
+        .order_by(RepoStat.first_commit.asc())
+        .all()
+    )
+    
+    if not repo_stats:
+        print("  No timeline data available.\n")
+        return
+    
+    for stat in repo_stats:
+        first = stat.first_commit.strftime("%Y-%m-%d") if stat.first_commit else "?"
+        last = stat.last_commit.strftime("%Y-%m-%d") if stat.last_commit else "?"
+        duration = (stat.last_commit - stat.first_commit).days if stat.first_commit and stat.last_commit else 0
+        active = "●" if stat.last_commit and stat.last_commit >= six_months_ago else "○"
+        
+        print(f"  {active} {stat.project_name}")
+        print(f"      {first} → {last} ({duration} days)")
+    
+    print()
+
+
+def display_skills_chronology(db: Session, extraction_path: str) -> None:
+    """Display chronological skills progression."""
+    from datetime import datetime as dt
+    from artifactminer.db.models import ProjectSkill, UserProjectSkill, Skill, RepoStat
+    
+    print("=" * 60)
+    print("                SKILLS CHRONOLOGY")
+    print("=" * 60 + "\n")
+    
+    # Query skills for repos in this extraction (similar to retrieval.py logic)
+    items = []
+    
+    # ProjectSkill results
+    project_results = (
+        db.query(ProjectSkill, Skill, RepoStat)
+        .join(Skill, ProjectSkill.skill_id == Skill.id)
+        .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(
+            RepoStat.deleted_at.is_(None),
+            RepoStat.project_path.like(f"{extraction_path}%")
+        )
+        .all()
+    )
+    
+    # UserProjectSkill results
+    user_results = (
+        db.query(UserProjectSkill, Skill, RepoStat)
+        .join(Skill, UserProjectSkill.skill_id == Skill.id)
+        .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(
+            RepoStat.deleted_at.is_(None),
+            RepoStat.project_path.like(f"{extraction_path}%")
+        )
+        .all()
+    )
+    
+    for skill_record, skill, repo_stat in project_results:
+        items.append({
+            "date": repo_stat.first_commit,
+            "skill": skill.name,
+            "project": repo_stat.project_name,
+            "category": skill.category,
+        })
+    
+    for skill_record, skill, repo_stat in user_results:
+        items.append({
+            "date": repo_stat.first_commit,
+            "skill": skill.name,
+            "project": repo_stat.project_name,
+            "category": skill.category,
+        })
+    
+    # Sort by date and deduplicate
+    items.sort(key=lambda x: x["date"] or dt.max)
+    seen_skills: set[str] = set()
+    unique_items = []
+    for item in items:
+        if item["skill"] not in seen_skills:
+            seen_skills.add(item["skill"])
+            unique_items.append(item)
+    
+    if not unique_items:
+        print("  No skills data available.\n")
+        return
+    
+    # Group by category
+    by_category: dict[str, list] = {}
+    for item in unique_items:
+        cat = item["category"] or "Other"
+        by_category.setdefault(cat, []).append(item)
+    
+    for category, skills in by_category.items():
+        print(f"  {category}:")
+        for item in skills:
+            date_str = item["date"].strftime("%Y-%m-%d") if item["date"] else "?"
+            print(f"    • {item['skill']} (first used: {date_str} in {item['project']})")
+        print()
+
+
 def prompt_consent() -> str:
     print("Step 1: Consent")
     print("-" * 40)
@@ -327,7 +544,7 @@ def prompt_input_file(initial=None) -> Path:
 
 
 def prompt_output_file(initial=None) -> Path:
-    print("Step 4: Output File")
+    print("Step 5: Output File")
     print("-" * 40)
     if initial is not None:
         validated = _validate_output_path(initial, confirm_overwrite=True)
@@ -335,7 +552,7 @@ def prompt_output_file(initial=None) -> Path:
             print(f"Output: {validated.name}\n")
             return validated
     while True:
-        path_str = _strip_wrapping_quotes(input("Enter output path (.json or .txt): "))
+        path_str = _strip_wrapping_quotes(input("Enter your output path: write your filename and extension (filename.json or filename.txt): "))
         if not path_str:
             print("Please enter a path.")
             continue
@@ -357,6 +574,49 @@ def run_interactive(input_path=None, output_path=None, consent=None, email=None)
             email = prompt_email()
 
         input_path = prompt_input_file(input_path)
+
+        # Step 4: Discover and select repositories
+        print("Extracting ZIP to discover repositories...")
+        db = SessionLocal()
+        try:
+            # Copy ZIP to uploads directory
+            UPLOADS_DIR.mkdir(exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            safe_filename = f"{timestamp}_{input_path.name}"
+            dest_path = UPLOADS_DIR / safe_filename
+            shutil.copy2(input_path, dest_path)
+            
+            # Create upload record
+            uploaded_zip = UploadedZip(
+                filename=input_path.name,
+                path=str(dest_path),
+                portfolio_id="cli-generated"
+            )
+            db.add(uploaded_zip)
+            db.commit()
+            db.refresh(uploaded_zip)
+            
+            # Extract ZIP
+            extraction_path = extract_zip_to_persistent_location(str(dest_path), uploaded_zip.id)
+            uploaded_zip.extraction_path = str(extraction_path)
+            db.commit()
+            
+            # Discover repos
+            discovered_repos = discover_git_repos(extraction_path)
+            
+            if not discovered_repos:
+                print("No git repositories found in the ZIP file.")
+                sys.exit(1)
+            
+            print()
+            selected_repos = prompt_repo_selection(discovered_repos)
+            
+            # Save zip_id for run_analysis
+            saved_zip_id = uploaded_zip.id
+            
+        finally:
+            db.close()
+        
         output_path = prompt_output_file(output_path)
 
         print("Proceed with analysis? [Y/n]: ", end="")
@@ -365,16 +625,13 @@ def run_interactive(input_path=None, output_path=None, consent=None, email=None)
             sys.exit(0)
 
         print()
-        asyncio.run(run_analysis(input_path, output_path, consent, email))
+        asyncio.run(run_analysis(input_path, output_path, consent, email, selected_repos, saved_zip_id))
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         sys.exit(0)
 
 
 def main():
-
-    """Adding arguments:"""
-
     """CLI entry point for ArtifactMiner."""
     parser = argparse.ArgumentParser(
         prog="artifactminer",
