@@ -15,6 +15,20 @@ from artifactminer.db import SessionLocal, Consent, UserAnswer, UploadedZip
 from artifactminer.tui.helpers import export_to_json, export_to_text
 from artifactminer.api.analyze import discover_git_repos, extract_zip_to_persistent_location
 from artifactminer.api.zip import UPLOADS_DIR
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+)
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+)
 
 
 async def setup_consent(db: Session, level: str) -> None:
@@ -94,12 +108,53 @@ async def run_analysis(
             print(f"Analyzing {len(selected_repos)} selected repositories...")
         else:
             print("Analyzing all discovered repositories...")
-
-        analyze_result = await analyze_zip(
-            zip_id=active_zip_id,
-            request=request,
-            db=db
+        
+        # Rich progress bar (per-repository).
+        # Note: analyze_zip emits prints; redirecting stdout/stderr prevents the bar
+        # from being corrupted by regular print output.
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            TextColumn("{task.fields[repo_name]}"),
+            transient=False,
+            redirect_stdout=True,
+            redirect_stderr=True,
+            expand=True,
         )
+
+        task_id: int | None = None
+
+        def progress_callback(current: int, total: int, repo_name: str) -> None:
+            nonlocal task_id
+            if task_id is None:
+                task_id = progress.add_task(
+                    "Analyzing repositories",
+                    total=total,
+                    repo_name=repo_name,
+                )
+            progress.update(
+                task_id,
+                total=total,
+                completed=current,
+                repo_name=repo_name,
+            )
+
+        with progress:
+            expected_total = len(selected_repos) if selected_repos else 0
+            if expected_total > 0:
+                task_id = progress.add_task(
+                    "Analyzing repositories",
+                    total=expected_total,
+                    repo_name="Starting...",
+                )
+            analyze_result = await analyze_zip(
+                zip_id=active_zip_id,
+                request=request,
+                db=db,
+                progress_callback=progress_callback,
+            )
         
         print(f"\n{'='*80}")
         print(f"ANALYSIS COMPLETE: {len(analyze_result.repos_analyzed)} repositories analyzed")
