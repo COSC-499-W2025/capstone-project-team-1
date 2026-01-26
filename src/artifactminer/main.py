@@ -200,16 +200,19 @@ async def run_analysis(
         # Retrieve results from database - only for projects analyzed in this ZIP
         print("\nFetching results from analyzed projects...")
         from artifactminer.db.models import ResumeItem, UserAIntelligenceSummary, RepoStat
+        from sqlalchemy import or_
         
         # Get the extraction path for this specific ZIP to avoid duplicates
         extraction_path_str = str(analyze_result.extraction_path)
+        extraction_path_abs = str(Path(extraction_path_str).resolve())
+        extraction_prefixes = {extraction_path_str, extraction_path_abs}
         
         # Get resume items - only for repos in this specific extraction path
         resume_items_query = db.query(ResumeItem, RepoStat).join(
             RepoStat, ResumeItem.repo_stat_id == RepoStat.id
         ).filter(
             RepoStat.deleted_at.is_(None),
-            RepoStat.project_path.like(f"{extraction_path_str}%")
+            or_(*[RepoStat.project_path.like(f"{prefix}%") for prefix in extraction_prefixes])
         )
         
         resume_items = [
@@ -224,16 +227,17 @@ async def run_analysis(
         ]
         
         # Get summaries - only for projects in this specific extraction path
-        
-        #API: CALLS get_summaries async
-        summaries_all = await get_AI_summaries(user_email,extraction_path_str, db)
+        summaries_query = db.query(UserAIntelligenceSummary).filter(
+            UserAIntelligenceSummary.user_email == user_email,
+            or_(*[UserAIntelligenceSummary.repo_path.like(f"{prefix}%") for prefix in extraction_prefixes])
+        )
         
         summaries = [
             {
                 "repo_path": s.repo_path,
                 "summary_text": s.summary_text
             }
-            for s in summaries_all
+            for s in summaries_query.all()
         ]
         
         # Build a lookup for summaries by project path
@@ -431,6 +435,7 @@ def display_project_timeline(db: Session, extraction_path: str) -> None:
     from datetime import timedelta
     from artifactminer.helpers.time import utcnow
     from artifactminer.db.models import RepoStat
+    from sqlalchemy import or_
     
     print("\n" + "=" * 60)
     print("                  PROJECT TIMELINE")
@@ -440,13 +445,15 @@ def display_project_timeline(db: Session, extraction_path: str) -> None:
     now = utcnow()
     six_months_ago = now - timedelta(days=180)
     
+    extraction_prefixes = {extraction_path, str(Path(extraction_path).resolve())}
+
     repo_stats = (
         db.query(RepoStat)
         .filter(
             RepoStat.first_commit.isnot(None),
             RepoStat.last_commit.isnot(None),
             RepoStat.deleted_at.is_(None),
-            RepoStat.project_path.like(f"{extraction_path}%")
+            or_(*[RepoStat.project_path.like(f"{prefix}%") for prefix in extraction_prefixes])
         )
         .order_by(RepoStat.first_commit.asc())
         .all()
@@ -472,6 +479,7 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
     """Display chronological skills progression."""
     from datetime import datetime as dt
     from artifactminer.db.models import ProjectSkill, UserProjectSkill, Skill, RepoStat
+    from sqlalchemy import or_
     
     print("=" * 60)
     print("                SKILLS CHRONOLOGY")
@@ -480,6 +488,8 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
     # Query skills for repos in this extraction (similar to retrieval.py logic)
     items = []
     
+    extraction_prefixes = {extraction_path, str(Path(extraction_path).resolve())}
+
     # ProjectSkill results
     project_results = (
         db.query(ProjectSkill, Skill, RepoStat)
@@ -487,7 +497,7 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
         .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
         .filter(
             RepoStat.deleted_at.is_(None),
-            RepoStat.project_path.like(f"{extraction_path}%")
+            or_(*[RepoStat.project_path.like(f"{prefix}%") for prefix in extraction_prefixes])
         )
         .all()
     )
@@ -499,7 +509,7 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
         .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
         .filter(
             RepoStat.deleted_at.is_(None),
-            RepoStat.project_path.like(f"{extraction_path}%")
+            or_(*[RepoStat.project_path.like(f"{prefix}%") for prefix in extraction_prefixes])
         )
         .all()
     )

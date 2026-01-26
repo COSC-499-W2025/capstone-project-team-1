@@ -371,20 +371,38 @@ async def analyze_zip(
 
             # repo_stat is now the SQLAlchemy model instance with .id
 
-            user_stats = getUserRepoStats(repo_path, user_email)
-            saveUserRepoStats(user_stats, db=db)
+            user_stats = None
+            user_contribution_pct = None
+            user_total_commits = None
+            user_commit_frequency = None
+            user_first_commit = None
+            user_last_commit = None
 
-            user_contribution_pct = user_stats.userStatspercentages
             try:
-                user_additions = collect_user_additions(
-                    repo_path=str(repo_path), user_email=user_email, max_commits=500
-                )
-                additions_text = "\n".join(user_additions)
-            except Exception as e:
-                print(
-                    f"[analyze] Warning: Could not collect additions for {repo_path.name}: {e}"
-                )
-                additions_text = ""
+                user_stats = getUserRepoStats(repo_path, user_email)
+                saveUserRepoStats(user_stats, db=db)
+                user_contribution_pct = user_stats.userStatspercentages
+                user_total_commits = user_stats.total_commits
+                user_commit_frequency = user_stats.commitFrequency
+                user_first_commit = user_stats.first_commit
+                user_last_commit = user_stats.last_commit
+            except ValueError as e:
+                # Still run deterministic analysis (skills/insights) even if user
+                # has no commits in this repo.
+                print(f"[analyze] Note: {repo_path.name}: {e}")
+
+            additions_text = ""
+            if user_stats is not None:
+                try:
+                    user_additions = collect_user_additions(
+                        repo_path=str(repo_path), user_email=user_email, max_commits=500
+                    )
+                    additions_text = "\n".join(user_additions)
+                except Exception as e:
+                    print(
+                        f"[analyze] Warning: Could not collect additions for {repo_path.name}: {e}"
+                    )
+                    additions_text = ""
 
             deep_result = analyzer.analyze(
                 repo_path=str(repo_path),
@@ -425,10 +443,10 @@ async def analyze_zip(
                     skills_count=skills_count,
                     insights_count=insights_count,
                     user_contribution_pct=user_contribution_pct,
-                    user_total_commits=user_stats.total_commits,
-                    user_commit_frequency=user_stats.commitFrequency,
-                    user_first_commit=user_stats.first_commit,
-                    user_last_commit=user_stats.last_commit,
+                    user_total_commits=user_total_commits,
+                    user_commit_frequency=user_commit_frequency,
+                    user_first_commit=user_first_commit,
+                    user_last_commit=user_last_commit,
                 )
             )
 
