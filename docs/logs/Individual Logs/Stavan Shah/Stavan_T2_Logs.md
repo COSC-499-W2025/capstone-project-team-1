@@ -73,6 +73,8 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 | Review PR #295 (OpenAI init) | Done | Approved |
 | Review PR #308 (CLI refactor) | Done | Big refactor with repo selection and timeline |
 
+![Tasks Week 3](Tasks_T2_Week3.png)
+
 ---
 
 # logs - Term 2 Week 2
