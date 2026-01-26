@@ -80,7 +80,7 @@ def user_email_to_db(db: Session, email: str) -> UserAnswer:
         db.refresh(email_answer)
     else:
         email_answer.answer_text = email.strip().lower()
-        email_answer.answered_at = datetime.utcnow(),
+        email_answer.answered_at = datetime.now(UTC)
 
         db.commit()
         db.refresh(email_answer)
