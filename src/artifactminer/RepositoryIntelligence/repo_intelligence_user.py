@@ -210,7 +210,19 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
     
     # Filter by extraction path if provided
     if extraction_path:
-        query = query.filter(RepoStat.project_path.like(f"{extraction_path}%"))
+        # Try both the raw path and resolved path to handle path variations
+        from pathlib import Path as PathLib
+        raw_path = str(extraction_path)
+        resolved_path = str(PathLib(extraction_path).resolve())
+        
+        # Use OR condition to match either path format
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                RepoStat.project_path.like(f"{raw_path}%"),
+                RepoStat.project_path.like(f"{resolved_path}%")
+            )
+        )
    
     top_repos: list[RepoStat] = (
         query
@@ -220,7 +232,10 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
     )
 
     if not top_repos:
+        print(f"[generate_summaries] No repos found for extraction_path={extraction_path}")
         return []
+    
+    print(f"[generate_summaries] Found {len(top_repos)} top repos to summarize")
 
     # Get the user's email from config answers (question_id = 1)
     email_answer = (
