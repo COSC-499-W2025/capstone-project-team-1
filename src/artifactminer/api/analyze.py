@@ -464,7 +464,7 @@ async def analyze_zip(
             )
             if repo_stat:
                 repo_stat.ranking_score = rank_info["score"]
-                repo_stat.ranked_at = datetime.now(UTC)
+                repo_stat.ranked_at = datetime.now(UTC).replace(tzinfo=None)
 
             rankings.append(
                 RankingResult(
