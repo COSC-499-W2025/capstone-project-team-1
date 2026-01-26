@@ -55,21 +55,21 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 
 ## Plan for Next Week
 
+* Work on the experimental OpenTUI React implementation
 * Continue supporting CLI integration with API
 * Review remaining PRs and help with final milestone push
-* Address any bugs that arise from the CLI merge
 
 ---
 
 | **Task** | **Status** | **Notes** |
 | --- | --- | --- |
-| Interactive CLI mode | ✅ Done | [PR #301](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/301) - Prompts, confirm, Ctrl+C |
-| Merge dev to main | ✅ Done | [PR #293](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/293) |
-| Add interactive CLI test | ✅ Done | test_interactive_cli added |
-| Document CLI usage | ✅ Done | Updated CLI_USAGE.md |
-| Review PR #304 (timestamp fix) | ✅ Done | Requested changes → Approved |
-| Review PR #299 (base CLI) | ✅ Done | Approved after changes |
-| Review PR #295 (OpenAI init) | ✅ Done | Approved |
+| Interactive CLI mode | Done | [PR #301](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/301) - Prompts, confirm, Ctrl+C |
+| Merge dev to main | Done | [PR #293](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/293) |
+| Add interactive CLI test | Done | test_interactive_cli added |
+| Document CLI usage | Done | Updated CLI_USAGE.md |
+| Review PR #304 (timestamp fix) | Done | Requested changes → Approved |
+| Review PR #299 (base CLI) | Done | Approved after changes |
+| Review PR #295 (OpenAI init) | Done | Approved |
 
 ---
 
