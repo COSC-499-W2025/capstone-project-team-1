@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import or_
 
-from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse
+from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
 from ..db import (
     get_db,
     ProjectSkill,
@@ -159,4 +159,24 @@ async def get_summaries(
             generated_at=s.generated_at,
         )
         for s in summaries
+    ]
+
+
+@router.get("/AI_summaries", response_model=List[UserAIIntelligenceSummaryResponse])
+async def get_AI_summaries(
+    user_email : str,
+    repo_path : str,
+    db: Session = Depends(get_db),
+):
+    summaries_query = db.query(UserAIntelligenceSummary).filter(
+        UserAIntelligenceSummary.user_email == user_email,
+        UserAIntelligenceSummary.repo_path.like(f"{repo_path}%")
+    ).all()
+    return [
+        UserAIIntelligenceSummaryResponse(
+            user_email=s.user_email,
+            repo_path=s.repo_path,
+            summary_text=s.summary_text
+        )
+        for s in summaries_query
     ]

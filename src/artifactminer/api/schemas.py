@@ -293,3 +293,9 @@ class RepresentationPreferences(BaseModel):
     project_order: list[str] = Field(
         default_factory=list, description="Manual project ordering override."
     )
+
+class UserAIIntelligenceSummaryResponse(BaseModel):
+    repo_path: str
+    user_email: str
+    summary_text: str
+

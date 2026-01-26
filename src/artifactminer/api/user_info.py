@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from artifactminer.db.models import UserAnswer
+from artifactminer.db.models import Question, UserAnswer
 
 from .schemas import UserAnswerCreate, UserAnswerResponse
 from ..db import get_db
@@ -64,9 +64,13 @@ async def create_user_answer(
 
 def user_email_to_db(db: Session, email: str) -> UserAnswer:
     """
-     question id 1 = user's email
+    question id 1 = user's email
     """
-    email_answer = db.query(UserAnswer).filter(UserAnswer.question_id == 1).first()
+    email_question_id = db.query(Question).filter(Question.key == "email").first() #get correct question id...
+    if email_question_id is None:
+        raise ValueError("Email question not found in database")
+
+    email_answer = db.query(UserAnswer).filter(UserAnswer.question_id == email_question_id.id).first()
 
     if not email_answer:
         # if answer does not exist,
