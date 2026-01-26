@@ -40,7 +40,7 @@ async def update_consent(payload: ConsentUpdateRequest, db: Session = Depends(ge
     consent.consent_level = payload.consent_level
     
     if payload.consent_level in ("full", "no_llm"):
-        consent.accepted_at = datetime.now(UTC)
+        consent.accepted_at = datetime.now(UTC).replace(tzinfo=None)
     else:
         consent.accepted_at = None
 

@@ -42,7 +42,7 @@ def client_with_data():
 
     # Seed test data
     db = TestingSessionLocal()
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     # Projects: Old (2020) -> Middle (2021) -> New (2023)
     repos = [

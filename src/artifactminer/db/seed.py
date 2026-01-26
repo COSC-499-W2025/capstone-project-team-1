@@ -1,10 +1,9 @@
 """Database seeding functions."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from sqlalchemy.orm import Session
 
 from .models import Question, RepoStat
-from ..helpers.time import utcnow
 
 
 def seed_questions(db: Session) -> None:
@@ -79,7 +78,7 @@ def seed_repo_stats(db: Session) -> None:
     if existing_count > 0:
         return
 
-    now = utcnow()
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     sample_stats = [
         RepoStat(
