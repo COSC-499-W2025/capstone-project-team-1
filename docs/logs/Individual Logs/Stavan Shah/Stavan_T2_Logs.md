@@ -45,6 +45,8 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 
 * Reviewed [PR #295](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/295) (OpenAI initialization on use by Evan) - Approved. Good fix to prevent API calls on startup.
 
+* Reviewed [PR #308](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/308) (CLI repo selection and timeline view by Ahmad) - Big PR with refactoring of CLI helpers and new features.
+
 ---
 
 ## Blockers & Issues
@@ -70,6 +72,7 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 | Review PR #304 (timestamp fix) | Done | Requested changes → Approved |
 | Review PR #299 (base CLI) | Done | Approved after changes |
 | Review PR #295 (OpenAI init) | Done | Approved |
+| Review PR #308 (CLI refactor) | Done | Big refactor with repo selection and timeline |
 
 ---
 
