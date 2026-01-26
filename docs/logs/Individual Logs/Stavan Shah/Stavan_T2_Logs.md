@@ -45,16 +45,6 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 
 * Reviewed [PR #295](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/295) (OpenAI initialization on use by Evan) - Approved. Good fix to prevent API calls on startup.
 
-* Reviewed [PR #290](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/290) (Ollama structured outputs by Shlok) - Approved. Nice benchmarking tests.
-
-* Reviewed [PR #285](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/285) (AnalyzingScreen by Ahmad) - Provided multiple comments, requested changes, then approved.
-
-* Reviewed [PR #283](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/283) (ResumeScreen by Ahmad) - Provided comments and approved.
-
-* Reviewed [PR #282](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/282) (email API) - Requested changes then approved.
-
-* Reviewed team logs PRs (#292, #289, #286, #284) - Approved.
-
 ---
 
 ## Blockers & Issues
@@ -80,10 +70,6 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 | Review PR #304 (timestamp fix) | ✅ Done | Requested changes → Approved |
 | Review PR #299 (base CLI) | ✅ Done | Approved after changes |
 | Review PR #295 (OpenAI init) | ✅ Done | Approved |
-| Review PR #290 (Ollama) | ✅ Done | Approved |
-| Review PR #285 (AnalyzingScreen) | ✅ Done | Requested changes → Approved |
-| Review PR #283 (ResumeScreen) | ✅ Done | Approved |
-| Review PR #282 (email API) | ✅ Done | Requested changes → Approved |
 
 ---
 
