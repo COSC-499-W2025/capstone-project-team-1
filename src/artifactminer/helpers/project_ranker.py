@@ -49,6 +49,7 @@ def rank_projects(projects_dir: str, user_email: str) -> List[Dict]:
                 cwd=str(project_path),
                 text=True,
                 stderr=subprocess.DEVNULL,
+                timeout=5,
             )
 
             total_commits = 0

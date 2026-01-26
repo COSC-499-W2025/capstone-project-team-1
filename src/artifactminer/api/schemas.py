@@ -1,11 +1,11 @@
 """Shared Pydantic models for Artifact Miner API contracts."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..helpers.time import utcnow
+
 
 class HealthStatus(BaseModel):
     """Response shape for service health and readiness checks."""
@@ -14,7 +14,7 @@ class HealthStatus(BaseModel):
         default="ok", description="Overall service health indicator."
     )
     timestamp: datetime = Field(
-        default_factory=utcnow,
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None),
         description="UTC timestamp when the status was generated.",
     )
 
@@ -293,3 +293,9 @@ class RepresentationPreferences(BaseModel):
     project_order: list[str] = Field(
         default_factory=list, description="Manual project ordering override."
     )
+
+class UserAIIntelligenceSummaryResponse(BaseModel):
+    repo_path: str
+    user_email: str
+    summary_text: str
+

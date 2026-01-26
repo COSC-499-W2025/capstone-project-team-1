@@ -22,6 +22,7 @@ import shutil
 from datetime import datetime, UTC
 from pathlib import Path
 from typing import List
+from collections.abc import Callable
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -256,11 +257,19 @@ def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
 
     return extraction_dir
 
+def _get_progress_callback() -> Callable[[int, int, str], None] | None:
+    """Dependency hook for CLI-only progress reporting (API uses None)."""
+    return None
+
+
 @router.post("/{zip_id}", response_model=AnalyzeResponse)
 async def analyze_zip(
     zip_id: int,
     request: AnalyzeRequest | None = Body(default=None),
     db: Session = Depends(get_db),
+    progress_callback: Callable[[int, int, str], None] | None = Depends(
+        _get_progress_callback
+    ),
 ):
     """
     Master orchestration endpoint: analyze all git repos in an uploaded ZIP.
@@ -298,8 +307,6 @@ async def analyze_zip(
     Returns:
         AnalyzeResponse with repos analyzed, rankings, and summaries
     """
-
-
     uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
     if not uploaded_zip:
         raise HTTPException(
@@ -345,15 +352,18 @@ async def analyze_zip(
 
     print(f"[analyze] Found {len(git_repos)} git repositories")
 
-
     # Initialize the deep analyzer (Stavans's component)
     # enable_llm=False because we use deterministic extraction only
     analyzer = DeepRepoAnalyzer(enable_llm=False)
 
     repos_analyzed: List[RepoAnalysisResult] = []
 
-    for repo_path in git_repos:
+    for idx, repo_path in enumerate(git_repos):
         print(f"[analyze] Processing: {repo_path.name}")
+
+        if progress_callback:
+            # Treat `current` as number of repos completed so far (0..total).
+            progress_callback(idx, len(git_repos), repo_path.name)
 
         try:
             repo_stats = getRepoStats(repo_path)
@@ -361,22 +371,39 @@ async def analyze_zip(
 
             # repo_stat is now the SQLAlchemy model instance with .id
 
-            user_stats = getUserRepoStats(repo_path, user_email)
-            saveUserRepoStats(user_stats, db=db)
+            user_stats = None
+            user_contribution_pct = None
+            user_total_commits = None
+            user_commit_frequency = None
+            user_first_commit = None
+            user_last_commit = None
 
-            user_contribution_pct = user_stats.userStatspercentages
             try:
-                user_additions = collect_user_additions(
-                    repo_path=str(repo_path), user_email=user_email, max_commits=500
-                )
-                additions_text = "\n".join(user_additions)
-            except Exception as e:
-                print(
-                    f"[analyze] Warning: Could not collect additions for {repo_path.name}: {e}"
-                )
-                additions_text = ""
+                user_stats = getUserRepoStats(repo_path, user_email)
+                saveUserRepoStats(user_stats, db=db)
+                user_contribution_pct = user_stats.userStatspercentages
+                user_total_commits = user_stats.total_commits
+                user_commit_frequency = user_stats.commitFrequency
+                user_first_commit = user_stats.first_commit
+                user_last_commit = user_stats.last_commit
+            except ValueError as e:
+                # Still run deterministic analysis (skills/insights) even if user
+                # has no commits in this repo.
+                print(f"[analyze] Note: {repo_path.name}: {e}")
 
-  
+            additions_text = ""
+            if user_stats is not None:
+                try:
+                    user_additions = collect_user_additions(
+                        repo_path=str(repo_path), user_email=user_email, max_commits=500
+                    )
+                    additions_text = "\n".join(user_additions)
+                except Exception as e:
+                    print(
+                        f"[analyze] Warning: Could not collect additions for {repo_path.name}: {e}"
+                    )
+                    additions_text = ""
+
             deep_result = analyzer.analyze(
                 repo_path=str(repo_path),
                 repo_stat=repo_stat,  # Pass the SQLAlchemy model
@@ -387,7 +414,6 @@ async def analyze_zip(
 
             skills_count = len(deep_result.skills)
             insights_count = len(deep_result.insights)
-
 
             persist_extracted_skills(
                 db=db,
@@ -417,10 +443,10 @@ async def analyze_zip(
                     skills_count=skills_count,
                     insights_count=insights_count,
                     user_contribution_pct=user_contribution_pct,
-                    user_total_commits=user_stats.total_commits,
-                    user_commit_frequency=user_stats.commitFrequency,
-                    user_first_commit=user_stats.first_commit,
-                    user_last_commit=user_stats.last_commit,
+                    user_total_commits=user_total_commits,
+                    user_commit_frequency=user_commit_frequency,
+                    user_first_commit=user_first_commit,
+                    user_last_commit=user_last_commit,
                 )
             )
 
@@ -434,6 +460,8 @@ async def analyze_zip(
                     error=str(e),
                 )
             )
+            if progress_callback:
+                progress_callback(idx + 1, len(git_repos), repo_path.name)
             continue
 
         except Exception as e:
@@ -448,7 +476,12 @@ async def analyze_zip(
                     error=f"{type(e).__name__}: {str(e)}",
                 )
             )
+            if progress_callback:
+                progress_callback(idx + 1, len(git_repos), repo_path.name)
             continue
+
+        if progress_callback:
+            progress_callback(idx + 1, len(git_repos), repo_path.name)
 
     print("[analyze] Ranking projects...")
 
@@ -464,7 +497,7 @@ async def analyze_zip(
             )
             if repo_stat:
                 repo_stat.ranking_score = rank_info["score"]
-                repo_stat.ranked_at = datetime.now(UTC)
+                repo_stat.ranked_at = datetime.now(UTC).replace(tzinfo=None)
 
             rankings.append(
                 RankingResult(
@@ -487,7 +520,9 @@ async def analyze_zip(
     try:
         # generate_summaries_for_ranked uses project_path from DB to access git repos
         # This is why we persist to ./extracted/ instead of using temp directory
-        summary_data = await generate_summaries_for_ranked(db, top=3)
+        summary_data = await generate_summaries_for_ranked(
+            db, top=3, extraction_path=str(extraction_path)
+        )
 
         for item in summary_data:
             summaries.append(

@@ -1,0 +1,137 @@
+"""CLI tests for artifactminer.main"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+
+
+def run_cli(*args: str, input_text: str | None = None, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{SRC_DIR}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(SRC_DIR)
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "artifactminer.main", *args],
+        input=input_text,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        env=env,
+    )
+
+
+@pytest.fixture
+def zip_file():
+    return Path(__file__).parent / "data" / "mock_projects.zip"
+
+def test_cli_interactive_mode(zip_file, tmp_path, monkeypatch):
+    """CLI runs in interactive mode when required args are missing."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.txt"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    # Input sequence: consent, email, zip_path, repo_selection, output_path, confirm
+    user_input = "\n".join([
+        "2",                      # Step 1: Consent (no_llm)
+        "student@example.com",    # Step 2: Email
+        str(zip_file),            # Step 3: Input file
+        "all",                    # Step 4: Select repositories
+        str(out),                 # Step 5: Output file
+        "y",                      # Confirm
+    ]) + "\n"
+    result = run_cli(input_text=user_input)
+    assert result.returncode == 0 and out.exists()
+
+def test_cli_text_export(zip_file, tmp_path, monkeypatch):
+    """CLI creates text output with project metrics."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.txt"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm")
+    assert result.returncode == 0 and out.exists()
+    content = out.read_text()
+    assert "PORTFOLIO ANALYSIS EXPORT" in content and "PROJECT ANALYSIS DETAILS" in content
+
+def test_cli_json_export(zip_file, tmp_path, monkeypatch):
+    """CLI creates JSON output with all fields."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.json"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm")
+    assert result.returncode == 0 and out.exists()
+    data = json.loads(out.read_text())
+    assert "project_analyses" in data and len(data["project_analyses"]) > 0
+
+def test_cli_consent_levels(zip_file, tmp_path, monkeypatch):
+    """CLI accepts different consent levels."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.txt"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none")
+    assert result.returncode == 0
+
+def test_cli_custom_email(zip_file, tmp_path, monkeypatch):
+    """CLI accepts custom user email."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.txt"
+    email = "custom@example.com"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", email, "-c", "none")
+    assert result.returncode == 0 and email in result.stdout
+
+def test_cli_format_detection(zip_file, tmp_path, monkeypatch):
+    """CLI detects format from file extension."""
+    if not zip_file.exists():
+        pytest.skip("mock_projects.zip not found")
+    out = tmp_path / "out.json"
+    monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none")
+    assert result.returncode == 0
+    data = json.loads(out.read_text())
+    assert isinstance(data, dict)
+
+
+def test_parse_selection_all():
+    """parse_selection returns all indices for 'all'."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("all", 5) == [0, 1, 2, 3, 4]
+    assert parse_selection("ALL", 3) == [0, 1, 2]
+
+
+def test_parse_selection_single():
+    """parse_selection handles single numbers."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1", 5) == [0]
+    assert parse_selection("3", 5) == [2]
+    assert parse_selection("6", 5) == []  # Out of range
+
+
+def test_parse_selection_comma_separated():
+    """parse_selection handles comma-separated numbers."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1,3,5", 5) == [0, 2, 4]
+    assert parse_selection("2, 4", 5) == [1, 3]
+
+
+def test_parse_selection_range():
+    """parse_selection handles ranges like '1-3'."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1-3", 5) == [0, 1, 2]
+    assert parse_selection("2-4", 5) == [1, 2, 3]
+
+
+def test_parse_selection_mixed():
+    """parse_selection handles mixed formats."""
+    from artifactminer.main import parse_selection
+    assert parse_selection("1,3-5", 6) == [0, 2, 3, 4]
+    assert parse_selection("1-2,4,6", 6) == [0, 1, 3, 5]

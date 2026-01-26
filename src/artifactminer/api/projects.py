@@ -1,33 +1,35 @@
 """Project-related API endpoints (timeline, delete, etc.)."""
 
-from datetime import timedelta, date
+from datetime import timedelta, date, datetime, UTC
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse
 from ..db import RepoStat, get_db
-from ..helpers.time import utcnow
 from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-
-@router.get("/timeline", response_model=List[ProjectTimelineItem])
-async def get_project_timeline(
+def fetch_project_timeline(
+    db: Session,
+    *,
     start_date: date | None = None,
     end_date: date | None = None,
     active_only: bool | None = None,
-    db: Session = Depends(get_db),
+    project_path_prefixes: list[str] | None = None,
 ) -> list[ProjectTimelineItem]:
-    """Return stored project activity windows with optional filtering."""
+    """Return stored project activity windows with optional filtering.
 
-    now = utcnow()
+    `project_path_prefixes` filters RepoStat.project_path by SQL LIKE prefix (e.g. extraction root).
+    """
+    now = datetime.now(UTC).replace(tzinfo=None)
     six_months_ago = now - timedelta(days=180)
 
-    repo_stats: List[RepoStat] = (
+    query = (
         db.query(RepoStat)
         .filter(
             RepoStat.first_commit.isnot(None),
@@ -35,8 +37,14 @@ async def get_project_timeline(
             RepoStat.deleted_at.is_(None),  # Exclude soft-deleted projects
         )
         .order_by(RepoStat.first_commit.asc())
-        .all()
     )
+
+    if project_path_prefixes:
+        query = query.filter(
+            or_(*[RepoStat.project_path.like(f"{prefix}%") for prefix in project_path_prefixes])
+        )
+
+    repo_stats: List[RepoStat] = query.all()
 
     timeline_items: list[ProjectTimelineItem] = []
     for stat in repo_stats:
@@ -70,6 +78,21 @@ async def get_project_timeline(
     return timeline_items
 
 
+@router.get("/timeline", response_model=List[ProjectTimelineItem])
+async def get_project_timeline(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    active_only: bool | None = None,
+    db: Session = Depends(get_db),
+) -> list[ProjectTimelineItem]:
+    return fetch_project_timeline(
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        active_only=active_only,
+    )
+
+
 @router.delete("/{project_id}", response_model=DeleteResponse)
 async def delete_project(
     project_id: int,
@@ -96,7 +119,7 @@ async def delete_project(
 
     # Soft delete - set timestamp
     project_name = repo_stat.project_name
-    repo_stat.deleted_at = utcnow()
+    repo_stat.deleted_at = datetime.now(UTC).replace(tzinfo=None)
     db.commit()
 
     return DeleteResponse(

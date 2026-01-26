@@ -42,25 +42,28 @@ def client_with_data():
 
     # Seed test data
     db = TestingSessionLocal()
-    now = datetime.now(UTC)
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     # Projects: Old (2020) -> Middle (2021) -> New (2023)
     repos = [
         RepoStat(
             id=1,
             project_name="OldProject",
+            project_path="/repo1",
             first_commit=datetime(2020, 1, 15),
             last_commit=datetime(2020, 6, 20),
         ),
         RepoStat(
             id=2,
             project_name="NewProject",
+            project_path="/repo2",
             first_commit=datetime(2023, 3, 1),
             last_commit=now - timedelta(days=5),
         ),
         RepoStat(
             id=3,
             project_name="MiddleProject",
+            project_path="/repo3",
             first_commit=datetime(2021, 6, 1),
             last_commit=datetime(2022, 12, 15),
         ),
@@ -267,3 +270,55 @@ def test_summaries_empty(client_empty):
     resp = client_empty.get("/summaries?user_email=anyone@example.com")
     assert resp.status_code == 200
     assert resp.json() == []
+
+# === /AI_summaries ===
+
+def test_AI_summaries_requires_params(client_with_data):
+    """Returns 422 if required query params are missing."""
+    # Missing both user_email and repo_path
+    resp = client_with_data.get("/AI_summaries")
+    assert resp.status_code == 422
+
+    # Missing repo_path
+    resp = client_with_data.get("/AI_summaries?user_email=stavan@example.com")
+    assert resp.status_code == 422
+
+    # Missing user_email
+    resp = client_with_data.get("/AI_summaries?repo_path=/repo")
+    assert resp.status_code == 422
+
+
+def test_AI_summaries_filters_by_email_and_repo(client_with_data):
+    """Returns only summaries matching user_email and repo_path prefix."""
+    resp = client_with_data.get("/AI_summaries", params={
+        "user_email": "stavan@example.com",
+        "repo_path": "/repo"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Only summaries for stavan@example.com
+    assert all(s["user_email"] == "stavan@example.com" for s in data)
+
+    # Only repos starting with "/repo"
+    assert all(s["repo_path"].startswith("/repo") for s in data)
+
+    # Required fields present
+    for s in data:
+        for field in ["user_email", "repo_path", "summary_text"]:
+            assert field in s
+
+    # There should be 2 matching summaries (based on seeded data)
+    assert len(data) == 2
+
+
+def test_AI_summaries_other_user(client_with_data):
+    """Returns correct summaries for a different user."""
+    resp = client_with_data.get("/AI_summaries", params={
+        "user_email": "other@example.com",
+        "repo_path": "/repo"
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Only one summary for 'other@example.com' in s

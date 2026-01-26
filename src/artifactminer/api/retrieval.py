@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import or_
 
-from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse
+from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
 from ..db import (
     get_db,
     ProjectSkill,
@@ -26,35 +26,40 @@ from ..db import (
 
 router = APIRouter(tags=["retrieval"])
 
-
-@router.get("/skills/chronology", response_model=List[SkillChronologyItem])
-async def get_skill_chronology(
-    db: Session = Depends(get_db),
+def fetch_skill_chronology(
+    db: Session,
+    *,
+    project_path_prefixes: list[str] | None = None,
 ) -> list[SkillChronologyItem]:
     """Get chronological list of skills ordered by when they were first demonstrated.
 
-    Joins ProjectSkill -> Skill -> RepoStat to get skill info with project dates.
-    Ordered by RepoStat.first_commit ASC (oldest first) to show skill progression.
-
-    Milestone Req #19: Chronological list of skills.
+    `project_path_prefixes` filters RepoStat.project_path by SQL LIKE prefix (e.g. extraction root).
     """
     items: list[SkillChronologyItem] = []
 
-    project_results = (
+    project_query = (
         db.query(ProjectSkill, Skill, RepoStat)
         .join(Skill, ProjectSkill.skill_id == Skill.id)
         .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
         .filter(RepoStat.deleted_at.is_(None))
-        .all()
     )
 
-    user_results = (
+    user_query = (
         db.query(UserProjectSkill, Skill, RepoStat)
         .join(Skill, UserProjectSkill.skill_id == Skill.id)
         .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
         .filter(RepoStat.deleted_at.is_(None))
-        .all()
     )
+
+    if project_path_prefixes:
+        path_filter = or_(
+            *[RepoStat.project_path.like(f"{prefix}%") for prefix in project_path_prefixes]
+        )
+        project_query = project_query.filter(path_filter)
+        user_query = user_query.filter(path_filter)
+
+    project_results = project_query.all()
+    user_results = user_query.all()
 
     for project_skill, skill, repo_stat in project_results:
         items.append(
@@ -80,6 +85,20 @@ async def get_skill_chronology(
 
     items.sort(key=lambda item: item.date or datetime.max)
     return items
+
+
+@router.get("/skills/chronology", response_model=List[SkillChronologyItem])
+async def get_skill_chronology(
+    db: Session = Depends(get_db),
+) -> list[SkillChronologyItem]:
+    """Get chronological list of skills ordered by when they were first demonstrated.
+
+    Joins ProjectSkill -> Skill -> RepoStat to get skill info with project dates.
+    Ordered by RepoStat.first_commit ASC (oldest first) to show skill progression.
+
+    Milestone Req #19: Chronological list of skills.
+    """
+    return fetch_skill_chronology(db)
 
 
 @router.get("/resume", response_model=List[ResumeItemResponse])
@@ -159,4 +178,24 @@ async def get_summaries(
             generated_at=s.generated_at,
         )
         for s in summaries
+    ]
+
+
+@router.get("/AI_summaries", response_model=List[UserAIIntelligenceSummaryResponse])
+async def get_AI_summaries(
+    user_email : str,
+    repo_path : str,
+    db: Session = Depends(get_db),
+):
+    summaries_query = db.query(UserAIntelligenceSummary).filter(
+        UserAIntelligenceSummary.user_email == user_email,
+        UserAIntelligenceSummary.repo_path.like(f"{repo_path}%")
+    ).all()
+    return [
+        UserAIIntelligenceSummaryResponse(
+            user_email=s.user_email,
+            repo_path=s.repo_path,
+            summary_text=s.summary_text
+        )
+        for s in summaries_query
     ]

@@ -2,7 +2,7 @@
 
 import shutil
 import zipfile
-from artifactminer.helpers.time import utcnow
+from datetime import datetime, UTC
 from pathlib import Path
 
 from artifactminer.db.database import SessionLocal
@@ -104,7 +104,7 @@ async def test_full_pipeline_zip_to_summaries():
 
             if repo_stat:
                 repo_stat.ranking_score = ranked["score"]
-                repo_stat.ranked_at = utcnow()
+                repo_stat.ranked_at = datetime.now(UTC).replace(tzinfo=None)
 
         db.commit()
 

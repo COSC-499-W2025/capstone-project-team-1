@@ -32,6 +32,7 @@ dev = [
 ]
 
 [project.scripts]
+artifactminer = "artifactminer.main:main"
 artifactminer-tui = "artifactminer.tui.app:run"
 api = "artifactminer.api.main:main"
 
