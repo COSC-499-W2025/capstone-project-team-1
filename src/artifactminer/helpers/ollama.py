@@ -1,6 +1,9 @@
 """Utilities for interacting with a local Ollama LLM."""
 
-from ollama import chat
+try:
+    from ollama import chat  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    chat = None
 from pydantic import BaseModel
 
 __all__ = ["get_ollama_response"]
@@ -14,6 +17,10 @@ class OllamaTextResponse(BaseModel):
 
 def get_ollama_response(prompt: str, model: str = DEFAULT_MODEL) -> str:
     try:
+        if chat is None:
+            raise RuntimeError(
+                "Ollama is not installed. Install it (e.g. `pip install ollama`) to enable local LLM responses."
+            )
         response = chat(
             model=model,
             messages=[{"role": "user", "content": prompt}],
