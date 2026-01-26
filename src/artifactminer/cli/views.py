@@ -34,8 +34,7 @@ def display_project_timeline(db: Session, extraction_path: str) -> None:
         first = item.first_commit.strftime("%Y-%m-%d") if item.first_commit else "?"
         last = item.last_commit.strftime("%Y-%m-%d") if item.last_commit else "?"
         active = "●" if item.was_active else "○"
-        print(f"  {active} {item.project_name}")
-        print(f"      {first} → {last} ({item.duration_days} days)")
+        print(f"  {active} {item.project_name}\n      {first} → {last} ({item.duration_days} days)")
 
     print()
 
@@ -57,11 +56,7 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
     items.sort(key=lambda item: item.date or dt.max)
 
     seen: set[str] = set()
-    unique_items = []
-    for item in items:
-        if item.skill not in seen:
-            seen.add(item.skill)
-            unique_items.append(item)
+    unique_items = [item for item in items if not (item.skill in seen or seen.add(item.skill))]
 
     by_category: dict[str, list] = defaultdict(list)
     for item in unique_items:
@@ -111,4 +106,3 @@ def display_repo_details(analyze_result) -> None:
             print(f"  Activity period: {first} → {last}")
 
     print(f"\n{'='*80}\n")
-

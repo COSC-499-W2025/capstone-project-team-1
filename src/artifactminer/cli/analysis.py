@@ -1,47 +1,111 @@
 import shutil
 import sys
 from pathlib import Path
-from datetime import datetime
 
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from artifactminer.api.analyze import analyze_zip
 from artifactminer.api.schemas import AnalyzeRequest
-from artifactminer.api.zip import UPLOADS_DIR
-from artifactminer.cli.db_setup import setup_consent, setup_user_email
-from artifactminer.cli.progress import create_repo_progress
 from artifactminer.cli.views import (
     extraction_prefixes,
     display_project_timeline,
     display_skills_chronology,
     display_repo_details,
 )
+from artifactminer.cli.upload import upload_zip
 from artifactminer.db import SessionLocal, UploadedZip
 from artifactminer.db.models import ResumeItem, UserAIntelligenceSummary, RepoStat
 from artifactminer.tui.helpers import export_to_json, export_to_text
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    BarColumn,
+    MofNCompleteColumn,
+)
+from datetime import datetime, UTC
+
+from artifactminer.db import Consent, Question, UserAnswer
 
 
 def _repo_directory_values(selected_repos: list[Path], extraction_root: str | None) -> list[str]:
-    if extraction_root is None:
+    if not extraction_root:
         return [repo.name for repo in selected_repos]
-
-    root = Path(extraction_root)
+    root = Path(extraction_root).resolve()
     values: list[str] = []
     for repo in selected_repos:
-        for candidate_repo in (repo, repo.resolve()):
-            for candidate_root in (root, root.resolve()):
-                try:
-                    values.append(str(candidate_repo.relative_to(candidate_root)))
-                    break
-                except ValueError:
-                    continue
-            else:
-                continue
-            break
+        resolved = repo.resolve()
+        if resolved.is_relative_to(root):
+            values.append(str(resolved.relative_to(root)))
         else:
             values.append(repo.name)
     return values
+
+
+def setup_consent(db: Session, level: str) -> None:
+    consent = db.get(Consent, 1)
+    if consent is None:
+        consent = Consent(id=1, consent_level=level, accepted_at=datetime.now(UTC))
+        db.add(consent)
+    else:
+        consent.consent_level = level
+        if level in ("full", "no_llm"):
+            consent.accepted_at = datetime.now(UTC)
+    db.commit()
+
+
+def setup_user_email(db: Session, email: str) -> None:
+    email_question = db.query(Question).filter(Question.key == "email").first()
+    if not email_question:
+        email_question = Question(key="email", text="What is your email?", order=1)
+        db.add(email_question)
+        db.commit()
+        db.refresh(email_question)
+
+    db.query(UserAnswer).filter(UserAnswer.question_id == email_question.id).delete()
+    answer = UserAnswer(
+        question_id=email_question.id,
+        answer_text=email,
+        answered_at=datetime.now(UTC),
+    )
+    db.add(answer)
+    db.commit()
+
+
+def create_repo_progress(
+    expected_total: int | None,
+) -> tuple[Progress, callable]:
+    progress = Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("{task.fields[repo_name]}"),
+        transient=False,
+        redirect_stdout=True,
+        redirect_stderr=True,
+        expand=True,
+        refresh_per_second=20,
+    )
+
+    task_id: int = progress.add_task(
+        "Analyzing repositories",
+        total=float(expected_total) if expected_total is not None else 1,
+        repo_name="Starting...",
+    )
+
+    def progress_callback(completed: int, total: int, repo_name: str) -> None:
+        total_value = expected_total if expected_total is not None else total
+        progress.update(
+            task_id,
+            total=total_value,
+            completed=completed,
+            repo_name=repo_name,
+            refresh=True,
+        )
+
+    return progress, progress_callback
 
 
 async def run_analysis(
@@ -69,21 +133,7 @@ async def run_analysis(
             print(f"Using existing ZIP (ID: {uploaded_zip.id})")
         else:
             print(f"Uploading ZIP: {input_path}")
-            UPLOADS_DIR.mkdir(exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_filename = f"{timestamp}_{input_path.name}"
-            dest_path = UPLOADS_DIR / safe_filename
-
-            shutil.copy2(input_path, dest_path)
-
-            uploaded_zip = UploadedZip(
-                filename=input_path.name,
-                path=str(dest_path),
-                portfolio_id="cli-generated",
-            )
-            db.add(uploaded_zip)
-            db.commit()
-            db.refresh(uploaded_zip)
+            uploaded_zip = upload_zip(db, input_path)
 
         print(f"\nAnalyzing ZIP (ID: {uploaded_zip.id})...")
 
@@ -201,4 +251,3 @@ async def run_analysis(
         sys.exit(1)
     finally:
         db.close()
-

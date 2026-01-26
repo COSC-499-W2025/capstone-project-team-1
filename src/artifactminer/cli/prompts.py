@@ -33,7 +33,7 @@ def _normalize_path_value(value):
     return Path(_strip_wrapping_quotes(str(value))).expanduser().resolve()
 
 
-def _validate_input_path(path):
+def validate_input_path(path):
     path = _normalize_path_value(path)
     if path is None:
         return None
@@ -46,10 +46,6 @@ def _validate_input_path(path):
     return path
 
 
-def validate_input_path(path):
-    return _validate_input_path(path)
-
-
 def _confirm_overwrite(path: Path) -> bool:
     while True:
         response = input(f"Output file exists: {path}. Overwrite? [y/N]: ").strip().lower()
@@ -60,7 +56,7 @@ def _confirm_overwrite(path: Path) -> bool:
         print("Please enter y or n.")
 
 
-def _validate_output_path(path, confirm_overwrite: bool = False):
+def validate_output_path(path, confirm_overwrite: bool = False):
     path = _normalize_path_value(path)
     if path is None:
         return None
@@ -73,8 +69,35 @@ def _validate_output_path(path, confirm_overwrite: bool = False):
     return path
 
 
-def validate_output_path(path, confirm_overwrite: bool = False):
-    return _validate_output_path(path, confirm_overwrite=confirm_overwrite)
+def prompt_path(
+    *,
+    step_title: str,
+    prompt_text: str,
+    validator,
+    initial=None,
+    on_success=None,
+) -> Path:
+    print(step_title)
+    print("-" * 40)
+
+    if initial is not None:
+        validated = validator(initial)
+        if validated is not None:
+            if on_success:
+                on_success(validated)
+            return validated
+
+    while True:
+        raw = _strip_wrapping_quotes(input(prompt_text))
+        if not raw:
+            print("Please enter a path.")
+            continue
+        validated = validator(raw)
+        if validated is None:
+            continue
+        if on_success:
+            on_success(validated)
+        return validated
 
 
 def prompt_consent() -> str:
@@ -107,45 +130,30 @@ def prompt_email() -> str:
 
 
 def prompt_input_file(initial=None) -> Path:
-    print("Step 3: Input File")
-    print("-" * 40)
-    if initial is not None:
-        validated = _validate_input_path(initial)
-        if validated is not None:
-            size_mb = validated.stat().st_size / (1024 * 1024)
-            print(f"Found: {validated.name} ({size_mb:.1f} MB)\n")
-            return validated
-    while True:
-        path_str = _strip_wrapping_quotes(input("Enter path to ZIP file: "))
-        if not path_str:
-            print("Please enter a path.")
-            continue
-        validated = _validate_input_path(path_str)
-        if validated is None:
-            continue
-        size_mb = validated.stat().st_size / (1024 * 1024)
-        print(f"Found: {validated.name} ({size_mb:.1f} MB)\n")
-        return validated
+    def _on_success(path: Path) -> None:
+        size_mb = path.stat().st_size / (1024 * 1024)
+        print(f"Found: {path.name} ({size_mb:.1f} MB)\n")
+
+    return prompt_path(
+        step_title="Step 3: Input File",
+        prompt_text="Enter path to ZIP file: ",
+        validator=validate_input_path,
+        initial=initial,
+        on_success=_on_success,
+    )
 
 
 def prompt_output_file(initial=None) -> Path:
-    print("Step 5: Output File")
-    print("-" * 40)
-    if initial is not None:
-        validated = _validate_output_path(initial, confirm_overwrite=True)
-        if validated is not None:
-            print(f"Output: {validated.name}\n")
-            return validated
-    while True:
-        path_str = _strip_wrapping_quotes(input("Enter output path (.json or .txt): "))
-        if not path_str:
-            print("Please enter a path.")
-            continue
-        validated = _validate_output_path(path_str, confirm_overwrite=True)
-        if validated is None:
-            continue
-        print(f"Output: {validated.name}\n")
-        return validated
+    def _on_success(path: Path) -> None:
+        print(f"Output: {path.name}\n")
+
+    return prompt_path(
+        step_title="Step 5: Output File",
+        prompt_text="Enter output path (.json or .txt): ",
+        validator=lambda p: validate_output_path(p, confirm_overwrite=True),
+        initial=initial,
+        on_success=_on_success,
+    )
 
 
 def confirm_or_exit(prompt: str) -> None:
