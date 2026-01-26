@@ -14,6 +14,7 @@ def print_header() -> None:
     """Print the interactive CLI header."""
     print("\n" + "=" * 60)
     print(BANNER_ART)
+    print("Student Portfolio Analysis Tool")
     print("=" * 60 + "\n")
 
 
