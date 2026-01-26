@@ -36,11 +36,11 @@ async def setup_user_email(db: Session, email: str) -> None:
 
 
 
-async def upload_zip(input_path:Path) -> ZipUploadResponse:
+async def upload_zip(input_path:Path,db) -> ZipUploadResponse:
     #API: calling upload zip async
     from artifactminer.api.zip import upload_zip
   
-    db = SessionLocal()
+ 
     with open(input_path, "rb") as f:
         upload_file = UploadFile(
             filename=input_path.name,
@@ -57,7 +57,7 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
     
     db = SessionLocal()
 
-    upload_payload = await upload_zip(input_path)
+    upload_payload = await upload_zip(input_path, db)
     
     try:
 
