@@ -1,11 +1,92 @@
 # Week Navigation
 
+- [Term 2 Week 3 (Jan 19 - Jan 25)](#logs---term-2-week-3)
 - [Term 2 Week 2 (Jan 12 - Jan 18)](#logs---term-2-week-2)
 - [Term 2 Week 1 (Jan 5 - Jan 11)](Stavan_T2_Week1.md)
 - [Term 1 Week 14 (Dec 1 - Dec 7)](Log%20Week14.md)
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 3
+
+## Connection to Previous Week
+Last week I focused on directory scoping for the analyze endpoint and fixing email validation. This week I continued by implementing interactive CLI mode (building on Evan's base CLI work), reviewing several team PRs, and helping merge development changes into main.
+
+---
+
+## Coding Tasks
+
+* Created interactive CLI mode ([PR #301](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/301)) - Added prompts for missing args, overwrite confirmation, quote trimming, and Ctrl+C exit handling. Built on top of Evan's #299 branch to make the CLI interactive.
+
+* Added interactive CLI test to verify the prompt flow works correctly.
+
+* Documented interactive CLI mode in CLI_USAGE.md.
+
+* Merged all development changes into main ([PR #293](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/293)) to sync the branches before milestone.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added test_interactive_cli test to verify the new interactive prompts work correctly.
+
+* Tested interactive CLI flow manually - consent, email, input ZIP, output path, confirmation.
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #304](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/304) (API timestamp cleanup by Shlok) - Initially requested changes, then approved after fixes. Good catch on the broken `answered_at` assignment.
+
+* Reviewed [PR #299](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/299) (base CLI by Evan) - Approved initially, then requested changes, approved final version.
+
+* Reviewed [PR #295](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/295) (OpenAI initialization on use by Evan) - Approved. Good fix to prevent API calls on startup.
+
+* Reviewed [PR #290](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/290) (Ollama structured outputs by Shlok) - Approved. Nice benchmarking tests.
+
+* Reviewed [PR #285](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/285) (AnalyzingScreen by Ahmad) - Provided multiple comments, requested changes, then approved.
+
+* Reviewed [PR #283](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/283) (ResumeScreen by Ahmad) - Provided comments and approved.
+
+* Reviewed [PR #282](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/282) (email API) - Requested changes then approved.
+
+* Reviewed [PR #281](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/281) (async OpenAI by Evan) - Provided 5 comments on singleton pattern and asyncio usage, approved.
+
+* Reviewed team logs PRs (#292, #289, #286, #284) - Approved.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Continue supporting CLI integration with API
+* Review remaining PRs and help with final milestone push
+* Address any bugs that arise from the CLI merge
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Interactive CLI mode | ✅ Done | [PR #301](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/301) - Prompts, confirm, Ctrl+C |
+| Merge dev to main | ✅ Done | [PR #293](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/293) |
+| Add interactive CLI test | ✅ Done | test_interactive_cli added |
+| Document CLI usage | ✅ Done | Updated CLI_USAGE.md |
+| Review PR #304 (timestamp fix) | ✅ Done | Requested changes → Approved |
+| Review PR #299 (base CLI) | ✅ Done | Approved after changes |
+| Review PR #295 (OpenAI init) | ✅ Done | Approved |
+| Review PR #290 (Ollama) | ✅ Done | Approved |
+| Review PR #285 (AnalyzingScreen) | ✅ Done | Requested changes → Approved |
+| Review PR #283 (ResumeScreen) | ✅ Done | Approved |
+| Review PR #282 (email API) | ✅ Done | Requested changes → Approved |
+| Review PR #281 (async OpenAI) | ✅ Done | Approved |
 
 ---
 
