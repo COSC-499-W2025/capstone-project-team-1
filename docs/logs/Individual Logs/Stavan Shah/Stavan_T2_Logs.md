@@ -53,8 +53,6 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 
 * Reviewed [PR #282](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/282) (email API) - Requested changes then approved.
 
-* Reviewed [PR #281](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/281) (async OpenAI by Evan) - Provided 5 comments on singleton pattern and asyncio usage, approved.
-
 * Reviewed team logs PRs (#292, #289, #286, #284) - Approved.
 
 ---
@@ -86,7 +84,6 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 | Review PR #285 (AnalyzingScreen) | ✅ Done | Requested changes → Approved |
 | Review PR #283 (ResumeScreen) | ✅ Done | Approved |
 | Review PR #282 (email API) | ✅ Done | Requested changes → Approved |
-| Review PR #281 (async OpenAI) | ✅ Done | Approved |
 
 ---
 
