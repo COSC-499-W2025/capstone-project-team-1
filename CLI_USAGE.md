@@ -6,7 +6,9 @@ CLI tool to analyze student project portfolios and generate reports. Supports in
 ## Basic Usage
 ```bash
 python -m artifactminer.main
+uv run python -m artifactminer.main
 python -m artifactminer.main -i <input.zip> -o <output.txt|json> [options]
+uv run python -m artifactminer.main -i <input.zip> -o <output.txt|json> [options]
 ```
 
 ## Required Arguments (Non-Interactive Mode)
@@ -39,6 +41,7 @@ After analysis completes, the CLI displays:
 **Interactive mode:**
 ```bash
 python -m artifactminer.main
+uv run python -m artifactminer.main
 ```
 
 **Text export with no LLM:**

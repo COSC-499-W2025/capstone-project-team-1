@@ -8,9 +8,12 @@ from sqlalchemy.orm import Session
 
 from artifactminer.api.projects import fetch_project_timeline
 from artifactminer.api.retrieval import fetch_skill_chronology
+from artifactminer.api.schemas import AnalyzeResponse
 
 
 def extraction_prefixes(extraction_path: str) -> list[str]:
+    if not extraction_path:
+        return []
     raw = str(extraction_path)
     resolved = str(Path(raw).resolve())
     return sorted({raw, resolved})
@@ -70,7 +73,7 @@ def display_skills_chronology(db: Session, extraction_path: str) -> None:
         print()
 
 
-def display_repo_details(analyze_result) -> None:
+def display_repo_details(analyze_result: AnalyzeResponse) -> None:
     print(f"\n{'='*80}")
     print(f"ANALYSIS COMPLETE: {len(analyze_result.repos_analyzed)} repositories analyzed")
     print(f"{'='*80}\n")
