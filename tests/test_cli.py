@@ -1,9 +1,30 @@
 """CLI tests for artifactminer.main"""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_DIR = PROJECT_ROOT / "src"
+
+
+def run_cli(*args: str, input_text: str | None = None, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = (
+        f"{SRC_DIR}{os.pathsep}{existing_pythonpath}" if existing_pythonpath else str(SRC_DIR)
+    )
+    return subprocess.run(
+        [sys.executable, "-m", "artifactminer.main", *args],
+        input=input_text,
+        text=True,
+        capture_output=True,
+        timeout=timeout,
+        env=env,
+    )
+
 
 @pytest.fixture
 def zip_file():
@@ -24,13 +45,7 @@ def test_cli_interactive_mode(zip_file, tmp_path, monkeypatch):
         str(out),                 # Step 5: Output file
         "y",                      # Confirm
     ]) + "\n"
-    result = subprocess.run(
-        [sys.executable, "-m", "artifactminer.main"],
-        input=user_input,
-        text=True,
-        capture_output=True,
-        timeout=120,
-    )
+    result = run_cli(input_text=user_input)
     assert result.returncode == 0 and out.exists()
 
 def test_cli_text_export(zip_file, tmp_path, monkeypatch):
@@ -39,7 +54,7 @@ def test_cli_text_export(zip_file, tmp_path, monkeypatch):
         pytest.skip("mock_projects.zip not found")
     out = tmp_path / "out.txt"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm"], capture_output=True, timeout=120)
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm")
     assert result.returncode == 0 and out.exists()
     content = out.read_text()
     assert "PORTFOLIO ANALYSIS EXPORT" in content and "PROJECT ANALYSIS DETAILS" in content
@@ -50,7 +65,7 @@ def test_cli_json_export(zip_file, tmp_path, monkeypatch):
         pytest.skip("mock_projects.zip not found")
     out = tmp_path / "out.json"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm"], capture_output=True, timeout=120)
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "no_llm")
     assert result.returncode == 0 and out.exists()
     data = json.loads(out.read_text())
     assert "project_analyses" in data and len(data["project_analyses"]) > 0
@@ -61,7 +76,7 @@ def test_cli_consent_levels(zip_file, tmp_path, monkeypatch):
         pytest.skip("mock_projects.zip not found")
     out = tmp_path / "out.txt"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none"], capture_output=True, timeout=120)
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none")
     assert result.returncode == 0
 
 def test_cli_custom_email(zip_file, tmp_path, monkeypatch):
@@ -71,8 +86,8 @@ def test_cli_custom_email(zip_file, tmp_path, monkeypatch):
     out = tmp_path / "out.txt"
     email = "custom@example.com"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-i", str(zip_file), "-o", str(out), "-u", email, "-c", "none"], capture_output=True, timeout=120)
-    assert result.returncode == 0 and email in result.stdout.decode()
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", email, "-c", "none")
+    assert result.returncode == 0 and email in result.stdout
 
 def test_cli_format_detection(zip_file, tmp_path, monkeypatch):
     """CLI detects format from file extension."""
@@ -80,7 +95,7 @@ def test_cli_format_detection(zip_file, tmp_path, monkeypatch):
         pytest.skip("mock_projects.zip not found")
     out = tmp_path / "out.json"
     monkeypatch.setenv("ARTIFACTMINER_DB", f"sqlite:///{tmp_path / 'test.db'}")
-    result = subprocess.run([sys.executable, "-m", "artifactminer.main", "-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none"], capture_output=True, timeout=120)
+    result = run_cli("-i", str(zip_file), "-o", str(out), "-u", "test@test.com", "-c", "none")
     assert result.returncode == 0
     data = json.loads(out.read_text())
     assert isinstance(data, dict)
