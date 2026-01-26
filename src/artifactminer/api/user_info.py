@@ -65,6 +65,8 @@ def user_email_to_db(db: Session, email: str) -> UserAnswer:
     question id 1 = user's email
     """
     email_question_id = db.query(Question).filter(Question.key == "email").first() #get correct question id...
+    if email_question_id is None:
+        raise ValueError("Email question not found in database")
 
     email_answer = db.query(UserAnswer).filter(UserAnswer.question_id == email_question_id.id).first()
 

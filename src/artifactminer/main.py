@@ -21,7 +21,6 @@ async def setup_consent(db: Session, level: str) -> None:
     """Set consent level in database."""
     #API: calling consent async
     from artifactminer.api.consent import update_consent
-    db = SessionLocal()
     consent_created = ConsentResponse(consent_level=level, datetime=datetime.now(UTC))
     consent = await update_consent(consent_created, db)
     print("\nconsent response: ", consent.consent_level)
@@ -31,7 +30,6 @@ async def setup_user_email(db: Session, email: str) -> None:
     """Set user email in database."""
     #API: calling user answer (email) async
     from artifactminer.api.user_info import create_user_answer 
-    db = SessionLocal()
     user_answer_created = UserAnswerCreate(email=email)
     user_answer = await create_user_answer(user_answer_created,db)
     print("\nemail response: ", user_answer.answer_text)
@@ -49,13 +47,12 @@ async def upload_zip(input_path:Path) -> ZipUploadResponse:
             file=f,
         )
         upload_zip_payload = await upload_zip(file=upload_file,portfolio_id="cli-generated",db=db)
-        upload_zip_payload.json()
 
     return upload_zip_payload
 
 
 async def run_analysis(input_path: Path, output_path: Path, consent_level: str, user_email: str) -> None:
-    """Run non-interactive analysis pipelixne."""
+    """Run non-interactive analysis pipeline."""
     from artifactminer.db import SessionLocal
     
     db = SessionLocal()
@@ -133,7 +130,7 @@ async def run_analysis(input_path: Path, output_path: Path, consent_level: str, 
         from artifactminer.db.models import ResumeItem, UserAIntelligenceSummary, RepoStat
         
         # Get the extraction path for this specific ZIP to avoid duplicates
-        extraction_path_str = str(analyze_result.extraction_path) if analyze_result.extraction_path else str(analyze_result.extraction_path)
+        extraction_path_str = str(analyze_result.extraction_path)
         
         # Get resume items - only for repos in this specific extraction path
         resume_items_query = db.query(ResumeItem, RepoStat).join(
