@@ -57,9 +57,8 @@ Last week I focused on directory scoping for the analyze endpoint and fixing ema
 
 ## Plan for Next Week
 
-* Work on the experimental OpenTUI React implementation
-* Continue supporting CLI integration with API
-* Review remaining PRs and help with final milestone push
+* Work on the experimental OpenTUI React implementation and see how we could use it. 
+* Review remaining PRs and help with milestone 2 push
 
 ---
 
