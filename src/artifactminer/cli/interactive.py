@@ -1,11 +1,8 @@
 import asyncio
-import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 
 from artifactminer.api.analyze import discover_git_repos, extract_zip_to_persistent_location
-from artifactminer.api.zip import UPLOADS_DIR
 from artifactminer.cli.analysis import run_analysis
 from artifactminer.cli.prompts import (
     print_header,
@@ -16,7 +13,8 @@ from artifactminer.cli.prompts import (
     confirm_or_exit,
 )
 from artifactminer.cli.selection import prompt_repo_selection
-from artifactminer.db import SessionLocal, UploadedZip
+from artifactminer.cli.upload import upload_zip
+from artifactminer.db import SessionLocal
 
 
 def run_interactive(input_path=None, output_path=None, consent=None, email=None) -> None:
@@ -34,22 +32,9 @@ def run_interactive(input_path=None, output_path=None, consent=None, email=None)
         print("Extracting ZIP to discover repositories...")
         db = SessionLocal()
         try:
-            UPLOADS_DIR.mkdir(exist_ok=True)
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            safe_filename = f"{timestamp}_{input_path.name}"
-            dest_path = UPLOADS_DIR / safe_filename
-            shutil.copy2(input_path, dest_path)
+            uploaded_zip = upload_zip(db, input_path)
 
-            uploaded_zip = UploadedZip(
-                filename=input_path.name,
-                path=str(dest_path),
-                portfolio_id="cli-generated",
-            )
-            db.add(uploaded_zip)
-            db.commit()
-            db.refresh(uploaded_zip)
-
-            extraction_path = extract_zip_to_persistent_location(str(dest_path), uploaded_zip.id)
+            extraction_path = extract_zip_to_persistent_location(uploaded_zip.path, uploaded_zip.id)
             uploaded_zip.extraction_path = str(extraction_path)
             db.commit()
 
@@ -72,4 +57,3 @@ def run_interactive(input_path=None, output_path=None, consent=None, email=None)
     except (KeyboardInterrupt, EOFError):
         print("\nCancelled.")
         sys.exit(0)
-
