@@ -1,12 +1,19 @@
 import sys
 from pathlib import Path
 
+BANNER_ART = r"""
+    _         _   _  __            _     __  __ _                 
+   / \   _ __| |_(_)/ _| __ _  ___| |_  |  \/  (_)_ __   ___ _ __ 
+  / _ \ | '__| __| | |_ / _` |/ __| __| | |\/| | | '_ \ / _ \ '__|
+ / ___ \| |  | |_| |  _| (_| | (__| |_  | |  | | | | | |  __/ |   
+/_/   \_\_|   \__|_|_|  \__,_|\___|\__| |_|  |_|_|_| |_|\___|_|   
+""".strip("\n")
+
 
 def print_header() -> None:
     """Print the interactive CLI header."""
     print("\n" + "=" * 60)
-    print("                    ARTIFACT MINER")
-    print("           Student Portfolio Analysis Tool")
+    print(BANNER_ART)
     print("=" * 60 + "\n")
 
 
