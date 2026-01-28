@@ -85,7 +85,7 @@ def delete_all_user_questions(db: Session): #for testing purposes only
     db.execute(sql,{"question_key1": IncludeKey, "question_key2": ExcludeKey})
     db.commit()
 
-def parse_user_input_text(text) -> list[text]: 
+def parse_user_input_text(text) -> list[str]: 
     #TODO add some more conditions for eronious input
     if text is None: 
         print("user input text is null.")
