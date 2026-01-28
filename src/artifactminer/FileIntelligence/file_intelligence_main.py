@@ -13,23 +13,23 @@ from pathlib import Path
 
 
 
-def analyze_file(file_path):
+async def analyze_file(file_path):
     # Placeholder for file analysis logic
     # This could involve AI-based analysis or simple string matching
     get_extension = file_path.split('.')[-1].lower()
     if(get_extension == "pdf"):
         print(f"Analyzing file: {file_path}")
-        return analyze_pdf(file_path)
+        return await analyze_pdf(file_path)
 
     return None
 
-def analyze_pdf(file_path):
+async def analyze_pdf(file_path):
     # Placeholder for PDF analysis logic
     print(f"Performing PDF analysis on: {file_path}")
     if(user_allows_llm()):
         prompt = f"Analyze the following PDF file and extract key information relevant for a resume:\n"
         prompt += extract_text_from_pdf(file_path)
-        response = getLLMResponse(prompt)
+        response = await getLLMResponse(prompt)
         return response
     else:
         print("User has not consented to LLM usage. Performing basic analysis.")
