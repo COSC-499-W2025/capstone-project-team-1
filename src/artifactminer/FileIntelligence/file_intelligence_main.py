@@ -24,16 +24,52 @@ async def analyze_file(file_path):
     return None
 
 async def analyze_pdf(file_path):
-    # Placeholder for PDF analysis logic
+    """
+    Analyze a PDF file, detecting if it's a resume and extracting relevant information.
+    
+    Args:
+        file_path: Path to the PDF file to analyze
+        
+    Returns:
+        Analysis results as a string or dict
+    """
     print(f"Performing PDF analysis on: {file_path}")
-    if(user_allows_llm()):
-        prompt = f"Analyze the following PDF file and extract key information relevant for a resume:\n"
-        prompt += extract_text_from_pdf(file_path)
+    
+    # Extract text from the PDF
+    text = extract_text_from_pdf(file_path)
+    
+    # Check if this PDF appears to be a resume
+    resume_keywords = ["experience", "education", "skills", "projects", "work history"]
+    is_resume = any(keyword in text.lower() for keyword in resume_keywords)
+    
+    if is_resume:
+        print(f"Detected resume in: {file_path}")
+    
+    if user_allows_llm():
+        # Customize prompt based on whether it's a resume
+        if is_resume:
+            prompt = (
+                "Analyze the following resume PDF and extract key information. "
+                "Focus on: work experience, education, technical skills, projects, and achievements. "
+                "Format the output in a structured way suitable for portfolio analysis:\n\n"
+            )
+        else:
+            prompt = "Analyze the following PDF file and extract key information relevant for a resume:\n\n"
+        
+        prompt += text
         response = await getLLMResponse(prompt)
         return response
     else:
         print("User has not consented to LLM usage. Performing basic analysis.")
         
+        # Basic non-LLM analysis
+        if is_resume:
+            return {
+                "type": "resume",
+                "file_path": file_path,
+                "detected_keywords": [kw for kw in resume_keywords if kw in text.lower()],
+                "text_preview": text[:500] + "..." if len(text) > 500 else text
+            }
    
     return f"Basic analysis of PDF file at {file_path} completed."
 
