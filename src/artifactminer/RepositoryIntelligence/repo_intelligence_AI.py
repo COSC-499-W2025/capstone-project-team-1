@@ -7,7 +7,7 @@ from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.helpers.openai import get_gpt5_nano_response
-from artifactminer.helpers.ollama import get_ollama_response
+from artifactminer.helpers.ollama_test import get_ollama_response
 
 
 def get_user_llm_selection() -> str:
