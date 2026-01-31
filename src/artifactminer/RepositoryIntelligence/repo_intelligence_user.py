@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from sqlalchemy import inspect
+from sqlalchemy import inspect, or_
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
@@ -216,11 +216,10 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
         resolved_path = str(PathLib(extraction_path).resolve())
         
         # Use OR condition to match either path format
-        from sqlalchemy import or_
         query = query.filter(
             or_(
-                RepoStat.project_path.like(f"{raw_path}%"),
-                RepoStat.project_path.like(f"{resolved_path}%")
+                RepoStat.project_path.like(f"{raw_path}/%"),
+                RepoStat.project_path.like(f"{resolved_path}/%")
             )
         )
 
