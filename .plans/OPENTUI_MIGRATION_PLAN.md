@@ -183,795 +183,81 @@ opentui-react-exp/
 
 ### Phase 1: Foundation (Days 1-3)
 
-#### 1.1 Create API Client Layer
+#### 1.1 API Client Layer (`src/api/client.ts`)
+- Create `ApiClient` class with `get`, `post`, `put`, `uploadFile`, `delete` methods
+- Use `fetch` with `AbortSignal.timeout()` for request timeouts
+- Handle errors with custom `ApiError` class
+- Base URL from `ARTIFACT_MINER_API_URL` env var (default: `http://127.0.0.1:8000`)
 
-```typescript
-// src/api/client.ts
-const API_BASE = process.env.ARTIFACT_MINER_API_URL || 'http://127.0.0.1:8000';
+#### 1.2 API Types (`src/api/types.ts`)
+Define TypeScript interfaces matching backend responses:
+- `ConsentResponse`, `Question`, `UploadResponse`, `DirectoriesResponse`
+- `AnalysisResponse`, `Summary`, `ResumeItem`, `ProjectRanking`
 
-export class ApiClient {
-  private baseUrl: string;
-  private timeout: number;
+#### 1.3 App Context (`src/context/AppContext.tsx`)
+Create React context to hold global state:
+- `consentLevel`, `userEmail`, `zipId`, `directories`, `selectedDirectories`
+- `analysisResult`, `analysisStatus`, `resumeItems`, `summaries`
+- Expose setters and `reset()` function
 
-  constructor(baseUrl = API_BASE, timeout = 30000) {
-    this.baseUrl = baseUrl;
-    this.timeout = timeout;
-  }
-
-  async get<T>(path: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(path, this.baseUrl);
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-    }
-    const response = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(this.timeout),
-    });
-    if (!response.ok) throw new ApiError(response.status, await response.text());
-    return response.json();
-  }
-
-  async post<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(this.timeout),
-    });
-    if (!response.ok) throw new ApiError(response.status, await response.text());
-    return response.json();
-  }
-
-  async uploadFile<T>(path: string, file: Buffer, filename: string): Promise<T> {
-    const formData = new FormData();
-    formData.append('file', new Blob([file]), filename);
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      body: formData,
-      signal: AbortSignal.timeout(this.timeout * 2), // Longer timeout for uploads
-    });
-    if (!response.ok) throw new ApiError(response.status, await response.text());
-    return response.json();
-  }
-
-  async put<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(this.timeout),
-    });
-    if (!response.ok) throw new ApiError(response.status, await response.text());
-    return response.json();
-  }
-}
-```
-
-#### 1.2 Define API Types
-
-```typescript
-// src/api/types.ts
-export interface ConsentResponse {
-  consent_level: 'full' | 'no_llm' | 'none';
-  accepted_at: string | null;
-}
-
-export interface Question {
-  id: number;
-  key: string;
-  question_text: string;
-}
-
-export interface UploadResponse {
-  zip_id: number;
-  filename: string;
-}
-
-export interface DirectoriesResponse {
-  directories: string[];
-}
-
-export interface AnalysisResponse {
-  repos_found: number;
-  summaries: Summary[];
-  rankings?: ProjectRanking[];
-}
-
-export interface Summary {
-  id: number;
-  repo_path: string;
-  summary_text: string;
-  created_at: string;
-}
-
-export interface ResumeItem {
-  id: number;
-  title: string;
-  content: string;
-  project_name?: string;
-  category?: string;
-}
-
-export interface ProjectRanking {
-  name: string;
-  score: number;
-}
-```
-
-#### 1.3 Create App Context
-
-```typescript
-// src/context/AppContext.tsx
-import { createContext, useContext, useState, ReactNode } from 'react';
-
-interface AppState {
-  // Auth/Config
-  consentLevel: 'full' | 'no_llm' | 'none';
-  userEmail: string | null;
-  
-  // Upload
-  zipId: number | null;
-  zipPath: string | null;
-  directories: string[];
-  selectedDirectories: string[];
-  
-  // Analysis
-  analysisResult: AnalysisResponse | null;
-  analysisStatus: 'idle' | 'running' | 'complete' | 'error';
-  
-  // Resume
-  resumeItems: ResumeItem[];
-  summaries: Summary[];
-}
-
-interface AppContextType {
-  state: AppState;
-  setConsentLevel: (level: 'full' | 'no_llm' | 'none') => void;
-  setUserEmail: (email: string) => void;
-  setZipId: (id: number) => void;
-  setDirectories: (dirs: string[]) => void;
-  setSelectedDirectories: (dirs: string[]) => void;
-  setAnalysisResult: (result: AnalysisResponse) => void;
-  setResumeData: (items: ResumeItem[], summaries: Summary[]) => void;
-  reset: () => void;
-}
-
-const AppContext = createContext<AppContextType | null>(null);
-
-export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AppState>(initialState);
-  
-  // ... implement setters
-  
-  return (
-    <AppContext.Provider value={{ state, ...setters }}>
-      {children}
-    </AppContext.Provider>
-  );
-}
-
-export function useAppState() {
-  const context = useContext(AppContext);
-  if (!context) throw new Error('useAppState must be used within AppProvider');
-  return context;
-}
-```
-
-#### 1.4 Create API Endpoint Functions
-
-```typescript
-// src/api/endpoints.ts
-import { ApiClient } from './client';
-import type * as T from './types';
-
-const client = new ApiClient();
-
-export const api = {
-  // Health
-  health: () => client.get<{ status: string }>('/health'),
-  
-  // Consent
-  getConsent: () => client.get<T.ConsentResponse>('/consent'),
-  updateConsent: (level: string) => 
-    client.put<T.ConsentResponse>('/consent', { consent_level: level }),
-  
-  // Questions
-  getQuestions: () => client.get<T.Question[]>('/questions'),
-  submitAnswers: (answers: Record<string, string>) =>
-    client.post<T.Question[]>('/answers', { answers }),
-  
-  // Upload
-  uploadZip: (file: Buffer, filename: string) =>
-    client.uploadFile<T.UploadResponse>('/zip/upload', file, filename),
-  listDirectories: (zipId: number) =>
-    client.get<T.DirectoriesResponse>(`/zip/${zipId}/directories`),
-  
-  // Analysis
-  runAnalysis: (zipId: number) =>
-    client.post<T.AnalysisResponse>(`/analyze/${zipId}`),
-  
-  // Results
-  getResume: (projectId?: number) =>
-    client.get<T.ResumeItem[]>('/resume', projectId ? { project_id: String(projectId) } : undefined),
-  getSummaries: (email: string) =>
-    client.get<T.Summary[]>('/summaries', { user_email: email }),
-  getSkillsChronology: () => client.get<T.SkillChronology[]>('/skills/chronology'),
-  getProjectTimeline: () => client.get<T.ProjectTimeline[]>('/projects/timeline'),
-  
-  // Management
-  deleteProject: (projectId: number) =>
-    client.delete<{ deleted_id: number }>(`/projects/${projectId}`),
-};
-```
+#### 1.4 API Endpoints (`src/api/endpoints.ts`)
+Wrap client calls in a typed `api` object:
+- `health()`, `getConsent()`, `updateConsent()`
+- `getQuestions()`, `submitAnswers()`
+- `uploadZip()`, `listDirectories()`
+- `runAnalysis()`, `getResume()`, `getSummaries()`
+- `getSkillsChronology()`, `getProjectTimeline()`, `deleteProject()`
 
 ### Phase 2: Core Screens (Days 4-7)
 
-#### 2.1 Create UserConfigScreen (NEW)
+#### 2.1 UserConfigScreen (NEW)
+- Fetch questions from `/questions` on mount
+- Render dynamic form fields based on question data
+- Submit answers to `/answers`, store email in context
+- Handle loading/error/submitting states
 
-```typescript
-// src/components/screens/UserConfigScreen.tsx
-import { useKeyboard } from '@opentui/react';
-import { useState, useEffect } from 'react';
-import { api } from '../../api/endpoints';
-import { useAppState } from '../../context/AppContext';
-import { theme } from '../../types';
-import { TopBar } from '../common/TopBar';
+#### 2.2 ConsentScreen Updates
+- Call `api.updateConsent()` on continue
+- Store consent level in app context
+- Add saving indicator and error handling
 
-interface UserConfigScreenProps {
-  onContinue: () => void;
-  onBack: () => void;
-}
+#### 2.3 FileUploadScreen Updates
+- Replace mock file list with real filesystem navigation using `fs/promises`
+- Navigate directories, filter for `.zip` files
+- Upload via `api.uploadZip()`, then fetch directories with `api.listDirectories()`
+- Store `zipId` and `directories` in context
 
-export function UserConfigScreen({ onContinue, onBack }: UserConfigScreenProps) {
-  const { setUserEmail } = useAppState();
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [focusIndex, setFocusIndex] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+#### 2.4 ProjectListScreen Updates
+- Read `directories` from app context (no mock data)
+- Multi-select with checkboxes, store selected in context
+- Pass selected directories to analysis
 
-  useEffect(() => {
-    loadQuestions();
-  }, []);
+#### 2.5 AnalysisScreen Updates
+- Call `api.runAnalysis(zipId)` on mount
+- Show simulated step progression while waiting
+- Store result in context, navigate to resume on complete
+- Handle error state with retry option
 
-  async function loadQuestions() {
-    try {
-      setLoading(true);
-      const data = await api.getQuestions();
-      setQuestions(data);
-      // Initialize answers
-      const initial: Record<string, string> = {};
-      data.forEach(q => { initial[q.key] = ''; });
-      setAnswers(initial);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load questions');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleSubmit() {
-    try {
-      setSubmitting(true);
-      await api.submitAnswers(answers);
-      if (answers.email) {
-        setUserEmail(answers.email);
-      }
-      onContinue();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to submit');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  useKeyboard((key) => {
-    if (key.name === 'escape') onBack();
-    if (key.name === 'tab') {
-      setFocusIndex(i => (i + 1) % (questions.length + 1)); // +1 for submit button
-    }
-    if (key.name === 'return' && focusIndex === questions.length) {
-      handleSubmit();
-    }
-  });
-
-  if (loading) {
-    return (
-      <box flexGrow={1} alignItems="center" justifyContent="center">
-        <text fg={theme.cyan}>Loading questions...</text>
-      </box>
-    );
-  }
-
-  return (
-    <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-      <TopBar
-        step="Configuration"
-        title="User Setup"
-        description="Please answer a few questions to personalize your experience"
-      />
-      
-      <box flexGrow={1} flexDirection="column" padding={2} gap={2}>
-        {questions.map((q, i) => (
-          <box key={q.key} flexDirection="column" gap={1}>
-            <text fg={theme.textSecondary}>{q.question_text}</text>
-            <input
-              value={answers[q.key] || ''}
-              onChange={(val) => setAnswers(prev => ({ ...prev, [q.key]: val }))}
-              focused={focusIndex === i}
-              placeholder={`Enter ${q.key}...`}
-              backgroundColor={theme.bgMedium}
-              width={40}
-            />
-          </box>
-        ))}
-        
-        {error && (
-          <box border borderColor={theme.error} padding={1}>
-            <text fg={theme.error}>{error}</text>
-          </box>
-        )}
-        
-        <box
-          border
-          borderColor={focusIndex === questions.length ? theme.gold : theme.textDim}
-          padding={1}
-          onMouseDown={handleSubmit}
-        >
-          <text fg={theme.gold}>
-            {submitting ? 'Submitting...' : 'Continue →'}
-          </text>
-        </box>
-      </box>
-    </box>
-  );
-}
-```
-
-#### 2.2 Update ConsentScreen with API
-
-```typescript
-// Updates to ConsentScreen.tsx
-import { api } from '../../api/endpoints';
-import { useAppState } from '../../context/AppContext';
-
-export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-  const { setConsentLevel } = useAppState();
-  const [selected, setSelected] = useState<Selection>('offline');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleContinue() {
-    try {
-      setSaving(true);
-      const level = selected === 'cloud' ? 'full' : 'no_llm';
-      await api.updateConsent(level);
-      setConsentLevel(level);
-      onContinue(selected === 'cloud');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save consent');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  useKeyboard((key) => {
-    if (key.name === 'return') handleContinue();
-    // ... rest of keyboard handling
-  });
-
-  // ... rest of component
-}
-```
-
-#### 2.3 Update FileUploadScreen with Real File Picker
-
-```typescript
-// src/components/screens/FileUploadScreen.tsx
-import { readdir, stat, readFile } from 'fs/promises';
-import { join, dirname, basename } from 'path';
-import { homedir } from 'os';
-
-interface FileEntry {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  size?: number;
-}
-
-export function FileUploadScreen({ onSubmit, onBack }: FileUploadProps) {
-  const { setZipId, setDirectories } = useAppState();
-  const [currentPath, setCurrentPath] = useState(homedir());
-  const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadDirectory(currentPath);
-  }, [currentPath]);
-
-  async function loadDirectory(path: string) {
-    try {
-      const items = await readdir(path);
-      const entriesWithStats = await Promise.all(
-        items.map(async (name) => {
-          const fullPath = join(path, name);
-          const stats = await stat(fullPath);
-          return {
-            name,
-            path: fullPath,
-            isDirectory: stats.isDirectory(),
-            size: stats.size,
-          };
-        })
-      );
-      // Sort: directories first, then files
-      entriesWithStats.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      // Add parent directory option
-      setEntries([
-        { name: '..', path: dirname(path), isDirectory: true },
-        ...entriesWithStats,
-      ]);
-      setSelectedIndex(0);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to read directory');
-    }
-  }
-
-  async function handleSelect() {
-    const entry = entries[selectedIndex];
-    if (!entry) return;
-    
-    if (entry.isDirectory) {
-      setCurrentPath(entry.path);
-    } else if (entry.name.endsWith('.zip')) {
-      await uploadFile(entry.path);
-    }
-  }
-
-  async function uploadFile(filePath: string) {
-    try {
-      setUploading(true);
-      const fileBuffer = await readFile(filePath);
-      const result = await api.uploadZip(fileBuffer, basename(filePath));
-      setZipId(result.zip_id);
-      
-      // Fetch directories
-      const dirsResult = await api.listDirectories(result.zip_id);
-      const cleanedDirs = dirsResult.directories
-        .filter(d => !d.startsWith('__MACOSX') && !d.includes('/._'))
-        .map(d => d.endsWith('/') ? d.slice(0, -1) : d);
-      setDirectories(cleanedDirs);
-      
-      onSubmit(filePath);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Upload failed');
-    } finally {
-      setUploading(false);
-    }
-  }
-
-  useKeyboard((key) => {
-    if (key.name === 'escape') onBack();
-    if (key.name === 'up' || key.name === 'k') {
-      setSelectedIndex(i => Math.max(0, i - 1));
-    }
-    if (key.name === 'down' || key.name === 'j') {
-      setSelectedIndex(i => Math.min(entries.length - 1, i + 1));
-    }
-    if (key.name === 'return') handleSelect();
-  });
-
-  return (
-    <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-      <TopBar
-        step="Step 1"
-        title="Select ZIP File"
-        description={currentPath}
-      />
-      
-      <box flexGrow={1} flexDirection="row" padding={1} gap={1}>
-        {/* File list */}
-        <box flexGrow={1} border borderColor={theme.gold} flexDirection="column">
-          <select
-            options={entries.map(e => ({
-              name: e.isDirectory ? `📁 ${e.name}` : `📄 ${e.name}`,
-              description: e.isDirectory ? 'Directory' : formatSize(e.size),
-              value: e.path,
-            }))}
-            selectedIndex={selectedIndex}
-            onChange={(i) => setSelectedIndex(i)}
-            onSelect={() => handleSelect()}
-            focused
-            height={20}
-            showScrollIndicator
-          />
-        </box>
-        
-        {/* Details panel */}
-        <box width={30} border borderColor={theme.textDim} padding={1} flexDirection="column">
-          {uploading ? (
-            <text fg={theme.cyan}>Uploading...</text>
-          ) : error ? (
-            <text fg={theme.error}>{error}</text>
-          ) : (
-            <text fg={theme.textDim}>
-              Select a .zip file to upload
-            </text>
-          )}
-        </box>
-      </box>
-    </box>
-  );
-}
-```
-
-#### 2.4 Update ProjectListScreen with API Data
-
-```typescript
-// src/components/screens/ProjectListScreen.tsx
-export function ProjectListScreen({ onContinue, onBack }: ProjectListProps) {
-  const { state, setSelectedDirectories } = useAppState();
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  
-  const directories = state.directories;
-
-  function toggleSelection(index: number) {
-    setSelectedIndices(prev => {
-      const next = new Set(prev);
-      if (next.has(index)) {
-        next.delete(index);
-      } else {
-        next.add(index);
-      }
-      return next;
-    });
-  }
-
-  function handleContinue() {
-    const selected = Array.from(selectedIndices).map(i => directories[i]);
-    setSelectedDirectories(selected);
-    onContinue();
-  }
-
-  // ... render with checkboxes for multi-select
-}
-```
-
-#### 2.5 Update AnalysisScreen with Real API
-
-```typescript
-// src/components/screens/AnalysisScreen.tsx
-export function AnalysisScreen({ onComplete, onBack }: AnalysisProps) {
-  const { state, setAnalysisResult } = useAppState();
-  const [status, setStatus] = useState<'idle' | 'running' | 'complete' | 'error'>('idle');
-  const [currentStep, setCurrentStep] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (state.zipId) {
-      runAnalysis();
-    }
-  }, [state.zipId]);
-
-  async function runAnalysis() {
-    if (!state.zipId) return;
-    
-    try {
-      setStatus('running');
-      
-      // Simulate step progression while waiting for API
-      const stepInterval = setInterval(() => {
-        setCurrentStep(s => Math.min(s + 1, analysisSteps.length - 1));
-      }, 800);
-      
-      const result = await api.runAnalysis(state.zipId);
-      
-      clearInterval(stepInterval);
-      setCurrentStep(analysisSteps.length);
-      setAnalysisResult(result);
-      setStatus('complete');
-      
-      setTimeout(onComplete, 1000);
-    } catch (e) {
-      setStatus('error');
-      setError(e instanceof Error ? e.message : 'Analysis failed');
-    }
-  }
-
-  // ... render with real progress
-}
-```
-
-#### 2.6 Update ResumeScreen with API Data
-
-```typescript
-// src/components/screens/ResumeScreen.tsx
-export function ResumeScreen({ onBack, onRestart }: ResumePreviewProps) {
-  const { state, setResumeData } = useAppState();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    loadResumeData();
-  }, []);
-
-  async function loadResumeData() {
-    try {
-      setLoading(true);
-      const [resumeItems, summaries] = await Promise.all([
-        api.getResume(),
-        state.userEmail ? api.getSummaries(state.userEmail) : Promise.resolve([]),
-      ]);
-      setResumeData(resumeItems, summaries);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load resume data');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // ... render with real data from state.resumeItems and state.summaries
-}
-```
+#### 2.6 ResumeScreen Updates
+- Fetch `api.getResume()` and `api.getSummaries()` on mount
+- Render from context state instead of mock data
+- Group items by project, show summaries
 
 ### Phase 3: Polish & Testing (Days 8-10)
 
-#### 3.1 Add Loading States Component
+#### 3.1 Loading States
+- Create `LoadingSpinner` component with animated spinner frames
+- Use consistently across all screens during API calls
 
-```typescript
-// src/components/common/LoadingSpinner.tsx
-const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+#### 3.2 Error Handling
+- Create `ErrorBanner` component with dismiss action
+- Add error boundaries around screens
+- Show user-friendly error messages
 
-export function LoadingSpinner({ message = 'Loading...' }: { message?: string }) {
-  const [frame, setFrame] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFrame(f => (f + 1) % spinnerFrames.length);
-    }, 80);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <box flexDirection="row" gap={1} alignItems="center">
-      <text fg={theme.cyan}>{spinnerFrames[frame]}</text>
-      <text fg={theme.textSecondary}>{message}</text>
-    </box>
-  );
-}
-```
-
-#### 3.2 Add Error Banner Component
-
-```typescript
-// src/components/common/ErrorBanner.tsx
-export function ErrorBanner({ 
-  error, 
-  onDismiss 
-}: { 
-  error: string; 
-  onDismiss?: () => void;
-}) {
-  return (
-    <box
-      border
-      borderColor={theme.error}
-      backgroundColor={theme.bgMedium}
-      padding={1}
-      flexDirection="row"
-      justifyContent="space-between"
-    >
-      <text fg={theme.error}>⚠ {error}</text>
-      {onDismiss && (
-        <box onMouseDown={onDismiss}>
-          <text fg={theme.textDim}>[x]</text>
-        </box>
-      )}
-    </box>
-  );
-}
-```
-
-#### 3.3 Add Export Functionality to Resume
-
-```typescript
-// Add to ResumeScreen
-import { writeFile } from 'fs/promises';
-import { join } from 'path';
-
-async function exportToJson() {
-  const data = {
-    generatedAt: new Date().toISOString(),
-    resumeItems: state.resumeItems,
-    summaries: state.summaries,
-  };
-  const path = join(process.cwd(), `resume_${Date.now()}.json`);
-  await writeFile(path, JSON.stringify(data, null, 2));
-  return path;
-}
-
-async function exportToText() {
-  let content = '# Generated Resume\n\n';
-  
-  // Group by project
-  const grouped = groupByProject(state.resumeItems);
-  for (const [project, items] of Object.entries(grouped)) {
-    content += `## ${project || 'General'}\n\n`;
-    for (const item of items) {
-      content += `### ${item.title}\n${item.content}\n\n`;
-    }
-  }
-  
-  const path = join(process.cwd(), `resume_${Date.now()}.txt`);
-  await writeFile(path, content);
-  return path;
-}
-```
-
----
-
-## State Management
-
-### Global State Shape
-
-```typescript
-interface AppState {
-  // Flow control
-  currentScreen: Screen;
-  
-  // User configuration
-  consentLevel: 'full' | 'no_llm' | 'none';
-  userEmail: string | null;
-  userAnswers: Record<string, string>;
-  
-  // Upload state
-  zipId: number | null;
-  zipPath: string | null;
-  directories: string[];
-  selectedDirectories: string[];
-  
-  // Analysis state
-  analysisStatus: 'idle' | 'running' | 'complete' | 'error';
-  analysisProgress: number;
-  analysisResult: AnalysisResponse | null;
-  
-  // Results
-  resumeItems: ResumeItem[];
-  summaries: Summary[];
-  skillsTimeline: SkillChronology[];
-  projectsTimeline: ProjectTimeline[];
-  
-  // UI state
-  error: string | null;
-  loading: boolean;
-}
-```
-
-### Actions
-
-```typescript
-type AppAction =
-  | { type: 'SET_SCREEN'; screen: Screen }
-  | { type: 'SET_CONSENT'; level: ConsentLevel }
-  | { type: 'SET_USER_EMAIL'; email: string }
-  | { type: 'SET_ANSWERS'; answers: Record<string, string> }
-  | { type: 'SET_ZIP_ID'; id: number }
-  | { type: 'SET_DIRECTORIES'; dirs: string[] }
-  | { type: 'SET_SELECTED_DIRS'; dirs: string[] }
-  | { type: 'START_ANALYSIS' }
-  | { type: 'UPDATE_ANALYSIS_PROGRESS'; progress: number }
-  | { type: 'COMPLETE_ANALYSIS'; result: AnalysisResponse }
-  | { type: 'ANALYSIS_ERROR'; error: string }
-  | { type: 'SET_RESUME_DATA'; items: ResumeItem[]; summaries: Summary[] }
-  | { type: 'SET_ERROR'; error: string | null }
-  | { type: 'RESET' };
-```
+#### 3.3 Export Functionality
+- Add `exportToJson()` and `exportToText()` functions to ResumeScreen
+- Write files to current directory with timestamp
+- Show success/error feedback
 
 ---
 
@@ -1012,105 +298,30 @@ type AppAction =
 - Print-friendly export
 
 ### Theme Updates
-
-```typescript
-// Enhanced theme
-export const theme = {
-  // Primary: Gold
-  gold: '#FFD700',
-  goldDark: '#B8860B',
-  goldDim: '#8B7500',
-  goldGlow: 'rgba(255, 215, 0, 0.3)',
-
-  // Secondary: Cyan
-  cyan: '#00CED1',
-  cyanDark: '#008B8B',
-  cyanDim: '#006666',
-  cyanGlow: 'rgba(0, 206, 209, 0.3)',
-
-  // Backgrounds with better contrast
-  bgDark: '#0a0a0f',
-  bgMedium: '#1a1a2e',
-  bgLight: '#2a2a4e',
-  bgPanel: '#16162a',
-
-  // Text with better hierarchy
-  textPrimary: '#FFFFFF',
-  textSecondary: '#B0B0C0',
-  textDim: '#606080',
-  textMuted: '#404060',
-
-  // Status colors
-  success: '#32CD32',
-  successDim: '#228B22',
-  error: '#FF4444',
-  errorDim: '#CC3333',
-  warning: '#FFA500',
-  warningDim: '#CC8400',
-  info: '#4169E1',
-  infoDim: '#3355BB',
-} as const;
-```
+- Primary colors: gold variants (`#FFD700`, `#B8860B`, `#8B7500`)
+- Secondary colors: cyan variants (`#00CED1`, `#008B8B`, `#006666`)
+- Backgrounds with better contrast: `bgDark`, `bgMedium`, `bgLight`, `bgPanel`
+- Text hierarchy: `textPrimary`, `textSecondary`, `textDim`, `textMuted`
+- Status colors: success/error/warning/info with dim variants
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
-
-```typescript
-// src/__tests__/api/client.test.ts
-import { describe, it, expect, mock } from 'bun:test';
-import { ApiClient } from '../../api/client';
-
-describe('ApiClient', () => {
-  it('should make GET requests', async () => {
-    const client = new ApiClient('http://localhost:8000');
-    // Mock fetch...
-  });
-  
-  it('should handle errors', async () => {
-    // Test error handling...
-  });
-});
-```
+- Test `ApiClient` methods (GET, POST, PUT, upload, error handling)
+- Test individual hooks (`useAppState`, etc.)
+- Mock fetch for isolated testing
 
 ### Integration Tests
-
-```typescript
-// src/__tests__/screens/ConsentScreen.test.tsx
-import { describe, it, expect } from 'bun:test';
-import { createTestRenderer } from '@opentui/react/testing';
-import { ConsentScreen } from '../../components/screens/ConsentScreen';
-
-describe('ConsentScreen', () => {
-  it('should render consent options', async () => {
-    const renderer = createTestRenderer();
-    // Render and test...
-  });
-  
-  it('should save consent on continue', async () => {
-    // Test API integration...
-  });
-});
-```
+- Test screen components with mocked API responses
+- Verify state updates flow correctly through context
+- Test keyboard navigation per screen
 
 ### E2E Test Flow
-
-```typescript
-// src/__tests__/e2e/full-flow.test.ts
-describe('Full Application Flow', () => {
-  it('should complete full upload and analysis flow', async () => {
-    // 1. Start at Landing
-    // 2. Navigate to Consent, select option
-    // 3. Fill UserConfig
-    // 4. Upload ZIP
-    // 5. Select projects
-    // 6. Run analysis
-    // 7. View resume
-  });
-});
-```
+- Full flow: Landing → Consent → Config → Upload → Projects → Analysis → Resume
+- Verify data persists across screen transitions
+- Test error recovery scenarios
 
 ---
 
@@ -1159,26 +370,15 @@ describe('Full Application Flow', () => {
 
 ## Environment Variables
 
-```bash
-# .env
-ARTIFACT_MINER_API_URL=http://127.0.0.1:8000
-ARTIFACT_MINER_TIMEOUT=30000
-```
+- `ARTIFACT_MINER_API_URL` - Backend API URL (default: `http://127.0.0.1:8000`)
+- `ARTIFACT_MINER_TIMEOUT` - Request timeout in ms (default: `30000`)
 
 ---
 
 ## Running the Migration
 
-```bash
-# 1. Start the backend API
-cd /path/to/capstone-project-team-1
-uv run uvicorn src.artifactminer.api.main:app --reload
-
-# 2. In another terminal, run the OpenTUI app
-cd opentui-react-exp
-bun install
-bun run src/index.tsx
-```
+1. Start backend: `uv run uvicorn src.artifactminer.api.main:app --reload`
+2. In another terminal: `cd opentui-react-exp && bun install && bun run src/index.tsx`
 
 ---
 
