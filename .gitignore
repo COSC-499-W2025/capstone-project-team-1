@@ -91,3 +91,6 @@ projects/
 .claude
 .ruff_cache
 .kit/
+
+.opencode
+node_modules/
