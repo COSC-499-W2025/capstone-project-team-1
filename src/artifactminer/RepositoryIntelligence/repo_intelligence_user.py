@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
 import git
-from sqlalchemy import inspect
+from sqlalchemy import inspect, or_
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
@@ -14,6 +14,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allow
 from email_validator import validate_email, EmailNotValidError
 from sqlalchemy.orm import Session
 from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
+from pathlib import Path as PathLib
 
 @dataclass
 class UserRepoStats:
@@ -210,8 +211,18 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
     
     # Filter by extraction path if provided
     if extraction_path:
-        query = query.filter(RepoStat.project_path.like(f"{extraction_path}%"))
-   
+                # Try both the raw path and resolved path to handle path variations
+        raw_path = str(extraction_path)
+        resolved_path = str(PathLib(extraction_path).resolve())
+        
+        # Use OR condition to match either path format
+        query = query.filter(
+            or_(
+                RepoStat.project_path.like(f"{raw_path}/%"),
+                RepoStat.project_path.like(f"{resolved_path}/%")
+            )
+        )
+
     top_repos: list[RepoStat] = (
         query
         .order_by(RepoStat.ranking_score.desc())
