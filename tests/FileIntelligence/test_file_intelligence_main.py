@@ -3,7 +3,6 @@ import os
 import pytest
 from artifactminer.FileIntelligence.file_intelligence_main import analyze_file
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import set_user_consent
-
 @pytest.mark.asyncio
 async def test_analyze_pdf():
     set_user_consent("full")  # Ensure user consent is given for LLM usage

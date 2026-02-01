@@ -276,6 +276,7 @@ class SummaryResponse(BaseModel):
 class FileValues(BaseModel):
     file_path : str
     file_name : str
+    file_ext : str
     
 class CrawlerFiles(BaseModel):
     """gets the according file and path data from the crawler"""

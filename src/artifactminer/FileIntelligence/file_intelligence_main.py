@@ -4,12 +4,36 @@
 # also using basic string matching in order to comply with non-AI file analysis.
 
 # We would call the 
-import os
-import zipfile
 from pypdf import PdfReader
-from artifactminer.directorycrawler.directory_walk import *
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
-from pathlib import Path
+from artifactminer.api.crawler import get_crawler_contents
+
+from artifactminer.api.schemas import CrawlerFiles, FileValues
+
+
+async def get_crawler_pdf_contents(zip_id : int) -> list[FileValues]:
+    
+    response = None
+    fileValues = None
+    try:
+        response = await get_crawler_contents(zip_id=zip_id)
+    except:
+        print("something went wrong getting zip contents")
+        response = CrawlerFiles(zip_id, list[FileValues])
+        fileValues = response.crawl_path_and_file_name
+
+    if fileValues is None:
+        return None
+    if len(fileValues) < 0: 
+        return None
+    
+    
+        
+        
+            
+    
+    
+
 
 
 
