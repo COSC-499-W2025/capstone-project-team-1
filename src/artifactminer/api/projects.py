@@ -7,12 +7,31 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse
+from fastapi import Query
+from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse, ProjectResponse
 from ..db import RepoStat, get_db
 from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+@router.get("", response_model=list[ProjectResponse])
+async def get_projects(
+    limit: int | None = Query(default=None, ge=1, description="Max results to return"),
+    offset: int | None = Query(default=0, ge=0, description="Number of results to skip"),
+    db: Session = Depends(get_db),
+) -> list[ProjectResponse]:
+    """List all projects, excluding soft-deleted."""
+    query = db.query(RepoStat).filter(RepoStat.deleted_at.is_(None))
+
+    if offset:
+        query = query.offset(offset)
+    if limit:
+        query = query.limit(limit)
+
+    return query.all()
+
 
 def fetch_project_timeline(
     db: Session,
