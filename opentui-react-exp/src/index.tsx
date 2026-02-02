@@ -8,6 +8,7 @@ import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
 import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
+import { UserConfigScreen } from "./components/UserConfigScreen";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 
@@ -20,6 +21,11 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	consent: [
 		{ key: "←/→", label: "Navigate" },
 		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
+	"user-config": [
+		{ key: "Tab", label: "Next Field" },
+		{ key: "Enter", label: "Continue" },
 		{ key: "Esc", label: "Back" },
 	],
 	"file-upload": [
@@ -67,6 +73,10 @@ function App() {
 				// Consent wizard handles its own keyboard events
 				break;
 
+			case "user-config":
+				// User config handles its own keyboard events
+				break;
+
 			case "file-upload":
 				if (key.name === "return") {
 					setScreen("project-list");
@@ -107,9 +117,17 @@ function App() {
 					<ConsentScreen
 						onContinue={(llmChoice) => {
 							setUseLLM(llmChoice);
-							setScreen("file-upload");
+							setScreen("user-config");
 						}}
 						onBack={() => setScreen("landing")}
+					/>
+				);
+
+			case "user-config":
+				return (
+					<UserConfigScreen
+						onContinue={() => setScreen("file-upload")}
+						onBack={() => setScreen("consent")}
 					/>
 				);
 

@@ -2,6 +2,7 @@
 export type Screen =
 	| "landing"
 	| "consent"
+	| "user-config"
 	| "file-upload"
 	| "project-list"
 	| "analysis"
