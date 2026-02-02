@@ -9,11 +9,20 @@ export class ApiError extends Error {
 	}
 }
 
-type RequestOptions = { method?: string; headers?: Record<string, string>; body?: BodyInit | null; signal?: AbortSignal };
+type RequestOptions = {
+	method?: string;
+	headers?: Record<string, string>;
+	body?: BodyInit | null;
+	signal?: AbortSignal;
+};
 type ClientOptions = { baseUrl?: string; timeoutMs?: number };
 
 const getEnv = (key: string): string | undefined =>
-	typeof process === "undefined" ? undefined : process.env ? process.env[key] : undefined;
+	typeof process === "undefined"
+		? undefined
+		: process.env
+			? process.env[key]
+			: undefined;
 
 export class ApiClient {
 	baseUrl: string;
@@ -22,18 +31,29 @@ export class ApiClient {
 		const envBaseUrl = getEnv("ARTIFACT_MINER_API_URL");
 		const envTimeout = getEnv("ARTIFACT_MINER_TIMEOUT");
 		this.baseUrl = options.baseUrl ?? envBaseUrl ?? "http://127.0.0.1:8000";
-		this.timeoutMs = options.timeoutMs ?? Number(envTimeout) || 30000;
+		this.timeoutMs = options.timeoutMs ?? (Number(envTimeout) || 30000);
 	}
-	private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+	private async request<T>(
+		path: string,
+		options: RequestOptions = {},
+	): Promise<T> {
 		const url = `${this.baseUrl}${path}`;
 		const timeoutSignal =
 			typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
 				? AbortSignal.timeout(this.timeoutMs)
 				: undefined;
-		const response = await fetch(url, { ...options, signal: options.signal ?? timeoutSignal });
+		const response = await fetch(url, {
+			...options,
+			signal: options.signal ?? timeoutSignal,
+		});
 		const contentType = response.headers.get("content-type") || "";
 		const isJson = contentType.includes("application/json");
-		const data = response.status === 204 ? undefined : isJson ? await response.json() : await response.text();
+		const data =
+			response.status === 204
+				? undefined
+				: isJson
+					? await response.json()
+					: await response.text();
 		if (!response.ok) {
 			const message =
 				data && typeof data === "object" && "detail" in data
@@ -69,7 +89,7 @@ export class ApiClient {
 		path: string,
 		file: Blob,
 		fieldName = "file",
-		extraFields?: Record<string, string>
+		extraFields?: Record<string, string>,
 	): Promise<T> {
 		const formData = new FormData();
 		formData.append(fieldName, file);
