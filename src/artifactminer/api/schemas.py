@@ -282,7 +282,7 @@ class CrawlerFiles(BaseModel):
     """gets the according file and path data from the crawler"""
     model_config = ConfigDict(arbitrary_types_allowed=True)
     zip_id : int
-    crawl_path_and_file_name : list[FileValues]
+    crawl_path_and_file_name_and_ext : list[FileValues]
 
 
 class RepresentationPreferences(BaseModel):

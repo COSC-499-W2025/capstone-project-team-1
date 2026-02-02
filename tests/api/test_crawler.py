@@ -88,7 +88,7 @@ def test_ignore_files(client):
 
 
     ]
-    assert payload["crawl_path_and_file_name"] == expected_files
+    assert payload["crawl_path_and_file_name_and_ext"] == expected_files
 
 def test_api_call(client, tmp_path, monkeypatch):
     
@@ -115,6 +115,6 @@ def test_api_call(client, tmp_path, monkeypatch):
     
     ]
 
-    assert data["crawl_path_and_file_name"] == expected_files
+    assert data["crawl_path_and_file_name_and_ext"] == expected_files
 
     

@@ -4,6 +4,7 @@
 # also using basic string matching in order to comply with non-AI file analysis.
 
 # We would call the 
+from pathlib import Path
 from pypdf import PdfReader
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
 from artifactminer.api.crawler import get_crawler_contents
@@ -11,6 +12,7 @@ from artifactminer.api.crawler import get_crawler_contents
 from artifactminer.api.schemas import CrawlerFiles, FileValues
 
 
+#CRAWLER INTEGRATION
 async def get_crawler_pdf_contents(zip_id : int) -> list[FileValues]:
     
     response = None
@@ -20,23 +22,22 @@ async def get_crawler_pdf_contents(zip_id : int) -> list[FileValues]:
     except:
         print("something went wrong getting zip contents")
         response = CrawlerFiles(zip_id, list[FileValues])
-        fileValues = response.crawl_path_and_file_name
+        fileValues = response.crawl_path_and_file_name_and_ext
 
     if fileValues is None:
         return None
     if len(fileValues) < 0: 
         return None
     
-    
-        
-        
-            
-    
-    
+    fileValues = response.crawl_path_and_file_name_and_ext
 
+    for file_data in fileValues:
+        if file_data.file_ext == ".pdf":
+            analyze_pdf(file_path=file_data.file_path) #get relative path
 
+    return fileValues
 
-
+"""
 async def analyze_file(file_path):
     # Placeholder for file analysis logic
     # This could involve AI-based analysis or simple string matching
@@ -46,6 +47,7 @@ async def analyze_file(file_path):
         return await analyze_pdf(file_path)
 
     return None
+"""
 
 async def analyze_pdf(file_path):
     """
