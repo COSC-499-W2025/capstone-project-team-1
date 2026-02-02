@@ -1,6 +1,6 @@
 import { fdir } from "fdir";
 import { stat } from "node:fs/promises";
-import { dirname, basename, join } from "node:path";
+import { dirname, basename, join, sep } from "node:path";
 
 // ============================================================================
 // Types
@@ -104,10 +104,13 @@ export async function scanForZips(options: ScanOptions): Promise<ScanResult> {
  */
 export function buildDirsWithZips(zips: ZipFile[], rootPath: string): Set<string> {
 	const dirs = new Set<string>();
+	// Ensure path ends with separator but don't double it (handles root "/" correctly)
+	const rootWithSep = rootPath.endsWith(sep) ? rootPath : rootPath + sep;
 
 	for (const zip of zips) {
 		let dir = zip.parentDir;
-		while (dir.startsWith(rootPath) && dir !== rootPath) {
+		// Check if dir is under rootPath (exact match or starts with rootPath + separator)
+		while ((dir === rootPath || dir.startsWith(rootWithSep)) && dir !== rootPath) {
 			dirs.add(dir);
 			dir = dirname(dir);
 		}
@@ -136,14 +139,17 @@ export function getChildDirsWithZips(
 	const childDirs = new Map<string, number>();
 
 	for (const zip of zips) {
+		// Ensure path ends with separator but don't double it (handles root "/" correctly)
+		const pathWithSep = currentPath.endsWith(sep) ? currentPath : currentPath + sep;
+
 		// Skip if not under current path (must be actual child, not just string prefix)
-		if (!zip.parentDir.startsWith(currentPath + "/")) continue;
+		if (!zip.parentDir.startsWith(pathWithSep)) continue;
 		// Skip if directly in current dir
 		if (zip.parentDir === currentPath) continue;
 
-		// Get the immediate child directory
-		const relativePath = zip.parentDir.slice(currentPath.length + 1);
-		const parts = relativePath.split("/").filter(Boolean);
+		// Get the immediate child directory (slice from the end of pathWithSep)
+		const relativePath = zip.parentDir.slice(pathWithSep.length);
+		const parts = relativePath.split(sep).filter(Boolean);
 		if (parts.length === 0) continue;
 
 		const childDir = parts[0];
