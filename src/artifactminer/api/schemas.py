@@ -113,6 +113,21 @@ class DirectoriesResponse(BaseModel):
     )
 
 
+class ProjectResponse(BaseModel):
+    """Response shape for project listing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_name: str
+    project_path: str
+    languages: list | None = None
+    frameworks: list | None = None
+    first_commit: datetime | None = None
+    last_commit: datetime | None = None
+    is_collaborative: bool
+
+
 class ProjectTimelineItem(BaseModel):
     """Aggregated activity window for a project repository."""
 
