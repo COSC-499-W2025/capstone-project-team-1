@@ -1,51 +1,33 @@
 import { useKeyboard } from "@opentui/react";
-import { fdir } from "fdir";
-import Fuse from "fuse.js";
-import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, dirname, basename } from "node:path";
+import { dirname } from "node:path";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
+import {
+	scanForZips,
+	buildEntries,
+	filterEntries,
+	getMatchCount,
+	pathToBreadcrumbs,
+	formatSize,
+	type ZipFile,
+	type DirEntry,
+	type SearchableEntry,
+} from "../utils";
 
 interface FileUploadProps {
 	onSubmit: (path: string) => void;
 	onBack: () => void;
+	/** Root path to scan for ZIPs. Defaults to homedir() */
+	scanRoot?: string;
 }
-
-type ZipFile = {
-	name: string;
-	fullPath: string;
-	size?: number;
-	parentDir: string;
-};
-
-type DirEntry = {
-	name: string;
-	fullPath: string;
-	zipCount: number; // Number of ZIPs in this dir (recursively)
-	isParent?: boolean;
-};
 
 type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
-const formatSize = (bytes: number): string => {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	if (bytes < 1024 * 1024 * 1024)
-		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-	return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
-};
-
-// Convert path to breadcrumb segments
-const pathToBreadcrumbs = (path: string): string[] => {
-	if (path === "/") return ["/"];
-	const parts = path.split("/").filter(Boolean);
-	return ["/", ...parts];
-};
-
-export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
-	const [currentPath, setCurrentPath] = useState(homedir());
+export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
+	const rootPath = scanRoot || homedir();
+	const [currentPath, setCurrentPath] = useState(rootPath);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -53,176 +35,42 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 	// Global ZIP scan state
 	const [allZips, setAllZips] = useState<ZipFile[]>([]);
 	const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
-	const [filesScanned, setFilesScanned] = useState(0);
 	const scanAbortRef = useRef<boolean>(false);
 
-	// Scan filesystem for all ZIP files using fdir
-	const scanForZips = useCallback(async () => {
+	// Scan filesystem for all ZIP files
+	const doScan = useCallback(async () => {
 		setScanStatus("scanning");
-		setFilesScanned(0);
 		scanAbortRef.current = false;
 
-		try {
-			const crawler = new fdir()
-				.withFullPaths()
-				.filter((path) => path.toLowerCase().endsWith(".zip"))
-				.exclude((dirName) => {
-					// Skip system directories that are slow or inaccessible
-					const skipDirs = [
-						"node_modules",
-						".git",
-						".Trash",
-						"Library",
-						"System",
-						"Applications",
-						".cache",
-						".npm",
-						".bun",
-						".vscode",
-						".idea",
-					];
-					return skipDirs.includes(dirName);
-				})
-				.crawl(homedir());
+		const result = await scanForZips({ rootPath });
 
-			const files = await crawler.withPromise();
+		if (scanAbortRef.current) return;
 
-			if (scanAbortRef.current) return;
-
-			// Convert to ZipFile format and get file sizes
-			const zipFiles: ZipFile[] = await Promise.all(
-				files.map(async (filePath) => {
-					let size: number | undefined;
-					try {
-						const stats = await stat(filePath);
-						size = stats.size;
-					} catch {
-						// Ignore stat errors
-					}
-					return {
-						name: basename(filePath),
-						fullPath: filePath,
-						parentDir: dirname(filePath),
-						size,
-					};
-				})
-			);
-
-			setAllZips(zipFiles);
-			setFilesScanned(zipFiles.length);
+		if (result.error) {
+			setScanStatus("error");
+		} else {
+			setAllZips(result.zips);
 			setScanStatus("complete");
-		} catch (err) {
-			if (!scanAbortRef.current) {
-				setScanStatus("error");
-			}
 		}
-	}, []);
+	}, [rootPath]);
 
 	// Start scan on mount
 	useEffect(() => {
-		scanForZips();
+		doScan();
 		return () => {
 			scanAbortRef.current = true;
 		};
-	}, [scanForZips]);
+	}, [doScan]);
 
-	// Build set of all directories that contain ZIPs (at any depth)
-	const dirsWithZips = useMemo(() => {
-		const dirs = new Set<string>();
-		for (const zip of allZips) {
-			// Add all parent directories up to home
-			let dir = zip.parentDir;
-			const home = homedir();
-			while (dir.startsWith(home) && dir !== home) {
-				dirs.add(dir);
-				dir = dirname(dir);
-			}
-			dirs.add(home); // Include home if it has zips
-		}
-		return dirs;
-	}, [allZips]);
-
-	// Get ZIPs in current directory
-	const zipsInCurrentDir = useMemo(() => {
-		return allZips.filter((zip) => zip.parentDir === currentPath);
-	}, [allZips, currentPath]);
-
-	// Get subdirectories that have ZIPs (direct children only)
-	const dirsInCurrentPath = useMemo(() => {
-		const childDirs = new Map<string, number>();
-		
-		for (const zip of allZips) {
-			// Check if this ZIP is under the current path
-			if (!zip.parentDir.startsWith(currentPath)) continue;
-			if (zip.parentDir === currentPath) continue; // Skip ZIPs directly in current dir
-			
-			// Get the immediate child directory
-			const relativePath = zip.parentDir.slice(currentPath.length);
-			const parts = relativePath.split("/").filter(Boolean);
-			if (parts.length === 0) continue;
-			
-			const childDir = parts[0];
-			const fullChildPath = join(currentPath, childDir);
-			
-			childDirs.set(fullChildPath, (childDirs.get(fullChildPath) || 0) + 1);
-		}
-
-		const entries: DirEntry[] = Array.from(childDirs.entries()).map(
-			([fullPath, zipCount]) => ({
-				name: basename(fullPath),
-				fullPath,
-				zipCount,
-			})
-		);
-
-		return entries.sort((a, b) => a.name.localeCompare(b.name));
-	}, [allZips, currentPath]);
-
-	// Combined entries: parent + directories with ZIPs + ZIPs in current dir
+	// Build entries for current directory view
 	const entries = useMemo(() => {
-		const result: Array<DirEntry | (ZipFile & { type: "zip" })> = [];
+		return buildEntries(allZips, currentPath, rootPath);
+	}, [allZips, currentPath, rootPath]);
 
-		// Add parent directory if not at home
-		if (currentPath !== homedir()) {
-			result.push({
-				name: "..",
-				fullPath: dirname(currentPath),
-				zipCount: 0,
-				isParent: true,
-			});
-		}
-
-		// Add directories that contain ZIPs
-		for (const dir of dirsInCurrentPath) {
-			result.push(dir);
-		}
-
-		// Add ZIPs in current directory
-		for (const zip of zipsInCurrentDir) {
-			result.push({ ...zip, type: "zip" });
-		}
-
-		return result;
-	}, [currentPath, dirsInCurrentPath, zipsInCurrentDir]);
-
-	// Fuse.js fuzzy search
-	const fuse = useMemo(() => {
-		return new Fuse(entries.filter((e) => !("isParent" in e && e.isParent)), {
-			keys: ["name", "fullPath"],
-			threshold: 0.4,
-			includeScore: true,
-		});
-	}, [entries]);
-
+	// Filter entries based on search
 	const filteredEntries = useMemo(() => {
-		if (!searchQuery.trim()) {
-			return entries;
-		}
-		const results = fuse.search(searchQuery);
-		const parentEntry = entries.find((e) => "isParent" in e && e.isParent);
-		const filtered = results.map((r) => r.item);
-		return parentEntry ? [parentEntry, ...filtered] : filtered;
-	}, [entries, searchQuery, fuse]);
+		return filterEntries(entries, searchQuery);
+	}, [entries, searchQuery]);
 
 	// Reset selection when entries change
 	useEffect(() => {
@@ -246,19 +94,17 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 		}
 
 		if ("type" in selectedEntry && selectedEntry.type === "zip") {
-			// ZIP selected - submit it
 			onSubmit(selectedEntry.fullPath);
 			return;
 		}
 
-		// Directory selected - navigate into it
 		if ("zipCount" in selectedEntry) {
 			setCurrentPath(selectedEntry.fullPath);
 		}
 	};
 
 	useKeyboard((key) => {
-		if (key.name === "backspace" && currentPath !== homedir() && !isSearchFocused) {
+		if (key.name === "backspace" && currentPath !== rootPath && !isSearchFocused) {
 			setCurrentPath(dirname(currentPath));
 		}
 		if (key.sequence === "/" && !isSearchFocused) {
@@ -274,9 +120,8 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 		if (key.name === "return" && isSearchFocused) {
 			setIsSearchFocused(false);
 		}
-		// Rescan with Ctrl+R
 		if (key.name === "r" && key.ctrl) {
-			scanForZips();
+			doScan();
 		}
 	});
 
@@ -284,7 +129,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 
 	// Get display info for each entry
 	const getEntryDisplay = (
-		entry: DirEntry | (ZipFile & { type: "zip" })
+		entry: SearchableEntry
 	): { icon: string; name: string; description: string } => {
 		if ("isParent" in entry && entry.isParent) {
 			return { icon: "", name: "..", description: "Parent directory" };
@@ -295,16 +140,15 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 			return { icon: "📦", name: entry.name, description: sizeStr };
 		}
 
-		// Directory with ZIPs
-		const zipLabel = entry.zipCount === 1 ? "1 ZIP" : `${entry.zipCount} ZIPs`;
-		return { icon: "📁", name: entry.name, description: zipLabel };
+		const dirEntry = entry as DirEntry;
+		const zipLabel = dirEntry.zipCount === 1 ? "1 ZIP" : `${dirEntry.zipCount} ZIPs`;
+		return { icon: "📁", name: dirEntry.name, description: zipLabel };
 	};
 
-	// Scan status display
 	const getScanStatusText = (): string => {
 		switch (scanStatus) {
 			case "scanning":
-				return `Scanning... ${filesScanned} ZIPs`;
+				return "Scanning...";
 			case "complete":
 				return `${allZips.length} ZIPs found`;
 			case "error":
@@ -312,24 +156,6 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 			default:
 				return "";
 		}
-	};
-
-	const getSelectedInfo = (): string => {
-		if (!selectedEntry) return "No selection";
-
-		if ("isParent" in selectedEntry && selectedEntry.isParent) {
-			return "Go to parent directory";
-		}
-
-		if ("type" in selectedEntry && selectedEntry.type === "zip") {
-			return `${selectedEntry.name} • ZIP Archive • Ready for analysis`;
-		}
-
-		if ("zipCount" in selectedEntry) {
-			return `${selectedEntry.name} • Folder • Contains ${selectedEntry.zipCount} ZIP${selectedEntry.zipCount > 1 ? "s" : ""}`;
-		}
-
-		return "";
 	};
 
 	return (
@@ -341,7 +167,6 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 			/>
 
 			<box flexGrow={1} flexDirection="column" padding={1}>
-				{/* Main Panel */}
 				<box
 					flexGrow={1}
 					border
@@ -349,7 +174,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 					borderColor={theme.gold}
 					flexDirection="column"
 				>
-					{/* Search Bar - Prominent with background */}
+					{/* Search Bar */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
@@ -358,7 +183,6 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						flexDirection="column"
 						gap={1}
 					>
-						{/* Scan status row */}
 						<box flexDirection="row" justifyContent="flex-end">
 							<text>
 								<span fg={scanStatus === "scanning" ? theme.gold : theme.success}>
@@ -367,17 +191,16 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 							</text>
 						</box>
 
-						{/* Search input with border */}
-					<box
-						border
-						borderStyle="rounded"
-						borderColor={isSearchFocused ? theme.cyan : theme.goldDim}
-						paddingLeft={1}
-						paddingRight={1}
-						flexDirection="row"
-						alignItems="center"
-						gap={1}
-					>
+						<box
+							border
+							borderStyle="rounded"
+							borderColor={isSearchFocused ? theme.cyan : theme.goldDim}
+							paddingLeft={1}
+							paddingRight={1}
+							flexDirection="row"
+							alignItems="center"
+							gap={1}
+						>
 							<text>
 								<span fg={isSearchFocused ? theme.cyan : theme.textDim}>🔍</span>
 							</text>
@@ -386,14 +209,12 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								onChange={setSearchQuery}
 								placeholder="Search for ZIP files..."
 								focused={isSearchFocused}
-								onFocus={() => setIsSearchFocused(true)}
-								onBlur={() => setIsSearchFocused(false)}
 								width={60}
 							/>
 							{searchQuery && (
 								<text>
 									<span fg={theme.cyan}>
-										{filteredEntries.length - (entries.find((e) => "isParent" in e && e.isParent) ? 1 : 0)} matches
+										{getMatchCount(filteredEntries)} matches
 									</span>
 								</text>
 							)}
@@ -423,7 +244,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 									return {
 										name: display.icon ? `${display.icon} ${display.name}` : display.name,
 										description: display.description,
-										value: "fullPath" in entry ? entry.fullPath : entry.name,
+										value: entry.fullPath || entry.name,
 									};
 								})}
 								onChange={(index) => setSelectedIndex(index)}
@@ -436,7 +257,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						)}
 					</box>
 
-					{/* Breadcrumb Bar - Full width background */}
+					{/* Breadcrumb Bar */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
@@ -461,7 +282,6 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								</>
 							))}
 						</text>
-						{/* Selected item info on the right */}
 						{selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? (
 							<text>
 								<span fg={theme.success}>⏎ Select this ZIP</span>
