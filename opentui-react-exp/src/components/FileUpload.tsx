@@ -349,89 +349,59 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 					borderColor={theme.gold}
 					flexDirection="column"
 				>
-					{/* Breadcrumb Navigation */}
+					{/* Search Bar - Prominent with background */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
 						paddingTop={1}
 						paddingBottom={1}
-						flexDirection="row"
-						justifyContent="space-between"
-						alignItems="center"
+						flexDirection="column"
+						gap={1}
 					>
-						<text>
-							<span fg={theme.textDim}>Location: </span>
-							{breadcrumbs.map((crumb, i) => (
-								<>
-									<span
-										key={i}
-										fg={i === breadcrumbs.length - 1 ? theme.cyan : theme.textSecondary}
-									>
-										{crumb === "/" ? "~" : crumb}
-									</span>
-									{i < breadcrumbs.length - 1 && (
-										<span fg={theme.textDim}> → </span>
-									)}
-								</>
-							))}
-						</text>
-						{/* Scan status on the right */}
-						<text>
-							<span fg={scanStatus === "scanning" ? theme.gold : theme.success}>
-								{getScanStatusText()}
-							</span>
-						</text>
-					</box>
+						{/* Scan status row */}
+						<box flexDirection="row" justifyContent="flex-end">
+							<text>
+								<span fg={scanStatus === "scanning" ? theme.gold : theme.success}>
+									{getScanStatusText()}
+								</span>
+							</text>
+						</box>
 
-					{/* Divider */}
-					<box paddingLeft={2} paddingRight={2}>
-						<text>
-							<span fg={theme.goldDim}>{"─".repeat(68)}</span>
-						</text>
-					</box>
-
-					{/* Search Bar - Boxed */}
+						{/* Search input with border */}
 					<box
-						marginLeft={2}
-						marginRight={2}
-						marginTop={1}
-						marginBottom={1}
 						border
 						borderStyle="rounded"
-						borderColor={isSearchFocused ? theme.cyan : theme.textDim}
+						borderColor={isSearchFocused ? theme.cyan : theme.goldDim}
 						paddingLeft={1}
 						paddingRight={1}
 						flexDirection="row"
 						alignItems="center"
 						gap={1}
 					>
-						<text>
-							<span fg={isSearchFocused ? theme.cyan : theme.textDim}>Search:</span>
-						</text>
-						<input
-							value={searchQuery}
-							onChange={setSearchQuery}
-							placeholder="Type to filter..."
-							focused={isSearchFocused}
-							onFocus={() => setIsSearchFocused(true)}
-							onBlur={() => setIsSearchFocused(false)}
-							width={35}
-						/>
-						{searchQuery ? (
 							<text>
-								<span fg={theme.cyan}>
-									{filteredEntries.length - (entries.find((e) => "isParent" in e && e.isParent) ? 1 : 0)} found
-								</span>
+								<span fg={isSearchFocused ? theme.cyan : theme.textDim}>🔍</span>
 							</text>
-						) : (
-							<text>
-								<span fg={theme.textDim}>Press / to search</span>
-							</text>
-						)}
+							<input
+								value={searchQuery}
+								onChange={setSearchQuery}
+								placeholder="Search for ZIP files..."
+								focused={isSearchFocused}
+								onFocus={() => setIsSearchFocused(true)}
+								onBlur={() => setIsSearchFocused(false)}
+								width={60}
+							/>
+							{searchQuery && (
+								<text>
+									<span fg={theme.cyan}>
+										{filteredEntries.length - (entries.find((e) => "isParent" in e && e.isParent) ? 1 : 0)} matches
+									</span>
+								</text>
+							)}
+						</box>
 					</box>
 
 					{/* File List */}
-					<box flexGrow={1} paddingLeft={1} paddingRight={1}>
+					<box flexGrow={1} paddingLeft={1} paddingRight={1} paddingTop={1}>
 						{scanStatus === "scanning" ? (
 							<box padding={1}>
 								<text>
@@ -460,34 +430,47 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
 								focused={!isSearchFocused}
-								height={14}
+								height={12}
 								showScrollIndicator
 							/>
 						)}
 					</box>
 
-					{/* Divider */}
-					<box paddingLeft={2} paddingRight={2}>
-						<text>
-							<span fg={theme.goldDim}>{"─".repeat(68)}</span>
-						</text>
-					</box>
-
-					{/* Selected Item Info Bar */}
+					{/* Breadcrumb Bar - Full width background */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
 						paddingTop={1}
 						paddingBottom={1}
 						flexDirection="row"
-						gap={1}
+						justifyContent="space-between"
+						alignItems="center"
 					>
 						<text>
-							<span fg={theme.textDim}>Selected: </span>
-							<span fg={selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? theme.success : theme.textPrimary}>
-								{getSelectedInfo()}
-							</span>
+							{breadcrumbs.map((crumb, i) => (
+								<>
+									<span
+										key={i}
+										fg={i === breadcrumbs.length - 1 ? theme.cyan : theme.textSecondary}
+									>
+										{crumb === "/" ? "~" : crumb}
+									</span>
+									{i < breadcrumbs.length - 1 && (
+										<span fg={theme.textDim}> / </span>
+									)}
+								</>
+							))}
 						</text>
+						{/* Selected item info on the right */}
+						{selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? (
+							<text>
+								<span fg={theme.success}>⏎ Select this ZIP</span>
+							</text>
+						) : selectedEntry && "zipCount" in selectedEntry && !("isParent" in selectedEntry && selectedEntry.isParent) ? (
+							<text>
+								<span fg={theme.textDim}>⏎ Open folder</span>
+							</text>
+						) : null}
 					</box>
 				</box>
 			</box>
