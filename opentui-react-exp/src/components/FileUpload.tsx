@@ -401,7 +401,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 					</box>
 
 					{/* File List */}
-					<box flexGrow={1} paddingLeft={1} paddingRight={1} paddingTop={1}>
+					<box flexGrow={1} paddingLeft={1} paddingRight={1}>
 						{scanStatus === "scanning" ? (
 							<box padding={1}>
 								<text>
@@ -430,7 +430,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
 								focused={!isSearchFocused}
-								height={12}
+								height={16}
 								showScrollIndicator
 							/>
 						)}
