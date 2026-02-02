@@ -136,13 +136,13 @@ export function getChildDirsWithZips(
 	const childDirs = new Map<string, number>();
 
 	for (const zip of zips) {
-		// Skip if not under current path
-		if (!zip.parentDir.startsWith(currentPath)) continue;
+		// Skip if not under current path (must be actual child, not just string prefix)
+		if (!zip.parentDir.startsWith(currentPath + "/")) continue;
 		// Skip if directly in current dir
 		if (zip.parentDir === currentPath) continue;
 
 		// Get the immediate child directory
-		const relativePath = zip.parentDir.slice(currentPath.length);
+		const relativePath = zip.parentDir.slice(currentPath.length + 1);
 		const parts = relativePath.split("/").filter(Boolean);
 		if (parts.length === 0) continue;
 
