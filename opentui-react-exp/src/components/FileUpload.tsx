@@ -1,9 +1,10 @@
 import { useKeyboard } from "@opentui/react";
+import { fdir } from "fdir";
 import Fuse from "fuse.js";
-import { readdir, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -12,13 +13,21 @@ interface FileUploadProps {
 	onBack: () => void;
 }
 
-type FileEntry = {
+type ZipFile = {
 	name: string;
-	type: "dir" | "file";
+	fullPath: string;
 	size?: number;
-	modifiedAt?: Date;
+	parentDir: string;
+};
+
+type DirEntry = {
+	name: string;
+	fullPath: string;
+	zipCount: number; // Number of ZIPs in this dir (recursively)
 	isParent?: boolean;
 };
+
+type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
 const formatSize = (bytes: number): string => {
 	if (bytes < 1024) return `${bytes} B`;
@@ -28,89 +37,178 @@ const formatSize = (bytes: number): string => {
 	return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 };
 
-const formatDate = (date: Date): string => {
-	return date.toLocaleDateString("en-US", {
-		year: "numeric",
-		month: "short",
-		day: "numeric",
-		hour: "2-digit",
-		minute: "2-digit",
-	});
-};
-
-const sortEntries = (a: FileEntry, b: FileEntry): number => {
-	if (a.isParent) return -1;
-	if (b.isParent) return 1;
-	if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
-	return a.name.localeCompare(b.name);
+// Convert path to breadcrumb segments
+const pathToBreadcrumbs = (path: string): string[] => {
+	if (path === "/") return ["/"];
+	const parts = path.split("/").filter(Boolean);
+	return ["/", ...parts];
 };
 
 export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 	const [currentPath, setCurrentPath] = useState(homedir());
-	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [showHidden, setShowHidden] = useState(false);
-	const [selectedStats, setSelectedStats] = useState<{
-		size?: number;
-		modifiedAt?: Date;
-		itemCount?: number;
-	} | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchFocused, setIsSearchFocused] = useState(false);
 
-	const loadDirectory = useCallback(async (dirPath: string) => {
-		setLoading(true);
-		setError(null);
-		setSelectedStats(null);
+	// Global ZIP scan state
+	const [allZips, setAllZips] = useState<ZipFile[]>([]);
+	const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
+	const [filesScanned, setFilesScanned] = useState(0);
+	const scanAbortRef = useRef<boolean>(false);
+
+	// Scan filesystem for all ZIP files using fdir
+	const scanForZips = useCallback(async () => {
+		setScanStatus("scanning");
+		setFilesScanned(0);
+		scanAbortRef.current = false;
 
 		try {
-			const dirents = await readdir(dirPath, { withFileTypes: true });
-
-			const fileEntries: FileEntry[] = dirents
-				.filter((dirent) => !dirent.name.startsWith(".") || showHidden)
-				.filter((dirent) => {
-					// Show all directories (for navigation) and only .zip files
-					if (dirent.isDirectory()) return true;
-					return dirent.name.toLowerCase().endsWith(".zip");
+			const crawler = new fdir()
+				.withFullPaths()
+				.filter((path) => path.toLowerCase().endsWith(".zip"))
+				.exclude((dirName) => {
+					// Skip system directories that are slow or inaccessible
+					const skipDirs = [
+						"node_modules",
+						".git",
+						".Trash",
+						"Library",
+						"System",
+						"Applications",
+						".cache",
+						".npm",
+						".bun",
+						".vscode",
+						".idea",
+					];
+					return skipDirs.includes(dirName);
 				})
-				.map((dirent) => ({
-					name: dirent.name,
-					type: dirent.isDirectory() ? "dir" : "file",
-				}));
+				.crawl(homedir());
 
-			const isRoot = dirPath === "/";
-			const withParent: FileEntry[] = isRoot
-				? []
-				: [{ name: "..", type: "dir", isParent: true }];
+			const files = await crawler.withPromise();
 
-			setEntries([...withParent, ...fileEntries].sort(sortEntries));
-			setSelectedIndex(0);
-		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to read directory",
+			if (scanAbortRef.current) return;
+
+			// Convert to ZipFile format and get file sizes
+			const zipFiles: ZipFile[] = await Promise.all(
+				files.map(async (filePath) => {
+					let size: number | undefined;
+					try {
+						const stats = await stat(filePath);
+						size = stats.size;
+					} catch {
+						// Ignore stat errors
+					}
+					return {
+						name: basename(filePath),
+						fullPath: filePath,
+						parentDir: dirname(filePath),
+						size,
+					};
+				})
 			);
-			setEntries([]);
-		} finally {
-			setLoading(false);
+
+			setAllZips(zipFiles);
+			setFilesScanned(zipFiles.length);
+			setScanStatus("complete");
+		} catch (err) {
+			if (!scanAbortRef.current) {
+				setScanStatus("error");
+			}
 		}
-	}, [showHidden]);
+	}, []);
 
+	// Start scan on mount
 	useEffect(() => {
-		loadDirectory(currentPath);
-	}, [currentPath, loadDirectory]);
+		scanForZips();
+		return () => {
+			scanAbortRef.current = true;
+		};
+	}, [scanForZips]);
 
-	// Reset search when changing directories
-	useEffect(() => {
-		setSearchQuery("");
-		setIsSearchFocused(false);
-	}, [currentPath]);
+	// Build set of all directories that contain ZIPs (at any depth)
+	const dirsWithZips = useMemo(() => {
+		const dirs = new Set<string>();
+		for (const zip of allZips) {
+			// Add all parent directories up to home
+			let dir = zip.parentDir;
+			const home = homedir();
+			while (dir.startsWith(home) && dir !== home) {
+				dirs.add(dir);
+				dir = dirname(dir);
+			}
+			dirs.add(home); // Include home if it has zips
+		}
+		return dirs;
+	}, [allZips]);
+
+	// Get ZIPs in current directory
+	const zipsInCurrentDir = useMemo(() => {
+		return allZips.filter((zip) => zip.parentDir === currentPath);
+	}, [allZips, currentPath]);
+
+	// Get subdirectories that have ZIPs (direct children only)
+	const dirsInCurrentPath = useMemo(() => {
+		const childDirs = new Map<string, number>();
+		
+		for (const zip of allZips) {
+			// Check if this ZIP is under the current path
+			if (!zip.parentDir.startsWith(currentPath)) continue;
+			if (zip.parentDir === currentPath) continue; // Skip ZIPs directly in current dir
+			
+			// Get the immediate child directory
+			const relativePath = zip.parentDir.slice(currentPath.length);
+			const parts = relativePath.split("/").filter(Boolean);
+			if (parts.length === 0) continue;
+			
+			const childDir = parts[0];
+			const fullChildPath = join(currentPath, childDir);
+			
+			childDirs.set(fullChildPath, (childDirs.get(fullChildPath) || 0) + 1);
+		}
+
+		const entries: DirEntry[] = Array.from(childDirs.entries()).map(
+			([fullPath, zipCount]) => ({
+				name: basename(fullPath),
+				fullPath,
+				zipCount,
+			})
+		);
+
+		return entries.sort((a, b) => a.name.localeCompare(b.name));
+	}, [allZips, currentPath]);
+
+	// Combined entries: parent + directories with ZIPs + ZIPs in current dir
+	const entries = useMemo(() => {
+		const result: Array<DirEntry | (ZipFile & { type: "zip" })> = [];
+
+		// Add parent directory if not at home
+		if (currentPath !== homedir()) {
+			result.push({
+				name: "..",
+				fullPath: dirname(currentPath),
+				zipCount: 0,
+				isParent: true,
+			});
+		}
+
+		// Add directories that contain ZIPs
+		for (const dir of dirsInCurrentPath) {
+			result.push(dir);
+		}
+
+		// Add ZIPs in current directory
+		for (const zip of zipsInCurrentDir) {
+			result.push({ ...zip, type: "zip" });
+		}
+
+		return result;
+	}, [currentPath, dirsInCurrentPath, zipsInCurrentDir]);
 
 	// Fuse.js fuzzy search
 	const fuse = useMemo(() => {
-		return new Fuse(entries.filter((e) => !e.isParent), {
-			keys: ["name"],
+		return new Fuse(entries.filter((e) => !("isParent" in e && e.isParent)), {
+			keys: ["name", "fullPath"],
 			threshold: 0.4,
 			includeScore: true,
 		});
@@ -121,84 +219,51 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 			return entries;
 		}
 		const results = fuse.search(searchQuery);
-		const parentEntry = entries.find((e) => e.isParent);
+		const parentEntry = entries.find((e) => "isParent" in e && e.isParent);
 		const filtered = results.map((r) => r.item);
-		// Always keep parent entry at top when searching
 		return parentEntry ? [parentEntry, ...filtered] : filtered;
 	}, [entries, searchQuery, fuse]);
 
-	// Reset selection when filtered results change
+	// Reset selection when entries change
 	useEffect(() => {
 		setSelectedIndex(0);
-	}, [filteredEntries.length]);
+	}, [filteredEntries.length, currentPath]);
+
+	// Reset search when changing directories
+	useEffect(() => {
+		setSearchQuery("");
+		setIsSearchFocused(false);
+	}, [currentPath]);
 
 	const selectedEntry = filteredEntries[selectedIndex];
-
-	// Load stats for selected entry
-	useEffect(() => {
-		if (!selectedEntry || selectedEntry.isParent) {
-			setSelectedStats(null);
-			return;
-		}
-
-		const entryPath = join(currentPath, selectedEntry.name);
-
-		(async () => {
-			try {
-				const stats = await stat(entryPath);
-				if (selectedEntry.type === "dir") {
-					const contents = await readdir(entryPath);
-					setSelectedStats({
-						modifiedAt: stats.mtime,
-						itemCount: contents.length,
-					});
-				} else {
-					setSelectedStats({
-						size: stats.size,
-						modifiedAt: stats.mtime,
-					});
-				}
-			} catch {
-				setSelectedStats(null);
-			}
-		})();
-	}, [selectedEntry, currentPath]);
-
-	const selectedPath = selectedEntry
-		? selectedEntry.isParent
-			? dirname(currentPath)
-			: join(currentPath, selectedEntry.name)
-		: currentPath;
 
 	const handleSelect = () => {
 		if (!selectedEntry) return;
 
-		if (selectedEntry.isParent) {
+		if ("isParent" in selectedEntry && selectedEntry.isParent) {
 			setCurrentPath(dirname(currentPath));
 			return;
 		}
 
-		if (selectedEntry.type === "dir") {
-			setCurrentPath(join(currentPath, selectedEntry.name));
+		if ("type" in selectedEntry && selectedEntry.type === "zip") {
+			// ZIP selected - submit it
+			onSubmit(selectedEntry.fullPath);
 			return;
 		}
 
-		// File selected - submit it
-		onSubmit(selectedPath);
+		// Directory selected - navigate into it
+		if ("zipCount" in selectedEntry) {
+			setCurrentPath(selectedEntry.fullPath);
+		}
 	};
 
 	useKeyboard((key) => {
-		if (key.name === "backspace" && currentPath !== "/" && !isSearchFocused) {
+		if (key.name === "backspace" && currentPath !== homedir() && !isSearchFocused) {
 			setCurrentPath(dirname(currentPath));
 		}
-		if (key.name === "h" && key.ctrl) {
-			setShowHidden((prev) => !prev);
-		}
-		// "/" to focus search
 		if (key.sequence === "/" && !isSearchFocused) {
 			setIsSearchFocused(true);
 		}
-		// Escape to clear/exit search
 		if (key.name === "escape" && isSearchFocused) {
 			if (searchQuery) {
 				setSearchQuery("");
@@ -206,13 +271,66 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 				setIsSearchFocused(false);
 			}
 		}
-		// Enter while in search to exit search and keep focus on list
 		if (key.name === "return" && isSearchFocused) {
 			setIsSearchFocused(false);
 		}
+		// Rescan with Ctrl+R
+		if (key.name === "r" && key.ctrl) {
+			scanForZips();
+		}
 	});
 
-	const displayPath = currentPath === "/" ? "/" : `${currentPath}/`;
+	const breadcrumbs = pathToBreadcrumbs(currentPath);
+
+	// Get display info for each entry
+	const getEntryDisplay = (
+		entry: DirEntry | (ZipFile & { type: "zip" })
+	): { icon: string; name: string; description: string } => {
+		if ("isParent" in entry && entry.isParent) {
+			return { icon: "", name: "..", description: "Parent directory" };
+		}
+
+		if ("type" in entry && entry.type === "zip") {
+			const sizeStr = entry.size !== undefined ? formatSize(entry.size) : "";
+			return { icon: "📦", name: entry.name, description: sizeStr };
+		}
+
+		// Directory with ZIPs
+		const zipLabel = entry.zipCount === 1 ? "1 ZIP" : `${entry.zipCount} ZIPs`;
+		return { icon: "📁", name: entry.name, description: zipLabel };
+	};
+
+	// Scan status display
+	const getScanStatusText = (): string => {
+		switch (scanStatus) {
+			case "scanning":
+				return `Scanning... ${filesScanned} ZIPs`;
+			case "complete":
+				return `${allZips.length} ZIPs found`;
+			case "error":
+				return "Scan failed";
+			default:
+				return "";
+		}
+	};
+
+	const getSelectedInfo = (): string => {
+		if (!selectedEntry) return "No selection";
+
+		if ("isParent" in selectedEntry && selectedEntry.isParent) {
+			return "Go to parent directory";
+		}
+
+		if ("type" in selectedEntry && selectedEntry.type === "zip") {
+			return `${selectedEntry.name} • ZIP Archive • Ready for analysis`;
+		}
+
+		if ("zipCount" in selectedEntry) {
+			return `${selectedEntry.name} • Folder • Contains ${selectedEntry.zipCount} ZIP${selectedEntry.zipCount > 1 ? "s" : ""}`;
+		}
+
+		return "";
+	};
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -222,85 +340,122 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 				description="Browse for your project zip file"
 			/>
 
-			<box flexGrow={1} flexDirection="row" padding={1} gap={1}>
-				{/* Left Panel: Directory Tree */}
+			<box flexGrow={1} flexDirection="column" padding={1}>
+				{/* Main Panel */}
 				<box
-					width="60%"
+					flexGrow={1}
 					border
 					borderStyle="rounded"
 					borderColor={theme.gold}
 					flexDirection="column"
-					padding={1}
 				>
-					<text>
-						<span fg={theme.gold}>
-							<strong>File Browser</strong>
-						</span>
-						{showHidden && (
-							<span fg={theme.textDim}> (showing hidden)</span>
-						)}
-					</text>
-					<text>
-						<span fg={theme.textDim}>{displayPath}</span>
-					</text>
-
-					{/* Search Bar */}
-					<box marginTop={1} flexDirection="row" gap={1}>
+					{/* Breadcrumb Navigation */}
+					<box
+						paddingLeft={2}
+						paddingRight={2}
+						paddingTop={1}
+						paddingBottom={1}
+						flexDirection="row"
+						justifyContent="space-between"
+						alignItems="center"
+					>
 						<text>
-							<span fg={theme.cyan}>/</span>
+							<span fg={theme.textDim}>Location: </span>
+							{breadcrumbs.map((crumb, i) => (
+								<>
+									<span
+										key={i}
+										fg={i === breadcrumbs.length - 1 ? theme.cyan : theme.textSecondary}
+									>
+										{crumb === "/" ? "~" : crumb}
+									</span>
+									{i < breadcrumbs.length - 1 && (
+										<span fg={theme.textDim}> → </span>
+									)}
+								</>
+							))}
+						</text>
+						{/* Scan status on the right */}
+						<text>
+							<span fg={scanStatus === "scanning" ? theme.gold : theme.success}>
+								{getScanStatusText()}
+							</span>
+						</text>
+					</box>
+
+					{/* Divider */}
+					<box paddingLeft={2} paddingRight={2}>
+						<text>
+							<span fg={theme.goldDim}>{"─".repeat(68)}</span>
+						</text>
+					</box>
+
+					{/* Search Bar - Boxed */}
+					<box
+						marginLeft={2}
+						marginRight={2}
+						marginTop={1}
+						marginBottom={1}
+						border
+						borderStyle="rounded"
+						borderColor={isSearchFocused ? theme.cyan : theme.textDim}
+						paddingLeft={1}
+						paddingRight={1}
+						flexDirection="row"
+						alignItems="center"
+						gap={1}
+					>
+						<text>
+							<span fg={isSearchFocused ? theme.cyan : theme.textDim}>Search:</span>
 						</text>
 						<input
 							value={searchQuery}
 							onChange={setSearchQuery}
-							placeholder="Search files..."
+							placeholder="Type to filter..."
 							focused={isSearchFocused}
 							onFocus={() => setIsSearchFocused(true)}
 							onBlur={() => setIsSearchFocused(false)}
-							width={30}
+							width={35}
 						/>
-						{searchQuery && (
+						{searchQuery ? (
 							<text>
-								<span fg={theme.textDim}>
-									({filteredEntries.length - (entries.find((e) => e.isParent) ? 1 : 0)} results)
+								<span fg={theme.cyan}>
+									{filteredEntries.length - (entries.find((e) => "isParent" in e && e.isParent) ? 1 : 0)} found
 								</span>
+							</text>
+						) : (
+							<text>
+								<span fg={theme.textDim}>Press / to search</span>
 							</text>
 						)}
 					</box>
 
-					{loading ? (
-						<box marginTop={1}>
-							<text>
-								<span fg={theme.cyan}>Loading...</span>
-							</text>
-						</box>
-					) : error ? (
-						<box marginTop={1}>
-							<text>
-								<span fg={theme.error}>Error: {error}</span>
-							</text>
-						</box>
-					) : filteredEntries.length === 0 ? (
-						<box marginTop={1}>
-							<text>
-								<span fg={theme.textDim}>
-									{searchQuery ? "No matches found" : "Empty directory"}
-								</span>
-							</text>
-						</box>
-					) : (
-						<box flexDirection="column" marginTop={1}>
+					{/* File List */}
+					<box flexGrow={1} paddingLeft={1} paddingRight={1}>
+						{scanStatus === "scanning" ? (
+							<box padding={1}>
+								<text>
+									<span fg={theme.gold}>Scanning for ZIP files...</span>
+								</text>
+							</box>
+						) : filteredEntries.length === 0 ? (
+							<box padding={1}>
+								<text>
+									<span fg={theme.textDim}>
+										{searchQuery ? "No matches found" : "No ZIP files in this location"}
+									</span>
+								</text>
+							</box>
+						) : (
 							<select
-								options={filteredEntries.map((entry) => ({
-									name: entry.isParent
-										? ".."
-										: `${entry.type === "dir" ? "📁" : "📄"} ${entry.name}`,
-									description: entry.isParent
-										? "Parent directory"
-										: entry.type === "dir"
-											? "Directory"
-											: "File",
-									value: entry.name,
-								}))}
+								options={filteredEntries.map((entry) => {
+									const display = getEntryDisplay(entry);
+									return {
+										name: display.icon ? `${display.icon} ${display.name}` : display.name,
+										description: display.description,
+										value: "fullPath" in entry ? entry.fullPath : entry.name,
+									};
+								})}
 								onChange={(index) => setSelectedIndex(index)}
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
@@ -308,98 +463,32 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								height={14}
 								showScrollIndicator
 							/>
-						</box>
-					)}
-				</box>
-
-				{/* Right Panel: Details */}
-				<box
-					flexGrow={1}
-					border
-					borderStyle="rounded"
-					borderColor={theme.textDim}
-					flexDirection="column"
-					padding={1}
-				>
-					<text>
-						<span fg={theme.gold}>
-							<strong>Details</strong>
-						</span>
-					</text>
-					<box flexDirection="column" marginTop={1} gap={1}>
-						<text>
-							Name:{" "}
-							<span fg={theme.textPrimary}>
-								{selectedEntry?.isParent
-									? ".."
-									: selectedEntry?.name ?? "-"}
-							</span>
-						</text>
-						<text>
-							Size:{" "}
-							<span fg={theme.textPrimary}>
-								{selectedStats?.size !== undefined
-									? formatSize(selectedStats.size)
-									: "-"}
-							</span>
-						</text>
-						<text>
-							Type:{" "}
-							<span fg={theme.textPrimary}>
-								{selectedEntry?.isParent
-									? "Parent Directory"
-									: selectedEntry?.type === "dir"
-										? "Folder"
-										: "File"}
-							</span>
-						</text>
-						<text>
-							Modified:{" "}
-							<span fg={theme.textPrimary}>
-								{selectedStats?.modifiedAt
-									? formatDate(selectedStats.modifiedAt)
-									: "-"}
-							</span>
-						</text>
-						<text>
-							Path:{" "}
-							<span fg={theme.textPrimary}>{selectedPath}</span>
-						</text>
-
-						<box
-							marginTop={2}
-							border
-							borderStyle="single"
-							borderColor={theme.textDim}
-							padding={1}
-						>
-							{selectedEntry?.isParent ? (
-								<text>Move up to the parent directory.</text>
-							) : selectedEntry?.type === "dir" ? (
-								<>
-									<text>Contains:</text>
-									<text>
-										• {selectedStats?.itemCount ?? "?"} items
-									</text>
-								</>
-							) : selectedEntry?.name.endsWith(".zip") ? (
-								<>
-									<text>
-										<span fg={theme.success}>ZIP Archive</span>
-									</text>
-									<text>• Ready for analysis</text>
-									<text>• Press Enter to select</text>
-								</>
-							) : (
-								<text>
-									<span fg={theme.textDim}>
-										Select a .zip file for analysis
-									</span>
-								</text>
-							)}
-						</box>
+						)}
 					</box>
 
+					{/* Divider */}
+					<box paddingLeft={2} paddingRight={2}>
+						<text>
+							<span fg={theme.goldDim}>{"─".repeat(68)}</span>
+						</text>
+					</box>
+
+					{/* Selected Item Info Bar */}
+					<box
+						paddingLeft={2}
+						paddingRight={2}
+						paddingTop={1}
+						paddingBottom={1}
+						flexDirection="row"
+						gap={1}
+					>
+						<text>
+							<span fg={theme.textDim}>Selected: </span>
+							<span fg={selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? theme.success : theme.textPrimary}>
+								{getSelectedInfo()}
+							</span>
+						</text>
+					</box>
 				</box>
 			</box>
 		</box>

@@ -19,6 +19,7 @@
 	"dependencies": {
 		"@opentui/core": "^0.1.72",
 		"@opentui/react": "^0.1.72",
+		"fdir": "^6.5.0",
 		"fuse.js": "^7.1.0",
 		"react": "^19.2.3"
 	}
