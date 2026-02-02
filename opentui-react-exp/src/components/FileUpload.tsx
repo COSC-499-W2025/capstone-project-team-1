@@ -40,6 +40,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 	// Scan filesystem for all ZIP files
 	const doScan = useCallback(async () => {
 		setScanStatus("scanning");
+		setAllZips([]); // Clear old data before new scan
 		scanAbortRef.current = false;
 
 		const result = await scanForZips({ rootPath });
