@@ -23,7 +23,11 @@ async def get_projects(
     db: Session = Depends(get_db),
 ) -> list[ProjectResponse]:
     """List all projects, excluding soft-deleted."""
-    query = db.query(RepoStat).filter(RepoStat.deleted_at.is_(None))
+    query = (
+        db.query(RepoStat)
+        .filter(RepoStat.deleted_at.is_(None))
+        .order_by(RepoStat.created_at.desc())
+    )
 
     if offset:
         query = query.offset(offset)
