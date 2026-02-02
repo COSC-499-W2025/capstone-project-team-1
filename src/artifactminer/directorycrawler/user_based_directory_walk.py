@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from pytest import Session
+from sqlalchemy import text
 from artifactminer.db.database import SessionLocal
 from artifactminer.db.models import UserAnswer
 from .directory_walk import user_keep_file, user_exclude_file, user_keep_extension, user_exclude_extension, is_extension, is_valid_filename

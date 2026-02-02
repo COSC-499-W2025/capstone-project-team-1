@@ -1,3 +1,4 @@
+import copy
 import os
 import re
 from pathlib import Path
@@ -574,8 +575,11 @@ def crawl_directory() -> tuple[dict, list[str]]:
                 if not isDuplicate:
                     '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
                     store_file_dictionary.add_to_dict(fileId, (file, full_path, extension)) #key = filename, path = filepath
+    
+    values = copy.deepcopy(store_file_dictionary.get_dict()) #perform deep copy to avoid duplicates
+    store_file_dictionary.remove_all_dict()
 
-    return store_file_dictionary.get_dict(), listforalldirs
+    return values, listforalldirs
 
 
 def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]]:
