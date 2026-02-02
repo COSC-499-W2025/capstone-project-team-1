@@ -24,7 +24,8 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	],
 	"file-upload": [
 		{ key: "↑/↓", label: "Navigate" },
-		{ key: "Enter", label: "Select" },
+		{ key: "Enter", label: "Open/Select" },
+		{ key: "Backspace", label: "Up" },
 		{ key: "Esc", label: "Back" },
 	],
 	"project-list": [
@@ -68,9 +69,7 @@ function App() {
 				break;
 
 			case "file-upload":
-				if (key.name === "return") {
-					setScreen("project-list");
-				} else if (key.name === "escape") {
+				if (key.name === "escape") {
 					setScreen("consent");
 				}
 				break;

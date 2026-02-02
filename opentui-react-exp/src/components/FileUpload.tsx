@@ -1,5 +1,5 @@
 import { useKeyboard } from "@opentui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -8,8 +8,17 @@ interface FileUploadProps {
 	onBack: () => void;
 }
 
+type FileNode = {
+	name: string;
+	type: "dir" | "file";
+	size?: string;
+	children?: FileNode[];
+};
+
+type FileEntry = FileNode & { isParent?: boolean };
+
 // Mock file system data
-const mockFileSystem = {
+const mockFileSystem: FileNode = {
 	name: "root",
 	type: "dir",
 	children: [
@@ -48,16 +57,88 @@ const mockFileSystem = {
 	],
 };
 
+const getNodeAtPath = (root: FileNode, segments: string[]) => {
+	let node: FileNode | undefined = root;
+	for (const segment of segments) {
+		const next = node.children?.find(
+			(child) => child.type === "dir" && child.name === segment,
+		);
+		if (!next) {
+			return undefined;
+		}
+		node = next;
+	}
+	return node;
+};
+
+const buildPath = (segments: string[], name?: string) => {
+	const base = `/${segments.join("/")}`;
+	if (!name) {
+		return base === "" ? "/" : base;
+	}
+	return base === "" || base === "/" ? `/${name}` : `${base}/${name}`;
+};
+
+const sortEntries = (a: FileEntry, b: FileEntry) => {
+	if (a.isParent) return -1;
+	if (b.isParent) return 1;
+	if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
+	return a.name.localeCompare(b.name);
+};
+
 export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
-	const [selectedPath, setSelectedPath] = useState(
-		"/Users/shlok/projects/capstone-project.zip",
+	const [currentPathSegments, setCurrentPathSegments] = useState([
+		"Users",
+		"shlok",
+		"projects",
+	]);
+	const [selectedIndex, setSelectedIndex] = useState(0);
+
+	const currentNode = useMemo(
+		() => getNodeAtPath(mockFileSystem, currentPathSegments),
+		[currentPathSegments],
 	);
+	const entries = useMemo(() => {
+		const baseEntries = currentNode?.children ?? [];
+		const withParent: FileEntry[] = currentPathSegments.length
+			? [{ name: "..", type: "dir", isParent: true }]
+			: [];
+		return [...withParent, ...baseEntries].sort(sortEntries);
+	}, [currentNode, currentPathSegments]);
 
-	// Interaction handling would go here - simplified for visual demo
+	useEffect(() => {
+		if (selectedIndex >= entries.length) {
+			setSelectedIndex(0);
+		}
+	}, [entries.length, selectedIndex]);
 
-	const handleSubmit = () => {
+	const selectedEntry = entries[selectedIndex];
+	const currentPath = buildPath(currentPathSegments);
+	const displayPath = currentPath === "/" ? "/" : `${currentPath}/`;
+	const selectedPath = selectedEntry
+		? selectedEntry.isParent
+			? buildPath(currentPathSegments.slice(0, -1))
+			: buildPath(currentPathSegments, selectedEntry.name)
+		: currentPath;
+
+	const handleSelect = () => {
+		if (!selectedEntry) return;
+		if (selectedEntry.isParent) {
+			setCurrentPathSegments((segments) => segments.slice(0, -1));
+			return;
+		}
+		if (selectedEntry.type === "dir") {
+			setCurrentPathSegments((segments) => [...segments, selectedEntry.name]);
+			return;
+		}
 		onSubmit(selectedPath);
 	};
+
+	useKeyboard((key) => {
+		if (key.name === "backspace" && currentPathSegments.length > 0) {
+			setCurrentPathSegments((segments) => segments.slice(0, -1));
+		}
+	});
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -83,14 +164,28 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						</span>
 					</text>
 					<text>
-						<span fg={theme.textDim}>/Users/shlok/projects/</span>
+						<span fg={theme.textDim}>{displayPath}</span>
 					</text>
 					<box flexDirection="column" marginTop={1}>
-						<text> 📁 opentui-react</text>
-						<box backgroundColor={theme.cyanDim}>
-							<text> 📄 capstone-project.zip</text>
-						</box>
-						<text> 📄 personal-site.zip</text>
+						<select
+							options={entries.map((entry) => ({
+								name: entry.isParent
+									? ".."
+									: `${entry.type === "dir" ? "📁" : "📄"} ${entry.name}`,
+								description: entry.isParent
+									? "Parent directory"
+									: entry.type === "dir"
+										? `${entry.children?.length ?? 0} items`
+										: entry.size ?? "File",
+								value: entry.name,
+							}))}
+							onChange={(index) => setSelectedIndex(index)}
+							onSelect={handleSelect}
+							selectedIndex={selectedIndex}
+							focused
+							height={16}
+							showScrollIndicator
+						/>
 					</box>
 				</box>
 
@@ -110,13 +205,34 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 					</text>
 					<box flexDirection="column" marginTop={1} gap={1}>
 						<text>
-							Name: <span fg={theme.textPrimary}>capstone-project.zip</span>
+							Name:{" "}
+							<span fg={theme.textPrimary}>
+								{selectedEntry?.isParent
+									? ".."
+									: selectedEntry?.name ?? "-"}
+							</span>
 						</text>
 						<text>
-							Size: <span fg={theme.textPrimary}>12 MB</span>
+							Size:{" "}
+							<span fg={theme.textPrimary}>
+								{selectedEntry?.type === "file"
+									? selectedEntry.size ?? "Unknown"
+									: "-"}
+							</span>
 						</text>
 						<text>
-							Type: <span fg={theme.textPrimary}>ZIP Archive</span>
+							Type:{" "}
+							<span fg={theme.textPrimary}>
+								{selectedEntry?.isParent
+									? "Parent Directory"
+									: selectedEntry?.type === "dir"
+										? "Folder"
+										: "File"}
+							</span>
+						</text>
+						<text>
+							Path:{" "}
+							<span fg={theme.textPrimary}>{selectedPath}</span>
 						</text>
 
 						<box
@@ -126,10 +242,23 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 							borderColor={theme.textDim}
 							padding={1}
 						>
-							<text>Contains:</text>
-							<text>• 4 git repositories</text>
-							<text>• 1,204 commits</text>
-							<text>• TypeScript, Rust</text>
+							{selectedEntry?.isParent ? (
+								<text>Move up to the parent directory.</text>
+							) : selectedEntry?.type === "dir" ? (
+								<>
+									<text>Contains:</text>
+									<text>
+										• {selectedEntry.children?.length ?? 0} items
+									</text>
+									<text>• Folders and files</text>
+								</>
+							) : (
+								<>
+									<text>Details:</text>
+									<text>• ZIP Archive</text>
+									<text>• Ready for analysis</text>
+								</>
+							)}
 						</box>
 					</box>
 
@@ -137,7 +266,7 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						<text>
 							<span fg={theme.textDim}>Press </span>
 							<span fg={theme.cyan}>Enter</span>
-							<span fg={theme.textDim}> to select</span>
+							<span fg={theme.textDim}> to open/select</span>
 						</text>
 					</box>
 
@@ -155,7 +284,9 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 							<span fg={theme.goldDark}>Demo Mode:</span>
 							<span fg={theme.textDim}> Press </span>
 							<span fg={theme.cyan}>Enter</span>
-							<span fg={theme.textDim}> to continue</span>
+							<span fg={theme.textDim}> to select, </span>
+							<span fg={theme.cyan}>Backspace</span>
+							<span fg={theme.textDim}> to go up</span>
 						</text>
 					</box>
 				</box>
