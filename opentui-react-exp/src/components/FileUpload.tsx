@@ -1,8 +1,9 @@
 import { useKeyboard } from "@opentui/react";
+import Fuse from "fuse.js";
 import { readdir, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname, basename } from "node:path";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -56,6 +57,8 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 		modifiedAt?: Date;
 		itemCount?: number;
 	} | null>(null);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [isSearchFocused, setIsSearchFocused] = useState(false);
 
 	const loadDirectory = useCallback(async (dirPath: string) => {
 		setLoading(true);
@@ -67,6 +70,11 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 
 			const fileEntries: FileEntry[] = dirents
 				.filter((dirent) => !dirent.name.startsWith(".") || showHidden)
+				.filter((dirent) => {
+					// Show all directories (for navigation) and only .zip files
+					if (dirent.isDirectory()) return true;
+					return dirent.name.toLowerCase().endsWith(".zip");
+				})
 				.map((dirent) => ({
 					name: dirent.name,
 					type: dirent.isDirectory() ? "dir" : "file",
@@ -93,7 +101,38 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 		loadDirectory(currentPath);
 	}, [currentPath, loadDirectory]);
 
-	const selectedEntry = entries[selectedIndex];
+	// Reset search when changing directories
+	useEffect(() => {
+		setSearchQuery("");
+		setIsSearchFocused(false);
+	}, [currentPath]);
+
+	// Fuse.js fuzzy search
+	const fuse = useMemo(() => {
+		return new Fuse(entries.filter((e) => !e.isParent), {
+			keys: ["name"],
+			threshold: 0.4,
+			includeScore: true,
+		});
+	}, [entries]);
+
+	const filteredEntries = useMemo(() => {
+		if (!searchQuery.trim()) {
+			return entries;
+		}
+		const results = fuse.search(searchQuery);
+		const parentEntry = entries.find((e) => e.isParent);
+		const filtered = results.map((r) => r.item);
+		// Always keep parent entry at top when searching
+		return parentEntry ? [parentEntry, ...filtered] : filtered;
+	}, [entries, searchQuery, fuse]);
+
+	// Reset selection when filtered results change
+	useEffect(() => {
+		setSelectedIndex(0);
+	}, [filteredEntries.length]);
+
+	const selectedEntry = filteredEntries[selectedIndex];
 
 	// Load stats for selected entry
 	useEffect(() => {
@@ -149,11 +188,27 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 	};
 
 	useKeyboard((key) => {
-		if (key.name === "backspace" && currentPath !== "/") {
+		if (key.name === "backspace" && currentPath !== "/" && !isSearchFocused) {
 			setCurrentPath(dirname(currentPath));
 		}
 		if (key.name === "h" && key.ctrl) {
 			setShowHidden((prev) => !prev);
+		}
+		// "/" to focus search
+		if (key.sequence === "/" && !isSearchFocused) {
+			setIsSearchFocused(true);
+		}
+		// Escape to clear/exit search
+		if (key.name === "escape" && isSearchFocused) {
+			if (searchQuery) {
+				setSearchQuery("");
+			} else {
+				setIsSearchFocused(false);
+			}
+		}
+		// Enter while in search to exit search and keep focus on list
+		if (key.name === "return" && isSearchFocused) {
+			setIsSearchFocused(false);
 		}
 	});
 
@@ -189,6 +244,29 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						<span fg={theme.textDim}>{displayPath}</span>
 					</text>
 
+					{/* Search Bar */}
+					<box marginTop={1} flexDirection="row" gap={1}>
+						<text>
+							<span fg={theme.cyan}>/</span>
+						</text>
+						<input
+							value={searchQuery}
+							onChange={setSearchQuery}
+							placeholder="Search files..."
+							focused={isSearchFocused}
+							onFocus={() => setIsSearchFocused(true)}
+							onBlur={() => setIsSearchFocused(false)}
+							width={30}
+						/>
+						{searchQuery && (
+							<text>
+								<span fg={theme.textDim}>
+									({filteredEntries.length - (entries.find((e) => e.isParent) ? 1 : 0)} results)
+								</span>
+							</text>
+						)}
+					</box>
+
 					{loading ? (
 						<box marginTop={1}>
 							<text>
@@ -201,16 +279,18 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								<span fg={theme.error}>Error: {error}</span>
 							</text>
 						</box>
-					) : entries.length === 0 ? (
+					) : filteredEntries.length === 0 ? (
 						<box marginTop={1}>
 							<text>
-								<span fg={theme.textDim}>Empty directory</span>
+								<span fg={theme.textDim}>
+									{searchQuery ? "No matches found" : "Empty directory"}
+								</span>
 							</text>
 						</box>
 					) : (
 						<box flexDirection="column" marginTop={1}>
 							<select
-								options={entries.map((entry) => ({
+								options={filteredEntries.map((entry) => ({
 									name: entry.isParent
 										? ".."
 										: `${entry.type === "dir" ? "📁" : "📄"} ${entry.name}`,
@@ -224,8 +304,8 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								onChange={(index) => setSelectedIndex(index)}
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
-								focused
-								height={16}
+								focused={!isSearchFocused}
+								height={14}
 								showScrollIndicator
 							/>
 						</box>
@@ -320,36 +400,6 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						</box>
 					</box>
 
-					<box marginTop={3}>
-						<text>
-							<span fg={theme.textDim}>Press </span>
-							<span fg={theme.cyan}>Enter</span>
-							<span fg={theme.textDim}> to open/select</span>
-						</text>
-					</box>
-
-					<box
-						marginTop={2}
-						border
-						borderStyle="single"
-						borderColor={theme.cyanDim}
-						paddingLeft={2}
-						paddingRight={2}
-						paddingTop={1}
-						paddingBottom={1}
-					>
-						<text>
-							<span fg={theme.cyan}>Shortcuts:</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>Backspace</span>
-							<span fg={theme.textPrimary}> - Go up</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>Ctrl+H</span>
-							<span fg={theme.textPrimary}> - Toggle hidden files</span>
-						</text>
-					</box>
 				</box>
 			</box>
 		</box>
