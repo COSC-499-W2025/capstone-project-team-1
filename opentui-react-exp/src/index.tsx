@@ -26,6 +26,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "↑/↓", label: "Navigate" },
 		{ key: "Enter", label: "Open/Select" },
 		{ key: "Backspace", label: "Up" },
+		{ key: "Ctrl+H", label: "Hidden" },
 		{ key: "Esc", label: "Back" },
 	],
 	"project-list": [

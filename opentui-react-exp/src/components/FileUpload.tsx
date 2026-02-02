@@ -1,5 +1,8 @@
 import { useKeyboard } from "@opentui/react";
-import { useEffect, useMemo, useState } from "react";
+import { readdir, stat } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join, dirname, basename } from "node:path";
+import { useEffect, useState, useCallback } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -8,78 +11,33 @@ interface FileUploadProps {
 	onBack: () => void;
 }
 
-type FileNode = {
+type FileEntry = {
 	name: string;
 	type: "dir" | "file";
-	size?: string;
-	children?: FileNode[];
+	size?: number;
+	modifiedAt?: Date;
+	isParent?: boolean;
 };
 
-type FileEntry = FileNode & { isParent?: boolean };
-
-// Mock file system data
-const mockFileSystem: FileNode = {
-	name: "root",
-	type: "dir",
-	children: [
-		{
-			name: "Users",
-			type: "dir",
-			children: [
-				{
-					name: "shlok",
-					type: "dir",
-					children: [
-						{
-							name: "projects",
-							type: "dir",
-							children: [
-								{ name: "opentui-react", type: "dir" },
-								{ name: "capstone-project.zip", type: "file", size: "12 MB" },
-								{ name: "personal-site.zip", type: "file", size: "4.5 MB" },
-							],
-						},
-						{ name: "Documents", type: "dir" },
-						{
-							name: "Downloads",
-							type: "dir",
-							children: [
-								{ name: "resume-data.zip", type: "file", size: "2 MB" },
-								{ name: "images.zip", type: "file", size: "150 MB" },
-							],
-						},
-					],
-				},
-			],
-		},
-		{ name: "var", type: "dir" },
-		{ name: "tmp", type: "dir" },
-	],
+const formatSize = (bytes: number): string => {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+	if (bytes < 1024 * 1024 * 1024)
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 };
 
-const getNodeAtPath = (root: FileNode, segments: string[]) => {
-	let node: FileNode | undefined = root;
-	for (const segment of segments) {
-		const next = node.children?.find(
-			(child) => child.type === "dir" && child.name === segment,
-		);
-		if (!next) {
-			return undefined;
-		}
-		node = next;
-	}
-	return node;
+const formatDate = (date: Date): string => {
+	return date.toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
 };
 
-const buildPath = (segments: string[], name?: string) => {
-	const base = `/${segments.join("/")}`;
-	if (!name) {
-		return base === "" ? "/" : base;
-	}
-	return base === "" || base === "/" ? `/${name}` : `${base}/${name}`;
-};
-
-const sortEntries = (a: FileEntry, b: FileEntry) => {
+const sortEntries = (a: FileEntry, b: FileEntry): number => {
 	if (a.isParent) return -1;
 	if (b.isParent) return 1;
 	if (a.type !== b.type) return a.type === "dir" ? -1 : 1;
@@ -87,58 +45,119 @@ const sortEntries = (a: FileEntry, b: FileEntry) => {
 };
 
 export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
-	const [currentPathSegments, setCurrentPathSegments] = useState([
-		"Users",
-		"shlok",
-		"projects",
-	]);
+	const [currentPath, setCurrentPath] = useState(homedir());
+	const [entries, setEntries] = useState<FileEntry[]>([]);
 	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
+	const [showHidden, setShowHidden] = useState(false);
+	const [selectedStats, setSelectedStats] = useState<{
+		size?: number;
+		modifiedAt?: Date;
+		itemCount?: number;
+	} | null>(null);
 
-	const currentNode = useMemo(
-		() => getNodeAtPath(mockFileSystem, currentPathSegments),
-		[currentPathSegments],
-	);
-	const entries = useMemo(() => {
-		const baseEntries = currentNode?.children ?? [];
-		const withParent: FileEntry[] = currentPathSegments.length
-			? [{ name: "..", type: "dir", isParent: true }]
-			: [];
-		return [...withParent, ...baseEntries].sort(sortEntries);
-	}, [currentNode, currentPathSegments]);
+	const loadDirectory = useCallback(async (dirPath: string) => {
+		setLoading(true);
+		setError(null);
+		setSelectedStats(null);
+
+		try {
+			const dirents = await readdir(dirPath, { withFileTypes: true });
+
+			const fileEntries: FileEntry[] = dirents
+				.filter((dirent) => !dirent.name.startsWith(".") || showHidden)
+				.map((dirent) => ({
+					name: dirent.name,
+					type: dirent.isDirectory() ? "dir" : "file",
+				}));
+
+			const isRoot = dirPath === "/";
+			const withParent: FileEntry[] = isRoot
+				? []
+				: [{ name: "..", type: "dir", isParent: true }];
+
+			setEntries([...withParent, ...fileEntries].sort(sortEntries));
+			setSelectedIndex(0);
+		} catch (err) {
+			setError(
+				err instanceof Error ? err.message : "Failed to read directory",
+			);
+			setEntries([]);
+		} finally {
+			setLoading(false);
+		}
+	}, [showHidden]);
 
 	useEffect(() => {
-		if (selectedIndex >= entries.length) {
-			setSelectedIndex(0);
-		}
-	}, [entries.length, selectedIndex]);
+		loadDirectory(currentPath);
+	}, [currentPath, loadDirectory]);
 
 	const selectedEntry = entries[selectedIndex];
-	const currentPath = buildPath(currentPathSegments);
-	const displayPath = currentPath === "/" ? "/" : `${currentPath}/`;
+
+	// Load stats for selected entry
+	useEffect(() => {
+		if (!selectedEntry || selectedEntry.isParent) {
+			setSelectedStats(null);
+			return;
+		}
+
+		const entryPath = join(currentPath, selectedEntry.name);
+
+		(async () => {
+			try {
+				const stats = await stat(entryPath);
+				if (selectedEntry.type === "dir") {
+					const contents = await readdir(entryPath);
+					setSelectedStats({
+						modifiedAt: stats.mtime,
+						itemCount: contents.length,
+					});
+				} else {
+					setSelectedStats({
+						size: stats.size,
+						modifiedAt: stats.mtime,
+					});
+				}
+			} catch {
+				setSelectedStats(null);
+			}
+		})();
+	}, [selectedEntry, currentPath]);
+
 	const selectedPath = selectedEntry
 		? selectedEntry.isParent
-			? buildPath(currentPathSegments.slice(0, -1))
-			: buildPath(currentPathSegments, selectedEntry.name)
+			? dirname(currentPath)
+			: join(currentPath, selectedEntry.name)
 		: currentPath;
 
 	const handleSelect = () => {
 		if (!selectedEntry) return;
+
 		if (selectedEntry.isParent) {
-			setCurrentPathSegments((segments) => segments.slice(0, -1));
+			setCurrentPath(dirname(currentPath));
 			return;
 		}
+
 		if (selectedEntry.type === "dir") {
-			setCurrentPathSegments((segments) => [...segments, selectedEntry.name]);
+			setCurrentPath(join(currentPath, selectedEntry.name));
 			return;
 		}
+
+		// File selected - submit it
 		onSubmit(selectedPath);
 	};
 
 	useKeyboard((key) => {
-		if (key.name === "backspace" && currentPathSegments.length > 0) {
-			setCurrentPathSegments((segments) => segments.slice(0, -1));
+		if (key.name === "backspace" && currentPath !== "/") {
+			setCurrentPath(dirname(currentPath));
+		}
+		if (key.name === "h" && key.ctrl) {
+			setShowHidden((prev) => !prev);
 		}
 	});
+
+	const displayPath = currentPath === "/" ? "/" : `${currentPath}/`;
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -162,31 +181,55 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						<span fg={theme.gold}>
 							<strong>File Browser</strong>
 						</span>
+						{showHidden && (
+							<span fg={theme.textDim}> (showing hidden)</span>
+						)}
 					</text>
 					<text>
 						<span fg={theme.textDim}>{displayPath}</span>
 					</text>
-					<box flexDirection="column" marginTop={1}>
-						<select
-							options={entries.map((entry) => ({
-								name: entry.isParent
-									? ".."
-									: `${entry.type === "dir" ? "📁" : "📄"} ${entry.name}`,
-								description: entry.isParent
-									? "Parent directory"
-									: entry.type === "dir"
-										? `${entry.children?.length ?? 0} items`
-										: entry.size ?? "File",
-								value: entry.name,
-							}))}
-							onChange={(index) => setSelectedIndex(index)}
-							onSelect={handleSelect}
-							selectedIndex={selectedIndex}
-							focused
-							height={16}
-							showScrollIndicator
-						/>
-					</box>
+
+					{loading ? (
+						<box marginTop={1}>
+							<text>
+								<span fg={theme.cyan}>Loading...</span>
+							</text>
+						</box>
+					) : error ? (
+						<box marginTop={1}>
+							<text>
+								<span fg={theme.error}>Error: {error}</span>
+							</text>
+						</box>
+					) : entries.length === 0 ? (
+						<box marginTop={1}>
+							<text>
+								<span fg={theme.textDim}>Empty directory</span>
+							</text>
+						</box>
+					) : (
+						<box flexDirection="column" marginTop={1}>
+							<select
+								options={entries.map((entry) => ({
+									name: entry.isParent
+										? ".."
+										: `${entry.type === "dir" ? "📁" : "📄"} ${entry.name}`,
+									description: entry.isParent
+										? "Parent directory"
+										: entry.type === "dir"
+											? "Directory"
+											: "File",
+									value: entry.name,
+								}))}
+								onChange={(index) => setSelectedIndex(index)}
+								onSelect={handleSelect}
+								selectedIndex={selectedIndex}
+								focused
+								height={16}
+								showScrollIndicator
+							/>
+						</box>
+					)}
 				</box>
 
 				{/* Right Panel: Details */}
@@ -215,8 +258,8 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 						<text>
 							Size:{" "}
 							<span fg={theme.textPrimary}>
-								{selectedEntry?.type === "file"
-									? selectedEntry.size ?? "Unknown"
+								{selectedStats?.size !== undefined
+									? formatSize(selectedStats.size)
 									: "-"}
 							</span>
 						</text>
@@ -228,6 +271,14 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 									: selectedEntry?.type === "dir"
 										? "Folder"
 										: "File"}
+							</span>
+						</text>
+						<text>
+							Modified:{" "}
+							<span fg={theme.textPrimary}>
+								{selectedStats?.modifiedAt
+									? formatDate(selectedStats.modifiedAt)
+									: "-"}
 							</span>
 						</text>
 						<text>
@@ -248,16 +299,23 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 								<>
 									<text>Contains:</text>
 									<text>
-										• {selectedEntry.children?.length ?? 0} items
+										• {selectedStats?.itemCount ?? "?"} items
 									</text>
-									<text>• Folders and files</text>
+								</>
+							) : selectedEntry?.name.endsWith(".zip") ? (
+								<>
+									<text>
+										<span fg={theme.success}>ZIP Archive</span>
+									</text>
+									<text>• Ready for analysis</text>
+									<text>• Press Enter to select</text>
 								</>
 							) : (
-								<>
-									<text>Details:</text>
-									<text>• ZIP Archive</text>
-									<text>• Ready for analysis</text>
-								</>
+								<text>
+									<span fg={theme.textDim}>
+										Select a .zip file for analysis
+									</span>
+								</text>
 							)}
 						</box>
 					</box>
@@ -271,22 +329,25 @@ export function FileUpload({ onSubmit, onBack }: FileUploadProps) {
 					</box>
 
 					<box
-						marginTop={5}
+						marginTop={2}
 						border
 						borderStyle="single"
-						borderColor={theme.error}
+						borderColor={theme.cyanDim}
 						paddingLeft={2}
 						paddingRight={2}
 						paddingTop={1}
 						paddingBottom={1}
 					>
 						<text>
-							<span fg={theme.goldDark}>Demo Mode:</span>
-							<span fg={theme.textDim}> Press </span>
-							<span fg={theme.cyan}>Enter</span>
-							<span fg={theme.textDim}> to select, </span>
-							<span fg={theme.cyan}>Backspace</span>
-							<span fg={theme.textDim}> to go up</span>
+							<span fg={theme.cyan}>Shortcuts:</span>
+						</text>
+						<text>
+							<span fg={theme.textDim}>Backspace</span>
+							<span fg={theme.textPrimary}> - Go up</span>
+						</text>
+						<text>
+							<span fg={theme.textDim}>Ctrl+H</span>
+							<span fg={theme.textPrimary}> - Toggle hidden files</span>
 						</text>
 					</box>
 				</box>
