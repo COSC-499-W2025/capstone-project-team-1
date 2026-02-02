@@ -128,6 +128,48 @@ class ProjectResponse(BaseModel):
     is_collaborative: bool
 
 
+class ProjectSkillItem(BaseModel):
+    """Skill item for project detail response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    skill_name: str
+    category: str | None = None
+    proficiency: float | None = None
+
+
+class ProjectResumeItem(BaseModel):
+    """Resume item for project detail response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    content: str
+    category: str | None = None
+
+
+class ProjectDetailResponse(BaseModel):
+    """Response shape for single project with related data."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    project_name: str
+    project_path: str
+    languages: list | None = None
+    frameworks: list | None = None
+    first_commit: datetime | None = None
+    last_commit: datetime | None = None
+    is_collaborative: bool
+    total_commits: int | None = None
+    primary_language: str | None = None
+    ranking_score: float | None = None
+    health_score: float | None = None
+    skills: list[ProjectSkillItem] = []
+    resume_items: list[ProjectResumeItem] = []
+
+
 class ProjectTimelineItem(BaseModel):
     """Aggregated activity window for a project repository."""
 
