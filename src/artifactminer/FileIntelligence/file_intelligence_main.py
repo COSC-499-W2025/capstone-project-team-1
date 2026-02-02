@@ -38,6 +38,7 @@ async def get_crawler_pdf_contents(zip_id : int) -> list[FileValues]:
     return fileValues
 
 """
+Evan's previous code: 
 async def analyze_file(file_path):
     # Placeholder for file analysis logic
     # This could involve AI-based analysis or simple string matching

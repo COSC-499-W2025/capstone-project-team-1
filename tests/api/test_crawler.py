@@ -1,6 +1,5 @@
 
 from pathlib import Path
-from tests.api.test_zip import _redirect_uploads
 from artifactminer.db.database import SessionLocal
 from artifactminer.directorycrawler.store_file_dict import StoreFileDict
 from artifactminer.directorycrawler.directory_walk import user_keep_extension

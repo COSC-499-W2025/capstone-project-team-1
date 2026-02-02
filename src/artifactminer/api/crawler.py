@@ -34,6 +34,3 @@ async def get_crawler_contents(zip_id: int, db: Session = Depends(get_db)) -> Cr
                         crawl_path_and_file_name_and_ext=file_value_list
                         )
 
-@router.post("/crawler", response_model=CrawlerFiles, tags=["crawler"])
-async def get_pdf_contents(zip_id: int, db: Session = Depends(get_db)) -> CrawlerFiles:
-    
