@@ -8,7 +8,15 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from fastapi import Query
-from .schemas import ProjectTimelineItem, ProjectRankingItem, DeleteResponse, ProjectResponse
+from .schemas import (
+    ProjectTimelineItem,
+    ProjectRankingItem,
+    DeleteResponse,
+    ProjectResponse,
+    ProjectDetailResponse,
+    ProjectSkillItem,
+    ProjectResumeItem,
+)
 from ..db import RepoStat, get_db
 from ..helpers.project_ranker import rank_projects
 
@@ -35,6 +43,57 @@ async def get_projects(
         query = query.limit(limit)
 
     return query.all()
+
+
+@router.get("/{project_id}", response_model=ProjectDetailResponse)
+async def get_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+) -> ProjectDetailResponse:
+    """Get single project by ID with related skills and resume items."""
+    repo_stat = (
+        db.query(RepoStat)
+        .filter(RepoStat.id == project_id, RepoStat.deleted_at.is_(None))
+        .first()
+    )
+    if not repo_stat:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    skills = [
+        ProjectSkillItem(
+            skill_name=ps.skill.name,
+            category=ps.skill.category,
+            proficiency=ps.proficiency,
+        )
+        for ps in repo_stat.project_skills
+    ]
+
+    resume_items = [
+        ProjectResumeItem(
+            id=ri.id,
+            title=ri.title,
+            content=ri.content,
+            category=ri.category,
+        )
+        for ri in repo_stat.resume_items
+    ]
+
+    return ProjectDetailResponse(
+        id=repo_stat.id,
+        project_name=repo_stat.project_name,
+        project_path=repo_stat.project_path,
+        languages=repo_stat.languages,
+        frameworks=repo_stat.frameworks,
+        first_commit=repo_stat.first_commit,
+        last_commit=repo_stat.last_commit,
+        is_collaborative=repo_stat.is_collaborative,
+        total_commits=repo_stat.total_commits,
+        primary_language=repo_stat.primary_language,
+        ranking_score=repo_stat.ranking_score,
+        health_score=repo_stat.health_score,
+        skills=skills,
+        resume_items=resume_items,
+    )
 
 
 def fetch_project_timeline(
