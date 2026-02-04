@@ -5,7 +5,7 @@ from typing import Type, TypeVar
 from ollama import chat, list as ollama_list
 from pydantic import BaseModel
 
-DEFAULT_MODEL = "qwen3:4b"
+DEFAULT_MODEL = "qwen3:1.7b"
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -31,8 +31,6 @@ def query_ollama(
     model: str = DEFAULT_MODEL,
     system: str | None = None,
     temperature: float = 0.1,
-    num_ctx: int = 4096,
-    num_predict: int = 1024,
 ) -> T:
     messages: list[dict[str, str]] = []
     if system:
@@ -45,12 +43,18 @@ def query_ollama(
         format=schema.model_json_schema(),
         options={
             "temperature": temperature,
-            "num_ctx": num_ctx,
-            "num_predict": num_predict,
         },
     )
 
-    return schema.model_validate_json(response.message.content)
+    content = response.message.content or ""
+    if not content.strip():
+        raise RuntimeError(
+            f"Ollama returned empty response. This may indicate the model "
+            f"'{model}' doesn't support structured JSON output, or the context "
+            f"window was exceeded. Try a different model or reduce input size."
+        )
+
+    return schema.model_validate_json(content)
 
 
 def query_ollama_text(
@@ -77,4 +81,4 @@ def query_ollama_text(
         },
     )
 
-    return response.message.content
+    return response.message.content or ""
