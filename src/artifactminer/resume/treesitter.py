@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 try:  # Tree-sitter is optional but recommended.
-    from tree_sitter import Parser
+    from tree_sitter import Language, Parser
     import tree_sitter_python as tspython
     import tree_sitter_javascript as tsjavascript
     import tree_sitter_typescript as tstypescript
@@ -13,14 +13,14 @@ except Exception:  # pragma: no cover - depends on local installation
     _TS_AVAILABLE = False
 
 
-def _language_map() -> dict[str, object]:
+def _language_map() -> dict[str, Language]:
     if not _TS_AVAILABLE:
         return {}
     return {
-        ".py": tspython.language(),
-        ".js": tsjavascript.language(),
-        ".ts": tstypescript.language_typescript(),
-        ".tsx": tstypescript.language_tsx(),
+        ".py": Language(tspython.language()),
+        ".js": Language(tsjavascript.language()),
+        ".ts": Language(tstypescript.language_typescript()),
+        ".tsx": Language(tstypescript.language_tsx()),
     }
 
 
@@ -72,8 +72,7 @@ def get_structural_summary(code: str, file_ext: str) -> str | None:
     if not lang:
         return None
 
-    parser = Parser()
-    parser.language = lang
+    parser = Parser(lang)
 
     code_bytes = code.encode("utf-8", errors="ignore")
     tree = parser.parse(code_bytes)

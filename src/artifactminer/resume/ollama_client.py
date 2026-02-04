@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Type, TypeVar
 
-from ollama import chat, list as ollama_list
+from ollama import chat, list as ollama_list, AsyncClient
 from pydantic import BaseModel
 
 DEFAULT_MODEL = "qwen3:1.7b"
@@ -82,3 +83,38 @@ def query_ollama_text(
     )
 
     return response.message.content or ""
+
+
+async def query_ollama_async(
+    prompt: str,
+    schema: Type[T],
+    *,
+    model: str = DEFAULT_MODEL,
+    system: str | None = None,
+    temperature: float = 0.1,
+) -> T:
+    """Async version of query_ollama for concurrent execution."""
+    messages: list[dict[str, str]] = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    client = AsyncClient()
+    response = await client.chat(
+        model=model,
+        messages=messages,
+        format=schema.model_json_schema(),
+        options={
+            "temperature": temperature,
+        },
+    )
+
+    content = response.message.content or ""
+    if not content.strip():
+        raise RuntimeError(
+            f"Ollama returned empty response. This may indicate the model "
+            f"'{model}' doesn't support structured JSON output, or the context "
+            f"window was exceeded. Try a different model or reduce input size."
+        )
+
+    return schema.model_validate_json(content)
