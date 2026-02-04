@@ -1,15 +1,14 @@
-from ollama import chat
-from ollama import ChatResponse
+from __future__ import annotations
 
-response: ChatResponse = chat(
-    model="lfm2.5-thinking:latest",
-    messages=[
-        {
-            "role": "user",
-            "content": "tell me about fc barcelona in 20 words",
-        },
-    ],
-)
-print(response["message"]["content"])
-# or access fields directly from the response object
-print(response.message.content)
+from ollama import chat
+
+DEFAULT_MODEL = "qwen3:4b"
+
+
+def get_ollama_response(prompt: str, model: str = DEFAULT_MODEL) -> str:
+    response = chat(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        options={"temperature": 0.3},
+    )
+    return response.message.content
