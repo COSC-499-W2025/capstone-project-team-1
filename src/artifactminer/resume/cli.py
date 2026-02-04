@@ -72,3 +72,7 @@ def generate(
     if output_markdown:
         output_markdown.parent.mkdir(parents=True, exist_ok=True)
         output_markdown.write_text(markdown)
+
+
+def main() -> None:
+    app()
