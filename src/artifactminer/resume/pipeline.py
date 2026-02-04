@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from collections import Counter
 from datetime import datetime
@@ -7,14 +8,20 @@ from pathlib import Path
 
 from email_validator import EmailNotValidError, validate_email
 
-from artifactminer.api.analyze import discover_git_repos, extract_zip_to_persistent_location
+from artifactminer.api.analyze import (
+    discover_git_repos,
+    extract_zip_to_persistent_location,
+)
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import getRepoStats
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import getUserRepoStats
 from artifactminer.skills.deep_analysis import DeepRepoAnalyzer
 
-from artifactminer.resume.helpers import collect_user_additions_by_file, should_skip_path
+from artifactminer.resume.helpers import (
+    collect_user_additions_by_file,
+    should_skip_path,
+)
 from artifactminer.resume.ollama_client import DEFAULT_MODEL, ensure_model_available
-from artifactminer.resume.passes.analysis import analyze_file
+from artifactminer.resume.passes.analysis import analyze_file_async
 from artifactminer.resume.passes.discovery import rank_files
 from artifactminer.resume.passes.portfolio import synthesize_portfolio
 from artifactminer.resume.passes.synthesis import synthesize_project
@@ -143,22 +150,27 @@ def generate_resume(
         selected_files = selected_files[:top_files]
         _log(verbose, f"  Selected {len(selected_files)} files for analysis.")
 
-        file_analyses = []
-        for file_path in selected_files:
-            code = additions_by_file.get(file_path, "")
-            if not code.strip():
-                continue
-            summary = get_structural_summary(code, Path(file_path).suffix)
-            analysis = analyze_file(
-                file_path=file_path,
-                project_name=repo_name,
-                languages=languages_label,
-                frameworks=frameworks_label,
-                tree_sitter_summary=summary,
-                user_code=code,
-                model=DEFAULT_MODEL,
-            )
-            file_analyses.append(analysis)
+        # Prepare analysis tasks for parallel execution
+        async def analyze_files_concurrent():
+            tasks = []
+            for file_path in selected_files:
+                code = additions_by_file.get(file_path, "")
+                if not code.strip():
+                    continue
+                summary = get_structural_summary(code, Path(file_path).suffix)
+                task = analyze_file_async(
+                    file_path=file_path,
+                    project_name=repo_name,
+                    languages=languages_label,
+                    frameworks=frameworks_label,
+                    tree_sitter_summary=summary,
+                    user_code=code,
+                    model=DEFAULT_MODEL,
+                )
+                tasks.append(task)
+            return await asyncio.gather(*tasks)
+
+        file_analyses = asyncio.run(analyze_files_concurrent())
 
         if not file_analyses:
             _log(verbose, "  No file analyses produced. Skipping repo.")
@@ -166,9 +178,7 @@ def generate_resume(
 
         skills_list = ""
         if deep_result:
-            skills_list = ", ".join(
-                [skill.skill for skill in deep_result.skills[:12]]
-            )
+            skills_list = ", ".join([skill.skill for skill in deep_result.skills[:12]])
 
         project_summary = synthesize_project(
             project_name=repo_name,
