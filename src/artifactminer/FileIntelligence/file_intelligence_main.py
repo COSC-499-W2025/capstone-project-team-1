@@ -3,39 +3,28 @@
 # that could be used in a resume. Primarily done using already made AI analysis functions, but
 # also using basic string matching in order to comply with non-AI file analysis.
 
-# We would call the 
-from pathlib import Path
+
 from pypdf import PdfReader
+
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
-from artifactminer.api.crawler import get_crawler_contents
 
-from artifactminer.api.schemas import CrawlerFiles, FileValues
-
-
+from artifactminer.api.schemas import FileValues
+ 
 #CRAWLER INTEGRATION
-async def get_crawler_pdf_contents(zip_id : int, db) -> list[FileValues]:
+async def get_crawler_pdf_contents(file_values : list[FileValues]) -> str:
     
-    response = None
-    fileValues = None
-    """try:"""
-    response = await get_crawler_contents(zip_id=zip_id, db=db)
-    """except:
-        print("something went wrong getting zip contents")
-        response = CrawlerFiles(zip_id, list[FileValues])
-        fileValues = response.crawl_path_and_file_name_and_ext
-    """
-    if fileValues is None:
-        return None
-    if len(fileValues) < 0: 
-        return None
+
+    if file_values is None:
+        return "no response, file value is null."
+    if len(file_values) < 0: 
+        return "no response, file value is empty."
     
-    fileValues = response.crawl_path_and_file_name_and_ext
 
-    for file_data in fileValues:
-        if file_data.file_ext == ".pdf":
-            analyze_pdf(file_path=file_data.file_path) #get relative path
+    for file_data in file_values:
+        if file_data["file_ext"] == ".pdf":
+            str_response = await analyze_pdf(file_path=file_data["file_path"]) #get relative path
 
-    return fileValues
+    return str_response
 
 """
 Evan's previous code: 

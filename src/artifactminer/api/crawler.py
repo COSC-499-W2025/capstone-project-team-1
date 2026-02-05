@@ -11,7 +11,7 @@ from ..db import get_db
 #import artifactminer.directorycrawler.directory_walk as directory_walk
 router = APIRouter(tags=["crawler"])
 
-@router.post("/crawler", response_model=CrawlerFiles, tags=["crawler"])
+@router.get("/crawler", response_model=CrawlerFiles, tags=["crawler"])
 async def get_crawler_contents(zip_id: int, db: Session = Depends(get_db)) -> CrawlerFiles:
     
     #1) get data from user consent (in config)

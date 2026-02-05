@@ -2,7 +2,6 @@ import copy
 import os
 import re
 from pathlib import Path
-from .file_object import FileValues
 from .store_file_dict import StoreFileDict
 from .check_file_duplicate import is_file_duplicate
 '''
@@ -598,42 +597,15 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     merged_dirs = []
     seen_dirs = set()
     
+    #TODO
     for path in paths:
-        path = Path(path) if isinstance(path, str) else path
-        if not path.exists():
-            print(f"path does not exist: {path}")
-            continue
-            
-        for (root, dirs, files) in os.walk(path, topdown=True):
-            for single_directory in dirs:
-                if single_directory not in seen_dirs:
-                    merged_dirs.append(single_directory)
-                    seen_dirs.add(single_directory)
-            if files:
-                current_folder = os.path.basename(root)
-                print(f"\n======================= GETTING FILES FROM FOLDER {current_folder} ======================================")
-                for file in files:
-                    full_path = os.path.join(root, file)
-                    if file in userExcludeFileName or get_extension(file) in userExcludeFileExtension:
-                        print("the file the user has excluded: ", file)
-                        continue
-                    if file not in userKeepFileName and get_extension(file) not in userIncludeFileExtension:
-                        if not is_file_readable(full_path):
-                            print("file name: ", file, " is not readable")
-                            continue
-                        if not is_file_ignored(file):
-                            print("file name: ", file, " is ignored")
-                            continue
-                    else:
-                        print("the file the user has included: ", file)
-                    
-                    print_files(file)
-                    isDuplicate, fileId = is_file_duplicate(file, root)
-                    
-                    if not isDuplicate:
-                        store_file_dictionary.add_to_dict(fileId, (file, full_path))
-    
-    return store_file_dictionary.get_dict(), merged_dirs
+       global CURRENTPATH
+       CURRENTPATH = path
+       crawl_payload = crawl_directory()
+       all_dirs = crawl_payload[1]
+       for dir in all_dirs:
+           merged_dirs.append
+       dirs = crawl_payload[1]
 
                 
 def is_file_readable(full_path: str) -> bool:

@@ -9,7 +9,6 @@ MOCKS_PATH = Path(__file__).parent/ "../directorycrawler" / "mocks"
 DEFAULT_ZIP_PATH = Path(__file__).parent/ "../directorycrawler" / "mocks" / "mockdirectory_zip_test_duplicate.zip"
 CONFIG_ZIP_PATH = MOCK_CONFIG_PATH.with_suffix(".zip")
 
-
 def upload_zip_for_test(client, path):
     response = None
     with path.open("rb") as f:
@@ -70,7 +69,7 @@ def test_ignore_files(client):
     assert payload["filename"] == "config_mock.zip"
     assert response.status_code == 200
 
-    response = client.post("/crawler", params={ "zip_id" : 1 })
+    response = client.get("/crawler", params={ "zip_id" : 1 })
     payload = response.json()
     
     expected_files = [
@@ -98,7 +97,7 @@ def test_api_call(client, tmp_path, monkeypatch):
 
 
     #2) perform api post call on crawler...
-    response = client.post("/crawler", params={ "zip_id" : 1 })
+    response = client.get("/crawler", params={ "zip_id" : 1 })
     data = response.json()
     assert data["zip_id"] == 1
 
@@ -126,7 +125,17 @@ async def test_get_crawler_content_pdf_analysis(client):
     assert response.status_code == 200
 
     zip_id = payload["zip_id"]
-    response = await get_crawler_pdf_contents(zip_id=zip_id)
+
+    response = client.get("/crawler", params={"zip_id" : zip_id})
+    
     payload = response.json()
+
+    file_values = payload["crawl_path_and_file_name_and_ext"]
+
+    response = await get_crawler_pdf_contents(file_values=file_values)
+
+    assert isinstance(response, str)
+    
+
 
     
