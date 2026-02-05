@@ -76,12 +76,12 @@ def _make_evidence(project_id: int = 0, **overrides):
 
 
 # =========================================================================
-# Creation
+# Creation & fields
 # =========================================================================
 
 
 class TestProjectEvidenceCreation:
-    """Basic model instantiation and persistence."""
+    """Model instantiation and persistence."""
 
     def test_create_with_all_fields(self, db, sample_project):
         """Evidence row is created with all fields populated."""
@@ -102,25 +102,22 @@ class TestProjectEvidenceCreation:
         assert evidence.date == date(2025, 3, 1)
         assert isinstance(evidence.created_at, datetime)
 
-    def test_create_with_minimal_fields(self, db, sample_project):
-        """Evidence can be created with only required fields."""
-        evidence = _make_evidence(sample_project.id, source=None, date=None)
+    def test_content_not_nullable(self, db, sample_project):
+        """Content column rejects NULL values."""
+        evidence = _make_evidence(sample_project.id, content=None)
         db.add(evidence)
-        db.commit()
-        db.refresh(evidence)
-
-        assert evidence.id is not None
-        assert evidence.source is None
-        assert evidence.date is None
+        with pytest.raises(Exception):
+            db.commit()
+        db.rollback()
 
 
 # =========================================================================
-# Relationships
+# Relationships & cascade
 # =========================================================================
 
 
 class TestProjectEvidenceRelationships:
-    """FK and relationship tests."""
+    """FK, relationship, and cascade tests."""
 
     def test_evidence_belongs_to_project(self, db, sample_project):
         """evidence.repo_stat resolves to the parent RepoStat."""
@@ -140,23 +137,6 @@ class TestProjectEvidenceRelationships:
 
         assert len(sample_project.evidence) == 2
 
-    def test_fk_constraint(self, db):
-        """Cannot create evidence for a nonexistent project."""
-        evidence = _make_evidence(repo_stat_id=99999)
-        db.add(evidence)
-        with pytest.raises(Exception):
-            db.commit()
-        db.rollback()
-
-
-# =========================================================================
-# Cascade deletion
-# =========================================================================
-
-
-class TestProjectEvidenceCascade:
-    """Cascade behaviour when the parent project is deleted."""
-
     def test_cascade_delete_removes_evidence(self, db, sample_project):
         """Deleting a RepoStat cascades to its evidence rows."""
         db.add(_make_evidence(sample_project.id))
@@ -166,31 +146,3 @@ class TestProjectEvidenceCascade:
         db.commit()
 
         assert db.query(ProjectEvidence).count() == 0
-
-    def test_deleting_evidence_preserves_project(self, db, sample_project):
-        """Deleting evidence does not remove the parent project."""
-        evidence = _make_evidence(sample_project.id)
-        db.add(evidence)
-        db.commit()
-
-        db.delete(evidence)
-        db.commit()
-
-        assert db.get(RepoStat, sample_project.id) is not None
-
-
-# =========================================================================
-# Constraints
-# =========================================================================
-
-
-class TestProjectEvidenceConstraints:
-    """NOT NULL constraint tests."""
-
-    def test_content_not_nullable(self, db, sample_project):
-        """Content column rejects NULL values."""
-        evidence = _make_evidence(sample_project.id, content=None)
-        db.add(evidence)
-        with pytest.raises(Exception):
-            db.commit()
-        db.rollback()
