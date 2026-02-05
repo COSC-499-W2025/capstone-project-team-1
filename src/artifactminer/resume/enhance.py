@@ -238,16 +238,15 @@ def enhance_with_llm(
     """
     Enhance portfolio facts with LLM-generated prose.
 
-    This is the SINGLE LLM call approach:
-    - One call for the entire portfolio
-    - Falls back to templates if LLM fails
-
     Args:
         portfolio: Pre-built PortfolioFacts from static analysis
         model: Ollama model to use
 
     Returns:
         ResumeContent with generated bullets and summaries
+
+    Raises:
+        RuntimeError: If Ollama is not available or model is not found
     """
     result = ResumeContent(
         project_bullets={},
@@ -256,19 +255,21 @@ def enhance_with_llm(
 
     # Check if Ollama is available
     if not check_ollama_available():
-        print("[enhance] Ollama not available, using template fallback")
-        return generate_without_llm(portfolio)
+        raise RuntimeError(
+            "Ollama is not available. Please start Ollama server with 'ollama serve'"
+        )
 
     # Check if the requested model is available
     available = get_available_models()
     if model not in available:
-        # Try to find a similar model or any model
         if available:
-            model = available[0]
-            print(f"[enhance] Requested model not found, using {model}")
+            raise RuntimeError(
+                f"Model '{model}' not found. Available models: {', '.join(available)}"
+            )
         else:
-            print("[enhance] No models available, using template fallback")
-            return generate_without_llm(portfolio)
+            raise RuntimeError(
+                f"No models available in Ollama. Run 'ollama pull {model}' to download."
+            )
 
     print(f"[enhance] Using model: {model}")
 
@@ -277,45 +278,45 @@ def enhance_with_llm(
         prompt = build_project_prompt(project)
         response = query_ollama(prompt, model)
 
-        if response:
-            # Parse bullets from response
-            bullets = []
-            for line in response.split("\n"):
-                line = line.strip()
-                if line and (line.startswith("•") or line.startswith("-") or line.startswith("*")):
-                    # Clean up the bullet marker
-                    bullet = line.lstrip("•-* ").strip()
-                    if bullet:
-                        bullets.append(bullet)
-            if bullets:
-                result.project_bullets[project.project_name] = bullets
-                result.llm_enhanced = True
-            else:
-                # Fallback to template if parsing failed
-                result.project_bullets[project.project_name] = generate_template_bullets(project)
-        else:
-            # Fallback to template
-            result.project_bullets[project.project_name] = generate_template_bullets(project)
+        if not response:
+            raise RuntimeError(f"LLM failed to generate bullets for {project.project_name}")
+
+        # Parse bullets from response
+        bullets = []
+        for line in response.split("\n"):
+            line = line.strip()
+            if line and (line.startswith("•") or line.startswith("-") or line.startswith("*")):
+                # Clean up the bullet marker
+                bullet = line.lstrip("•-* ").strip()
+                if bullet:
+                    bullets.append(bullet)
+
+        if not bullets:
+            raise RuntimeError(
+                f"LLM response for {project.project_name} contained no bullets. "
+                f"Response was: {response[:200]}..."
+            )
+
+        result.project_bullets[project.project_name] = bullets
+        result.llm_enhanced = True
 
     # Generate portfolio summary
     portfolio_prompt = build_portfolio_prompt(portfolio)
     portfolio_response = query_ollama(portfolio_prompt, model)
 
-    if portfolio_response:
-        # Parse summary and skills from response
-        if "SUMMARY:" in portfolio_response:
-            parts = portfolio_response.split("SKILLS:")
-            summary_part = parts[0].replace("SUMMARY:", "").strip()
-            result.professional_summary = summary_part
-            if len(parts) > 1:
-                result.skills_section = parts[1].strip()
-            result.llm_enhanced = True
-        else:
-            # Response didn't follow format, use as summary
-            result.professional_summary = portfolio_response[:500]
+    if not portfolio_response:
+        raise RuntimeError("LLM failed to generate portfolio summary")
+
+    # Parse summary and skills from response
+    if "SUMMARY:" in portfolio_response:
+        parts = portfolio_response.split("SKILLS:")
+        summary_part = parts[0].replace("SUMMARY:", "").strip()
+        result.professional_summary = summary_part
+        if len(parts) > 1:
+            result.skills_section = parts[1].strip()
     else:
-        result.professional_summary = generate_template_summary(portfolio)
-        result.skills_section = generate_template_skills(portfolio)
+        # Response didn't follow format, use as summary
+        result.professional_summary = portfolio_response[:500]
 
     result.model_used = model
     return result

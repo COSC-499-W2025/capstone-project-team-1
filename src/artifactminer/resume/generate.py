@@ -31,9 +31,6 @@ from .facts import (
 from .enhance import (
     ResumeContent,
     enhance_with_llm,
-    generate_without_llm,
-    check_ollama_available,
-    get_available_models,
 )
 
 
@@ -184,7 +181,6 @@ def discover_git_repos(base_path: Path) -> List[Path]:
 def generate_resume(
     zip_path: str,
     user_email: str,
-    use_llm: bool = True,
     llm_model: Optional[str] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> GenerationResult:
@@ -194,12 +190,14 @@ def generate_resume(
     Args:
         zip_path: Absolute path to the ZIP file containing git repos
         user_email: User's email for attribution in git history
-        use_llm: Whether to use LLM enhancement (default True)
-        llm_model: Specific Ollama model to use (default: auto-select)
+        llm_model: Ollama model to use (default: qwen3:1.7b)
         progress_callback: Optional callback for progress updates
 
     Returns:
         GenerationResult with portfolio facts and resume content
+
+    Raises:
+        RuntimeError: If Ollama is not available or LLM fails
     """
     start_time = datetime.now()
     errors: List[str] = []
@@ -293,24 +291,10 @@ def generate_resume(
     portfolio = build_portfolio_facts(user_email, project_facts_list)
     log(f"Portfolio: {portfolio.total_projects} projects, {len(portfolio.top_skills)} skills")
 
-    # Step 5: Generate resume content (with or without LLM)
-    if use_llm:
-        log("Checking Ollama availability...")
-        if check_ollama_available():
-            available_models = get_available_models()
-            if available_models:
-                model = llm_model if llm_model in available_models else available_models[0]
-                log(f"Enhancing with LLM ({model})...")
-                resume_content = enhance_with_llm(portfolio, model=model)
-            else:
-                log("No models available, using templates")
-                resume_content = generate_without_llm(portfolio)
-        else:
-            log("Ollama not available, using templates")
-            resume_content = generate_without_llm(portfolio)
-    else:
-        log("LLM disabled, using templates")
-        resume_content = generate_without_llm(portfolio)
+    # Step 5: Generate resume content with LLM
+    model = llm_model or "qwen3:1.7b"
+    log(f"Enhancing with LLM ({model})...")
+    resume_content = enhance_with_llm(portfolio, model=model)
 
     # Done
     elapsed = (datetime.now() - start_time).total_seconds()
