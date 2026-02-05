@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from sqlalchemy import or_
 
-from .schemas import SkillChronologyItem, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
+from .schemas import SkillChronologyItem, SkillResponse, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
 from ..db import (
     get_db,
     ProjectSkill,
@@ -25,6 +25,66 @@ from ..db import (
 
 
 router = APIRouter(tags=["retrieval"])
+
+
+@router.get("/skills", response_model=List[SkillResponse])
+async def get_skills(
+    category: str | None = Query(
+        default=None,
+        description="Filter skills by category (e.g., 'Programming Languages').",
+    ),
+    include_project_count: bool = Query(
+        default=False,
+        description="Include count of projects using each skill.",
+    ),
+    db: Session = Depends(get_db),
+) -> list[SkillResponse]:
+    """Get all skills from the Skill table.
+
+    Returns a list of all skills with optional filtering by category.
+    Optionally includes an aggregate count of projects using each skill.
+    """
+    query = db.query(Skill)
+
+    if category:
+        query = query.filter(Skill.category == category)
+
+    query = query.order_by(Skill.name.asc())
+    skills = query.all()
+
+    result = []
+    for skill in skills:
+        project_count = None
+        if include_project_count:
+            # Count distinct projects using this skill (from both ProjectSkill and UserProjectSkill)
+            # Only count non-deleted projects
+            project_skill_count = (
+                db.query(ProjectSkill)
+                .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+                .filter(ProjectSkill.skill_id == skill.id)
+                .filter(RepoStat.deleted_at.is_(None))
+                .count()
+            )
+            user_project_skill_count = (
+                db.query(UserProjectSkill)
+                .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+                .filter(UserProjectSkill.skill_id == skill.id)
+                .filter(RepoStat.deleted_at.is_(None))
+                .count()
+            )
+            project_count = project_skill_count + user_project_skill_count
+
+        result.append(
+            SkillResponse(
+                id=skill.id,
+                name=skill.name,
+                category=skill.category,
+                project_count=project_count,
+            )
+        )
+
+    return result
+
 
 def fetch_skill_chronology(
     db: Session,
