@@ -170,7 +170,8 @@ def test_skills_chronology_returns_ordered_list(client_with_data):
     assert resp.status_code == 200
     data = resp.json()
 
-    assert len(data) == 3
+    # 3 ProjectSkill rows + 1 UserProjectSkill row = 4 chronology entries
+    assert len(data) == 4
     # Oldest project first
     assert data[0]["project"] == "OldProject"
     assert data[0]["skill"] == "Python"
