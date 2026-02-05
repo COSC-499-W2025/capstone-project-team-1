@@ -13,7 +13,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 from collections import defaultdict
 
-from .schemas import SkillChronologyItem, SkillResponse, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
+from .schemas import (
+    SkillChronologyItem,
+    SkillResponse,
+    ResumeItemResponse,
+    SummaryResponse,
+    UserAIIntelligenceSummaryResponse,
+)
 from ..db import (
     get_db,
     ProjectSkill,
@@ -123,7 +129,10 @@ def fetch_skill_chronology(
 
     if project_path_prefixes:
         path_filter = or_(
-            *[RepoStat.project_path.like(f"{prefix}%") for prefix in project_path_prefixes]
+            *[
+                RepoStat.project_path.like(f"{prefix}%")
+                for prefix in project_path_prefixes
+            ]
         )
         project_query = project_query.filter(path_filter)
         user_query = user_query.filter(path_filter)
@@ -234,9 +243,7 @@ async def get_resume_item_by_id(
     # Check if associated project is soft-deleted
     if resume_item.repo_stat_id is not None:
         repo_stat = (
-            db.query(RepoStat)
-            .filter(RepoStat.id == resume_item.repo_stat_id)
-            .first()
+            db.query(RepoStat).filter(RepoStat.id == resume_item.repo_stat_id).first()
         )
         if repo_stat is None or repo_stat.deleted_at is not None:
             raise HTTPException(status_code=404, detail="Resume item not found")
@@ -291,19 +298,21 @@ async def get_summaries(
 
 @router.get("/AI_summaries", response_model=List[UserAIIntelligenceSummaryResponse])
 async def get_AI_summaries(
-    user_email : str,
-    repo_path : str,
+    user_email: str,
+    repo_path: str,
     db: Session = Depends(get_db),
 ):
-    summaries_query = db.query(UserAIntelligenceSummary).filter(
-        UserAIntelligenceSummary.user_email == user_email,
-        UserAIntelligenceSummary.repo_path.like(f"{repo_path}%")
-    ).all()
+    summaries_query = (
+        db.query(UserAIntelligenceSummary)
+        .filter(
+            UserAIntelligenceSummary.user_email == user_email,
+            UserAIntelligenceSummary.repo_path.like(f"{repo_path}%"),
+        )
+        .all()
+    )
     return [
         UserAIIntelligenceSummaryResponse(
-            user_email=s.user_email,
-            repo_path=s.repo_path,
-            summary_text=s.summary_text
+            user_email=s.user_email, repo_path=s.repo_path, summary_text=s.summary_text
         )
         for s in summaries_query
     ]
