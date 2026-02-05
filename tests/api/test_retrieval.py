@@ -339,6 +339,13 @@ def test_AI_summaries_other_user(client_with_data):
 # === /skills ===
 
 
+def test_skills_empty(client_empty):
+    """Returns empty list when no data."""
+    resp = client_empty.get("/skills")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
 def test_skills_returns_all_skills(client_with_data):
     """GET /skills returns all skills from the Skill table."""
     resp = client_with_data.get("/skills")
