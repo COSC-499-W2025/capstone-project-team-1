@@ -217,6 +217,19 @@ class SkillChronologyItem(BaseModel):
     )
 
 
+class SkillResponse(BaseModel):
+    """Response shape for skill listing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    category: str | None = None
+    project_count: int | None = Field(
+        default=None, description="Number of projects using this skill."
+    )
+
+
 class ResumeItemResponse(BaseModel):
     """Response shape for resume/portfolio items."""
 
