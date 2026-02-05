@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, JSON, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, Float, String, DateTime, Date, Boolean, JSON, ForeignKey, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, UTC
 
@@ -77,6 +77,7 @@ class RepoStat(Base):#model for storing repository statistics
         "UserProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan"
     )
     resume_items = relationship("ResumeItem", back_populates="repo_stat", cascade="all, delete-orphan")
+    evidence = relationship("ProjectEvidence", back_populates="repo_stat", cascade="all, delete-orphan")
 
 class UserRepoStat(Base):#model for storing user-specific repository statistics by project_name: str first_commit,last_commit,total_commits,userStatspercentages, and commitFrequency
     __tablename__ = "user_repo_stats"
@@ -255,6 +256,23 @@ class Export(Base):
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
     completed_at = Column(DateTime, nullable=True)
+
+
+class ProjectEvidence(Base):
+    __tablename__ = "project_evidence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    repo_stat_id = Column(Integer, ForeignKey("repo_stats.id", ondelete="CASCADE"), nullable=False)
+    type = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    source = Column(String, nullable=True)
+    date = Column(Date, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+
+    # Relationships
+    repo_stat = relationship("RepoStat", back_populates="evidence")
 
 
 class RepresentationPrefs(Base):

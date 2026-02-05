@@ -14,6 +14,7 @@ from .models import (
     UserProjectSkill,
     ResumeItem,
     UserAIntelligenceSummary,
+    ProjectEvidence,
     RepresentationPrefs,
 )
 from .seed import seed_questions, seed_repo_stats
@@ -35,6 +36,7 @@ __all__ = [
     "UserProjectSkill",
     "ResumeItem",
     "UserAIntelligenceSummary",
+    "ProjectEvidence",
     "RepresentationPrefs",
     "seed_questions",
     "seed_repo_stats",
