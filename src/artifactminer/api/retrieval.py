@@ -10,7 +10,8 @@ from typing import List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from sqlalchemy import or_
+from sqlalchemy import or_, func
+from collections import defaultdict
 
 from .schemas import SkillChronologyItem, SkillResponse, ResumeItemResponse, SummaryResponse, UserAIIntelligenceSummaryResponse
 from ..db import (
@@ -52,28 +53,36 @@ async def get_skills(
     query = query.order_by(Skill.name.asc())
     skills = query.all()
 
+    # Pre-compute project counts in bulk (2 queries total) to avoid N+1
+    project_count_map: dict[int, int] | None = None
+    if include_project_count:
+        # Collect (skill_id, repo_stat_id) pairs from both tables in two queries
+        skill_repo_pairs: dict[int, set[int]] = defaultdict(set)
+
+        for skill_id, repo_stat_id in (
+            db.query(ProjectSkill.skill_id, ProjectSkill.repo_stat_id)
+            .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+            .filter(RepoStat.deleted_at.is_(None))
+        ):
+            skill_repo_pairs[skill_id].add(repo_stat_id)
+
+        for skill_id, repo_stat_id in (
+            db.query(UserProjectSkill.skill_id, UserProjectSkill.repo_stat_id)
+            .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+            .filter(RepoStat.deleted_at.is_(None))
+        ):
+            skill_repo_pairs[skill_id].add(repo_stat_id)
+
+        project_count_map = {
+            skill_id: len(repo_ids)
+            for skill_id, repo_ids in skill_repo_pairs.items()
+        }
+
     result = []
     for skill in skills:
         project_count = None
-        if include_project_count:
-            # Count distinct projects using this skill (from both ProjectSkill and UserProjectSkill)
-            # Use set union to avoid double-counting projects that appear in both tables
-            # Only count non-deleted projects
-            project_repo_ids = {
-                row.repo_stat_id
-                for row in db.query(ProjectSkill.repo_stat_id)
-                .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
-                .filter(ProjectSkill.skill_id == skill.id)
-                .filter(RepoStat.deleted_at.is_(None))
-            }
-            user_repo_ids = {
-                row.repo_stat_id
-                for row in db.query(UserProjectSkill.repo_stat_id)
-                .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
-                .filter(UserProjectSkill.skill_id == skill.id)
-                .filter(RepoStat.deleted_at.is_(None))
-            }
-            project_count = len(project_repo_ids | user_repo_ids)
+        if project_count_map is not None:
+            project_count = project_count_map.get(skill.id, 0)
 
         result.append(
             SkillResponse(
