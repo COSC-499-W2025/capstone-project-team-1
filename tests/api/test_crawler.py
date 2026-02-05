@@ -1,11 +1,8 @@
 
 from pathlib import Path
-from artifactminer.db.database import SessionLocal
-from artifactminer.directorycrawler.store_file_dict import StoreFileDict
 from artifactminer.directorycrawler.directory_walk import user_keep_extension
+from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_pdf_contents
 import shutil
-import zipfile
-import os
 
 MOCK_CONFIG_PATH =  Path(__file__).parent/ "../directorycrawler" / "mocks" / "config_mock"
 MOCKS_PATH = Path(__file__).parent/ "../directorycrawler" / "mocks"
@@ -19,7 +16,6 @@ def upload_zip_for_test(client, path):
         files = {"file": (path.name, f, "application/zip")}
         response = client.post("/zip/upload", files=files)
     return response
-
 
 def directory_to_zip(dir_path: Path, output_zip: Path):
     shutil.make_archive(
@@ -116,4 +112,21 @@ def test_api_call(client, tmp_path, monkeypatch):
 
     assert data["crawl_path_and_file_name_and_ext"] == expected_files
 
+#testing file intelligence
+async def test_get_crawler_content_pdf_analysis(client):
+        
+    pdf_path = Path(__file__).parent/ "../directorycrawler" / "mocks" / "pdfdirectory.zip"
+    response = upload_zip_for_test(client=client, path=pdf_path)
+    payload = response.json()
     
+
+    assert payload["zip_id"] == 1
+    assert payload["filename"] == "pdfdirectory.zip"
+    assert response.status_code == 200
+
+    zip_id = payload["zip_id"]
+    response = await get_crawler_pdf_contents(zip_id=zip_id)
+    payload = response.json()
+    
+    
+
