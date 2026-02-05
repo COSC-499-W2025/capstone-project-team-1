@@ -464,13 +464,6 @@ READABLE_EXTENSIONS = {
     ".nc",
     ".parquet",
     ".avro",
-
-    # --- Logs & output ---
-    ".log",
-    ".out",
-    ".err",
-    ".trace",
-
     # --- Misc readable formats ---
     ".diff",
     ".patch",
@@ -598,6 +591,11 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
         Tuple of (merged file dict, merged directory list)
     """
     merged_dirs = []
+
+    if paths is None:
+        return [], {}
+    if len(paths) <= 0:
+        return [], {}
  
     for path in paths:
 
@@ -610,9 +608,13 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     
     all_file_values = copy.deepcopy(store_file_dictionary.get_dict()) #get dictionary values...
     store_file_dictionary.remove_all_dict()
-
+    
     return merged_dirs, all_file_values
 
+"""        path = Path(path) if isinstance(path, str) else path
+        if not path.exists():
+            print(f"path does not exist: {path}")
+            continue"""
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists
