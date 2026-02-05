@@ -13,17 +13,17 @@ from artifactminer.api.schemas import CrawlerFiles, FileValues
 
 
 #CRAWLER INTEGRATION
-async def get_crawler_pdf_contents(zip_id : int) -> list[FileValues]:
+async def get_crawler_pdf_contents(zip_id : int, db) -> list[FileValues]:
     
     response = None
     fileValues = None
-    try:
-        response = await get_crawler_contents(zip_id=zip_id)
-    except:
+    """try:"""
+    response = await get_crawler_contents(zip_id=zip_id, db=db)
+    """except:
         print("something went wrong getting zip contents")
         response = CrawlerFiles(zip_id, list[FileValues])
         fileValues = response.crawl_path_and_file_name_and_ext
-
+    """
     if fileValues is None:
         return None
     if len(fileValues) < 0: 

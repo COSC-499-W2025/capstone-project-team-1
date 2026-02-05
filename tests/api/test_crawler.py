@@ -113,6 +113,7 @@ def test_api_call(client, tmp_path, monkeypatch):
     assert data["crawl_path_and_file_name_and_ext"] == expected_files
 
 #testing file intelligence
+
 async def test_get_crawler_content_pdf_analysis(client):
         
     pdf_path = Path(__file__).parent/ "../directorycrawler" / "mocks" / "pdfdirectory.zip"
@@ -127,6 +128,5 @@ async def test_get_crawler_content_pdf_analysis(client):
     zip_id = payload["zip_id"]
     response = await get_crawler_pdf_contents(zip_id=zip_id)
     payload = response.json()
-    
-    
 
+    
