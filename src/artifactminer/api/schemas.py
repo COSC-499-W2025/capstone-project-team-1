@@ -1,9 +1,48 @@
 """Shared Pydantic models for Artifact Miner API contracts."""
 
+from __future__ import annotations
+
+import datetime as _dt
 from datetime import datetime, UTC
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# ---------------------------------------------------------------------------
+# Evidence types
+# ---------------------------------------------------------------------------
+
+EvidenceType = Literal["metric", "feedback", "evaluation", "award", "custom"]
+
+
+class EvidenceCreateRequest(BaseModel):
+    """Request payload for creating project evidence."""
+
+    type: EvidenceType
+    content: str = Field(min_length=1)
+    source: Optional[str] = None
+    date: Optional[_dt.date] = None
+
+
+class EvidenceResponse(BaseModel):
+    """Response shape for a single evidence item."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: str
+    content: str
+    source: Optional[str] = None
+    date: Optional[_dt.date] = None
+    project_id: int
+
+
+class EvidenceDeleteResponse(BaseModel):
+    """Response shape for evidence deletion."""
+
+    success: bool
+    deleted_id: int
 
 
 
@@ -169,6 +208,7 @@ class ProjectDetailResponse(BaseModel):
     role: str | None = None
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
+    evidence: list[EvidenceResponse] = []
 
 
 class ProjectRoleUpdateRequest(BaseModel):
