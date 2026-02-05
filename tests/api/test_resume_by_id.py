@@ -270,19 +270,17 @@ def test_get_resume_by_id_null_project(client_with_orphan_resume):
 
 
 def test_get_resume_by_id_zero_id(client_with_data):
-    """Returns 404 for ID=0."""
+    """Returns 422 for ID=0 due to Path(gt=0) validation."""
     response = client_with_data.get("/resume/0")
 
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Resume item not found"
+    assert response.status_code == 422
 
 
 def test_get_resume_by_id_negative_id(client_with_data):
-    """Returns 404 for negative IDs."""
+    """Returns 422 for negative IDs due to Path(gt=0) validation."""
     response = client_with_data.get("/resume/-1")
 
-    # FastAPI may return 422 for path validation or 404 if it reaches the handler
-    assert response.status_code in [404, 422]
+    assert response.status_code == 422
 
 
 # === Data Integrity Tests ===

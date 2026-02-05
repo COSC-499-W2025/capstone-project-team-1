@@ -7,7 +7,7 @@ All are GET-only with no side effects.
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from sqlalchemy import or_, func
@@ -227,7 +227,7 @@ async def get_resume_items(
 
 @router.get("/resume/{resume_id}", response_model=ResumeItemResponse)
 async def get_resume_item_by_id(
-    resume_id: int,
+    resume_id: int = Path(..., gt=0),
     db: Session = Depends(get_db),
 ) -> ResumeItemResponse:
     """Retrieve a single resume item by its ID.
@@ -235,28 +235,27 @@ async def get_resume_item_by_id(
     Returns 404 if the item doesn't exist or its associated project is soft-deleted.
     Orphan items (no associated project) are returned with project_name: null.
     """
-    resume_item = db.query(ResumeItem).filter(ResumeItem.id == resume_id).first()
+    result = (
+        db.query(ResumeItem, RepoStat)
+        .outerjoin(RepoStat, ResumeItem.repo_stat_id == RepoStat.id)
+        .filter(ResumeItem.id == resume_id)
+        .first()
+    )
 
-    if resume_item is None:
+    if result is None:
         raise HTTPException(status_code=404, detail="Resume item not found")
 
-    # Check if associated project is soft-deleted
-    if resume_item.repo_stat_id is not None:
-        repo_stat = (
-            db.query(RepoStat).filter(RepoStat.id == resume_item.repo_stat_id).first()
-        )
-        if repo_stat is None or repo_stat.deleted_at is not None:
-            raise HTTPException(status_code=404, detail="Resume item not found")
-        project_name = repo_stat.project_name
-    else:
-        project_name = None
+    resume_item, repo_stat = result
+
+    if repo_stat is not None and repo_stat.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Resume item not found")
 
     return ResumeItemResponse(
         id=resume_item.id,
         title=resume_item.title,
         content=resume_item.content,
         category=resume_item.category,
-        project_name=project_name,
+        project_name=repo_stat.project_name if repo_stat else None,
         created_at=resume_item.created_at,
     )
 
