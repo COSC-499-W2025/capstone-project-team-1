@@ -259,7 +259,7 @@ READABLE_EXTENSIONS = {
     ".pak",
     ".img",
     ".bak",
-    ".tmp"
+    ".tmp",
 
       # --- Core programming languages ---
     ".py", ".pyw", ".pyi",
@@ -600,6 +600,7 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     merged_dirs = []
  
     for path in paths:
+
        global CURRENTPATH
        CURRENTPATH = path
        crawl_payload = crawl_directory(False)
@@ -607,10 +608,10 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
        for dir in all_dirs:
            merged_dirs.append(dir)
     
-    all_file_values = store_file_dictionary.get_dict() #get dictionary values...
+    all_file_values = copy.deepcopy(store_file_dictionary.get_dict()) #get dictionary values...
     store_file_dictionary.remove_all_dict()
 
-    return merged_dirs,all_file_values
+    return merged_dirs, all_file_values
 
                 
 def is_file_readable(full_path: str) -> bool:

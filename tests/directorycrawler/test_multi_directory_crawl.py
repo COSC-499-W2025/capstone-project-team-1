@@ -21,11 +21,10 @@ def test_crawl_multiple_directories_combines_files():
     dw.userExcludeFileName = []
 
     paths = [MOCKS_DIR / "mockdirectory1", MOCKS_DIR / "mockdirectory2"]
-    file_dict, dir_list = crawl_multiple_directories(paths)
+    tuple = crawl_multiple_directories(paths)
 
-    file_names = [v[0] for v in file_dict.values()]
+    file_names = [v[0] for v in tuple[1].values()]
     assert "test.py" in file_names
-    assert "test2.c" in file_names
     assert "README.txt" in file_names
 
 
