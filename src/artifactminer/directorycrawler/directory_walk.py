@@ -533,7 +533,7 @@ userIncludeAllFiles = False
 
 store_file_dictionary = StoreFileDict()
 #storing files from mock folder to dictionary
-def crawl_directory() -> tuple[dict, list[str]]: 
+def crawl_directory(refresh_dict = True) -> tuple[dict, list[str]]: 
     listforalldirs = []
     if not os.path.exists(CURRENTPATH):
         print("path does not exist")
@@ -575,8 +575,11 @@ def crawl_directory() -> tuple[dict, list[str]]:
                     '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
                     store_file_dictionary.add_to_dict(fileId, (file, full_path, extension)) #key = filename, path = filepath
     
+    
     values = copy.deepcopy(store_file_dictionary.get_dict()) #perform deep copy to avoid duplicates
-    store_file_dictionary.remove_all_dict()
+    
+    if refresh_dict: #do we want to remove all items for dictionary when we call this function or manually? 
+        store_file_dictionary.remove_all_dict()
 
     return values, listforalldirs
 
@@ -595,17 +598,19 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
         Tuple of (merged file dict, merged directory list)
     """
     merged_dirs = []
-    seen_dirs = set()
-    
-    #TODO
+ 
     for path in paths:
        global CURRENTPATH
        CURRENTPATH = path
-       crawl_payload = crawl_directory()
+       crawl_payload = crawl_directory(False)
        all_dirs = crawl_payload[1]
        for dir in all_dirs:
-           merged_dirs.append
-       dirs = crawl_payload[1]
+           merged_dirs.append(dir)
+    
+    all_file_values = store_file_dictionary.get_dict() #get dictionary values...
+    store_file_dictionary.remove_all_dict()
+
+    return merged_dirs,all_file_values
 
                 
 def is_file_readable(full_path: str) -> bool:
