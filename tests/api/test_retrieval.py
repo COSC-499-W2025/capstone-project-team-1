@@ -321,4 +321,74 @@ def test_AI_summaries_other_user(client_with_data):
     assert resp.status_code == 200
     data = resp.json()
 
-    # Only one summary for 'other@example.com' in s
+    # Only one summary for 'other@example.com' in seeded data
+    assert len(data) == 1
+    assert data[0]["user_email"] == "other@example.com"
+
+
+# === /skills ===
+
+
+def test_skills_returns_all_skills(client_with_data):
+    """GET /skills returns all skills from the Skill table."""
+    resp = client_with_data.get("/skills")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data) == 2
+    # Required fields present
+    assert all(k in data[0] for k in ["id", "name", "category"])
+    # Should be ordered by name
+    assert data[0]["name"] == "FastAPI"
+    assert data[1]["name"] == "Python"
+
+
+def test_skills_returns_correct_fields(client_with_data):
+    """Each skill has id, name, and category fields."""
+    resp = client_with_data.get("/skills")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    for skill in data:
+        assert "id" in skill
+        assert "name" in skill
+        assert "category" in skill
+
+
+def test_skills_filter_by_category(client_with_data):
+    """Filters skills by category query param."""
+    resp = client_with_data.get("/skills?category=Programming Languages")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data) == 1
+    assert data[0]["name"] == "Python"
+    assert data[0]["category"] == "Programming Languages"
+
+
+def test_skills_filter_nonexistent_category(client_with_data):
+    """Returns empty list for nonexistent category."""
+    resp = client_with_data.get("/skills?category=Nonexistent")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+def test_skills_with_project_count(client_with_data):
+    """Include project count when include_project_count=true."""
+    resp = client_with_data.get("/skills?include_project_count=true")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert len(data) == 2
+    # Check project_count is present
+    for skill in data:
+        assert "project_count" in skill
+        assert skill["project_count"] is not None
+
+    # Python is used in 2 projects (OldProject and NewProject)
+    python_skill = next(s for s in data if s["name"] == "Python")
+    assert python_skill["project_count"] == 2
+
+    # FastAPI is used in 1 project (NewProject)
+    fastapi_skill = next(s for s in data if s["name"] == "FastAPI")
+    assert fastapi_skill["project_count"] == 1
