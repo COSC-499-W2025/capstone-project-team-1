@@ -57,22 +57,23 @@ async def get_skills(
         project_count = None
         if include_project_count:
             # Count distinct projects using this skill (from both ProjectSkill and UserProjectSkill)
+            # Use set union to avoid double-counting projects that appear in both tables
             # Only count non-deleted projects
-            project_skill_count = (
-                db.query(ProjectSkill)
+            project_repo_ids = {
+                row.repo_stat_id
+                for row in db.query(ProjectSkill.repo_stat_id)
                 .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
                 .filter(ProjectSkill.skill_id == skill.id)
                 .filter(RepoStat.deleted_at.is_(None))
-                .count()
-            )
-            user_project_skill_count = (
-                db.query(UserProjectSkill)
+            }
+            user_repo_ids = {
+                row.repo_stat_id
+                for row in db.query(UserProjectSkill.repo_stat_id)
                 .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
                 .filter(UserProjectSkill.skill_id == skill.id)
                 .filter(RepoStat.deleted_at.is_(None))
-                .count()
-            )
-            project_count = project_skill_count + user_project_skill_count
+            }
+            project_count = len(project_repo_ids | user_repo_ids)
 
         result.append(
             SkillResponse(
