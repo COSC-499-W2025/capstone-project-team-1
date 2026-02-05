@@ -17,6 +17,71 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 import json
 
+# Extension to language name mapping (import from skill_patterns for single source of truth)
+from ..skills.skill_patterns import LANGUAGE_EXTENSIONS
+
+# File extensions that are NOT programming languages (filter these out)
+JUNK_EXTENSIONS = {
+    ".zip", ".tar", ".gz", ".rar", ".7z",  # Archives
+    ".lock", ".log", ".tmp", ".cache",      # Generated files
+    ".gitignore", ".gitattributes", ".gitmodules",  # Git files
+    ".env", ".env.example", ".env.local",   # Env files
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",  # Images
+    ".mp4", ".avi", ".mov", ".webm",        # Videos
+    ".mp3", ".wav", ".ogg",                 # Audio
+    ".pdf", ".doc", ".docx",                # Documents
+    ".csv", ".xlsx",                        # Data files
+    ".txt", ".example", ".sample",          # Misc text
+    ".mako", ".jinja", ".jinja2",           # Templates (not primary languages)
+    ".ini", ".cfg", ".conf",                # Config files
+    ".yml", ".yaml",                        # YAML (usually config)
+    ".xml",                                 # XML (usually config/data)
+    ".woff", ".woff2", ".ttf", ".eot",      # Fonts
+}
+
+
+def extension_to_language(ext: str) -> Optional[str]:
+    """Convert file extension to human-readable language name."""
+    if ext in LANGUAGE_EXTENSIONS:
+        return LANGUAGE_EXTENSIONS[ext][0]  # Returns "Python", "JavaScript", etc.
+    return None
+
+
+def is_programming_language(ext: str) -> bool:
+    """Check if extension represents a programming language."""
+    ext_lower = ext.lower()
+    if ext_lower in JUNK_EXTENSIONS:
+        return False
+    # Known programming languages
+    if ext_lower in LANGUAGE_EXTENSIONS:
+        return True
+    # Additional code extensions not in LANGUAGE_EXTENSIONS
+    code_extensions = {".html", ".css", ".scss", ".sass", ".less", ".vue", ".svelte"}
+    return ext_lower in code_extensions
+
+
+def clean_skill_evidence(evidence_list: List[str]) -> List[str]:
+    """
+    Clean skill evidence for resume presentation.
+
+    Removes debug-style evidence like "366 user-touched *.py files detected"
+    and keeps only meaningful evidence.
+    """
+    cleaned = []
+    for evidence in evidence_list:
+        # Skip file count evidence (not resume-appropriate)
+        if "files detected" in evidence.lower():
+            continue
+        # Skip "Detected via repo stats" internal messages
+        if "detected via repo stats" in evidence.lower():
+            continue
+        # Skip "Detected framework" internal messages
+        if evidence.lower().startswith("detected framework"):
+            continue
+        # Keep meaningful evidence (pattern matches, etc.)
+        cleaned.append(evidence)
+    return cleaned
+
 
 @dataclass
 class ProjectFacts:
@@ -212,12 +277,33 @@ def build_project_facts(
     Returns:
         ProjectFacts with all relevant signals aggregated
     """
+    # Clean up languages: filter junk, map to proper names, deduplicate
+    raw_languages = repo_stats.Languages or []
+    raw_percentages = repo_stats.language_percentages or []
+
+    # First pass: collect and aggregate by language name
+    lang_totals: Dict[str, float] = {}
+    for ext, pct in zip(raw_languages, raw_percentages):
+        if is_programming_language(ext):
+            lang_name = extension_to_language(ext) or ext.lstrip(".")
+            lang_totals[lang_name] = lang_totals.get(lang_name, 0) + pct
+
+    # Sort by percentage descending
+    sorted_langs = sorted(lang_totals.items(), key=lambda x: -x[1])
+    clean_languages = [lang for lang, _ in sorted_langs]
+    clean_percentages = [pct for _, pct in sorted_langs]
+
+    # Determine primary language (map from extension to name)
+    primary_lang = repo_stats.primary_language
+    if primary_lang:
+        primary_lang = extension_to_language(primary_lang) or primary_lang.lstrip(".")
+
     facts = ProjectFacts(
         project_name=repo_stats.project_name,
         project_path=str(repo_path),
-        languages=repo_stats.Languages or [],
-        language_percentages=repo_stats.language_percentages or [],
-        primary_language=repo_stats.primary_language,
+        languages=clean_languages,
+        language_percentages=clean_percentages,
+        primary_language=primary_lang,
         frameworks=repo_stats.frameworks or [],
         total_commits=repo_stats.total_commits,
         health_score=repo_stats.health_score,
@@ -248,18 +334,23 @@ def build_project_facts(
 
     # Add skills and insights from deep analysis
     if deep_result:
-        # Extract skill names and evidence
+        # Extract skill names and evidence (cleaned for resume)
         for skill in deep_result.skills:
             facts.detected_skills.append(skill.skill)
             if skill.evidence:
-                facts.skill_evidence[skill.skill] = skill.evidence[:5]
+                # Clean evidence: remove debug strings, keep meaningful content
+                cleaned = clean_skill_evidence(skill.evidence[:5])
+                if cleaned:
+                    facts.skill_evidence[skill.skill] = cleaned
 
         # Extract insights
         for insight in deep_result.insights:
+            # Clean insight evidence too
+            cleaned_evidence = clean_skill_evidence(insight.evidence[:3]) if insight.evidence else []
             facts.insights.append({
                 "title": insight.title,
                 "why": insight.why_it_matters,
-                "evidence": insight.evidence[:3] if insight.evidence else [],
+                "evidence": cleaned_evidence,
             })
 
     return facts
@@ -291,6 +382,7 @@ def build_portfolio_facts(
     )
 
     # Collect all languages (deduplicated, ordered by frequency)
+    # Languages are already cleaned in build_project_facts
     lang_counter: Dict[str, int] = {}
     for p in project_facts_list:
         for lang in p.languages:

@@ -25,13 +25,9 @@ def generate(
         ..., "--email", "-e",
         help="User's email for git attribution",
     ),
-    no_llm: bool = typer.Option(
-        False, "--no-llm",
-        help="Disable LLM enhancement, use templates only",
-    ),
-    model: Optional[str] = typer.Option(
-        None, "--model", "-m",
-        help="Specific Ollama model to use (default: auto-select)",
+    model: str = typer.Option(
+        "qwen3:1.7b", "--model", "-m",
+        help="Ollama model to use",
     ),
     output_json: Optional[Path] = typer.Option(
         None, "--output-json",
@@ -49,16 +45,11 @@ def generate(
     """
     Generate resume content from a ZIP of git repositories.
 
-    This uses the new Static-First architecture:
-    - Static analysis does all the heavy lifting (skills, insights, metrics)
-    - LLM (optional) just polishes the prose
+    Uses Ollama for LLM-enhanced prose generation. Requires Ollama to be running.
 
     Examples:
-        # Basic usage
+        # Basic usage (uses qwen3:1.7b)
         python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com
-
-        # Without LLM (works on any machine)
-        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --no-llm
 
         # With specific model
         python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model llama3:8b
@@ -73,7 +64,6 @@ def generate(
         result = generate_resume(
             zip_path=str(zip_path.resolve()),
             user_email=email.lower().strip(),
-            use_llm=not no_llm,
             llm_model=model,
             progress_callback=progress if verbose else None,
         )
