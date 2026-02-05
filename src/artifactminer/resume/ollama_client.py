@@ -42,6 +42,7 @@ def query_ollama(
         model=model,
         messages=messages,
         format=schema.model_json_schema(),
+        think=False,
         options={
             "temperature": temperature,
         },
@@ -67,6 +68,7 @@ def query_ollama_text(
     num_ctx: int = 4096,
     num_predict: int = 2048,
 ) -> str:
+    """Query Ollama for text output (no structured format)."""
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
@@ -75,6 +77,7 @@ def query_ollama_text(
     response = chat(
         model=model,
         messages=messages,
+        think=False,  # Disable thinking mode for faster responses
         options={
             "temperature": temperature,
             "num_ctx": num_ctx,
@@ -83,6 +86,23 @@ def query_ollama_text(
     )
 
     return response.message.content or ""
+
+
+def check_ollama_available() -> bool:
+    """Check if Ollama server is running and accessible."""
+    try:
+        ollama_list()
+        return True
+    except Exception:
+        return False
+
+
+def get_available_models() -> list[str]:
+    """Get list of models available in Ollama."""
+    try:
+        return [m.model for m in ollama_list().models]
+    except Exception:
+        return []
 
 
 async def query_ollama_async(
@@ -104,6 +124,7 @@ async def query_ollama_async(
         model=model,
         messages=messages,
         format=schema.model_json_schema(),
+        think=False,
         options={
             "temperature": temperature,
         },
