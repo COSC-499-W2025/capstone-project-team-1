@@ -209,8 +209,6 @@ class ProjectDetailResponse(BaseModel):
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
     evidence: list[EvidenceResponse] = []
-
-
 class ProjectRoleUpdateRequest(BaseModel):
     """Payload for setting a user's role on a project."""
 
