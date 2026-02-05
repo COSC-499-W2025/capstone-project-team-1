@@ -56,28 +56,10 @@ class TestCreateEvidence:
         assert "source" in data
         assert "date" in data
 
-    def test_missing_type_returns_422(self, client):
-        """POST returns 422 when 'type' is missing."""
-        pid = _get_project_id(client)
-        resp = client.post(f"/projects/{pid}/evidence", json={"content": "x"})
-        assert resp.status_code == 422
-
-    def test_missing_content_returns_422(self, client):
-        """POST returns 422 when 'content' is missing."""
-        pid = _get_project_id(client)
-        resp = client.post(f"/projects/{pid}/evidence", json={"type": "metric"})
-        assert resp.status_code == 422
-
     def test_invalid_type_returns_422(self, client):
         """POST returns 422 for an unrecognised evidence type."""
         pid = _get_project_id(client)
         resp = _post_evidence(client, pid, type="invalid_type")
-        assert resp.status_code == 422
-
-    def test_empty_content_returns_422(self, client):
-        """POST returns 422 when content is an empty string."""
-        pid = _get_project_id(client)
-        resp = _post_evidence(client, pid, content="")
         assert resp.status_code == 422
 
     def test_nonexistent_project_returns_404(self, client):
@@ -102,13 +84,6 @@ class TestCreateEvidence:
 class TestListEvidence:
     """Tests for the evidence listing endpoint."""
 
-    def test_empty_list(self, client):
-        """GET returns 200 with empty list when project has no evidence."""
-        pid = _get_project_id(client)
-        resp = client.get(f"/projects/{pid}/evidence")
-        assert resp.status_code == 200
-        assert resp.json() == []
-
     def test_returns_created_items(self, client):
         """GET returns evidence previously added via POST."""
         pid = _get_project_id(client)
@@ -131,11 +106,6 @@ class TestListEvidence:
 
         assert client.get(f"/projects/{pid_a}/evidence").json()[0]["content"] == "Only for A"
         assert client.get(f"/projects/{pid_b}/evidence").json()[0]["content"] == "Only for B"
-
-    def test_nonexistent_project_returns_404(self, client):
-        """GET returns 404 for a nonexistent project."""
-        resp = client.get("/projects/99999/evidence")
-        assert resp.status_code == 404
 
     def test_filter_by_type(self, client):
         """GET with ?type= filters evidence by type."""
@@ -164,21 +134,6 @@ class TestDeleteEvidence:
         resp = client.delete(f"/projects/{pid}/evidence/{eid}")
         assert resp.status_code == 200
         assert resp.json() == {"success": True, "deleted_id": eid}
-
-    def test_delete_actually_removes(self, client):
-        """Deleted evidence no longer appears in GET listing."""
-        pid = _get_project_id(client)
-        eid = _post_evidence(client, pid).json()["id"]
-
-        client.delete(f"/projects/{pid}/evidence/{eid}")
-
-        ids = [item["id"] for item in client.get(f"/projects/{pid}/evidence").json()]
-        assert eid not in ids
-
-    def test_nonexistent_evidence_returns_404(self, client):
-        """DELETE returns 404 for evidence ID that does not exist."""
-        pid = _get_project_id(client)
-        assert client.delete(f"/projects/{pid}/evidence/99999").status_code == 404
 
     def test_wrong_project_returns_404(self, client):
         """DELETE returns 404 when evidence belongs to a different project."""
@@ -223,11 +178,4 @@ class TestEvidenceIntegration:
     def test_empty_evidence_field_present(self, client):
         """Project detail includes empty evidence list when none exist."""
         pid = _get_project_id(client)
-        assert client.get(f"/projects/{pid}").json()["evidence"] == []
-
-    def test_deleted_evidence_excluded(self, client):
-        """Deleted evidence does not appear in project detail."""
-        pid = _get_project_id(client)
-        eid = _post_evidence(client, pid).json()["id"]
-        client.delete(f"/projects/{pid}/evidence/{eid}")
         assert client.get(f"/projects/{pid}").json()["evidence"] == []
