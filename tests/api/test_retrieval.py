@@ -392,3 +392,65 @@ def test_skills_with_project_count(client_with_data):
     # FastAPI is used in 1 project (NewProject)
     fastapi_skill = next(s for s in data if s["name"] == "FastAPI")
     assert fastapi_skill["project_count"] == 1
+
+
+def test_skills_project_count_no_double_counting():
+    """Verify project count doesn't double-count when skill exists in both tables."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+    from artifactminer.db import Base, get_db, ProjectSkill, UserProjectSkill, Skill, RepoStat
+    from artifactminer.api.app import create_app
+    from fastapi.testclient import TestClient
+    from datetime import datetime
+
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app = create_app()
+    app.dependency_overrides[get_db] = override_get_db
+
+    # Seed test data with overlapping skills in both tables
+    db = TestingSessionLocal()
+    repos = [
+        RepoStat(id=1, project_name="Project1", project_path="/repo1",
+                 first_commit=datetime(2020, 1, 1), last_commit=datetime(2020, 6, 1)),
+        RepoStat(id=2, project_name="Project2", project_path="/repo2",
+                 first_commit=datetime(2021, 1, 1), last_commit=datetime(2021, 6, 1)),
+    ]
+    skills = [Skill(id=1, name="Python", category="Programming Languages")]
+    # Python in ProjectSkill for both repos
+    project_skills = [
+        ProjectSkill(repo_stat_id=1, skill_id=1, proficiency=0.8),
+        ProjectSkill(repo_stat_id=2, skill_id=1, proficiency=0.9),
+    ]
+    # Python ALSO in UserProjectSkill for repo 1 (overlap!)
+    user_project_skills = [
+        UserProjectSkill(repo_stat_id=1, skill_id=1, user_email="test@example.com", proficiency=0.85),
+    ]
+    db.add_all(repos + skills + project_skills + user_project_skills)
+    db.commit()
+    db.close()
+
+    client = TestClient(app)
+    resp = client.get("/skills?include_project_count=true")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    python_data = next(s for s in data if s["name"] == "Python")
+    # Should be 2 (not 3), because repo 1 appears in both tables but is deduplicated
+    assert python_data["project_count"] == 2
+
+    app.dependency_overrides.clear()
