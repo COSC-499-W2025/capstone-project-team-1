@@ -79,12 +79,15 @@ SYSTEM_CONTEXT = """You are a professional resume writer specializing in softwar
 
 Rules:
 - Be SPECIFIC: reference actual features, endpoints, or tools from the commit messages.
-  GOOD: "Implemented REST alerting endpoint and JSON export for test results"
-  BAD:  "Built and maintained the project"
+  Do NOT use generic phrases like "built and maintained the project".
+  Instead, name the concrete thing that was built, using the commit messages as your source.
 - Use STRONG action verbs: Architected, Implemented, Designed, Engineered, Developed
 - If the developer contributed 100% of commits, say "Independently built" or "Architected"
 - NEVER use generic filler like "built and maintained", "various features", or "multiple components"
 - Each bullet: 1-2 lines max, factual, drawn ONLY from the provided facts
+- EVERY bullet must trace back to a specific commit message listed below.
+  Do NOT invent features from the "Skills demonstrated" or "Key insights" sections.
+  If fewer than 3 commit messages exist, write fewer bullets — never fabricate.
 - QUANTIFY when possible: contribution percentages, commit counts, number of endpoints
 
 Output format: Write bullet points directly, no explanations or preamble."""
@@ -110,6 +113,10 @@ that were built. Each bullet should name a concrete deliverable.
 
 {context}
 
+CRITICAL: Only reference features, tools, or endpoints that appear in the
+"What this developer built" commit messages above. Do not reference items
+from "Skills demonstrated" that lack a matching commit message.
+
 Write the bullet points now (no preamble, just bullets starting with •):"""
 
 
@@ -128,6 +135,9 @@ Portfolio facts:
 
 IMPORTANT rules for the SKILLS section:
 - Group skills into categories: Languages, Frameworks & Libraries, Infrastructure, Practices
+- Each skill must appear in EXACTLY ONE category. If a skill could fit multiple
+  categories, place it in the most specific one (e.g., TypeScript → Languages, not Frameworks)
+- Never list a programming language under Frameworks & Libraries
 - List ONLY skill names separated by commas — NO percentages, NO evidence, NO descriptions
 - Do NOT include internal metadata like "1 occurrence in user-edited manifests"
 
