@@ -22,8 +22,10 @@ T = TypeVar("T", bound=BaseModel)
 # Regex to strip Qwen3-style <think>...</think> reasoning blocks from output
 _THINK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
 
-# Models that support /no_think to disable chain-of-thought reasoning
-_SUPPORTS_NO_THINK = {"qwen3-1.7b"}
+# Models that support /no_think to disable chain-of-thought reasoning.
+# Used ONLY for structured JSON calls where grammar constraints already
+# guide the output. Free-text calls let the model think for better quality.
+_SUPPORTS_NO_THINK_JSON = {"qwen3-1.7b"}
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -37,12 +39,12 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
     "qwen3-1.7b": (
         "bartowski/Qwen_Qwen3-1.7B-GGUF",
         "Qwen_Qwen3-1.7B-Q4_K_M.gguf",
-        4096,
+        8192,
     ),
     "lfm2.5-1.2b": (
         "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
         "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
-        4096,
+        8192,
     ),
 }
 
@@ -228,9 +230,9 @@ def query_llm(
     """
     llm = get_model(model)
 
-    # Disable thinking mode for models that support it
+    # Disable thinking for JSON calls — grammar constraints guide output
     effective_prompt = prompt
-    if model in _SUPPORTS_NO_THINK:
+    if model in _SUPPORTS_NO_THINK_JSON:
         effective_prompt = prompt + " /no_think"
 
     messages: list[dict[str, str]] = []
@@ -279,20 +281,17 @@ def query_llm_text(
     model: str = DEFAULT_MODEL,
     system: str | None = None,
     temperature: float = 0.3,
-    max_tokens: int = 2048,
+    max_tokens: int = 4096,
 ) -> str:
     """Query the LLM for plain text output."""
     llm = get_model(model)
 
-    # Disable thinking mode for models that support it
-    effective_prompt = prompt
-    if model in _SUPPORTS_NO_THINK:
-        effective_prompt = prompt + " /no_think"
-
+    # Let thinking models reason — produces better prose quality.
+    # _strip_think_tags() removes <think>...</think> from the final output.
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": effective_prompt})
+    messages.append({"role": "user", "content": prompt})
 
     response = llm.create_chat_completion(
         messages=messages,
