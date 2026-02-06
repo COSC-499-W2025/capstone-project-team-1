@@ -142,7 +142,8 @@ def compute_skill_first_appearances(
 TIMELINE_SYSTEM = (
     "You are a professional resume writer. Generate a concise 2-3 sentence "
     "narrative describing a developer's skill evolution over time. "
-    "Focus on growth trajectory and technology adoption. "
+    "ONLY mention skills and technologies that appear in the provided data. "
+    "NEVER invent or assume additional technologies. "
     "Be specific with dates (use month names, not numbers)."
 )
 

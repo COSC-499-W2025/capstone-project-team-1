@@ -47,10 +47,16 @@ def extension_to_language(ext: str) -> Optional[str]:
     return None
 
 
+NON_LANGUAGE_EXTENSIONS = {
+    ".md", ".markdown", ".rst", ".txt",  # Documentation (not a language)
+    ".json", ".toml",                    # Data/config (not a language)
+}
+
+
 def is_programming_language(ext: str) -> bool:
     """Check if extension represents a programming language."""
     ext_lower = ext.lower()
-    if ext_lower in JUNK_EXTENSIONS:
+    if ext_lower in JUNK_EXTENSIONS or ext_lower in NON_LANGUAGE_EXTENSIONS:
         return False
     # Known programming languages
     if ext_lower in LANGUAGE_EXTENSIONS:

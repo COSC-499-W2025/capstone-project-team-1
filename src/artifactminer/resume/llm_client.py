@@ -11,12 +11,19 @@ from __future__ import annotations
 import asyncio
 import json
 import platform
+import re
 from pathlib import Path
 from typing import Type, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
+
+# Regex to strip Qwen3-style <think>...</think> reasoning blocks from output
+_THINK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+
+# Models that support /no_think to disable chain-of-thought reasoning
+_SUPPORTS_NO_THINK = {"qwen3-1.7b"}
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -221,10 +228,15 @@ def query_llm(
     """
     llm = get_model(model)
 
+    # Disable thinking mode for models that support it
+    effective_prompt = prompt
+    if model in _SUPPORTS_NO_THINK:
+        effective_prompt = prompt + " /no_think"
+
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+    messages.append({"role": "user", "content": effective_prompt})
 
     response = llm.create_chat_completion(
         messages=messages,
@@ -250,6 +262,17 @@ def query_llm(
 # ---------------------------------------------------------------------------
 
 
+def _strip_think_tags(text: str) -> str:
+    """Strip Qwen3-style <think>...</think> reasoning blocks from output."""
+    result = _THINK_RE.sub("", text).strip()
+    # Handle case where <think> wasn't closed (model hit max_tokens mid-thought)
+    if "<think>" in result:
+        result = result.split("</think>")[-1].strip()
+        if result.startswith("<think>"):
+            result = ""
+    return result
+
+
 def query_llm_text(
     prompt: str,
     *,
@@ -261,10 +284,15 @@ def query_llm_text(
     """Query the LLM for plain text output."""
     llm = get_model(model)
 
+    # Disable thinking mode for models that support it
+    effective_prompt = prompt
+    if model in _SUPPORTS_NO_THINK:
+        effective_prompt = prompt + " /no_think"
+
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+    messages.append({"role": "user", "content": effective_prompt})
 
     response = llm.create_chat_completion(
         messages=messages,
@@ -272,7 +300,8 @@ def query_llm_text(
         max_tokens=max_tokens,
     )
 
-    return response["choices"][0]["message"]["content"] or ""
+    raw = response["choices"][0]["message"]["content"] or ""
+    return _strip_think_tags(raw)
 
 
 # ---------------------------------------------------------------------------
