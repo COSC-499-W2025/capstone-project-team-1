@@ -338,6 +338,7 @@ def generate_resume(
                     facts.commit_breakdown = classify_commits(
                         commit_msgs, model=model
                     )
+                    facts.commit_subjects = [c.message for c in commit_msgs]
             except Exception as e:
                 log(f"  Note: commit classification skipped: {e}")
 

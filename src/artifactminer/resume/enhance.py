@@ -75,16 +75,17 @@ def _query_llm(prompt: str, model: str, system: Optional[str] = None) -> Optiona
 # Prompt Construction
 # ---------------------------------------------------------------------------
 
-SYSTEM_CONTEXT = """You are a professional resume writer. Your job is to transform
-technical project facts into compelling, recruiter-friendly resume bullet points.
+SYSTEM_CONTEXT = """You are a professional resume writer specializing in software engineering resumes.
 
 Rules:
-- Be CONCISE: each bullet should be 1-2 lines max
-- Be FACTUAL: only mention what's in the provided facts, never invent
-- Be SPECIFIC: use actual technology names, not vague terms
-- Use ACTION VERBS: Built, Designed, Implemented, Developed, Created
-- QUANTIFY when possible: contribution percentages, commit counts
-- Focus on IMPACT and SKILLS demonstrated
+- Be SPECIFIC: reference actual features, endpoints, or tools from the commit messages.
+  GOOD: "Implemented REST alerting endpoint and JSON export for test results"
+  BAD:  "Built and maintained the project"
+- Use STRONG action verbs: Architected, Implemented, Designed, Engineered, Developed
+- If the developer contributed 100% of commits, say "Independently built" or "Architected"
+- NEVER use generic filler like "built and maintained", "various features", or "multiple components"
+- Each bullet: 1-2 lines max, factual, drawn ONLY from the provided facts
+- QUANTIFY when possible: contribution percentages, commit counts, number of endpoints
 
 Output format: Write bullet points directly, no explanations or preamble."""
 
@@ -93,9 +94,19 @@ def build_project_prompt(project: ProjectFacts) -> str:
     """Build a prompt for generating bullets for a single project."""
     context = project.to_llm_context()
 
-    return f"""{SYSTEM_CONTEXT}
+    solo_hint = ""
+    if project.user_contribution_pct is not None and project.user_contribution_pct >= 95:
+        solo_hint = (
+            "\nThis is a SOLO project (100% contribution). "
+            "Use phrases like 'Independently built', 'Architected and implemented', "
+            "or 'Designed from scratch'.\n"
+        )
 
-Based on the following project facts, write 3-5 resume bullet points:
+    return f"""{SYSTEM_CONTEXT}
+{solo_hint}
+Turn the following project facts into 3-5 achievement-oriented resume bullets.
+Use the commit message subjects below to identify SPECIFIC features, endpoints, or tools
+that were built. Each bullet should name a concrete deliverable.
 
 {context}
 
@@ -106,21 +117,35 @@ def build_portfolio_prompt(portfolio: PortfolioFacts) -> str:
     """Build a prompt for the full portfolio summary."""
     context = portfolio.to_llm_context()
 
-    return f"""{SYSTEM_CONTEXT}
+    return f"""You are a professional resume writer.
 
 Based on the following portfolio of projects, write:
-1. A 2-3 sentence professional summary suitable for the top of a resume
-2. A skills section grouping the demonstrated technical skills by category
+1. A 2-3 sentence professional summary for the top of a resume
+2. A technical skills section grouped by category
 
 Portfolio facts:
 {context}
 
+IMPORTANT rules for the SKILLS section:
+- Group skills into categories: Languages, Frameworks & Libraries, Infrastructure, Practices
+- List ONLY skill names separated by commas — NO percentages, NO evidence, NO descriptions
+- Do NOT include internal metadata like "1 occurrence in user-edited manifests"
+
+Example skills format:
+Languages: Python, Go, TypeScript
+Frameworks & Libraries: FastAPI, React, scikit-learn
+Infrastructure: Docker, AWS, Terraform
+Practices: REST API Design, Test-Driven Development
+
+Example summary style:
+"Full-stack developer with experience building REST APIs, CLI tools, and data pipelines across 4 projects. Proficient in Python and Go with a focus on clean architecture and test coverage."
+
 Format your response as:
 SUMMARY:
-[Your 2-3 sentence summary here]
+[Your 2-3 sentence summary]
 
 SKILLS:
-[Grouped skills here]"""
+[Grouped skills — names only, no metadata]"""
 
 
 # ---------------------------------------------------------------------------
