@@ -1,30 +1,39 @@
 """
-Embedded LLM client using llama-cpp-python.
+LLM client using llama-server + OpenAI SDK.
 
-Replaces the Ollama-based client with in-process inference via llama.cpp.
-No daemon needed — models are GGUF files loaded directly into the Python process.
-Auto-downloads from HuggingFace on first use.
+Manages a llama-server subprocess and communicates via the OpenAI-compatible
+HTTP API.  No llama-cpp-python build dependency — only needs the llama-server
+binary (brew install llama.cpp) and the openai Python package.
+
+Reasoning control: llama-server is launched with --reasoning-format deepseek,
+which separates <think>…</think> into a dedicated reasoning_content field.
+No regex stripping needed.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
+import atexit
+import logging
 import platform
-import re
+import shutil
+import socket
+import subprocess
+import time
 from pathlib import Path
 from typing import Type, TypeVar
 
+import httpx
+from openai import OpenAI
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
 
-# Regex to strip Qwen3-style <think>...</think> reasoning blocks from output
-_THINK_RE = re.compile(r"<think>.*?</think>\s*", re.DOTALL)
+log = logging.getLogger(__name__)
 
 # Models that support /no_think to disable chain-of-thought reasoning.
 # Used ONLY for structured JSON calls where grammar constraints already
-# guide the output. Free-text calls let the model think for better quality.
+# guide the output.  Free-text calls let the model think for better quality.
 _SUPPORTS_NO_THINK_JSON = {"qwen3-1.7b"}
 
 # ---------------------------------------------------------------------------
@@ -46,13 +55,16 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
         "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
         8192,
     ),
+    "qwen2.5-coder-3b": (
+        "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
+        "qwen2.5-coder-3b-instruct-q6_k.gguf",
+        16384,
+    ),
 }
 
 # ---------------------------------------------------------------------------
-# Model loading (lazy, cached)
+# Model path / GPU helpers (unchanged)
 # ---------------------------------------------------------------------------
-
-_loaded_models: dict[str, object] = {}
 
 
 def _resolve_model_path(model: str) -> Path:
@@ -95,18 +107,58 @@ def _get_gpu_layers() -> int:
     return 0  # CPU-only by default on other platforms
 
 
-def get_model(model: str = DEFAULT_MODEL) -> object:
-    """
-    Load and cache a Llama model instance.
+# ---------------------------------------------------------------------------
+# llama-server lifecycle (private)
+# ---------------------------------------------------------------------------
 
-    On first call for a given model, loads the GGUF file (1-2 seconds).
-    Subsequent calls return the cached instance.
-    """
-    if model in _loaded_models:
-        return _loaded_models[model]
+_server_process: subprocess.Popen | None = None
+_server_port: int | None = None
+_server_model: str | None = None
+_openai_client: OpenAI | None = None
 
-    from llama_cpp import Llama
 
+def _find_llama_server() -> str:
+    """Locate the llama-server binary on PATH."""
+    path = shutil.which("llama-server")
+    if path is None:
+        raise FileNotFoundError(
+            "llama-server binary not found on PATH.\n"
+            "Install it with:  brew install llama.cpp\n"
+            "Then verify with:  which llama-server"
+        )
+    return path
+
+
+def _pick_free_port() -> int:
+    """Get an OS-assigned ephemeral port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def _wait_for_server(port: int, timeout: float = 30.0) -> None:
+    """Poll llama-server /health until it returns 200 or timeout."""
+    url = f"http://127.0.0.1:{port}/health"
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            resp = httpx.get(url, timeout=2.0)
+            if resp.status_code == 200:
+                return
+        except (httpx.ConnectError, httpx.ReadTimeout):
+            pass
+        time.sleep(0.25)
+    raise TimeoutError(
+        f"llama-server did not become healthy on port {port} "
+        f"within {timeout}s"
+    )
+
+
+def _start_server(model: str) -> None:
+    """Spawn a llama-server subprocess for the given model."""
+    global _server_process, _server_port, _server_model, _openai_client
+
+    binary = _find_llama_server()
     model_path = _resolve_model_path(model)
     if not model_path.exists():
         raise FileNotFoundError(
@@ -114,26 +166,115 @@ def get_model(model: str = DEFAULT_MODEL) -> object:
             f"Run 'resume download-model {model}' to download it."
         )
 
-    llm = Llama(
-        model_path=str(model_path),
-        n_ctx=_get_n_ctx(model),
-        n_gpu_layers=_get_gpu_layers(),
-        verbose=False,
+    port = _pick_free_port()
+    n_ctx = _get_n_ctx(model)
+    gpu = _get_gpu_layers()
+
+    cmd = [
+        binary,
+        "--model", str(model_path),
+        "--ctx-size", str(n_ctx),
+        "--n-gpu-layers", str(gpu),
+        "--port", str(port),
+        "--reasoning-format", "deepseek",
+        "--log-disable",
+    ]
+
+    log.info("[llm] Starting llama-server on port %d for model %s", port, model)
+    _server_process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )
-    _loaded_models[model] = llm
-    return llm
+    _server_port = port
+    _server_model = model
+    _openai_client = None  # force re-creation
+
+    atexit.register(_stop_server)
+
+    _wait_for_server(port)
+    log.info("[llm] llama-server healthy on port %d", port)
 
 
-def unload_model(model: str | None = None) -> None:
-    """Unload a cached model to free memory. If model is None, unload all."""
-    if model is None:
-        _loaded_models.clear()
+def _stop_server() -> None:
+    """Terminate the running llama-server process."""
+    global _server_process, _server_port, _server_model, _openai_client
+
+    if _server_process is None:
+        return
+
+    log.info("[llm] Stopping llama-server (pid %d)", _server_process.pid)
+    _server_process.terminate()
+    try:
+        _server_process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        _server_process.kill()
+        _server_process.wait()
+
+    _server_process = None
+    _server_port = None
+    _server_model = None
+    _openai_client = None
+
+
+def _restart_server(model: str) -> None:
+    """Stop current server and start a new one with a different model."""
+    _stop_server()
+    _start_server(model)
+
+
+def _ensure_server_running(model: str) -> None:
+    """Ensure llama-server is running with the requested model."""
+    if (
+        _server_process is not None
+        and _server_process.poll() is None
+        and _server_model == model
+    ):
+        return  # already running with the right model
+
+    if _server_process is not None:
+        _restart_server(model)
     else:
-        _loaded_models.pop(model, None)
+        _start_server(model)
+
+
+def _get_client() -> OpenAI:
+    """Return a lazily-created OpenAI client pointed at the local server."""
+    global _openai_client
+
+    if _openai_client is None:
+        if _server_port is None:
+            raise RuntimeError("llama-server is not running")
+        _openai_client = OpenAI(
+            base_url=f"http://127.0.0.1:{_server_port}/v1",
+            api_key="not-needed",
+        )
+    return _openai_client
 
 
 # ---------------------------------------------------------------------------
-# Model management
+# Model loading API (adapted for server lifecycle)
+# ---------------------------------------------------------------------------
+
+
+def get_model(model: str = DEFAULT_MODEL) -> OpenAI:
+    """
+    Ensure the server is running with the given model and return the client.
+
+    Preserves the same call semantics as the old get_model() — callers like
+    benchmark.py use it to measure startup time.
+    """
+    _ensure_server_running(model)
+    return _get_client()
+
+
+def unload_model(model: str | None = None) -> None:
+    """Stop the server to free resources. Model arg kept for API compat."""
+    _stop_server()
+
+
+# ---------------------------------------------------------------------------
+# Model management (unchanged)
 # ---------------------------------------------------------------------------
 
 
@@ -226,11 +367,12 @@ def query_llm(
     """
     Query the LLM for structured JSON output conforming to a Pydantic schema.
 
-    Uses llama.cpp's grammar-based constrained decoding to guarantee valid JSON.
+    Uses llama-server's json_schema response format for constrained decoding.
     """
-    llm = get_model(model)
+    _ensure_server_running(model)
+    client = _get_client()
 
-    # Disable thinking for JSON calls — grammar constraints guide output
+    # Disable thinking for JSON calls — schema constraints guide output
     effective_prompt = prompt
     if model in _SUPPORTS_NO_THINK_JSON:
         effective_prompt = prompt + " /no_think"
@@ -240,16 +382,22 @@ def query_llm(
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": effective_prompt})
 
-    response = llm.create_chat_completion(
+    response = client.chat.completions.create(
+        model="local",
         messages=messages,
-        response_format={
-            "type": "json_object",
-            "schema": schema.model_json_schema(),
-        },
         temperature=temperature,
+        extra_body={
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": schema.__name__,
+                    "schema": schema.model_json_schema(),
+                },
+            },
+        },
     )
 
-    content = response["choices"][0]["message"]["content"] or ""
+    content = response.choices[0].message.content or ""
     if not content.strip():
         raise RuntimeError(
             f"LLM returned empty response. Model '{model}' may not support "
@@ -264,17 +412,6 @@ def query_llm(
 # ---------------------------------------------------------------------------
 
 
-def _strip_think_tags(text: str) -> str:
-    """Strip Qwen3-style <think>...</think> reasoning blocks from output."""
-    result = _THINK_RE.sub("", text).strip()
-    # Handle case where <think> wasn't closed (model hit max_tokens mid-thought)
-    if "<think>" in result:
-        result = result.split("</think>")[-1].strip()
-        if result.startswith("<think>"):
-            result = ""
-    return result
-
-
 def query_llm_text(
     prompt: str,
     *,
@@ -283,28 +420,32 @@ def query_llm_text(
     temperature: float = 0.3,
     max_tokens: int = 4096,
 ) -> str:
-    """Query the LLM for plain text output."""
-    llm = get_model(model)
+    """
+    Query the LLM for plain text output.
 
-    # Let thinking models reason — produces better prose quality.
-    # _strip_think_tags() removes <think>...</think> from the final output.
+    With --reasoning-format deepseek, thinking goes to reasoning_content
+    and the clean answer comes back in content — no regex stripping needed.
+    """
+    _ensure_server_running(model)
+    client = _get_client()
+
     messages: list[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
-    response = llm.create_chat_completion(
+    response = client.chat.completions.create(
+        model="local",
         messages=messages,
         temperature=temperature,
         max_tokens=max_tokens,
     )
 
-    raw = response["choices"][0]["message"]["content"] or ""
-    return _strip_think_tags(raw)
+    return response.choices[0].message.content or ""
 
 
 # ---------------------------------------------------------------------------
-# Async wrappers (llama.cpp is synchronous — run in thread pool)
+# Async wrappers (OpenAI SDK calls are synchronous — run in thread pool)
 # ---------------------------------------------------------------------------
 
 

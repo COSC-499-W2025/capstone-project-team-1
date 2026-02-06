@@ -22,7 +22,6 @@ dependencies = [
   "aiosqlite>=0.19",
   "email_validator>=2.3.0",
   "python-multipart>=0.0.20",
-  "llama-cpp-python>=0.3.8",
   "huggingface-hub>=0.24",
   "typer>=0.12",
   "rich>=13",
