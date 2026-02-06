@@ -5,6 +5,8 @@
 	"private": true,
 	"scripts": {
 		"dev": "bun run --watch src/index.tsx",
+		"test": "bun test",
+		"test:watch": "bun test --watch",
 		"lint": "biome lint .",
 		"format": "biome format . --write",
 		"fix": "biome check --write ."
@@ -19,6 +21,8 @@
 	"dependencies": {
 		"@opentui/core": "^0.1.72",
 		"@opentui/react": "^0.1.72",
+		"fdir": "^6.5.0",
+		"fuse.js": "^7.1.0",
 		"react": "^19.2.3"
 	}
 }
