@@ -32,9 +32,10 @@ T = TypeVar("T", bound=BaseModel)
 log = logging.getLogger(__name__)
 
 # Models that support /no_think to disable chain-of-thought reasoning.
-# Used ONLY for structured JSON calls where grammar constraints already
-# guide the output.  Free-text calls let the model think for better quality.
-_SUPPORTS_NO_THINK_JSON = {"qwen3-1.7b"}
+# Currently empty — we prefer to let thinking models reason even on
+# structured JSON calls, since --reasoning-format deepseek routes
+# <think> output to a separate field without polluting the JSON.
+_SUPPORTS_NO_THINK_JSON: set[str] = set()
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -45,20 +46,54 @@ MODELS_DIR = Path.home() / ".artifactminer" / "models"
 
 # Maps friendly name → (HuggingFace repo_id, filename, context_length)
 MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
+    # ── Qwen ─────────────────────────────────────────────────────────
     "qwen3-1.7b": (
         "bartowski/Qwen_Qwen3-1.7B-GGUF",
         "Qwen_Qwen3-1.7B-Q4_K_M.gguf",
         8192,
     ),
-    "lfm2.5-1.2b": (
-        "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
-        "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
-        8192,
+    "qwen3-4b": (
+        "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+        "Qwen3-4B-Instruct-2507-Q8_0.gguf",
+        20480,
     ),
     "qwen2.5-coder-3b": (
         "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
         "qwen2.5-coder-3b-instruct-q6_k.gguf",
         16384,
+    ),
+    # ── LiquidAI LFM2.5 1.2B ────────────────────────────────────────
+    "lfm2.5-1.2b": (
+        "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
+        "LFM2.5-1.2B-Instruct-BF16.gguf",
+        20480,
+    ),
+    "lfm2.5-1.2b-thinking": (
+        "LiquidAI/LFM2.5-1.2B-Thinking-GGUF",
+        "LFM2.5-1.2B-Thinking-BF16.gguf",
+        20480,
+    ),
+    # ── LiquidAI LFM2 2.6B ──────────────────────────────────────────
+    "lfm2-2.6b-f16": (
+        "LiquidAI/LFM2-2.6B-GGUF",
+        "LFM2-2.6B-F16.gguf",
+        20480,
+    ),
+    "lfm2-2.6b-q8": (
+        "LiquidAI/LFM2-2.6B-GGUF",
+        "LFM2-2.6B-Q8_0.gguf",
+        20480,
+    ),
+    # ── LiquidAI LFM2 2.6B Experimental ─────────────────────────────
+    "lfm2-2.6b-exp-f16": (
+        "LiquidAI/LFM2-2.6B-Exp-GGUF",
+        "LFM2-2.6B-Exp-F16.gguf",
+        20480,
+    ),
+    "lfm2-2.6b-exp-q8": (
+        "LiquidAI/LFM2-2.6B-Exp-GGUF",
+        "LFM2-2.6B-Exp-Q8_0.gguf",
+        20480,
     ),
 }
 
