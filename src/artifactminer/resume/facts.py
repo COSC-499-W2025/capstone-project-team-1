@@ -133,6 +133,9 @@ class ProjectFacts:
     # Commit classification (feature/bugfix/refactor/test/docs/chore counts)
     commit_breakdown: Dict[str, int] = field(default_factory=dict)
 
+    # Raw commit message subjects (what the user actually built)
+    commit_subjects: List[str] = field(default_factory=list)
+
     # Skill first-appearance dates (skill_name → ISO date)
     skill_first_appearances: Dict[str, str] = field(default_factory=dict)
 
@@ -207,6 +210,12 @@ class ProjectFacts:
             parts = [f"{k}: {v}" for k, v in self.commit_breakdown.items() if v > 0]
             if parts:
                 lines.append(f"Commit types: {', '.join(parts)}")
+
+        # What the user actually built (commit message subjects)
+        if self.commit_subjects:
+            lines.append("What this developer built (from their commit messages):")
+            for subj in self.commit_subjects[:15]:
+                lines.append(f"  - {subj}")
 
         return "\n".join(lines)
 
