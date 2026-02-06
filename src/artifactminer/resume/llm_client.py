@@ -453,7 +453,7 @@ def query_llm_text(
     model: str = DEFAULT_MODEL,
     system: str | None = None,
     temperature: float = 0.3,
-    max_tokens: int = 4096,
+    max_tokens: int = 12288,
 ) -> str:
     """
     Query the LLM for plain text output.
@@ -509,7 +509,7 @@ async def query_llm_text_async(
     model: str = DEFAULT_MODEL,
     system: str | None = None,
     temperature: float = 0.3,
-    max_tokens: int = 2048,
+    max_tokens: int = 12288,
 ) -> str:
     """Async version of query_llm_text. Runs inference in a thread pool."""
     return await asyncio.to_thread(
