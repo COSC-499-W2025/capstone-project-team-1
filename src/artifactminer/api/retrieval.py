@@ -24,6 +24,7 @@ from ..db import (
     get_db,
     ProjectSkill,
     UserProjectSkill,
+    UserRepoStat,
     Skill,
     RepoStat,
     ResumeItem,
@@ -212,17 +213,39 @@ async def get_resume_items(
 
     results = query.all()
 
-    return [
-        ResumeItemResponse(
-            id=resume_item.id,
-            title=resume_item.title,
-            content=resume_item.content,
-            category=resume_item.category,
-            project_name=repo_stat.project_name if repo_stat else None,
-            created_at=resume_item.created_at,
+    role_cache: dict[tuple[str, str], str | None] = {}
+    response_items: list[ResumeItemResponse] = []
+
+    for resume_item, repo_stat in results:
+        role: str | None = None
+        if repo_stat:
+            key = (repo_stat.project_name, repo_stat.project_path)
+            if key not in role_cache:
+                latest_user_stat = (
+                    db.query(UserRepoStat)
+                    .filter(
+                        UserRepoStat.project_name == repo_stat.project_name,
+                        UserRepoStat.project_path == repo_stat.project_path,
+                    )
+                    .order_by(UserRepoStat.id.desc())
+                    .first()
+                )
+                role_cache[key] = latest_user_stat.user_role if latest_user_stat else None
+            role = role_cache[key]
+
+        response_items.append(
+            ResumeItemResponse(
+                id=resume_item.id,
+                title=resume_item.title,
+                content=resume_item.content,
+                category=resume_item.category,
+                project_name=repo_stat.project_name if repo_stat else None,
+                role=role,
+                created_at=resume_item.created_at,
+            )
         )
-        for resume_item, repo_stat in results
-    ]
+
+    return response_items
 
 
 @router.get("/resume/{resume_id}", response_model=ResumeItemResponse)

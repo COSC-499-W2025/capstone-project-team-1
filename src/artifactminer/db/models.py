@@ -97,6 +97,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
         DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
     activity_breakdown = Column(JSON, nullable=True)
+    user_role = Column(String, nullable=True)
 
 class UserAIntelligenceSummary(Base):
     __tablename__ = "user_intelligence_summaries"
