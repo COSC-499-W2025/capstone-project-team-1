@@ -44,7 +44,7 @@ MODELS_DIR = Path.home() / ".artifactminer" / "models"
 
 # Maps friendly name → (HuggingFace repo_id, filename, context_length)
 MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
-    "qwen3-4b": (
+    "qwen3-4b-q4": (
         "unsloth/Qwen3-4B-Instruct-2507-GGUF",
         "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
         20480,
