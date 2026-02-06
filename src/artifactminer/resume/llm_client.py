@@ -39,7 +39,7 @@ _SUPPORTS_NO_THINK_JSON: set[str] = set()
 # Configuration
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "qwen3-4b"
+DEFAULT_MODEL = "qwen3-4b-q4"
 MODELS_DIR = Path.home() / ".artifactminer" / "models"
 
 # Maps friendly name → (HuggingFace repo_id, filename, context_length)
@@ -48,6 +48,26 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
         "unsloth/Qwen3-4B-Instruct-2507-GGUF",
         "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
         20480,
+    ),
+    "qwen3-4b-q3": (
+        "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+        "Qwen3-4B-Instruct-2507-Q3_K_M.gguf",
+        20480,
+    ),
+    "qwen3-1.7b-q8": (
+        "unsloth/Qwen3-1.7B-Instruct-GGUF",
+        "Qwen3-1.7B-UD-Q8_K_XL.gguf",
+        32768,
+    ),
+    "lfm2-2.6b-q8": (
+        "meta-llama/Llama-2-2.6b-GGUF",
+        "LFM2-2.6B-Q8_0.gguf",
+        8192,
+    ),
+    "lfm2.5-1.2b-bf16": (
+        "meta-llama/Llama-2.5-1.2B-Instruct-GGUF",
+        "LFM2.5-1.2B-Instruct-BF16.gguf",
+        8192,
     ),
 }
 
