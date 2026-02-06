@@ -12,6 +12,7 @@ from artifactminer.db import (
     Base,
     get_db,
     RepoStat,
+    UserRepoStat,
     Skill,
     ProjectSkill,
     UserProjectSkill,
@@ -129,7 +130,27 @@ def client_with_data():
             generated_at=now,
         ),
     ]
-    db.add_all(repos + skills + project_skills + user_project_skills + resume_items + summaries)
+    user_repo_stats = [
+        UserRepoStat(
+            project_name="OldProject",
+            project_path="/repo1",
+            user_role="Contributor",
+        ),
+        UserRepoStat(
+            project_name="NewProject",
+            project_path="/repo2",
+            user_role="Lead Developer",
+        ),
+    ]
+    db.add_all(
+        repos
+        + skills
+        + project_skills
+        + user_project_skills
+        + resume_items
+        + summaries
+        + user_repo_stats
+    )
     db.commit()
     db.close()
 
@@ -202,10 +223,12 @@ def test_resume_returns_sorted_list(client_with_data):
     assert len(data) == 2
     assert data[0]["project_name"] == "NewProject"  # newest
     assert data[-1]["project_name"] == "OldProject"  # oldest
+    assert data[0]["role"] == "Lead Developer"
+    assert data[-1]["role"] == "Contributor"
     # Required fields
     assert all(
         k in data[0]
-        for k in ["id", "title", "content", "category", "project_name", "created_at"]
+        for k in ["id", "title", "content", "category", "project_name", "role", "created_at"]
     )
 
 

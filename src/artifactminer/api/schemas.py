@@ -166,8 +166,27 @@ class ProjectDetailResponse(BaseModel):
     primary_language: str | None = None
     ranking_score: float | None = None
     health_score: float | None = None
+    role: str | None = None
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
+
+
+class ProjectRoleUpdateRequest(BaseModel):
+    """Payload for setting a user's role on a project."""
+
+    role: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Role of the user in this project (e.g., Lead Developer).",
+    )
+
+
+class ProjectRoleResponse(BaseModel):
+    """Response after creating/updating a project role."""
+
+    project_id: int
+    project_name: str
+    role: str
 
 
 class ProjectTimelineItem(BaseModel):
@@ -241,6 +260,9 @@ class ResumeItemResponse(BaseModel):
     category: str | None = None
     project_name: str | None = Field(
         default=None, description="Associated project name."
+    )
+    role: str | None = Field(
+        default=None, description="User role in the associated project."
     )
     created_at: datetime
 
@@ -340,7 +362,7 @@ class AnalyzeResponse(BaseModel):
     consent_level: str
     user_email: str
 
-class SummaryResponse(BaseModel):
+class SummaryListResponse(BaseModel):
     summaries: list[SummaryResult]
 
 class FileValues(BaseModel):
@@ -368,4 +390,3 @@ class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
     summary_text: str
-

@@ -26,6 +26,7 @@ class UserRepoStats:
     userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
     commitActivities: Optional[dict] = None # New field to store activity breakdown
+    user_role: Optional[str] = None
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -168,6 +169,20 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
         db = SessionLocal()
     
     try:
+        latest_existing = (
+            db.query(UserRepoStat)
+            .filter(
+                UserRepoStat.project_name == stats.project_name,
+                UserRepoStat.project_path == stats.project_path,
+            )
+            .order_by(UserRepoStat.id.desc())
+            .first()
+        )
+
+        role_value = stats.user_role
+        if role_value is None and latest_existing is not None:
+            role_value = latest_existing.user_role
+
         user_repo_stat = UserRepoStat(
             project_name=stats.project_name,
             project_path=stats.project_path,
@@ -176,7 +191,8 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
             total_commits=stats.total_commits,
             userStatspercentages=stats.userStatspercentages,
             commitFrequency=stats.commitFrequency,
-            activity_breakdown=stats.commitActivities
+            activity_breakdown=stats.commitActivities,
+            user_role=role_value,
         )
         db.add(user_repo_stat)
         if own_session:
@@ -248,11 +264,15 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
         # Default summary uses template
         user_stats = (
             db.query(UserRepoStat)
-            .filter(UserRepoStat.project_name == repo.project_name)
+            .filter(
+                UserRepoStat.project_name == repo.project_name,
+                UserRepoStat.project_path == repo.project_path,
+            )
             .order_by(UserRepoStat.id.desc())
             .first()
         )
         pct = user_stats.userStatspercentages if user_stats and user_stats.userStatspercentages is not None else 0
+        role_text = user_stats.user_role.strip() if user_stats and user_stats.user_role else None
 
         languages = repo.languages or []
         if isinstance(languages, list):
@@ -264,6 +284,11 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
             f"User contributed {pct:.1f}% to {repo.project_name} "
             f"using {languages_text}."
         )
+        if role_text:
+            summary_text = (
+                f"User served as {role_text} on {repo.project_name} "
+                f"and contributed {pct:.1f}% using {languages_text}."
+            )
 
         # If we have consent + a valid email, try the LLM-based summary instead
         if user_allows_llm() and user_email:
