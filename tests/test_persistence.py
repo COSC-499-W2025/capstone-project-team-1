@@ -1,8 +1,7 @@
-"""Tests for skill and insight persistence helpers.
+"""Tests for skill persistence helpers.
 
 Tests cover:
 - persist_extracted_skills: saves ExtractedSkill to ProjectSkill or UserProjectSkill
-- persist_insights_as_resume_items: saves Insight to ResumeItem
 """
 
 import pytest
@@ -16,13 +15,10 @@ from artifactminer.db.models import (
     Skill,
     ProjectSkill,
     UserProjectSkill,
-    ResumeItem,
 )
 from artifactminer.skills.models import ExtractedSkill
-from artifactminer.skills.deep_analysis import Insight
 from artifactminer.skills.persistence import (
     persist_extracted_skills,
-    persist_insights_as_resume_items,
 )
 
 
@@ -176,69 +172,3 @@ def test_persist_skills_commit_false(db_session, repo_stat):
     db_session.rollback()
 
     assert db_session.query(Skill).filter(Skill.name == "Go").first() is None
-
-
-# --- persist_insights_as_resume_items tests ---
-
-
-def test_persist_insights_validation(db_session, repo_stat):
-    """Empty list returns early; missing RepoStat raises."""
-    assert persist_insights_as_resume_items(db_session, repo_stat.id, []) == []
-
-    with pytest.raises(ValueError, match="RepoStat 999 does not exist"):
-        persist_insights_as_resume_items(
-            db_session, 999, [Insight(title="X", evidence=["e"], why_it_matters="w")]
-        )
-
-
-def test_persist_insights_creates_resume_item(db_session, repo_stat):
-    """Creates ResumeItem from Insight with formatted content."""
-    insights = [
-        Insight(
-            title="Complexity",
-            evidence=["caps", "chunks"],
-            why_it_matters="perf matters",
-        )
-    ]
-    saved = persist_insights_as_resume_items(db_session, repo_stat.id, insights)
-
-    assert len(saved) == 1
-    item = (
-        db_session.query(ResumeItem)
-        .filter(ResumeItem.repo_stat_id == repo_stat.id)
-        .first()
-    )
-    assert item and item.title == "Complexity" and item.category == "Deep Insight"
-    assert "caps" in item.content and "perf matters" in item.content
-
-
-def test_persist_insights_updates_existing_by_title(db_session, repo_stat):
-    """Updates existing ResumeItem when title matches (dedup by title)."""
-    persist_insights_as_resume_items(
-        db_session,
-        repo_stat.id,
-        [Insight(title="API", evidence=["REST"], why_it_matters="v1")],
-    )
-    persist_insights_as_resume_items(
-        db_session,
-        repo_stat.id,
-        [Insight(title="API", evidence=["GraphQL"], why_it_matters="v2")],
-    )
-
-    items = db_session.query(ResumeItem).filter(ResumeItem.title == "API").all()
-    assert len(items) == 1 and "GraphQL" in items[0].content
-
-
-def test_persist_insights_commit_false(db_session, repo_stat):
-    """commit=False defers commit; rollback discards changes."""
-    persist_insights_as_resume_items(
-        db_session,
-        repo_stat.id,
-        [Insight(title="Temp", evidence=["x"], why_it_matters="y")],
-        commit=False,
-    )
-    db_session.rollback()
-
-    assert (
-        db_session.query(ResumeItem).filter(ResumeItem.title == "Temp").first() is None
-    )
