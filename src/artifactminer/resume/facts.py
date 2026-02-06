@@ -122,6 +122,20 @@ class ProjectFacts:
     health_score: Optional[float] = None
     is_collaborative: bool = False
 
+    # --- NEW: LLM-enhanced analysis fields ---
+
+    # Commit classification (feature/bugfix/refactor/test/docs/chore counts)
+    commit_breakdown: Dict[str, int] = field(default_factory=dict)
+
+    # Skill first-appearance dates (skill_name → ISO date)
+    skill_first_appearances: Dict[str, str] = field(default_factory=dict)
+
+    # Code style metrics
+    style_metrics: Optional[Dict[str, Any]] = None
+
+    # Complexity highlights (top complex files)
+    complexity_highlights: List[Dict[str, Any]] = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
@@ -182,6 +196,12 @@ class ProjectFacts:
             for insight in self.insights:
                 lines.append(f"  - {insight.get('title', 'Unknown')}: {insight.get('why', '')}")
 
+        # Commit breakdown
+        if self.commit_breakdown:
+            parts = [f"{k}: {v}" for k, v in self.commit_breakdown.items() if v > 0]
+            if parts:
+                lines.append(f"Commit types: {', '.join(parts)}")
+
         return "\n".join(lines)
 
 
@@ -204,6 +224,19 @@ class PortfolioFacts:
     # Date range across all projects
     earliest_commit: Optional[str] = None
     latest_commit: Optional[str] = None
+
+    # --- NEW: LLM-enhanced analysis fields ---
+
+    # Aggregated commit breakdown across all projects
+    total_commit_breakdown: Dict[str, int] = field(default_factory=dict)
+
+    # Skill timeline (aggregated across projects, sorted by date)
+    skill_timeline: List[Dict[str, str]] = field(default_factory=list)
+
+    # LLM-generated narratives (populated after LLM calls)
+    skill_evolution_narrative: Optional[str] = None
+    developer_fingerprint: Optional[str] = None
+    complexity_narrative: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -409,5 +442,22 @@ def build_portfolio_facts(
         portfolio.earliest_commit = min(all_firsts)
     if all_lasts:
         portfolio.latest_commit = max(all_lasts)
+
+    # Aggregate commit breakdowns
+    for p in project_facts_list:
+        for cat, count in p.commit_breakdown.items():
+            portfolio.total_commit_breakdown[cat] = (
+                portfolio.total_commit_breakdown.get(cat, 0) + count
+            )
+
+    # Aggregate skill timeline (sorted by date across all projects)
+    for p in project_facts_list:
+        for skill, date in p.skill_first_appearances.items():
+            portfolio.skill_timeline.append({
+                "skill": skill,
+                "first_seen": date,
+                "project": p.project_name,
+            })
+    portfolio.skill_timeline.sort(key=lambda x: x.get("first_seen", ""))
 
     return portfolio

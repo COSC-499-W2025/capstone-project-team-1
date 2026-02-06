@@ -25,6 +25,7 @@ dependencies = [
   "ollama>=0.6.1",
   "pypdf",
   "requests",
+  "huggingface-hub>=0.24",
   "typer>=0.12",
   "rich>=13",
   "tree-sitter>=0.24",
