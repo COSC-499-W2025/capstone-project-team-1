@@ -62,12 +62,12 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
     "lfm2-2.6b-q8": (
         "meta-llama/Llama-2-2.6b-GGUF",
         "LFM2-2.6B-Q8_0.gguf",
-        8192,
+        20480,
     ),
     "lfm2.5-1.2b-bf16": (
         "meta-llama/Llama-2.5-1.2B-Instruct-GGUF",
         "LFM2.5-1.2B-Instruct-BF16.gguf",
-        8192,
+        20480,
     ),
 }
 
