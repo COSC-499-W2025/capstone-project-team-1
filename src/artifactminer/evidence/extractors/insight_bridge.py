@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Iterable
 
-from artifactminer.evidence.models import EvidenceItem
+from artifactminer.evidence.models import EVIDENCE_TYPE_EVALUATION, EvidenceItem
 from artifactminer.skills.deep_analysis import Insight
 
 
@@ -42,7 +42,7 @@ def insights_to_evidence(
 
         converted.append(
             EvidenceItem(
-                type="evaluation",
+                type=EVIDENCE_TYPE_EVALUATION,
                 content=content,
                 source=source,
                 date=evidence_date,
