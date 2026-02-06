@@ -18,9 +18,9 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .facts import PortfolioFacts, ProjectFacts
-from .ollama_client import (
-    query_ollama_text,
-    check_ollama_available,
+from .llm_client import (
+    query_llm_text,
+    check_llm_available,
     get_available_models,
 )
 
@@ -36,32 +36,38 @@ class ResumeContent:
     professional_summary: Optional[str] = None
     skills_section: Optional[str] = None
 
+    # New portfolio-level sections
+    skill_evolution: Optional[str] = None
+    developer_profile: Optional[str] = None
+    complexity_highlights: Optional[str] = None
+    work_breakdown: Optional[dict] = None  # {"feature": 15, "bugfix": 8, ...}
+
     # Metadata
     llm_enhanced: bool = False
     model_used: Optional[str] = None
 
 
-def query_ollama(prompt: str, model: str, system: Optional[str] = None) -> Optional[str]:
+def _query_llm(prompt: str, model: str, system: Optional[str] = None) -> Optional[str]:
     """
-    Query Ollama using the official Python SDK.
+    Query the local LLM for text output.
 
     Args:
         prompt: The prompt to send
-        model: Ollama model name (e.g., "qwen3:1.7b", "llama3:8b")
+        model: Model name (e.g., "qwen3-1.7b", "lfm2.5-1.2b")
         system: Optional system prompt
 
     Returns:
         Response text, or None if failed
     """
     try:
-        return query_ollama_text(
+        return query_llm_text(
             prompt=prompt,
             model=model,
             system=system,
             temperature=0.3,
         )
     except Exception as e:
-        print(f"[enhance] Ollama query failed: {e}")
+        print(f"[enhance] LLM query failed: {e}")
         return None
 
 
@@ -233,7 +239,7 @@ def generate_template_skills(portfolio: PortfolioFacts) -> str:
 
 def enhance_with_llm(
     portfolio: PortfolioFacts,
-    model: str = "qwen3:1.7b",
+    model: str = "qwen3-1.7b",
 ) -> ResumeContent:
     """
     Enhance portfolio facts with LLM-generated prose.
@@ -253,30 +259,22 @@ def enhance_with_llm(
         llm_enhanced=False,
     )
 
-    # Check if Ollama is available
-    if not check_ollama_available():
+    # Check if model is available
+    if not check_llm_available(model):
         raise RuntimeError(
-            "Ollama is not available. Please start Ollama server with 'ollama serve'"
+            f"Model '{model}' is not available. "
+            f"Run 'resume download-model {model}' to download it."
         )
 
-    # Check if the requested model is available
+    # List available models for diagnostics if needed
     available = get_available_models()
-    if model not in available:
-        if available:
-            raise RuntimeError(
-                f"Model '{model}' not found. Available models: {', '.join(available)}"
-            )
-        else:
-            raise RuntimeError(
-                f"No models available in Ollama. Run 'ollama pull {model}' to download."
-            )
 
     print(f"[enhance] Using model: {model}")
 
     # Generate bullets for each project
     for project in portfolio.projects:
         prompt = build_project_prompt(project)
-        response = query_ollama(prompt, model)
+        response = _query_llm(prompt, model)
 
         if not response:
             raise RuntimeError(f"LLM failed to generate bullets for {project.project_name}")
@@ -302,7 +300,7 @@ def enhance_with_llm(
 
     # Generate portfolio summary
     portfolio_prompt = build_portfolio_prompt(portfolio)
-    portfolio_response = query_ollama(portfolio_prompt, model)
+    portfolio_response = _query_llm(portfolio_prompt, model)
 
     if not portfolio_response:
         raise RuntimeError("LLM failed to generate portfolio summary")
@@ -319,6 +317,13 @@ def enhance_with_llm(
         result.professional_summary = portfolio_response[:500]
 
     result.model_used = model
+
+    # Populate new sections from portfolio facts (set by analysis pipeline)
+    result.skill_evolution = portfolio.skill_evolution_narrative
+    result.developer_profile = portfolio.developer_fingerprint
+    result.complexity_highlights = portfolio.complexity_narrative
+    result.work_breakdown = portfolio.total_commit_breakdown or None
+
     return result
 
 

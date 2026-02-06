@@ -26,8 +26,8 @@ def generate(
         help="User's email for git attribution",
     ),
     model: str = typer.Option(
-        "qwen3:1.7b", "--model", "-m",
-        help="Ollama model to use",
+        "qwen3-1.7b", "--model", "-m",
+        help="Local GGUF model to use (e.g., qwen3-1.7b, lfm2.5-1.2b)",
     ),
     output_json: Optional[Path] = typer.Option(
         None, "--output-json",
@@ -45,14 +45,14 @@ def generate(
     """
     Generate resume content from a ZIP of git repositories.
 
-    Uses Ollama for LLM-enhanced prose generation. Requires Ollama to be running.
+    Uses a local GGUF model via llama.cpp for LLM-enhanced prose generation.
 
     Examples:
-        # Basic usage (uses qwen3:1.7b)
+        # Basic usage (uses qwen3-1.7b)
         python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com
 
         # With specific model
-        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model llama3:8b
+        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model lfm2.5-1.2b
     """
     from .generate import generate_resume
 
@@ -112,23 +112,69 @@ def generate(
 
 
 @app.command()
-def check_ollama() -> None:
-    """Check if Ollama is available and list installed models."""
-    from .enhance import check_ollama_available, get_available_models
+def check_models() -> None:
+    """List locally available GGUF models and known downloadable models."""
+    from .llm_client import get_available_models, MODEL_REGISTRY, MODELS_DIR
 
-    if check_ollama_available():
-        typer.secho("✓ Ollama is running", fg=typer.colors.GREEN)
-        models = get_available_models()
-        if models:
-            typer.echo(f"\nAvailable models ({len(models)}):")
-            for model in models:
-                typer.echo(f"  - {model}")
-        else:
-            typer.secho("No models installed. Run: ollama pull qwen3:1.7b", fg=typer.colors.YELLOW)
+    models = get_available_models()
+    if models:
+        typer.secho("Installed models:", fg=typer.colors.GREEN)
+        for m in models:
+            typer.echo(f"  - {m}")
     else:
-        typer.secho("✗ Ollama is not running or not installed", fg=typer.colors.RED)
-        typer.echo("\nTo install Ollama: https://ollama.ai")
-        typer.echo("To start Ollama: ollama serve")
+        typer.secho("No models installed locally.", fg=typer.colors.YELLOW)
+
+    typer.echo(f"\nModel directory: {MODELS_DIR}")
+    typer.echo(f"\nDownloadable models ({len(MODEL_REGISTRY)}):")
+    for name, (repo_id, filename, _) in MODEL_REGISTRY.items():
+        status = "installed" if name in models else "not installed"
+        typer.echo(f"  - {name} ({status}) — {repo_id}")
+
+
+@app.command()
+def download_model(
+    model: str = typer.Argument("qwen3-1.7b", help="Model name to download"),
+) -> None:
+    """Download a GGUF model from HuggingFace for local inference."""
+    from .llm_client import ensure_model_available, check_llm_available
+
+    if check_llm_available(model):
+        typer.secho(f"Model '{model}' is already installed.", fg=typer.colors.GREEN)
+        return
+
+    typer.echo(f"Downloading model '{model}'...")
+    try:
+        ensure_model_available(model)
+        typer.secho(f"Model '{model}' downloaded successfully.", fg=typer.colors.GREEN)
+    except RuntimeError as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+
+@app.command()
+def benchmark(
+    models: Optional[list[str]] = typer.Option(
+        None, "--models", "-m",
+        help="Models to benchmark (default: all registered models)",
+    ),
+    runs: int = typer.Option(
+        3, "--runs", "-r",
+        help="Number of runs per prompt (1 cold + N-1 warm)",
+    ),
+    output: Optional[Path] = typer.Option(
+        None, "--output", "-o",
+        help="Save markdown report to file",
+    ),
+) -> None:
+    """Run a side-by-side model benchmark comparing speed, memory, and output quality."""
+    from .benchmark import run_benchmark
+
+    report = run_benchmark(
+        models=models,
+        runs=runs,
+        output_path=str(output) if output else None,
+    )
+    typer.echo("\n" + report)
 
 
 def main() -> None:

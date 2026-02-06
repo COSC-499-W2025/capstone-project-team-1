@@ -51,6 +51,10 @@ class GenerationResult:
                 "project_bullets": self.resume_content.project_bullets,
                 "professional_summary": self.resume_content.professional_summary,
                 "skills_section": self.resume_content.skills_section,
+                "skill_evolution": self.resume_content.skill_evolution,
+                "developer_profile": self.resume_content.developer_profile,
+                "complexity_highlights": self.resume_content.complexity_highlights,
+                "work_breakdown": self.resume_content.work_breakdown,
                 "llm_enhanced": self.resume_content.llm_enhanced,
                 "model_used": self.resume_content.model_used,
             },
@@ -103,6 +107,40 @@ class GenerationResult:
             bullets = self.resume_content.project_bullets.get(project.project_name, [])
             for bullet in bullets:
                 lines.append(f"- {bullet}")
+            lines.append("")
+
+        # Skill Evolution
+        if self.resume_content.skill_evolution:
+            lines.append("## Skill Evolution")
+            lines.append("")
+            lines.append(self.resume_content.skill_evolution)
+            lines.append("")
+
+        # Developer Profile
+        if self.resume_content.developer_profile:
+            lines.append("## Developer Profile")
+            lines.append("")
+            lines.append(self.resume_content.developer_profile)
+            lines.append("")
+
+        # Complexity Highlights
+        if self.resume_content.complexity_highlights:
+            lines.append("## Complexity Highlights")
+            lines.append("")
+            lines.append(self.resume_content.complexity_highlights)
+            lines.append("")
+
+        # Work Breakdown
+        if self.resume_content.work_breakdown:
+            lines.append("## Work Breakdown")
+            lines.append("")
+            total = sum(self.resume_content.work_breakdown.values())
+            for cat, count in sorted(
+                self.resume_content.work_breakdown.items(),
+                key=lambda x: -x[1],
+            ):
+                pct = (count / total * 100) if total > 0 else 0
+                lines.append(f"- **{cat.title()}**: {count} commits ({pct:.0f}%)")
             lines.append("")
 
         # Footer
@@ -190,14 +228,14 @@ def generate_resume(
     Args:
         zip_path: Absolute path to the ZIP file containing git repos
         user_email: User's email for attribution in git history
-        llm_model: Ollama model to use (default: qwen3:1.7b)
+        llm_model: Local GGUF model to use (default: qwen3-1.7b)
         progress_callback: Optional callback for progress updates
 
     Returns:
         GenerationResult with portfolio facts and resume content
 
     Raises:
-        RuntimeError: If Ollama is not available or LLM fails
+        RuntimeError: If model is not available or LLM fails
     """
     start_time = datetime.now()
     errors: List[str] = []
@@ -206,6 +244,12 @@ def generate_resume(
         if progress_callback:
             progress_callback(msg)
         print(f"[resume] {msg}")
+
+    # Ensure the LLM model is available before starting analysis
+    model = llm_model or "qwen3-1.7b"
+    from .llm_client import ensure_model_available
+    log(f"Ensuring model '{model}' is available...")
+    ensure_model_available(model)
 
     # Import existing analysis infrastructure
     # (Deferred import to avoid circular dependencies)
@@ -275,6 +319,61 @@ def generate_resume(
                 deep_result=deep_result,
             )
 
+            # --- NEW: LLM-enhanced analysis per repo ---
+            from .analysis.commit_classifier import (
+                extract_commit_messages,
+                classify_commits,
+            )
+            from .analysis.skill_timeline import compute_skill_first_appearances
+            from .analysis.developer_style import compute_style_metrics
+            from .analysis.complexity_narrative import compute_complexity_metrics
+
+            # 3b: Commit message classification
+            try:
+                commit_msgs = extract_commit_messages(
+                    str(repo_path), user_email, max_commits=200
+                )
+                if commit_msgs:
+                    log(f"  Classifying {len(commit_msgs)} commits...")
+                    facts.commit_breakdown = classify_commits(
+                        commit_msgs, model=model
+                    )
+            except Exception as e:
+                log(f"  Note: commit classification skipped: {e}")
+
+            # 3c: Skill first-appearances
+            try:
+                appearances = compute_skill_first_appearances(
+                    str(repo_path), user_email, facts.detected_skills
+                )
+                facts.skill_first_appearances = {
+                    a.skill_name: a.first_date for a in appearances
+                }
+            except Exception as e:
+                log(f"  Note: skill timeline skipped: {e}")
+
+            # 3d: Style metrics
+            try:
+                style = compute_style_metrics(
+                    str(repo_path), user_email, facts.primary_language
+                )
+                if style:
+                    from dataclasses import asdict as _asdict
+                    facts.style_metrics = _asdict(style)
+            except Exception as e:
+                log(f"  Note: style metrics skipped: {e}")
+
+            # 3e: Complexity metrics
+            try:
+                complexity = compute_complexity_metrics(str(repo_path), user_email)
+                if complexity:
+                    from dataclasses import asdict as _asdict2
+                    facts.complexity_highlights = [
+                        _asdict2(c) for c in complexity[:5]
+                    ]
+            except Exception as e:
+                log(f"  Note: complexity metrics skipped: {e}")
+
             project_facts_list.append(facts)
             log(f"  ✓ {len(facts.detected_skills)} skills, {len(facts.insights)} insights")
 
@@ -291,8 +390,70 @@ def generate_resume(
     portfolio = build_portfolio_facts(user_email, project_facts_list)
     log(f"Portfolio: {portfolio.total_projects} projects, {len(portfolio.top_skills)} skills")
 
-    # Step 5: Generate resume content with LLM
-    model = llm_model or "qwen3:1.7b"
+    # Step 5: LLM narrative generation for new analysis features
+
+    # 5a: Skill evolution narrative
+    if portfolio.skill_timeline:
+        try:
+            from .analysis.skill_timeline import (
+                SkillAppearance,
+                generate_skill_timeline_narrative,
+            )
+            appearances = [
+                SkillAppearance(
+                    skill_name=s["skill"],
+                    first_date=s["first_seen"],
+                    project_name=s.get("project", ""),
+                    evidence="",
+                )
+                for s in portfolio.skill_timeline
+            ]
+            log("Generating skill evolution narrative...")
+            result = generate_skill_timeline_narrative(appearances, model)
+            if result:
+                portfolio.skill_evolution_narrative = result.narrative
+        except Exception as e:
+            log(f"  Note: skill timeline narrative skipped: {e}")
+
+    # 5b: Developer style fingerprint
+    all_style_metrics = [
+        p.style_metrics for p in project_facts_list if p.style_metrics
+    ]
+    if all_style_metrics:
+        try:
+            from .analysis.developer_style import (
+                StyleMetrics,
+                generate_style_fingerprint,
+            )
+            # Use the first project's metrics (or aggregate later)
+            m = all_style_metrics[0]
+            metrics = StyleMetrics(**m)
+            log("Generating developer profile...")
+            fingerprint = generate_style_fingerprint(metrics, model)
+            if fingerprint:
+                portfolio.developer_fingerprint = fingerprint.narrative
+        except Exception as e:
+            log(f"  Note: developer fingerprint skipped: {e}")
+
+    # 5c: Complexity narrative
+    all_complexity = []
+    for p in project_facts_list:
+        all_complexity.extend(p.complexity_highlights)
+    if all_complexity:
+        try:
+            from .analysis.complexity_narrative import (
+                FileComplexity,
+                generate_complexity_narrative,
+            )
+            metrics_list = [FileComplexity(**c) for c in all_complexity]
+            log("Generating complexity narrative...")
+            narrative = generate_complexity_narrative(metrics_list, model)
+            if narrative:
+                portfolio.complexity_narrative = narrative.narrative
+        except Exception as e:
+            log(f"  Note: complexity narrative skipped: {e}")
+
+    # Step 6: Generate resume content with LLM (existing prose polish)
     log(f"Enhancing with LLM ({model})...")
     resume_content = enhance_with_llm(portfolio, model=model)
 
