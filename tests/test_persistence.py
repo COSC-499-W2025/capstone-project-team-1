@@ -47,7 +47,11 @@ def db_session():
 @pytest.fixture
 def repo_stat(db_session):
     """Pre-populated RepoStat for foreign key references."""
-    rs = RepoStat(project_name="test-project", is_collaborative=False)
+    rs = RepoStat(
+        project_name="test-project",
+        project_path="/tmp/test-project",
+        is_collaborative=False,
+    )
     db_session.add(rs)
     db_session.commit()
     return rs
