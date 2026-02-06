@@ -470,7 +470,6 @@ READABLE_EXTENSIONS = {
     ".rej",
     ".lock",
     ".example",
-    ".sample",
     ".template",
     ".tmpl",
     ".j2",
@@ -593,9 +592,9 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     merged_dirs = []
 
     if paths is None:
-        return [], {}
+        return {}, []
     if len(paths) <= 0:
-        return [], {}
+        return {}, []
  
     for path in paths:
 
@@ -609,7 +608,7 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     all_file_values = copy.deepcopy(store_file_dictionary.get_dict()) #get dictionary values...
     store_file_dictionary.remove_all_dict()
     
-    return merged_dirs, all_file_values
+    return all_file_values, merged_dirs 
 
 """        path = Path(path) if isinstance(path, str) else path
         if not path.exists():

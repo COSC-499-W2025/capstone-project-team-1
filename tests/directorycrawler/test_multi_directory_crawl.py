@@ -23,7 +23,7 @@ def test_crawl_multiple_directories_combines_files():
     paths = [MOCKS_DIR / "mockdirectory1", MOCKS_DIR / "mockdirectory2"]
     tuple = crawl_multiple_directories(paths)
 
-    file_names = [v[0] for v in tuple[1].values()]
+    file_names = [v[0] for v in tuple[0].values()]
     assert "test.py" in file_names
     assert "README.txt" in file_names
 
@@ -35,7 +35,7 @@ def test_crawl_multiple_directories_deduplicates_dirs():
     dw.userExcludeFileName = []
 
     paths = [MOCKS_DIR / "mockdirectory1", MOCKS_DIR / "mockdirectory2"]
-    _, dir_list = crawl_multiple_directories(paths)
+    dir_list, _ = crawl_multiple_directories(paths)
 
     assert len(dir_list) == len(set(dir_list))
 
@@ -47,7 +47,7 @@ def test_crawl_multiple_directories_handles_nonexistent():
     dw.userExcludeFileName = []
 
     paths = [MOCKS_DIR / "mockdirectory1", MOCKS_DIR / "does_not_exist"]
-    _, file_dict = crawl_multiple_directories(paths)
+    file_dict,_ = crawl_multiple_directories(paths)
 
     file_names = [v[0] for v in file_dict.values()]
     assert "test.py" in file_names
@@ -56,7 +56,7 @@ def test_crawl_multiple_directories_handles_nonexistent():
 def test_crawl_multiple_directories_empty_list():
     """Test that empty path list returns empty results."""
     store.remove_all_dict()
-    dir_list,file_dict = crawl_multiple_directories([])
+    file_dict,dir_list = crawl_multiple_directories([])
 
     assert file_dict == {}
     assert dir_list == []
@@ -69,7 +69,7 @@ def test_crawl_multiple_directories_single_path():
     dw.userExcludeFileName = []
 
     paths = [MOCKS_DIR / "mockdirectory1"]
-    _,file_dict = crawl_multiple_directories(paths)
+    file_dict,_ = crawl_multiple_directories(paths)
 
     file_names = [v[0] for v in file_dict.values()]
     assert "test.py" in file_names
@@ -90,7 +90,7 @@ def test_crawl_multiple_directories_deduplicates_identical_files(tmp_path):
     (dir2 / "shared.py").write_text("print('hello world')")
     (dir2 / "unique.py").write_text("print('unique file')")
 
-    _, file_dict = crawl_multiple_directories([dir1, dir2])
+    file_dict, _ = crawl_multiple_directories([dir1, dir2])
 
     file_names = [v[0] for v in file_dict.values()]
     assert file_names.count("shared.py") == 1
