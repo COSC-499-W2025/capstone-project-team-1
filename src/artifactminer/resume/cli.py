@@ -27,7 +27,13 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 @app.command("generate")
 def generate_v3(
     zip_path: Path = typer.Option(
-        ..., "--zip", "-z", exists=True, file_okay=True, dir_okay=False, readable=True,
+        ...,
+        "--zip",
+        "-z",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
         help="Path to ZIP file containing git repositories",
     ),
     email: str = typer.Option(
