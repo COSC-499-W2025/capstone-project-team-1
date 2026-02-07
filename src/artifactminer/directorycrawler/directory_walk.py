@@ -610,10 +610,6 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
     
     return all_file_values, merged_dirs 
 
-"""        path = Path(path) if isinstance(path, str) else path
-        if not path.exists():
-            print(f"path does not exist: {path}")
-            continue"""
                 
 def is_file_readable(full_path: str) -> bool:
     #1- check if the file exists

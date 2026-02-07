@@ -19,25 +19,13 @@ async def get_crawler_pdf_contents(file_values : list[FileValues]) -> str:
     if len(file_values) < 0: 
         return "no response, file value is empty."
     
-    str_response = "No pdf file found."
+    str_response = "No pdf file found." #update this message based on file type...
     for file_data in file_values:
         if file_data[2] == ".pdf":
-            str_response = await analyze_pdf(file_path=file_data[2]) #get relative path
+            str_response = await analyze_pdf(file_path=file_data[0]) #get relative path
 
     return str_response
 
-"""
-Evan's previous code: 
-async def analyze_file(file_path):
-    # Placeholder for file analysis logic
-    # This could involve AI-based analysis or simple string matching
-    get_extension = file_path.split('.')[-1].lower()
-    if(get_extension == "pdf"):
-        print(f"Analyzing file: {file_path}")
-        return await analyze_pdf(file_path)
-
-    return None
-"""
 
 async def analyze_pdf(file_path):
     """

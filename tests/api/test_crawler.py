@@ -118,7 +118,6 @@ async def test_get_crawler_content_pdf_analysis(client):
     pdf_path = Path(__file__).parent/ "../directorycrawler" / "mocks" / "pdfdirectory.zip"
     response = upload_zip_for_test(client=client, path=pdf_path)
     payload = response.json()
-    
 
     assert payload["zip_id"] == 1
     assert payload["filename"] == "pdfdirectory.zip"
@@ -132,7 +131,11 @@ async def test_get_crawler_content_pdf_analysis(client):
 
     file_values = payload["crawl_path_and_file_name_and_ext"]
 
-    response = await get_crawler_pdf_contents(file_values=file_values)
+    #convert object to tuple 
+    tuple_file_values = [(fv["file_path"], fv["file_name"], fv["file_ext"])
+    for fv in file_values]
+
+    response = await get_crawler_pdf_contents(file_values=tuple_file_values)
 
     assert isinstance(response, str)
     

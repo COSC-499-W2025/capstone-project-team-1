@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+import logging
+import os
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from artifactminer.api.analyze import extract_zip_to_persistent_location
@@ -14,10 +16,30 @@ router = APIRouter(tags=["crawler"])
 @router.get("/crawler", response_model=CrawlerFiles, tags=["crawler"])
 async def get_crawler_contents(zip_id: int, db: Session = Depends(get_db)) -> CrawlerFiles:
     
-    #1) get data from user consent (in config)
-
-    #2) get zip path data.
-    uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
+    try:
+    #1) get zip path data.
+        uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == zip_id).first()
+    except Exception as e: 
+        raise HTTPException(
+                status_code=404,
+                detail=f"{e}"
+            )
+    if uploaded_zip is None:
+        if uploaded_zip is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"could not find uploaded zip row with zip id {zip_id}"
+            )
+    if uploaded_zip.path is None:
+        raise HTTPException(
+                status_code=404,
+                detail=f"path not found for zip id {zip_id}"
+            )
+    if not os.path.exists(uploaded_zip.path):
+        raise HTTPException(
+                status_code=404,
+                detail=f"path {uploaded_zip.path} does not exist for system"
+            )
 
     extraction_path = extract_zip_to_persistent_location(uploaded_zip.path, zip_id) #extract the zip file.
     
