@@ -133,7 +133,9 @@ Based on the following portfolio of projects, write:
 Portfolio facts:
 {context}
 
-IMPORTANT rules for the SKILLS section:
+CRITICAL RULES for the SKILLS section:
+- ONLY list technologies that appear in the portfolio facts above
+- NEVER invent or assume technologies not explicitly listed
 - Group skills into categories: Languages, Frameworks & Libraries, Infrastructure, Practices
 - Each skill must appear in EXACTLY ONE category. If a skill could fit multiple
   categories, place it in the most specific one (e.g., TypeScript → Languages, not Frameworks)
@@ -141,14 +143,14 @@ IMPORTANT rules for the SKILLS section:
 - List ONLY skill names separated by commas — NO percentages, NO evidence, NO descriptions
 - Do NOT include internal metadata like "1 occurrence in user-edited manifests"
 
-Example skills format:
-Languages: Python, Go, TypeScript
-Frameworks & Libraries: FastAPI, React, scikit-learn
-Infrastructure: Docker, AWS, Terraform
-Practices: REST API Design, Test-Driven Development
+Format (use actual skills from portfolio, NOT these examples):
+Languages: [actual languages from portfolio]
+Frameworks & Libraries: [actual frameworks from portfolio]
+Infrastructure: [actual infrastructure tools from portfolio]
+Practices: [actual practices from portfolio]
 
-Example summary style:
-"Full-stack developer with experience building REST APIs, CLI tools, and data pipelines across 4 projects. Proficient in Python and Go with a focus on clean architecture and test coverage."
+Example summary style (adapt to actual portfolio):
+"[Role] with experience building [types of systems] across [N] projects. Proficient in [primary languages] with a focus on [key practices from portfolio]."
 
 Format your response as:
 SUMMARY:
