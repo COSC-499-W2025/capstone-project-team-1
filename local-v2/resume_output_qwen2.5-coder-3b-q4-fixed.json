@@ -1,0 +1,946 @@
+{
+  "portfolio": {
+    "user_email": "shlok10@student.ubc.ca",
+    "projects": [
+      {
+        "project_name": "go-task-runner",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/go-task-runner",
+        "languages": [
+          "Go"
+        ],
+        "language_percentages": [
+          50.0
+        ],
+        "primary_language": "Go",
+        "frameworks": [],
+        "user_contribution_pct": 30.434782608695656,
+        "user_total_commits": 7,
+        "total_commits": 23,
+        "commit_frequency": "0.3025469513763828",
+        "first_commit": "2020-08-31T17:00:00",
+        "last_commit": "2021-02-09T16:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Go",
+          "Technical Writing"
+        ],
+        "skill_evidence": {},
+        "insights": [],
+        "health_score": 37.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "feature": 3,
+          "chore": 2,
+          "docs": 1,
+          "test": 1
+        },
+        "commit_subjects": [
+          "feat: save results to json file",
+          "feat: add dry-run flag",
+          "feat: map outputs to result structs",
+          "chore: add logger interface",
+          "docs: validation rules",
+          "test: ensure config loads",
+          "chore: init module and task config"
+        ],
+        "skill_first_appearances": {
+          "Go": "2020-09-01T00:00:00+00:00"
+        },
+        "style_metrics": null,
+        "complexity_highlights": []
+      },
+      {
+        "project_name": "personal-portfolio-site",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/personal-portfolio-site",
+        "languages": [
+          "JavaScript",
+          "html",
+          "css"
+        ],
+        "language_percentages": [
+          33.33333333333333,
+          16.666666666666664,
+          16.666666666666664
+        ],
+        "primary_language": "JavaScript",
+        "frameworks": [],
+        "user_contribution_pct": 100.0,
+        "user_total_commits": 21,
+        "total_commits": 21,
+        "commit_frequency": "0.5652940233936868",
+        "first_commit": "2020-12-31T16:00:00",
+        "last_commit": "2021-09-17T17:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "JavaScript",
+          "Technical Writing"
+        ],
+        "skill_evidence": {},
+        "insights": [],
+        "health_score": 37.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "feature": 7,
+          "bugfix": 1,
+          "docs": 6,
+          "test": 1,
+          "refactor": 4,
+          "chore": 2
+        },
+        "commit_subjects": [
+          "style: footer palette",
+          "a11y: enable keyboard navigation",
+          "docs: note skills + accessibility",
+          "test: assert skills section exists",
+          "style: improve readability",
+          "feat: add skills section",
+          "docs: deployment notes",
+          "content: showcase go runner",
+          "docs: jot seo todo",
+          "style: center layout",
+          "refactor: prep footer slot",
+          "docs: document smoke test",
+          "chore: guard against empty data",
+          "style: refine card depth",
+          "docs: add accessibility note",
+          "copy: tighten title and tagline",
+          "docs: note badge spacing",
+          "content: add infra project",
+          "style: add hover affordance",
+          "feat: hero CTA and project grid",
+          "chore: scaffold portfolio site"
+        ],
+        "skill_first_appearances": {
+          "JavaScript": "2021-01-01T00:00:00+00:00"
+        },
+        "style_metrics": {
+          "avg_function_length": 7.666666666666667,
+          "max_function_length": 15,
+          "total_functions": 3,
+          "naming_convention": "camelCase",
+          "type_annotation_ratio": 0.0,
+          "comment_density": 2.127659574468085,
+          "docstring_coverage": 0.0,
+          "avg_imports_per_file": 0.5,
+          "files_analyzed": 2
+        },
+        "complexity_highlights": [
+          {
+            "filepath": "tests/links.test.js",
+            "cyclomatic_complexity": 4,
+            "max_nesting_depth": 1,
+            "loc": 10,
+            "function_count": 0
+          },
+          {
+            "filepath": "src/main.js",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 2,
+            "loc": 31,
+            "function_count": 3
+          }
+        ]
+      },
+      {
+        "project_name": "sensor-fleet-backend",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/sensor-fleet-backend",
+        "languages": [
+          "Python"
+        ],
+        "language_percentages": [
+          57.14285714285714
+        ],
+        "primary_language": "Python",
+        "frameworks": [
+          "FastAPI",
+          "Data Validation",
+          "Testing"
+        ],
+        "user_contribution_pct": 43.47826086956522,
+        "user_total_commits": 10,
+        "total_commits": 23,
+        "commit_frequency": "0.33339948402460806",
+        "first_commit": "2021-06-30T17:00:00",
+        "last_commit": "2022-01-26T16:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Technical Writing",
+          "Python",
+          "FastAPI",
+          "Data Validation",
+          "Testing",
+          "Resource Management",
+          "Context Management"
+        ],
+        "skill_evidence": {
+          "FastAPI": [
+            "1 occurrence(s) of 'fastapi' in user-edited manifests",
+            "1 occurrence(s) of 'uvicorn' in user-edited manifests"
+          ],
+          "Data Validation": [
+            "1 occurrence(s) of 'pydantic' in user-edited manifests",
+            "Pydantic models referenced (2 matches)"
+          ],
+          "Testing": [
+            "1 occurrence(s) of 'pytest' in user-edited manifests"
+          ],
+          "Resource Management": [
+            "Resource caps or chunking present in changes (2 matches)"
+          ],
+          "Context Management": [
+            "Context manager usage for resource safety in changes (2 matches)"
+          ]
+        },
+        "insights": [
+          {
+            "title": "Complexity awareness",
+            "why": "Resource caps and chunking show attention to cost/complexity under load.",
+            "evidence": [
+              "Resource caps or chunking present in changes (2 matches)"
+            ]
+          },
+          {
+            "title": "Abstraction and encapsulation",
+            "why": "Structured modeling and interfaces reflect design thinking beyond scripts.",
+            "evidence": [
+              "1 occurrence(s) of 'pydantic' in user-edited manifests",
+              "Pydantic models referenced (2 matches)"
+            ]
+          },
+          {
+            "title": "Robustness and error handling",
+            "why": "Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
+            "evidence": [
+              "Context manager usage for resource safety in changes (2 matches)"
+            ]
+          },
+          {
+            "title": "API design and architecture",
+            "why": "Clean API design with validation and DI shows architectural maturity.",
+            "evidence": [
+              "1 occurrence(s) of 'pydantic' in user-edited manifests",
+              "Pydantic models referenced (2 matches)"
+            ]
+          }
+        ],
+        "health_score": 37.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "docs": 1,
+          "feature": 3,
+          "test": 4,
+          "chore": 2
+        },
+        "commit_subjects": [
+          "docs: describe alerts",
+          "feat: add alerts endpoint",
+          "test: calibrate endpoint",
+          "feat: uptime endpoint",
+          "test: export csv helper",
+          "test: cover clear helper",
+          "test: stale sensor path",
+          "chore: add requests for seeding",
+          "feat: average helper",
+          "chore: scaffold fastapi service"
+        ],
+        "skill_first_appearances": {
+          "Python": "2021-07-01T00:00:00+00:00",
+          "Testing": "2021-07-01T00:00:00+00:00"
+        },
+        "style_metrics": {
+          "avg_function_length": 2.6875,
+          "max_function_length": 6,
+          "total_functions": 16,
+          "naming_convention": "snake_case",
+          "type_annotation_ratio": 0.0,
+          "comment_density": 0.0,
+          "docstring_coverage": 0.0,
+          "avg_imports_per_file": 2.75,
+          "files_analyzed": 4
+        },
+        "complexity_highlights": [
+          {
+            "filepath": "tests/test_health.py",
+            "cyclomatic_complexity": 4,
+            "max_nesting_depth": 1,
+            "loc": 15,
+            "function_count": 7
+          },
+          {
+            "filepath": "app/main.py",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 2,
+            "loc": 35,
+            "function_count": 4
+          },
+          {
+            "filepath": "scripts/seed_data.py",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 1,
+            "loc": 7,
+            "function_count": 0
+          },
+          {
+            "filepath": "app/repository.py",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 2,
+            "loc": 13,
+            "function_count": 5
+          }
+        ]
+      },
+      {
+        "project_name": "infra-terraform",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/infra-terraform",
+        "languages": [],
+        "language_percentages": [],
+        "primary_language": "tf",
+        "frameworks": [],
+        "user_contribution_pct": 30.434782608695656,
+        "user_total_commits": 7,
+        "total_commits": 23,
+        "commit_frequency": "0.05587695613396294",
+        "first_commit": "2023-06-30T17:00:00",
+        "last_commit": "2025-11-23T15:14:35",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Technical Writing"
+        ],
+        "skill_evidence": {},
+        "insights": [],
+        "health_score": 52.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "chore": 2,
+          "feature": 4,
+          "docs": 1
+        },
+        "commit_subjects": [
+          "chore: clean dev/stage terraform layout",
+          "feat: output cost center",
+          "feat: add cost center local",
+          "docs: capture tfvars and version pin",
+          "feat: add stage environment",
+          "feat: expose logging bucket output",
+          "chore: seed modules and dev env"
+        ],
+        "skill_first_appearances": {},
+        "style_metrics": null,
+        "complexity_highlights": []
+      },
+      {
+        "project_name": "algorithms-toolkit",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/algorithms-toolkit",
+        "languages": [
+          "Python"
+        ],
+        "language_percentages": [
+          62.5
+        ],
+        "primary_language": "Python",
+        "frameworks": [
+          "Testing"
+        ],
+        "user_contribution_pct": 100.0,
+        "user_total_commits": 18,
+        "total_commits": 18,
+        "commit_frequency": "0.7636363636363636",
+        "first_commit": "2021-03-31T17:00:00",
+        "last_commit": "2021-09-12T17:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Technical Writing",
+          "Python",
+          "Testing",
+          "Command Line Tools",
+          "Advanced Collections",
+          "Context Management"
+        ],
+        "skill_evidence": {
+          "Testing": [
+            "1 occurrence(s) of 'pytest' in user-edited manifests"
+          ],
+          "Command Line Tools": [
+            "CLI parsing detected (6 matches)"
+          ],
+          "Advanced Collections": [
+            "Specialized Python collections in changes (2 matches)"
+          ],
+          "Context Management": [
+            "Context manager usage for resource safety in changes (2 matches)"
+          ]
+        },
+        "insights": [
+          {
+            "title": "Data structure and optimization",
+            "why": "Specialized collections and optimization tools indicate performance-minded choices.",
+            "evidence": [
+              "Specialized Python collections in changes (2 matches)"
+            ]
+          },
+          {
+            "title": "Robustness and error handling",
+            "why": "Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
+            "evidence": [
+              "Context manager usage for resource safety in changes (2 matches)"
+            ]
+          }
+        ],
+        "health_score": 32.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "docs": 3,
+          "test": 5,
+          "feature": 6,
+          "chore": 2
+        },
+        "commit_subjects": [
+          "docs: summarize new helpers",
+          "test: cover rotate",
+          "feat: add rotate helper",
+          "test: cover dijkstra",
+          "feat: add dijkstra shortest path",
+          "test: bounded search",
+          "feat: bounded binary search",
+          "chore: list argparse for clarity",
+          "docs: clarify binary search target",
+          "test: cover reverse helper",
+          "feat: convenience reverse helper",
+          "docs: add CLI examples",
+          "test: add sorted check",
+          "test: cover two-sum",
+          "feat: utility to check sorted arrays",
+          "docs: mention two-sum helper",
+          "feat: add two-sum helper",
+          "chore: scaffold algorithms toolkit"
+        ],
+        "skill_first_appearances": {
+          "Python": "2021-04-01T00:00:00+00:00",
+          "Testing": "2021-04-01T00:00:00+00:00"
+        },
+        "style_metrics": {
+          "avg_function_length": 5.041666666666667,
+          "max_function_length": 19,
+          "total_functions": 24,
+          "naming_convention": "snake_case",
+          "type_annotation_ratio": 0.125,
+          "comment_density": 0.0,
+          "docstring_coverage": 0.0,
+          "avg_imports_per_file": 1.6,
+          "files_analyzed": 5
+        },
+        "complexity_highlights": [
+          {
+            "filepath": "algokit/search.py",
+            "cyclomatic_complexity": 13,
+            "max_nesting_depth": 4,
+            "loc": 40,
+            "function_count": 6
+          },
+          {
+            "filepath": "algokit/sorting.py",
+            "cyclomatic_complexity": 6,
+            "max_nesting_depth": 3,
+            "loc": 30,
+            "function_count": 6
+          },
+          {
+            "filepath": "algokit/cli.py",
+            "cyclomatic_complexity": 6,
+            "max_nesting_depth": 4,
+            "loc": 31,
+            "function_count": 2
+          },
+          {
+            "filepath": "tests/test_search.py",
+            "cyclomatic_complexity": 5,
+            "max_nesting_depth": 1,
+            "loc": 16,
+            "function_count": 10
+          },
+          {
+            "filepath": "algokit/__init__.py",
+            "cyclomatic_complexity": 1,
+            "max_nesting_depth": 0,
+            "loc": 3,
+            "function_count": 0
+          }
+        ]
+      },
+      {
+        "project_name": "java-chat-service",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/java-chat-service",
+        "languages": [
+          "Java"
+        ],
+        "language_percentages": [
+          66.66666666666666
+        ],
+        "primary_language": "Java",
+        "frameworks": [],
+        "user_contribution_pct": 30.434782608695656,
+        "user_total_commits": 7,
+        "total_commits": 23,
+        "commit_frequency": "0.34027777777777773",
+        "first_commit": "2020-03-31T17:00:00",
+        "last_commit": "2020-08-22T17:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Java",
+          "Technical Writing"
+        ],
+        "skill_evidence": {},
+        "insights": [],
+        "health_score": 22.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "test": 1,
+          "feature": 4,
+          "chore": 2
+        },
+        "commit_subjects": [
+          "test: cover latest helper",
+          "feat: search messages endpoint",
+          "feat: json messages endpoint",
+          "feat: fetch latest messages",
+          "feat: expose message count endpoint",
+          "chore: log high traffic",
+          "chore: bootstrap java http server"
+        ],
+        "skill_first_appearances": {
+          "Java": "2020-04-01T00:00:00+00:00"
+        },
+        "style_metrics": null,
+        "complexity_highlights": []
+      },
+      {
+        "project_name": "campus-navigation-api",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/campus-navigation-api",
+        "languages": [
+          "TypeScript",
+          "JavaScript"
+        ],
+        "language_percentages": [
+          40.0,
+          30.0
+        ],
+        "primary_language": "TypeScript",
+        "frameworks": [
+          "Express",
+          "TypeScript"
+        ],
+        "user_contribution_pct": 36.0,
+        "user_total_commits": 9,
+        "total_commits": 25,
+        "commit_frequency": "0.34607461661707484",
+        "first_commit": "2022-01-31T16:00:00",
+        "last_commit": "2022-08-01T17:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "TypeScript",
+          "Technical Writing",
+          "JavaScript",
+          "Express",
+          "TypeScript Typing"
+        ],
+        "skill_evidence": {
+          "TypeScript": [
+            "1 occurrence(s) of 'typescript' in user-edited manifests"
+          ],
+          "Express": [
+            "2 occurrence(s) of 'express' in user-edited manifests"
+          ],
+          "TypeScript Typing": [
+            "Type annotations detected in TS/JS (6 matches)"
+          ]
+        },
+        "insights": [],
+        "health_score": 37.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "feature": 4,
+          "docs": 3,
+          "test": 1,
+          "chore": 1
+        },
+        "commit_subjects": [
+          "feat: simple preference routing",
+          "feat: safe path respecting closures",
+          "docs: expand API surface",
+          "feat: fetch single building",
+          "docs: add deployment notes",
+          "docs: describe schedule API",
+          "test: ensure fallback route",
+          "feat: endpoint to create buildings",
+          "chore: bootstrap express + tsconfig"
+        ],
+        "skill_first_appearances": {
+          "TypeScript": "2022-02-01T00:00:00+00:00",
+          "JavaScript": "2022-02-01T00:00:00+00:00"
+        },
+        "style_metrics": {
+          "avg_function_length": 4.6,
+          "max_function_length": 15,
+          "total_functions": 5,
+          "naming_convention": "camelCase",
+          "type_annotation_ratio": 0.2,
+          "comment_density": 0.0,
+          "docstring_coverage": 0.0,
+          "avg_imports_per_file": 1.5,
+          "files_analyzed": 4
+        },
+        "complexity_highlights": [
+          {
+            "filepath": "dist/graph.js",
+            "cyclomatic_complexity": 5,
+            "max_nesting_depth": 4,
+            "loc": 17,
+            "function_count": 2
+          },
+          {
+            "filepath": "dist/index.js",
+            "cyclomatic_complexity": 5,
+            "max_nesting_depth": 1,
+            "loc": 29,
+            "function_count": 0
+          },
+          {
+            "filepath": "src/graph.ts",
+            "cyclomatic_complexity": 5,
+            "max_nesting_depth": 4,
+            "loc": 18,
+            "function_count": 3
+          },
+          {
+            "filepath": "src/index.ts",
+            "cyclomatic_complexity": 4,
+            "max_nesting_depth": 1,
+            "loc": 31,
+            "function_count": 0
+          },
+          {
+            "filepath": "tests/routes.test.ts",
+            "cyclomatic_complexity": 3,
+            "max_nesting_depth": 0,
+            "loc": 8,
+            "function_count": 0
+          }
+        ]
+      },
+      {
+        "project_name": "ml-lab-notebooks",
+        "project_path": "/Users/Shlok/Downloads/20260125_221350_mock_projects_extracted/projects/ml-lab-notebooks",
+        "languages": [
+          "Python"
+        ],
+        "language_percentages": [
+          50.0
+        ],
+        "primary_language": "Python",
+        "frameworks": [
+          "Numerical Computing",
+          "Data Analysis",
+          "Machine Learning",
+          "Testing"
+        ],
+        "user_contribution_pct": 31.818181818181817,
+        "user_total_commits": 7,
+        "total_commits": 22,
+        "commit_frequency": "0.32657595112468757",
+        "first_commit": "2023-02-28T16:00:00",
+        "last_commit": "2023-07-28T17:00:00",
+        "activity_breakdown": {},
+        "detected_skills": [
+          "Technical Writing",
+          "Python",
+          "Numerical Computing",
+          "Data Analysis",
+          "Machine Learning",
+          "Testing"
+        ],
+        "skill_evidence": {
+          "Numerical Computing": [
+            "1 occurrence(s) of 'numpy' in user-edited manifests"
+          ],
+          "Data Analysis": [
+            "1 occurrence(s) of 'pandas' in user-edited manifests"
+          ],
+          "Machine Learning": [
+            "1 occurrence(s) of 'scikit-learn' in user-edited manifests"
+          ],
+          "Testing": [
+            "1 occurrence(s) of 'pytest' in user-edited manifests"
+          ]
+        },
+        "insights": [],
+        "health_score": 37.0,
+        "is_collaborative": true,
+        "commit_breakdown": {
+          "feature": 4,
+          "test": 1,
+          "docs": 1,
+          "chore": 1
+        },
+        "commit_subjects": [
+          "notes: add cross-validation todo",
+          "feat: add logistic regression experiment",
+          "test: mae metric",
+          "feat: simple train/test split",
+          "notes: add ridge idea",
+          "docs: add heuristic",
+          "chore: add regression baseline"
+        ],
+        "skill_first_appearances": {
+          "Python": "2023-03-01T00:00:00+00:00",
+          "Testing": "2023-03-01T00:00:00+00:00"
+        },
+        "style_metrics": {
+          "avg_function_length": 3.3125,
+          "max_function_length": 12,
+          "total_functions": 16,
+          "naming_convention": "snake_case",
+          "type_annotation_ratio": 0.125,
+          "comment_density": 0.0,
+          "docstring_coverage": 0.0,
+          "avg_imports_per_file": 2.75,
+          "files_analyzed": 4
+        },
+        "complexity_highlights": [
+          {
+            "filepath": "tests/test_cleaning.py",
+            "cyclomatic_complexity": 4,
+            "max_nesting_depth": 1,
+            "loc": 20,
+            "function_count": 7
+          },
+          {
+            "filepath": "experiments/linear_regression.py",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 1,
+            "loc": 13,
+            "function_count": 1
+          },
+          {
+            "filepath": "experiments/logistic_regression.py",
+            "cyclomatic_complexity": 2,
+            "max_nesting_depth": 2,
+            "loc": 17,
+            "function_count": 1
+          },
+          {
+            "filepath": "experiments/cleaning.py",
+            "cyclomatic_complexity": 1,
+            "max_nesting_depth": 1,
+            "loc": 13,
+            "function_count": 7
+          }
+        ]
+      }
+    ],
+    "top_skills": [
+      "Technical Writing",
+      "Python",
+      "Testing",
+      "JavaScript",
+      "Context Management",
+      "Go",
+      "FastAPI",
+      "Data Validation",
+      "Resource Management",
+      "Command Line Tools",
+      "Advanced Collections",
+      "Java",
+      "TypeScript",
+      "Express",
+      "TypeScript Typing",
+      "Numerical Computing",
+      "Data Analysis",
+      "Machine Learning"
+    ],
+    "total_projects": 8,
+    "total_commits": 86,
+    "languages_used": [
+      "Python",
+      "JavaScript",
+      "Go",
+      "html",
+      "css",
+      "Java",
+      "TypeScript"
+    ],
+    "frameworks_used": [
+      "Data Analysis",
+      "Data Validation",
+      "Express",
+      "FastAPI",
+      "Machine Learning",
+      "Numerical Computing",
+      "Testing",
+      "TypeScript"
+    ],
+    "earliest_commit": "2020-03-31T17:00:00",
+    "latest_commit": "2025-11-23T15:14:35",
+    "total_commit_breakdown": {
+      "feature": 35,
+      "chore": 14,
+      "docs": 16,
+      "test": 14,
+      "bugfix": 1,
+      "refactor": 4
+    },
+    "skill_timeline": [
+      {
+        "skill": "Java",
+        "first_seen": "2020-04-01T00:00:00+00:00",
+        "project": "java-chat-service"
+      },
+      {
+        "skill": "Go",
+        "first_seen": "2020-09-01T00:00:00+00:00",
+        "project": "go-task-runner"
+      },
+      {
+        "skill": "JavaScript",
+        "first_seen": "2021-01-01T00:00:00+00:00",
+        "project": "personal-portfolio-site"
+      },
+      {
+        "skill": "Python",
+        "first_seen": "2021-04-01T00:00:00+00:00",
+        "project": "algorithms-toolkit"
+      },
+      {
+        "skill": "Testing",
+        "first_seen": "2021-04-01T00:00:00+00:00",
+        "project": "algorithms-toolkit"
+      },
+      {
+        "skill": "Python",
+        "first_seen": "2021-07-01T00:00:00+00:00",
+        "project": "sensor-fleet-backend"
+      },
+      {
+        "skill": "Testing",
+        "first_seen": "2021-07-01T00:00:00+00:00",
+        "project": "sensor-fleet-backend"
+      },
+      {
+        "skill": "TypeScript",
+        "first_seen": "2022-02-01T00:00:00+00:00",
+        "project": "campus-navigation-api"
+      },
+      {
+        "skill": "JavaScript",
+        "first_seen": "2022-02-01T00:00:00+00:00",
+        "project": "campus-navigation-api"
+      },
+      {
+        "skill": "Python",
+        "first_seen": "2023-03-01T00:00:00+00:00",
+        "project": "ml-lab-notebooks"
+      },
+      {
+        "skill": "Testing",
+        "first_seen": "2023-03-01T00:00:00+00:00",
+        "project": "ml-lab-notebooks"
+      }
+    ],
+    "skill_evolution_narrative": "Over the past year, the developer has evolved from proficient in Java to a versatile developer with skills in Go, JavaScript, Python, and TypeScript. Key milestones include the creation of go-task-runner in September 2020, the development of personal-portfolio-site in January 2021, and the implementation of sensor-fleet-backend in July 2021. The developer has also demonstrated expertise in testing, contributing to the algorithms-toolkit, sensor-fleet-backend, campus-navigation-api, and ml-lab-notebooks projects.",
+    "developer_fingerprint": "The developer has a moderate function length of 7.7 lines, with the longest function at 15 lines. They use camelCase naming convention and have a low type annotation coverage of 0%. The code is well-commented with 2.1 comments per 100 lines, but lacks docstrings. The developer imports an average of 0.5 packages per file, and the codebase consists of 2 files. ",
+    "complexity_narrative": "This developer excels at handling complex code with a high average cyclomatic complexity of 3.9 and a maximum nesting depth of 4. Their expertise is demonstrated by their ability to manage 20 files with complex logic, including the top 3 most complex files: tests/links.test.js, src/main.js, and tests/test_health.py, each with a complexity of 4 and a depth of 1, 2, and 1 respectively, showcasing their proficiency in managing large and intricate codebases."
+  },
+  "resume": {
+    "project_bullets": {
+      "go-task-runner": [
+        "Independently built a feature to save results to a JSON file, ensuring that the results are saved correctly after running tasks.",
+        "Implemented a dry-run flag to simulate task execution without making any changes to the system, which helps in testing the task runner without affecting the actual data.",
+        "Designed and implemented a mapping mechanism to convert task outputs into structured result structs, enhancing the readability and usability of the results.",
+        "Added a logger interface to facilitate logging of tasks and their execution, improving the maintainability and traceability of the application.",
+        "Documented validation rules for the configuration files, ensuring that the configuration is valid before the task runner starts, preventing errors during execution.",
+        "Ensured that the configuration loads correctly by writing tests that validate the loading process, ensuring that the application starts without issues.",
+        "Initialized the module and task configuration, setting up the necessary structures and configurations for the task runner to function properly."
+      ],
+      "personal-portfolio-site": [
+        "Independently built a responsive personal portfolio site with a modern design, including a footer palette, improved readability, and a skills section.",
+        "Implemented keyboard navigation for accessibility, ensuring the site is accessible to users with disabilities.",
+        "Designed and documented the site's deployment process, including notes on skills and accessibility.",
+        "Added a showcase of the Go runner, ensuring the site is comprehensive and informative.",
+        "Documented SEO todo items to improve search engine optimization.",
+        "Centered the layout to enhance user experience.",
+        "Refactored the footer slot to improve maintainability.",
+        "Documented a smoke test to ensure the site functions correctly.",
+        "Guarded against empty data to prevent errors.",
+        "Refined the card depth for a more visually appealing design."
+      ],
+      "sensor-fleet-backend": [
+        "Independently built and designed the alerts endpoint, which includes detailed documentation on alert types and configurations.",
+        "Implemented the uptime endpoint, which provides real-time monitoring of sensor fleet health and performance.",
+        "Developed the export CSV helper function, which facilitates the generation of sensor data reports in CSV format.",
+        "Created the cover clear helper function, which ensures that sensor data is cleared from memory when not in use.",
+        "Designed and implemented the stale sensor path feature, which automatically removes sensor data from the system when it becomes outdated.",
+        "Added the requests for seeding feature, which automates the seeding of sensor data into the system for testing purposes.",
+        "Implemented the average helper function, which calculates the average of sensor data for analysis.",
+        "Scaffoldered the FastAPI service, setting up the basic structure and dependencies for the backend application."
+      ],
+      "infra-terraform": [
+        "Independently designed and implemented a feature to output the cost center in Terraform configurations.",
+        "Independently developed a feature to add a cost center local variable in Terraform configurations.",
+        "Independently documented the capture of Terraform variables and version pinning in the project.",
+        "Independently added a stage environment to the Terraform configuration.",
+        "Independently exposed a logging bucket output in the Terraform configuration.",
+        "Independently seeded modules and set up a development environment for the Terraform infrastructure."
+      ],
+      "algorithms-toolkit": [
+        "Independently built a comprehensive toolkit for algorithmic operations, including a `rotate` helper function, a `dijkstra` shortest path algorithm, and a `bounded search` function. Implemented unit tests for each feature to ensure robustness and reliability.",
+        "Designed and implemented a CLI for the toolkit, utilizing `argparse` for clarity and ease of use. Enhanced the CLI with examples and detailed documentation to guide users effectively.",
+        "Utilized advanced Python collections, such as `deque` and `heapq`, to optimize performance in the `rotate` and `dijkstra` implementations. This choice demonstrates a performance-minded approach to algorithm design.",
+        "Implemented a utility function to check if an array is sorted, which is a common requirement in many algorithmic problems. This function was thoroughly tested to ensure accuracy and reliability.",
+        "Enhanced the toolkit with a `reverse` helper function, which is a fundamental operation in many algorithms. The function was tested with various edge cases to ensure correctness.",
+        "Added comprehensive documentation for each feature, including usage examples and explanations of the algorithms and data structures used. This documentation was generated using `pytest` and `argparse` to ensure clarity and maintainability.",
+        "Implemented a `bounded binary search` function, which is a specialized search algorithm for finding the smallest index of an element in a sorted array that is greater than or equal to a given target. This function was tested with various scenarios to ensure correctness.",
+        "Designed and implemented a `dijkstra` shortest path algorithm, which is a classic algorithm for finding the shortest path in a graph. The algorithm was tested with various graphs to ensure correctness and efficiency."
+      ],
+      "java-chat-service": [
+        "Independently built a search messages endpoint, which allows users to search through chat messages using keywords.",
+        "Implemented a JSON messages endpoint, enabling clients to retrieve chat messages in JSON format.",
+        "Designed and developed a fetch latest messages feature, which retrieves the most recent messages from the chat system.",
+        "Exposed a message count endpoint, providing a quick way for clients to check the total number of messages in the chat.",
+        "Added logging to track high traffic, which helps in monitoring and optimizing the server performance during peak usage periods."
+      ],
+      "campus-navigation-api": [
+        "Independently built a simple preference routing feature, enhancing user experience by allowing users to set their navigation preferences.",
+        "Implemented safe path respecting closures to ensure that navigation paths are secure and do not expose sensitive information.",
+        "Expanded the API surface with additional endpoints, including a fetch single building endpoint, to provide more comprehensive navigation information.",
+        "Added deployment notes to the documentation, ensuring that the API is easily deployable to production environments.",
+        "Described the schedule API in the documentation, providing users with a clear understanding of the navigation schedule.",
+        "Ensured that the fallback route is properly tested, providing a robust fallback mechanism in case of network issues.",
+        "Added an endpoint to create buildings, allowing administrators to add new buildings to the navigation system.",
+        "Bootstrapped the Express application with TypeScript and configured the TypeScript configuration file, ensuring a clean and efficient development environment."
+      ],
+      "ml-lab-notebooks": [
+        "Independently built a logistic regression experiment and added a simple train/test split.",
+        "Independently implemented a cross-validation todo note and added a ridge idea.",
+        "Independently added a MAE metric test and documented a heuristic for model evaluation."
+      ]
+    },
+    "professional_summary": "A skilled software developer with a diverse portfolio of projects, proficient in Python, JavaScript, Go, and TypeScript, specializing in data analysis, validation, and machine learning. With a focus on writing clean, maintainable code and delivering high-quality solutions.",
+    "skills_section": "Languages: Python, JavaScript, Go, TypeScript\nFrameworks & Libraries: Data Analysis, Data Validation, Express, FastAPI, Machine Learning, Numerical Computing, Testing, TypeScript Typing\nInfrastructure: Terraform\nPractices: Technical Writing, Context Management, Resource Management, Command Line Tools",
+    "skill_evolution": "Over the past year, the developer has evolved from proficient in Java to a versatile developer with skills in Go, JavaScript, Python, and TypeScript. Key milestones include the creation of go-task-runner in September 2020, the development of personal-portfolio-site in January 2021, and the implementation of sensor-fleet-backend in July 2021. The developer has also demonstrated expertise in testing, contributing to the algorithms-toolkit, sensor-fleet-backend, campus-navigation-api, and ml-lab-notebooks projects.",
+    "developer_profile": "The developer has a moderate function length of 7.7 lines, with the longest function at 15 lines. They use camelCase naming convention and have a low type annotation coverage of 0%. The code is well-commented with 2.1 comments per 100 lines, but lacks docstrings. The developer imports an average of 0.5 packages per file, and the codebase consists of 2 files. ",
+    "complexity_highlights": "This developer excels at handling complex code with a high average cyclomatic complexity of 3.9 and a maximum nesting depth of 4. Their expertise is demonstrated by their ability to manage 20 files with complex logic, including the top 3 most complex files: tests/links.test.js, src/main.js, and tests/test_health.py, each with a complexity of 4 and a depth of 1, 2, and 1 respectively, showcasing their proficiency in managing large and intricate codebases.",
+    "work_breakdown": {
+      "feature": 35,
+      "chore": 14,
+      "docs": 16,
+      "test": 14,
+      "bugfix": 1,
+      "refactor": 4
+    },
+    "llm_enhanced": true,
+    "model_used": "qwen2.5-coder-3b-q4"
+  },
+  "metadata": {
+    "generation_time_seconds": 396.720188,
+    "errors": []
+  }
+}
