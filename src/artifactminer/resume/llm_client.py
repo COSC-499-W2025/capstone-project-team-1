@@ -39,11 +39,29 @@ _SUPPORTS_NO_THINK_JSON: set[str] = set()
 # Configuration
 # ---------------------------------------------------------------------------
 
-DEFAULT_MODEL = "qwen3-4b-q4"
+DEFAULT_MODEL = "qwen2.5-coder-3b-q4"  # Code-specialized model, Q4 for faster loading
 MODELS_DIR = Path.home() / ".artifactminer" / "models"
+
+# Task-specific model recommendations
+# Use these for optimal performance on different tasks:
+# - Code analysis (commits, skills): qwen2.5-coder-3b-q4 (fast, specialized)
+# - Reasoning (narratives, complexity, skill evolution): deepseek-r1-qwen-1.5b-q8 (superior logic)
+# - Prose generation (bullets, summary): lfm2-2.6b-q8 or qwen3-4b-q4
 
 # Maps friendly name → (HuggingFace repo_id, filename, context_length)
 MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
+    # Code-specialized model (best for commit analysis, code understanding)
+    "qwen2.5-coder-3b-q4": (
+        "Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
+        "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+        16384,  # 16K context - sufficient for commit analysis, fast loading
+    ),
+    # Reasoning-specialized model (best for narratives, step-by-step logic)
+    "deepseek-r1-qwen-1.5b-q8": (
+        "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B",
+        "DeepSeek-R1-Distill-Qwen-1.5B-Q8_0.gguf",
+        32768,  # 32K context - excellent for detailed reasoning
+    ),
     "qwen3-4b-q4": (
         "unsloth/Qwen3-4B-Instruct-2507-GGUF",
         "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
@@ -145,7 +163,7 @@ def _pick_free_port() -> int:
         return s.getsockname()[1]
 
 
-def _wait_for_server(port: int, timeout: float = 30.0) -> None:
+def _wait_for_server(port: int, timeout: float = 60.0) -> None:
     """Poll llama-server /health until it returns 200 or timeout."""
     url = f"http://127.0.0.1:{port}/health"
     deadline = time.monotonic() + timeout
@@ -190,10 +208,11 @@ def _start_server(model: str) -> None:
     ]
 
     log.info("[llm] Starting llama-server on port %d for model %s", port, model)
+    # Temporarily enable logs for debugging startup issues
     _server_process = subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
     )
     _server_port = port
     _server_model = model
