@@ -26,12 +26,14 @@ PROJECT_SYSTEM = (
     "- EVERY bullet must trace to a commit message or code construct listed below.\n"
     "- NEVER invent features not present in the data.\n"
     "- QUANTIFY when possible: contribution %, commit counts, number of endpoints.\n"
-    "- If the developer contributed >95%, use 'Independently built' or 'Architected'."
+    "- If the developer contributed >95%, use 'Independently built' or 'Architected'.\n"
+    "- Output plain text only: no markdown headings, no bold markers, no code fences."
 )
 
 SUMMARY_SYSTEM = (
     "You are a professional resume writer. Write concise, factual content. "
-    "Only reference technologies and projects that appear in the data provided."
+    "Only reference technologies and projects that appear in the data provided. "
+    "Output plain text only (no markdown decoration)."
 )
 
 
@@ -73,6 +75,8 @@ Rules:
 - The NARRATIVE should highlight the developer's role and key technical decisions.
 - Write 3-5 bullets depending on how much data is available.
 - If fewer than 3 commit messages exist, write fewer bullets — never fabricate.
+- Use plain text section markers exactly as written: DESCRIPTION:, BULLETS:, NARRATIVE:.
+- Do not wrap section labels or bullets in markdown formatting (no **, no headers).
 
 {context}"""
 
@@ -99,7 +103,9 @@ def build_summary_prompt(portfolio: PortfolioDataBundle) -> str:
 
     # Project summaries
     for p in portfolio.projects:
-        lines.append(f"\n- {p.project_name}: {p.project_type}, {p.primary_language or 'multi-language'}")
+        lines.append(
+            f"\n- {p.project_name}: {p.project_type}, {p.primary_language or 'multi-language'}"
+        )
 
     context = "\n".join(lines)
 
@@ -126,9 +132,9 @@ def build_skills_prompt(portfolio: PortfolioDataBundle) -> str:
 
     return f"""Organize the following technologies into a clean skills section for a resume.
 
-Languages: {', '.join(all_langs)}
-Frameworks/Libraries: {', '.join(all_frameworks)}
-Skills/Practices: {', '.join(all_skills)}
+Languages: {", ".join(all_langs)}
+Frameworks/Libraries: {", ".join(all_frameworks)}
+Skills/Practices: {", ".join(all_skills)}
 
 Rules:
 - Group into: Languages, Frameworks & Libraries, Tools & Infrastructure, Practices
@@ -148,9 +154,15 @@ def build_profile_prompt(portfolio: PortfolioDataBundle) -> str:
     """Build prompt for the developer profile narrative (3-4 sentences)."""
     lines = []
     for p in portfolio.projects:
-        contrib = f"{p.user_contribution_pct:.0f}%" if p.user_contribution_pct else "N/A"
+        contrib = (
+            f"{p.user_contribution_pct:.0f}%" if p.user_contribution_pct else "N/A"
+        )
         commit_types = p.commit_count_by_type()
-        type_str = ", ".join(f"{k}: {v}" for k, v in commit_types.items()) if commit_types else "N/A"
+        type_str = (
+            ", ".join(f"{k}: {v}" for k, v in commit_types.items())
+            if commit_types
+            else "N/A"
+        )
         lines.append(
             f"- {p.project_name} ({p.project_type}): "
             f"{p.primary_language or '?'}, {contrib} contribution, "
