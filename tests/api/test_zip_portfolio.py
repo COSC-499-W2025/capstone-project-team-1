@@ -192,3 +192,54 @@ class TestBackwardsCompatibility:
         uploads_root = tmp_path / "uploads"
         saved_files = list(uploads_root.glob("*artifact.zip"))
         assert saved_files, "Uploaded file should be written to uploads dir"
+
+
+class TestIncrementalFixtures:
+    """Integration checks for v1/v2 snapshot ZIP fixtures."""
+
+    def test_upload_v1_then_v2_fixture_under_same_portfolio(
+        self, client, tmp_path, monkeypatch
+    ):
+        _redirect_uploads(monkeypatch, tmp_path)
+
+        root = Path(__file__).resolve().parents[1]
+        v1_zip = root / "data" / "mock_projects.zip"
+        v2_zip = root / "data" / "mock_projects_v2.zip"
+        if not v1_zip.exists() or not v2_zip.exists():
+            pytest.skip("mock_projects fixtures missing")
+
+        with v1_zip.open("rb") as f:
+            first = client.post(
+                "/zip/upload",
+                files={"file": ("mock_projects.zip", f, "application/zip")},
+            )
+        assert first.status_code == 200
+        first_payload = first.json()
+        portfolio_id = first_payload["portfolio_id"]
+        zip_id_v1 = first_payload["zip_id"]
+
+        with v2_zip.open("rb") as f:
+            second = client.post(
+                f"/zip/upload?portfolio_id={portfolio_id}",
+                files={"file": ("mock_projects_v2.zip", f, "application/zip")},
+            )
+        assert second.status_code == 200
+        second_payload = second.json()
+        zip_id_v2 = second_payload["zip_id"]
+
+        assert second_payload["portfolio_id"] == portfolio_id
+        assert zip_id_v1 != zip_id_v2
+
+        portfolio_response = client.get(f"/zip/portfolios/{portfolio_id}")
+        assert portfolio_response.status_code == 200
+        payload = portfolio_response.json()
+        zip_ids = {entry["zip_id"] for entry in payload["zips"]}
+        assert {zip_id_v1, zip_id_v2}.issubset(zip_ids)
+
+        dirs_v1 = client.get(f"/zip/{zip_id_v1}/directories")
+        dirs_v2 = client.get(f"/zip/{zip_id_v2}/directories")
+        assert dirs_v1.status_code == 200
+        assert dirs_v2.status_code == 200
+
+        files_v2 = dirs_v2.json().get("cleanedfilespath", [])
+        assert any(path.endswith("incremental_upload_check.md") for path in files_v2)
