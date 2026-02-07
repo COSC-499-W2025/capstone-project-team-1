@@ -98,7 +98,10 @@ def build_project_prompt(project: ProjectFacts) -> str:
     context = project.to_llm_context()
 
     solo_hint = ""
-    if project.user_contribution_pct is not None and project.user_contribution_pct >= 95:
+    if (
+        project.user_contribution_pct is not None
+        and project.user_contribution_pct >= 95
+    ):
         solo_hint = (
             "\nThis is a SOLO project (100% contribution). "
             "Use phrases like 'Independently built', 'Architected and implemented', "
@@ -164,6 +167,7 @@ SKILLS:
 # Template Fallback (No LLM)
 # ---------------------------------------------------------------------------
 
+
 def generate_template_bullets(project: ProjectFacts) -> List[str]:
     """
     Generate resume bullets using templates (no LLM required).
@@ -178,7 +182,9 @@ def generate_template_bullets(project: ProjectFacts) -> List[str]:
         contrib = f"{project.user_contribution_pct:.0f}%"
         stack = project.primary_language or "the codebase"
         if project.frameworks:
-            stack = f"{project.frameworks[0]}/{project.primary_language or 'application'}"
+            stack = (
+                f"{project.frameworks[0]}/{project.primary_language or 'application'}"
+            )
         bullets.append(
             f"Contributed {contrib} of commits to {project.project_name}, "
             f"a {stack} project"
@@ -187,9 +193,7 @@ def generate_template_bullets(project: ProjectFacts) -> List[str]:
     # Skills bullet
     if project.detected_skills:
         top_skills = project.detected_skills[:4]
-        bullets.append(
-            f"Demonstrated proficiency in {', '.join(top_skills)}"
-        )
+        bullets.append(f"Demonstrated proficiency in {', '.join(top_skills)}")
 
     # Framework/technology bullet
     if project.frameworks:
@@ -207,7 +211,9 @@ def generate_template_bullets(project: ProjectFacts) -> List[str]:
     if project.activity_breakdown:
         test_pct = project.activity_breakdown.get("tests", 0)
         if test_pct > 10:
-            bullets.append(f"Wrote comprehensive tests ({test_pct:.0f}% of contributions)")
+            bullets.append(
+                f"Wrote comprehensive tests ({test_pct:.0f}% of contributions)"
+            )
 
     return bullets if bullets else [f"Contributed to {project.project_name}"]
 
@@ -229,9 +235,17 @@ def generate_template_summary(portfolio: PortfolioFacts) -> str:
         # Clean up file extensions to language names
         lang_names = []
         ext_to_name = {
-            ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript",
-            ".java": "Java", ".go": "Go", ".rs": "Rust", ".cpp": "C++",
-            ".c": "C", ".rb": "Ruby", ".php": "PHP", ".kt": "Kotlin",
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".ts": "TypeScript",
+            ".java": "Java",
+            ".go": "Go",
+            ".rs": "Rust",
+            ".cpp": "C++",
+            ".c": "C",
+            ".rb": "Ruby",
+            ".php": "PHP",
+            ".kt": "Kotlin",
         }
         for ext in top_langs:
             lang_names.append(ext_to_name.get(ext, ext.replace(".", "")))
@@ -252,11 +266,22 @@ def generate_template_skills(portfolio: PortfolioFacts) -> str:
     # Languages
     if portfolio.languages_used:
         ext_to_name = {
-            ".py": "Python", ".js": "JavaScript", ".ts": "TypeScript",
-            ".java": "Java", ".go": "Go", ".rs": "Rust", ".cpp": "C++",
-            ".c": "C", ".rb": "Ruby", ".php": "PHP", ".kt": "Kotlin",
+            ".py": "Python",
+            ".js": "JavaScript",
+            ".ts": "TypeScript",
+            ".java": "Java",
+            ".go": "Go",
+            ".rs": "Rust",
+            ".cpp": "C++",
+            ".c": "C",
+            ".rb": "Ruby",
+            ".php": "PHP",
+            ".kt": "Kotlin",
         }
-        lang_names = [ext_to_name.get(ext, ext.replace(".", "")) for ext in portfolio.languages_used[:6]]
+        lang_names = [
+            ext_to_name.get(ext, ext.replace(".", ""))
+            for ext in portfolio.languages_used[:6]
+        ]
         sections.append(f"Languages: {', '.join(lang_names)}")
 
     # Frameworks
@@ -273,6 +298,7 @@ def generate_template_skills(portfolio: PortfolioFacts) -> str:
 # ---------------------------------------------------------------------------
 # Main Enhancement Functions
 # ---------------------------------------------------------------------------
+
 
 def enhance_with_llm(
     portfolio: PortfolioFacts,
@@ -300,7 +326,8 @@ def enhance_with_llm(
     if not check_llm_available(model):
         raise RuntimeError(
             f"Model '{model}' is not available. "
-            f"Run 'resume download-model {model}' to download it."
+            "Manually download the GGUF into ~/.artifactminer/models/ "
+            "or pass a direct .gguf path via --model."
         )
 
     # List available models for diagnostics if needed
@@ -314,13 +341,17 @@ def enhance_with_llm(
         response = _query_llm(prompt, model)
 
         if not response:
-            raise RuntimeError(f"LLM failed to generate bullets for {project.project_name}")
+            raise RuntimeError(
+                f"LLM failed to generate bullets for {project.project_name}"
+            )
 
         # Parse bullets from response
         bullets = []
         for line in response.split("\n"):
             line = line.strip()
-            if line and (line.startswith("•") or line.startswith("-") or line.startswith("*")):
+            if line and (
+                line.startswith("•") or line.startswith("-") or line.startswith("*")
+            ):
                 # Clean up the bullet marker
                 bullet = line.lstrip("•-* ").strip()
                 if bullet:
@@ -376,7 +407,9 @@ def generate_without_llm(portfolio: PortfolioFacts) -> ResumeContent:
     )
 
     for project in portfolio.projects:
-        result.project_bullets[project.project_name] = generate_template_bullets(project)
+        result.project_bullets[project.project_name] = generate_template_bullets(
+            project
+        )
 
     result.professional_summary = generate_template_summary(portfolio)
     result.skills_section = generate_template_skills(portfolio)

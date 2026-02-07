@@ -20,10 +20,11 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Type, TypeVar
+from typing import Type, TypeVar, cast
 
 import httpx
 from openai import OpenAI
+from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
@@ -176,8 +177,7 @@ def _wait_for_server(port: int, timeout: float = 60.0) -> None:
             pass
         time.sleep(0.25)
     raise TimeoutError(
-        f"llama-server did not become healthy on port {port} "
-        f"within {timeout}s"
+        f"llama-server did not become healthy on port {port} within {timeout}s"
     )
 
 
@@ -190,7 +190,7 @@ def _start_server(model: str) -> None:
     if not model_path.exists():
         raise FileNotFoundError(
             f"Model file not found: {model_path}. "
-            f"Run 'resume download-model {model}' to download it."
+            f"Manually download the GGUF into {MODELS_DIR} or pass a direct .gguf path via --model."
         )
 
     port = _pick_free_port()
@@ -199,11 +199,16 @@ def _start_server(model: str) -> None:
 
     cmd = [
         binary,
-        "--model", str(model_path),
-        "--ctx-size", str(n_ctx),
-        "--n-gpu-layers", str(gpu),
-        "--port", str(port),
-        "--reasoning-budget", "0",
+        "--model",
+        str(model_path),
+        "--ctx-size",
+        str(n_ctx),
+        "--n-gpu-layers",
+        str(gpu),
+        "--port",
+        str(port),
+        "--reasoning-budget",
+        "0",
         "--log-disable",
     ]
 
@@ -308,49 +313,36 @@ def unload_model(model: str | None = None) -> None:
 
 def ensure_model_available(model: str = DEFAULT_MODEL) -> None:
     """
-    Ensure a model is available on disk, downloading if necessary.
+    Ensure a model GGUF file exists on disk.
 
-    Raises RuntimeError with a helpful message if download fails.
+    This project intentionally does not auto-download models.
+    Download a GGUF manually and place it in ~/.artifactminer/models/ (or pass
+    a direct path to a .gguf file).
     """
     try:
         path = _resolve_model_path(model)
-        if path.exists():
-            return
-    except FileNotFoundError:
-        pass
-
-    # Need to download
-    if model not in MODEL_REGISTRY:
+    except FileNotFoundError as exc:
         raise RuntimeError(
-            f"Model '{model}' is not in the registry and no .gguf file found. "
-            f"Known models: {', '.join(MODEL_REGISTRY)}. "
-            f"Or provide a direct path to a .gguf file."
-        )
-
-    repo_id, filename, _ = MODEL_REGISTRY[model]
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    dest = MODELS_DIR / filename
-
-    print(f"[llm] Downloading {model} from {repo_id}...")
-    print(f"[llm] Destination: {dest}")
-
-    try:
-        from huggingface_hub import hf_hub_download
-
-        hf_hub_download(
-            repo_id=repo_id,
-            filename=filename,
-            local_dir=str(MODELS_DIR),
-            local_dir_use_symlinks=False,
-        )
-        print(f"[llm] Download complete: {dest}")
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed to download model '{model}' from HuggingFace. "
-            f"Check your internet connection, or manually download "
-            f"'{filename}' from https://huggingface.co/{repo_id} "
-            f"and place it in {MODELS_DIR}"
+            f"Model '{model}' was not found. Provide a direct path to a .gguf file "
+            f"or use a known model name: {', '.join(MODEL_REGISTRY)}."
         ) from exc
+
+    if path.exists():
+        return
+
+    # Helpful manual download instructions for registry models
+    if model in MODEL_REGISTRY:
+        repo_id, filename, _ = MODEL_REGISTRY[model]
+        raise RuntimeError(
+            f"Model '{model}' is not available locally at {path}. "
+            f"Manually download '{filename}' from https://huggingface.co/{repo_id} "
+            f"and place it in {MODELS_DIR} (or pass --model /path/to/{filename})."
+        )
+
+    raise RuntimeError(
+        f"Model '{model}' is not available locally at {path}. "
+        f"Provide a direct path to a .gguf file."
+    )
 
 
 def check_llm_available(model: str = DEFAULT_MODEL) -> bool:
@@ -405,10 +397,14 @@ def query_llm(
     if model in _SUPPORTS_NO_THINK_JSON:
         effective_prompt = prompt + " /no_think"
 
-    messages: list[dict[str, str]] = []
+    messages: list[ChatCompletionMessageParam] = []
     if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": effective_prompt})
+        messages.append(
+            cast(ChatCompletionMessageParam, {"role": "system", "content": system})
+        )
+    messages.append(
+        cast(ChatCompletionMessageParam, {"role": "user", "content": effective_prompt})
+    )
 
     response = client.chat.completions.create(
         model="local",
@@ -456,10 +452,14 @@ def query_llm_text(
     _ensure_server_running(model)
     client = _get_client()
 
-    messages: list[dict[str, str]] = []
+    messages: list[ChatCompletionMessageParam] = []
     if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
+        messages.append(
+            cast(ChatCompletionMessageParam, {"role": "system", "content": system})
+        )
+    messages.append(
+        cast(ChatCompletionMessageParam, {"role": "user", "content": prompt})
+    )
 
     response = client.chat.completions.create(
         model="local",

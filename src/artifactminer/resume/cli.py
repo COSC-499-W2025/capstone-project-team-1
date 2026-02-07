@@ -37,23 +37,32 @@ def generate_v3(
         help="Path to ZIP file containing git repositories",
     ),
     email: str = typer.Option(
-        ..., "--email", "-e",
+        ...,
+        "--email",
+        "-e",
         help="User's email for git attribution",
     ),
     model: str = typer.Option(
-        "qwen2.5-coder-3b-q4", "--model", "-m",
+        "qwen2.5-coder-3b-q4",
+        "--model",
+        "-m",
         help="Local GGUF model to use (default: qwen2.5-coder-3b-q4)",
     ),
     output_json: Optional[Path] = typer.Option(
-        None, "--output-json",
+        None,
+        "--output-json",
         help="Output JSON file path",
     ),
     output_markdown: Optional[Path] = typer.Option(
-        None, "--output-markdown", "--output-md",
+        None,
+        "--output-markdown",
+        "--output-md",
         help="Output Markdown file path",
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v",
+        False,
+        "--verbose",
+        "-v",
         help="Show detailed progress",
     ),
 ) -> None:
@@ -123,6 +132,7 @@ def generate_v3(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         if verbose:
             import traceback
+
             traceback.print_exc()
         raise typer.Exit(1) from exc
 
@@ -135,27 +145,42 @@ def generate_v3(
 @app.command("generate-v2")
 def generate_v2(
     zip_path: Path = typer.Option(
-        ..., "--zip", "-z", exists=True, file_okay=True, dir_okay=False, readable=True,
+        ...,
+        "--zip",
+        "-z",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
         help="Path to ZIP file containing git repositories",
     ),
     email: str = typer.Option(
-        ..., "--email", "-e",
+        ...,
+        "--email",
+        "-e",
         help="User's email for git attribution",
     ),
     model: str = typer.Option(
-        "qwen3-1.7b", "--model", "-m",
+        "qwen3-1.7b",
+        "--model",
+        "-m",
         help="Local GGUF model to use",
     ),
     output_json: Optional[Path] = typer.Option(
-        None, "--output-json",
+        None,
+        "--output-json",
         help="Output JSON file path",
     ),
     output_markdown: Optional[Path] = typer.Option(
-        None, "--output-markdown", "--output-md",
+        None,
+        "--output-markdown",
+        "--output-md",
         help="Output Markdown file path",
     ),
     verbose: bool = typer.Option(
-        False, "--verbose", "-v",
+        False,
+        "--verbose",
+        "-v",
         help="Show detailed progress",
     ),
 ) -> None:
@@ -203,13 +228,14 @@ def generate_v2(
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
         if verbose:
             import traceback
+
             traceback.print_exc()
         raise typer.Exit(1) from exc
 
 
 @app.command()
 def check_models() -> None:
-    """List locally available GGUF models and known downloadable models."""
+    """List locally available GGUF models and known model sources."""
     from .llm_client import get_available_models, MODEL_REGISTRY, MODELS_DIR
 
     models = get_available_models()
@@ -221,44 +247,30 @@ def check_models() -> None:
         typer.secho("No models installed locally.", fg=typer.colors.YELLOW)
 
     typer.echo(f"\nModel directory: {MODELS_DIR}")
-    typer.echo(f"\nDownloadable models ({len(MODEL_REGISTRY)}):")
+    typer.echo(f"\nKnown models (manual download) ({len(MODEL_REGISTRY)}):")
     for name, (repo_id, filename, _) in MODEL_REGISTRY.items():
         status = "installed" if name in models else "not installed"
-        typer.echo(f"  - {name} ({status}) — {repo_id}")
-
-
-@app.command()
-def download_model(
-    model: str = typer.Argument("qwen3-1.7b", help="Model name to download"),
-) -> None:
-    """Download a GGUF model from HuggingFace for local inference."""
-    from .llm_client import ensure_model_available, check_llm_available
-
-    if check_llm_available(model):
-        typer.secho(f"Model '{model}' is already installed.", fg=typer.colors.GREEN)
-        return
-
-    typer.echo(f"Downloading model '{model}'...")
-    try:
-        ensure_model_available(model)
-        typer.secho(f"Model '{model}' downloaded successfully.", fg=typer.colors.GREEN)
-    except RuntimeError as exc:
-        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1) from exc
+        typer.echo(f"  - {name} ({status}) — https://huggingface.co/{repo_id}")
 
 
 @app.command()
 def benchmark(
     models: Optional[list[str]] = typer.Option(
-        None, "--models", "-m",
+        None,
+        "--models",
+        "-m",
         help="Models to benchmark (default: all registered models)",
     ),
     runs: int = typer.Option(
-        3, "--runs", "-r",
+        3,
+        "--runs",
+        "-r",
         help="Number of runs per prompt (1 cold + N-1 warm)",
     ),
     output: Optional[Path] = typer.Option(
-        None, "--output", "-o",
+        None,
+        "--output",
+        "-o",
         help="Save markdown report to file",
     ),
 ) -> None:
