@@ -1,8 +1,12 @@
 """
-CLI for resume generation - New architecture (Static-First, LLM-Light).
+CLI for resume generation.
+
+Two pipelines available:
+  - generate (v2): Static-First, LLM-Light (original)
+  - generate-v3: EXTRACT → QUERY → ASSEMBLE (new, richer data)
 
 Usage:
-    python -m artifactminer.resume generate --zip /path/to/repos.zip --email user@example.com
+    python -m artifactminer.resume generate-v3 --zip /path/to/repos.zip --email user@example.com
 """
 
 from __future__ import annotations
@@ -15,8 +19,13 @@ import typer
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
-@app.command()
-def generate(
+# ---------------------------------------------------------------------------
+# v3 pipeline (new default)
+# ---------------------------------------------------------------------------
+
+
+@app.command("generate")
+def generate_v3(
     zip_path: Path = typer.Option(
         ..., "--zip", "-z", exists=True, file_okay=True, dir_okay=False, readable=True,
         help="Path to ZIP file containing git repositories",
@@ -26,8 +35,8 @@ def generate(
         help="User's email for git attribution",
     ),
     model: str = typer.Option(
-        "qwen3-1.7b", "--model", "-m",
-        help="Local GGUF model to use (e.g., qwen3-1.7b, lfm2.5-1.2b)",
+        "qwen2.5-coder-3b-q4", "--model", "-m",
+        help="Local GGUF model to use (default: qwen2.5-coder-3b-q4)",
     ),
     output_json: Optional[Path] = typer.Option(
         None, "--output-json",
@@ -43,16 +52,111 @@ def generate(
     ),
 ) -> None:
     """
-    Generate resume content from a ZIP of git repositories.
+    Generate resume content from a ZIP of git repositories (v3 pipeline).
 
-    Uses a local GGUF model via llama.cpp for LLM-enhanced prose generation.
+    Uses the EXTRACT → QUERY → ASSEMBLE pipeline with rich data extraction
+    and focused LLM calls.
 
     Examples:
-        # Basic usage (uses qwen3-1.7b)
         python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com
+        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model qwen2.5-coder-3b-q4
+    """
+    from .pipeline import generate_resume_v3
+    from .assembler import assemble_markdown, assemble_json
 
-        # With specific model
-        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model lfm2.5-1.2b
+    def progress(msg: str) -> None:
+        if verbose:
+            typer.echo(msg)
+
+    try:
+        result = generate_resume_v3(
+            zip_path=str(zip_path.resolve()),
+            user_email=email.lower().strip(),
+            llm_model=model,
+            progress_callback=progress if verbose else None,
+        )
+
+        # Generate outputs
+        markdown = assemble_markdown(result)
+        json_str = assemble_json(result)
+
+        # Always print markdown to stdout
+        typer.echo("\n" + "=" * 60)
+        typer.echo(markdown)
+
+        # Save to files if requested
+        if output_json:
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            output_json.write_text(json_str)
+            typer.echo(f"\nJSON output written to: {output_json}")
+
+        if output_markdown:
+            output_markdown.parent.mkdir(parents=True, exist_ok=True)
+            output_markdown.write_text(markdown)
+            typer.echo(f"Markdown output written to: {output_markdown}")
+
+        # Print summary
+        portfolio = result.portfolio_data
+        typer.echo("\n" + "=" * 60)
+        typer.echo("GENERATION SUMMARY (v3)")
+        typer.echo("=" * 60)
+        if portfolio:
+            typer.echo(f"Projects analyzed: {portfolio.total_projects}")
+            typer.echo(f"Total commits: {portfolio.total_commits}")
+            typer.echo(f"Skills detected: {len(portfolio.top_skills)}")
+            typer.echo(f"Project types: {portfolio.project_types}")
+        typer.echo(f"Model used: {result.model_used}")
+        typer.echo(f"Generation time: {result.generation_time_seconds:.1f}s")
+
+        if result.errors:
+            typer.echo(f"\nWarnings ({len(result.errors)}):", err=True)
+            for err in result.errors:
+                typer.secho(f"  - {err}", fg=typer.colors.YELLOW, err=True)
+
+    except Exception as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        raise typer.Exit(1) from exc
+
+
+# ---------------------------------------------------------------------------
+# v2 pipeline (kept for rollback)
+# ---------------------------------------------------------------------------
+
+
+@app.command("generate-v2")
+def generate_v2(
+    zip_path: Path = typer.Option(
+        ..., "--zip", "-z", exists=True, file_okay=True, dir_okay=False, readable=True,
+        help="Path to ZIP file containing git repositories",
+    ),
+    email: str = typer.Option(
+        ..., "--email", "-e",
+        help="User's email for git attribution",
+    ),
+    model: str = typer.Option(
+        "qwen3-1.7b", "--model", "-m",
+        help="Local GGUF model to use",
+    ),
+    output_json: Optional[Path] = typer.Option(
+        None, "--output-json",
+        help="Output JSON file path",
+    ),
+    output_markdown: Optional[Path] = typer.Option(
+        None, "--output-markdown", "--output-md",
+        help="Output Markdown file path",
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v",
+        help="Show detailed progress",
+    ),
+) -> None:
+    """
+    Generate resume content using the v2 pipeline (legacy).
+
+    Kept for comparison and rollback purposes.
     """
     from .generate import generate_resume
 
@@ -68,14 +172,10 @@ def generate(
             progress_callback=progress if verbose else None,
         )
 
-        # Generate markdown output
         markdown = result.to_markdown()
-
-        # Always print to stdout
         typer.echo("\n" + "=" * 60)
         typer.echo(markdown)
 
-        # Save to files if requested
         if output_json:
             output_json.parent.mkdir(parents=True, exist_ok=True)
             output_json.write_text(result.to_json())
@@ -86,22 +186,12 @@ def generate(
             output_markdown.write_text(markdown)
             typer.echo(f"Markdown output written to: {output_markdown}")
 
-        # Print summary
         typer.echo("\n" + "=" * 60)
-        typer.echo("GENERATION SUMMARY")
+        typer.echo("GENERATION SUMMARY (v2)")
         typer.echo("=" * 60)
         typer.echo(f"Projects analyzed: {result.portfolio_facts.total_projects}")
         typer.echo(f"Total commits: {result.portfolio_facts.total_commits}")
-        typer.echo(f"Skills detected: {len(result.portfolio_facts.top_skills)}")
-        typer.echo(f"LLM enhanced: {result.resume_content.llm_enhanced}")
-        if result.resume_content.model_used:
-            typer.echo(f"Model used: {result.resume_content.model_used}")
         typer.echo(f"Generation time: {result.generation_time_seconds:.1f}s")
-
-        if result.errors:
-            typer.echo(f"\nWarnings ({len(result.errors)}):", err=True)
-            for err in result.errors:
-                typer.secho(f"  - {err}", fg=typer.colors.YELLOW, err=True)
 
     except Exception as exc:
         typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
