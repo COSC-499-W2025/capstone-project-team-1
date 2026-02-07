@@ -18,21 +18,23 @@ from ..models import ProjectDataBundle, PortfolioDataBundle
 # ---------------------------------------------------------------------------
 
 PROJECT_SYSTEM = (
-    "You are a professional resume writer for software engineers. "
-    "You write concise, achievement-oriented content. "
+    "You are a resume editor for software engineers. "
+    "Write concise, natural, achievement-focused content. "
     "Rules:\n"
-    "- Be SPECIFIC: name actual features, endpoints, classes from the data below.\n"
-    "- Use STRONG action verbs: Architected, Implemented, Designed, Engineered.\n"
-    "- EVERY bullet must trace to a commit message or code construct listed below.\n"
-    "- NEVER invent features not present in the data.\n"
-    "- QUANTIFY when possible: contribution %, commit counts, number of endpoints.\n"
-    "- If the developer contributed >95%, use 'Independently built' or 'Architected'.\n"
+    "- Use ONLY facts present in the project data below.\n"
+    "- Never invent features, endpoints, classes, tools, or outcomes.\n"
+    "- Use numbers only when they are explicitly present in the data.\n"
+    "- If contribution is >=95%, you may use 'Independently built' once.\n"
+    "- If contribution is <95%, do not imply sole ownership.\n"
+    "- Prefer concrete technical work from commits and code constructs over generic claims.\n"
+    "- Avoid repeating the same claim across sections.\n"
     "- Output plain text only: no markdown headings, no bold markers, no code fences."
 )
 
 SUMMARY_SYSTEM = (
-    "You are a professional resume writer. Write concise, factual content. "
+    "You are a resume editor. Write concise, natural, factual content. "
     "Only reference technologies and projects that appear in the data provided. "
+    "Do not invent metrics, ownership claims, or tools not present in the data. "
     "Output plain text only (no markdown decoration)."
 )
 
@@ -51,30 +53,37 @@ def build_project_prompt(bundle: ProjectDataBundle) -> str:
     """
     context = bundle.to_prompt_context()
 
-    solo_hint = ""
+    ownership_hint = ""
     if bundle.user_contribution_pct is not None and bundle.user_contribution_pct >= 95:
-        solo_hint = (
+        ownership_hint = (
             "\nThis is a SOLO project (the developer wrote nearly all the code). "
-            "Use phrases like 'Independently built', 'Architected and implemented', "
-            "or 'Designed from scratch'.\n"
+            "Ownership language is allowed, but keep claims factual and brief.\n"
+        )
+    elif bundle.user_contribution_pct is not None and bundle.user_contribution_pct < 95:
+        ownership_hint = (
+            "\nThis is a TEAM project (partial contribution). "
+            "Do not claim full ownership or use words like 'independently', "
+            "'solely', 'from scratch', or 'entire system'.\n"
         )
 
-    return f"""{solo_hint}
+    return f"""{ownership_hint}
 Using the project data below, write a resume section with EXACTLY this format:
 
-DESCRIPTION: [1-2 sentences describing what this project is and does]
+DESCRIPTION: [1 sentence describing what this project is and does]
 BULLETS:
 - [achievement bullet 1]
 - [achievement bullet 2]
 - [achievement bullet 3]
-NARRATIVE: [2-3 sentences about the developer's specific contribution and impact]
+NARRATIVE: [1 sentence about the developer's specific contribution and impact]
 
 Rules:
-- The DESCRIPTION should explain what the project does (use the README and project type).
+- The DESCRIPTION should explain what the project does in 1 sentence.
 - Each BULLET must reference a concrete feature, endpoint, class, or fix from the data.
-- The NARRATIVE should highlight the developer's role and key technical decisions.
-- Write 3-5 bullets depending on how much data is available.
-- If fewer than 3 commit messages exist, write fewer bullets — never fabricate.
+- The NARRATIVE should be 1 sentence about the developer's role and impact.
+- Write 2-4 bullets depending on how much data is available.
+- If fewer than 2 commit messages exist, write fewer bullets — never fabricate.
+- Keep each bullet to one sentence and keep tone natural.
+- Do not repeat the same claim across DESCRIPTION, BULLETS, and NARRATIVE.
 - Use plain text section markers exactly as written: DESCRIPTION:, BULLETS:, NARRATIVE:.
 - Do not wrap section labels or bullets in markdown formatting (no **, no headers).
 
@@ -151,7 +160,7 @@ Practices: ..."""
 
 
 def build_profile_prompt(portfolio: PortfolioDataBundle) -> str:
-    """Build prompt for the developer profile narrative (3-4 sentences)."""
+    """Build prompt for the developer profile narrative (2-3 sentences)."""
     lines = []
     for p in portfolio.projects:
         contrib = (
@@ -171,14 +180,15 @@ def build_profile_prompt(portfolio: PortfolioDataBundle) -> str:
 
     context = "\n".join(lines)
 
-    return f"""Write a 3-4 sentence developer profile paragraph based on these projects.
+    return f"""Write a 2-3 sentence developer profile paragraph based on these projects.
 
 {context}
 
 Rules:
-- Describe the developer's strengths, growth areas, and technical range.
+- Describe the developer's strengths and technical range.
 - Reference specific project types and technologies from the data.
 - Focus on patterns across projects (e.g., "consistently writes tests", "full-stack range").
+- Do NOT include weaknesses, growth areas, or limiting language.
 - Do NOT use generic filler. Every claim must connect to the data above.
 
 Write the profile now (no preamble, just the paragraph):"""

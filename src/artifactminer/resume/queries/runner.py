@@ -30,10 +30,78 @@ from .prompts import (
 log = logging.getLogger(__name__)
 
 
+_SECTION_HEADER_LINE_RE = re.compile(
+    r"^\s*(?:[#>\-]+\s*)?(?:\*\*)?\s*"
+    r"(DESCRIPTION|BULLETS|NARRATIVE)\s*"
+    r"(?:\*\*)?\s*:\s*(?:\*\*)?\s*(.*)$",
+    re.I,
+)
+
+_BULLET_LINE_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+(.+)$")
+
+_SKILLS_HEADER_RE = re.compile(
+    r"^\s*(?:[-*•]\s*)?"
+    r"(Languages|Frameworks\s*&\s*Libraries|Frameworks|"
+    r"Tools\s*&\s*Infrastructure|Infrastructure|Practices)"
+    r"\s*:\s*(.*)$",
+    re.I,
+)
+
+_COMMON_LANGUAGES = {
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "go",
+    "rust",
+    "c",
+    "c++",
+    "c#",
+    "kotlin",
+    "swift",
+    "php",
+    "ruby",
+    "scala",
+    "r",
+    "dart",
+    "tf",
+}
+
+_TOOL_KEYWORDS = {
+    "terraform",
+    "docker",
+    "kubernetes",
+    "helm",
+    "aws",
+    "gcp",
+    "azure",
+    "ansible",
+    "jenkins",
+    "github actions",
+    "gitlab ci",
+    "linux",
+    "bash",
+    "shell",
+    "prometheus",
+    "grafana",
+    "nginx",
+    "vpc",
+    "s3",
+    "ec2",
+    "lambda",
+    "cloudformation",
+    "ci/cd",
+    "ci cd",
+}
+
+
 def _query(
     prompt: str,
     model: str,
     system: str,
+    *,
+    temperature: float = 0.2,
+    max_tokens: int = 1024,
 ) -> str:
     """Execute a single LLM query, returning raw text."""
     from ..llm_client import query_llm_text
@@ -42,7 +110,8 @@ def _query(
         prompt=prompt,
         model=model,
         system=system,
-        temperature=0.3,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
 
 
@@ -59,40 +128,264 @@ def _parse_project_response(text: str) -> ProjectSection:
     """
     section = ProjectSection()
 
-    # Extract DESCRIPTION
-    desc_match = re.search(r"DESCRIPTION:\s*(.+?)(?=\nBULLETS:|\Z)", text, re.S)
-    if desc_match:
-        section.description = desc_match.group(1).strip()
+    if not text or not text.strip():
+        return section
 
-    # Extract BULLETS
-    bullets_match = re.search(r"BULLETS:\s*(.+?)(?=\nNARRATIVE:|\Z)", text, re.S)
-    if bullets_match:
-        bullets_text = bullets_match.group(1)
-        for line in bullets_text.split("\n"):
-            line = line.strip()
-            if line and (line.startswith("-") or line.startswith("•") or line.startswith("*")):
-                bullet = line.lstrip("-•* ").strip()
-                if bullet:
-                    section.bullets.append(bullet)
+    raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    parsed_sections = {"description": [], "bullets": [], "narrative": []}
 
-    # Extract NARRATIVE
-    narr_match = re.search(r"NARRATIVE:\s*(.+)", text, re.S)
-    if narr_match:
-        section.narrative = narr_match.group(1).strip()
+    current_key: str | None = None
+    found_structured_markers = False
+    for raw_line in raw_lines:
+        line = raw_line.rstrip()
+        marker = _SECTION_HEADER_LINE_RE.match(line)
+        if marker:
+            found_structured_markers = True
+            current_key = marker.group(1).lower()
+            tail = marker.group(2).strip()
+            if tail:
+                parsed_sections[current_key].append(tail)
+            continue
+        if current_key:
+            parsed_sections[current_key].append(line)
 
-    # Fallback: if no structured sections found, treat whole response as bullets
+    if found_structured_markers:
+        section.description = _clean_text_block(
+            parsed_sections["description"],
+            drop_bullets=True,
+        )
+        section.bullets = _extract_bullets(parsed_sections["bullets"])
+        section.narrative = _clean_text_block(
+            parsed_sections["narrative"],
+            drop_bullets=True,
+        )
+
+    # Fallback: extract bullets from the whole response
+    if not section.bullets:
+        section.bullets = _extract_bullets(raw_lines)
+
+    # Fallback: derive description from non-bullet lines
+    if not section.description:
+        non_bullet_lines = [
+            line
+            for line in raw_lines
+            if not _BULLET_LINE_RE.match(line.strip())
+            and not _SECTION_HEADER_LINE_RE.match(line.strip())
+        ]
+        section.description = _clean_text_block(non_bullet_lines, drop_bullets=True)
+
+    # Last resort: use a trimmed version of the response
     if not section.bullets and not section.description:
-        for line in text.split("\n"):
-            line = line.strip()
-            if line and (line.startswith("-") or line.startswith("•") or line.startswith("*")):
-                bullet = line.lstrip("-•* ").strip()
-                if bullet:
-                    section.bullets.append(bullet)
-        if not section.bullets:
-            # Last resort: use entire response as description
-            section.description = text.strip()[:500]
+        section.description = _clean_text_block([text])[:500]
 
     return section
+
+
+def _clean_text_block(lines: list[str], *, drop_bullets: bool = False) -> str:
+    """Normalize a generated text block by stripping markdown noise."""
+    cleaned: list[str] = []
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            if cleaned and cleaned[-1] != "":
+                cleaned.append("")
+            continue
+
+        line = re.sub(r"^>\s*", "", line)
+
+        if _SECTION_HEADER_LINE_RE.match(line):
+            continue
+        if drop_bullets and _BULLET_LINE_RE.match(line):
+            continue
+        if re.fullmatch(r"[\s*_`#>\-]+", line):
+            continue
+
+        line = _clean_inline_text(line)
+        if line:
+            cleaned.append(line)
+
+    text = "\n".join(cleaned).strip()
+    return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def _clean_inline_text(text: str) -> str:
+    """Normalize markdown-heavy inline text to plain resume prose."""
+    value = text.strip()
+    value = value.replace("**", "")
+    value = value.replace("__", "")
+    value = value.replace("`", "")
+    value = re.sub(r"\s+", " ", value).strip()
+    value = re.sub(r"\s+([,.;:!?])", r"\1", value)
+    return value.strip(" -*")
+
+
+def _extract_bullets(lines: list[str]) -> list[str]:
+    """Extract and deduplicate bullet lines from model output."""
+    bullets: list[str] = []
+    seen: set[str] = set()
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        match = _BULLET_LINE_RE.match(line)
+        if not match:
+            continue
+
+        bullet = _clean_inline_text(match.group(1))
+        if not bullet:
+            continue
+        if _SECTION_HEADER_LINE_RE.match(bullet):
+            continue
+        if re.match(r"^(DESCRIPTION|BULLETS|NARRATIVE)\s*:", bullet, re.I):
+            continue
+
+        key = bullet.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        bullets.append(bullet)
+
+    return bullets
+
+
+def _clean_summary_or_profile(text: str) -> str:
+    """Strip optional section labels from summary/profile responses."""
+    cleaned = _clean_text_block(text.splitlines())
+    cleaned = re.sub(
+        r"^(SUMMARY|PROFILE|DEVELOPER PROFILE)\s*:\s*", "", cleaned, flags=re.I
+    )
+    return cleaned.strip()
+
+
+def _normalize_skills_section(raw: str, portfolio: PortfolioDataBundle) -> str:
+    """Parse, clean, and normalize the skills section into stable categories."""
+    categories: dict[str, list[str]] = {
+        "languages": [],
+        "frameworks": [],
+        "tools": [],
+        "practices": [],
+    }
+
+    current_category: str | None = None
+    for raw_line in raw.splitlines():
+        line = raw_line.strip()
+        if not line:
+            current_category = None
+            continue
+
+        header = _SKILLS_HEADER_RE.match(line)
+        if header:
+            current_category = _normalize_category_name(header.group(1))
+            categories[current_category].extend(_split_skills(header.group(2)))
+            continue
+
+        if current_category and (line.startswith(("-", "*", "•")) or "," in line):
+            categories[current_category].extend(_split_skills(line))
+
+    # Fill gaps with deterministic portfolio data
+    if not categories["languages"]:
+        categories["languages"].extend(portfolio.languages_used[:8])
+    if not categories["frameworks"]:
+        categories["frameworks"].extend(portfolio.frameworks_used[:10])
+    if not categories["practices"]:
+        categories["practices"].extend(portfolio.top_skills[:15])
+
+    if not categories["tools"]:
+        tool_candidates = portfolio.frameworks_used + portfolio.top_skills
+        categories["tools"].extend(
+            item for item in tool_candidates if _looks_like_tool(item)
+        )
+
+    language_tokens = {
+        _normalize_token(name)
+        for name in (_COMMON_LANGUAGES | set(portfolio.languages_used))
+    }
+
+    # Ensure languages are only listed under Languages
+    for cat in ("frameworks", "tools", "practices"):
+        keep: list[str] = []
+        for item in categories[cat]:
+            cleaned = _clean_inline_text(item)
+            if not cleaned:
+                continue
+            if _normalize_token(cleaned) in language_tokens:
+                categories["languages"].append(cleaned)
+            else:
+                keep.append(cleaned)
+        categories[cat] = keep
+
+    ordered = ["languages", "frameworks", "tools", "practices"]
+    deduped: dict[str, list[str]] = {k: [] for k in ordered}
+    seen_global: set[str] = set()
+
+    for cat in ordered:
+        for item in categories[cat]:
+            cleaned = _clean_inline_text(item)
+            if not cleaned:
+                continue
+            key = cleaned.casefold()
+            if key in seen_global:
+                continue
+            seen_global.add(key)
+            deduped[cat].append(cleaned)
+
+    lines: list[str] = []
+    if deduped["languages"]:
+        lines.append(f"Languages: {', '.join(deduped['languages'])}")
+    if deduped["frameworks"]:
+        lines.append(f"Frameworks & Libraries: {', '.join(deduped['frameworks'])}")
+    if deduped["tools"]:
+        lines.append(f"Tools & Infrastructure: {', '.join(deduped['tools'])}")
+    if deduped["practices"]:
+        lines.append(f"Practices: {', '.join(deduped['practices'])}")
+
+    if lines:
+        return "\n".join(lines)
+
+    # Last-resort fallback
+    return _clean_text_block(raw.splitlines())
+
+
+def _normalize_category_name(raw: str) -> str:
+    """Map category headers to canonical keys."""
+    key = raw.strip().casefold()
+    if "language" in key:
+        return "languages"
+    if "framework" in key:
+        return "frameworks"
+    if "tool" in key or "infrastructure" in key:
+        return "tools"
+    return "practices"
+
+
+def _split_skills(raw: str) -> list[str]:
+    """Split a skills line into individual items."""
+    text = _clean_inline_text(raw)
+    if not text:
+        return []
+
+    text = re.sub(r"^[-*•]\s*", "", text)
+    parts = [segment.strip() for segment in re.split(r"[,;|]", text)]
+    items: list[str] = []
+    for part in parts:
+        cleaned = _clean_inline_text(part)
+        if cleaned:
+            items.append(cleaned)
+    return items
+
+
+def _normalize_token(text: str) -> str:
+    """Normalize an item for case-insensitive matching."""
+    return re.sub(r"[^a-z0-9#+]+", "", text.casefold())
+
+
+def _looks_like_tool(item: str) -> bool:
+    """Heuristic for infra/tooling skill names."""
+    lowered = item.casefold()
+    return any(keyword in lowered for keyword in _TOOL_KEYWORDS)
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +408,13 @@ def run_project_query(
         progress(f"  Querying LLM for {bundle.project_name}...")
 
     prompt = build_project_prompt(bundle)
-    response = _query(prompt, model, PROJECT_SYSTEM)
+    response = _query(
+        prompt,
+        model,
+        PROJECT_SYSTEM,
+        temperature=0.15,
+        max_tokens=768,
+    )
 
     if not response.strip():
         raise RuntimeError(
@@ -140,18 +439,41 @@ def run_portfolio_queries(
     if progress:
         progress("Generating professional summary...")
     summary_prompt = build_summary_prompt(portfolio)
-    summary = _query(summary_prompt, model, SUMMARY_SYSTEM).strip()
+    summary = _clean_summary_or_profile(
+        _query(
+            summary_prompt,
+            model,
+            SUMMARY_SYSTEM,
+            temperature=0.15,
+            max_tokens=256,
+        )
+    )
 
     # 2. Skills section
     if progress:
         progress("Generating skills section...")
     skills_prompt = build_skills_prompt(portfolio)
-    skills = _query(skills_prompt, model, SUMMARY_SYSTEM).strip()
+    raw_skills = _query(
+        skills_prompt,
+        model,
+        SUMMARY_SYSTEM,
+        temperature=0.1,
+        max_tokens=320,
+    )
+    skills = _normalize_skills_section(raw_skills, portfolio)
 
     # 3. Developer profile
     if progress:
         progress("Generating developer profile...")
     profile_prompt = build_profile_prompt(portfolio)
-    profile = _query(profile_prompt, model, SUMMARY_SYSTEM).strip()
+    profile = _clean_summary_or_profile(
+        _query(
+            profile_prompt,
+            model,
+            SUMMARY_SYSTEM,
+            temperature=0.15,
+            max_tokens=320,
+        )
+    )
 
     return summary, skills, profile

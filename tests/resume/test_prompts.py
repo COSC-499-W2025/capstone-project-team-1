@@ -16,7 +16,10 @@ from artifactminer.resume.queries.prompts import (
     build_skills_prompt,
     build_profile_prompt,
 )
-from artifactminer.resume.queries.runner import _parse_project_response
+from artifactminer.resume.queries.runner import (
+    _parse_project_response,
+    _normalize_skills_section,
+)
 from artifactminer.resume.assembler import assemble_markdown, assemble_json
 
 
@@ -37,17 +40,26 @@ def _make_bundle() -> ProjectDataBundle:
         last_commit="2024-06-20",
         readme_text="A REST API for managing tasks and users built with FastAPI.",
         commit_groups=[
-            CommitGroup(category="feature", messages=[
-                "feat: implement user registration endpoint",
-                "feat: add task CRUD operations",
-                "feat: add JWT authentication",
-            ]),
-            CommitGroup(category="bugfix", messages=[
-                "fix: handle null user in create endpoint",
-            ]),
-            CommitGroup(category="test", messages=[
-                "test: add route handler tests",
-            ]),
+            CommitGroup(
+                category="feature",
+                messages=[
+                    "feat: implement user registration endpoint",
+                    "feat: add task CRUD operations",
+                    "feat: add JWT authentication",
+                ],
+            ),
+            CommitGroup(
+                category="bugfix",
+                messages=[
+                    "fix: handle null user in create endpoint",
+                ],
+            ),
+            CommitGroup(
+                category="test",
+                messages=[
+                    "test: add route handler tests",
+                ],
+            ),
         ],
         directory_overview=["src", "tests", "docs"],
         module_groups={"src": ["src/api/routes.py", "src/models/user.py"]},
@@ -170,8 +182,7 @@ class TestParseProjectResponse:
     def test_handles_bullet_style_only(self) -> None:
         """Should fallback to parsing bullets when no structure markers."""
         text = (
-            "- Built user authentication system\n"
-            "- Implemented task CRUD operations\n"
+            "- Built user authentication system\n- Implemented task CRUD operations\n"
         )
         section = _parse_project_response(text)
         assert len(section.bullets) == 2
@@ -181,6 +192,48 @@ class TestParseProjectResponse:
         text = "DESCRIPTION: \nBULLETS:\nNARRATIVE: "
         section = _parse_project_response(text)
         assert isinstance(section, ProjectSection)
+
+    def test_parses_markdown_decorated_headers(self) -> None:
+        """Should parse headers even when wrapped in markdown markers."""
+        text = (
+            "DESCRIPTION:\n"
+            "**\n"
+            "Campus pathfinding API with schedule-aware routing.\n"
+            "**BULLETS:**\n"
+            "- **Implemented** /schedule endpoint with busy building metadata\n"
+            "- Architected safe-path routing that respects closures\n"
+            "**NARRATIVE:**\n"
+            "As a core contributor, designed route safety logic and endpoint shape.\n"
+            "- NARRATIVE:**"
+        )
+
+        section = _parse_project_response(text)
+        assert section.description.startswith("Campus pathfinding API")
+        assert len(section.bullets) == 2
+        assert "Implemented /schedule endpoint" in section.bullets[0]
+        assert "As a core contributor" in section.narrative
+        assert "NARRATIVE:" not in section.narrative
+
+
+class TestNormalizeSkillsSection:
+    """Tests for skills section cleanup and normalization."""
+
+    def test_moves_languages_out_of_other_categories(self) -> None:
+        """Languages should not be duplicated under frameworks/practices."""
+        portfolio = _make_portfolio()
+        portfolio.top_skills = ["Testing", "CI/CD"]
+
+        raw = (
+            "Languages: Python, JavaScript\n"
+            "Frameworks & Libraries: FastAPI, TypeScript, SQLAlchemy\n"
+            "Practices: Python, Testing, CI/CD"
+        )
+
+        normalized = _normalize_skills_section(raw, portfolio)
+        assert "Languages: Python, JavaScript, TypeScript" in normalized
+        assert "Frameworks & Libraries: FastAPI, SQLAlchemy" in normalized
+        assert "Tools & Infrastructure: CI/CD" in normalized
+        assert "Practices: Testing" in normalized
 
 
 # ── Assembler ─────────────────────────────────────────────────────────
