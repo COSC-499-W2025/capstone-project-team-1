@@ -22,7 +22,6 @@ async def get_file_intelligence_contents(zip_id: int, db: Session = Depends(get_
                 detail=f"{e}"
             )
     if uploaded_zip is None:
-        if uploaded_zip is None:
             raise HTTPException(
                 status_code=404,
                 detail=f"could not find uploaded zip row with zip id {zip_id}"

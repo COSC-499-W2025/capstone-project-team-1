@@ -132,7 +132,7 @@ async def test_get_crawler_content_pdf_analysis(client):
     file_values = payload["crawl_path_and_file_name_and_ext"]
 
     #convert object to tuple 
-    tuple_file_values = [(fv["file_path"], fv["file_name"], fv["file_ext"])
+    tuple_file_values = [(fv["file_name"],fv["file_path"], fv["file_ext"])
     for fv in file_values]
 
     response = await get_crawler_pdf_contents(file_values=tuple_file_values)
