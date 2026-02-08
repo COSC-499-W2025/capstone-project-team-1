@@ -6,7 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db, RepoStat, ResumeItem
-from .schemas import ResumeItemResponse
+from .schemas import ResumeItemResponse, ResumeGenerationRequest, ResumeGenerationResponse
+from .analyze import get_user_email, get_consent_level
 from ..skills.deep_analysis import DeepRepoAnalyzer
 from ..skills.persistence import persist_extracted_skills, persist_insights_as_resume_items
 from ..RepositoryIntelligence.repo_intelligence_user import collect_user_additions
@@ -104,4 +105,116 @@ async def generate_resume_for_project(
         print(f"[resume_generate] Error: {error_msg}")
         errors.append(error_msg)
         return [], errors
+
+
+@router.post("/generate", response_model=ResumeGenerationResponse)
+async def generate_resume_items(
+    request: ResumeGenerationRequest,
+    db: Session = Depends(get_db),
+) -> ResumeGenerationResponse:
+    """Generate resume items for selected projects.
+    
+    This endpoint triggers on-demand resume item generation by running
+    DeepRepoAnalyzer on specified projects and persisting the extracted insights.
+    
+    The generation process:
+    1. Validates that all project IDs exist and are not soft-deleted
+    2. Retrieves user email and consent level
+    3. For each project:
+       - Optionally deletes existing resume items (if regenerate=True)
+       - Collects user contributions from git history
+       - Runs DeepRepoAnalyzer to extract skills and insights
+       - Persists insights as resume items
+    4. Returns all generated resume items
+    
+    Args:
+        request: ResumeGenerationRequest with project_ids and regenerate flag
+        db: Database session (injected)
+    
+    Returns:
+        ResumeGenerationResponse with generated items and metadata
+    
+    Raises:
+        HTTPException 400: If user email not configured
+        HTTPException 404: If any project_id not found or soft-deleted
+    
+    Milestone Requirement: #331 - POST /resume/generate endpoint
+    """
+    # Get user email and consent level
+    user_email = get_user_email(db)
+    consent_level = get_consent_level(db)
+    
+    print(
+        f"[resume_generate] Starting generation for {len(request.project_ids)} projects "
+        f"(user={user_email}, consent={consent_level}, regenerate={request.regenerate})"
+    )
+    
+    # Validate all project IDs exist and are not soft-deleted
+    projects = (
+        db.query(RepoStat)
+        .filter(
+            RepoStat.id.in_(request.project_ids),
+            RepoStat.deleted_at.is_(None),
+        )
+        .all()
+    )
+    
+    if len(projects) != len(request.project_ids):
+        found_ids = {p.id for p in projects}
+        missing_ids = set(request.project_ids) - found_ids
+        raise HTTPException(
+            status_code=404,
+            detail=f"Projects not found or deleted: {sorted(missing_ids)}",
+        )
+    
+    # Generate resume items for each project
+    all_resume_items = []
+    all_errors = []
+    
+    for project in projects:
+        resume_items, errors = await generate_resume_for_project(
+            db=db,
+            repo_stat=project,
+            user_email=user_email,
+            consent_level=consent_level,
+            regenerate=request.regenerate,
+        )
+        all_resume_items.extend(resume_items)
+        all_errors.extend(errors)
+    
+    # Commit all changes
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save resume items: {str(e)}",
+        )
+    
+    # Convert to response format
+    response_items = [
+        ResumeItemResponse(
+            id=item.id,
+            title=item.title,
+            content=item.content,
+            category=item.category,
+            project_name=item.repo_stat.project_name if item.repo_stat else None,
+            created_at=item.created_at,
+        )
+        for item in all_resume_items
+    ]
+    
+    print(
+        f"[resume_generate] Completed: {len(all_resume_items)} items generated, "
+        f"{len(all_errors)} errors"
+    )
+    
+    return ResumeGenerationResponse(
+        success=True,
+        items_generated=len(all_resume_items),
+        resume_items=response_items,
+        consent_level=consent_level,
+        errors=all_errors,
+    )
 
