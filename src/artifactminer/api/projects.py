@@ -239,7 +239,7 @@ async def list_evidence(
     if type is not None:
         query = query.filter(ProjectEvidence.type == type)
 
-    rows = query.all()
+    rows = query.order_by(ProjectEvidence.created_at).all()
     return [
         EvidenceResponse(
             id=ev.id,
