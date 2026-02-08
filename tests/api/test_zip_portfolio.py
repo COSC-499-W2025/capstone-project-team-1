@@ -241,5 +241,7 @@ class TestIncrementalFixtures:
         assert dirs_v1.status_code == 200
         assert dirs_v2.status_code == 200
 
+        files_v1 = dirs_v1.json().get("cleanedfilespath", [])
         files_v2 = dirs_v2.json().get("cleanedfilespath", [])
+        assert not any(path.endswith("incremental_upload_check.md") for path in files_v1)
         assert any(path.endswith("incremental_upload_check.md") for path in files_v2)
