@@ -128,3 +128,66 @@ Continue to work on file analysis outside of repositories. I want to make sure t
 
 
 
+
+
+# Evan Crowley
+## Log: February 8 2026
+
+
+
+
+
+
+
+
+### From Peer Review
+![Tasks_I_Did](Screenshot%202026-02-08%20190529.png)
+
+
+
+
+
+
+
+
+Week 1 = Monday Jan 26th
+### Tuesday
+I fixed an issue with the file path variations in the CLI. I added some code so that when the user gives slight variations of the file path it still works correctly.
+
+
+Started work on the file analysis system. Created the initial file intelligence main python file with pdf analysis. Created a unit test for testing pdf analysis.
+
+
+### Wednesday
+Refined PDF analysis to be able to detect if a PDF is a resume
+
+
+### Worked on this week:
+- CLI bug fixes
+- Starting PDF file analysis
+
+
+Week 2 = Monday February 2nd
+### Saturday
+Worked on milestone issue #331 add generate resume endpoint. Created the endpoint for on demand resume generation, using a combination of previously made functions, as well creating the new resume generation function. Added the ability for the user to "regenerate" their resume by deleting the old one on generation of the new one. Created testing to ensure full file functionality.
+
+
+### Reflection:
+Got bug fixes and new features put in for both weeks. Overall I think I managed to get some good additions into the project, and some bug fixes as well. The tests I added should help with any future debugging and there are improvements to be made to the resume generation endpoint when some of the soft dependencies are added.
+
+
+
+
+### Team Dynamic:
+Overall this week we worked well as a team and managed to support each other when needed. Nathan and I collaborated on getting the file analysis started. He picked it up after I added the pdf analysis, and integrated his file analysis code into the process.
+
+
+### Plan:
+I plan to continue working on file analysis but primarily want to focus on local AI and open AI prompt engineering. I want to find the most efficient prompt to get the correct information from both our local and cloud based LLMs. I plan on discussing my findings with Shlok at some point through the week.
+
+
+
+
+
+
+
