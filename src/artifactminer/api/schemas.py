@@ -209,8 +209,6 @@ class ProjectDetailResponse(BaseModel):
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
     evidence: list[EvidenceResponse] = []
-
-
 class ProjectRoleUpdateRequest(BaseModel):
     """Payload for setting a user's role on a project."""
 
@@ -324,6 +322,37 @@ class DeleteResponse(BaseModel):
     success: bool = Field(description="Whether the delete operation succeeded.")
     message: str = Field(description="Human-readable result message.")
     deleted_id: int = Field(description="ID of the deleted resource.")
+
+
+class ResumeGenerationRequest(BaseModel):
+    """Request payload for resume generation."""
+
+    project_ids: list[int] = Field(
+        description="List of project IDs (repo_stat IDs) to generate resume items for.",
+        min_length=1,
+    )
+    regenerate: bool = Field(
+        default=False,
+        description="If True, delete existing resume items for these projects before regenerating.",
+    )
+
+
+class ResumeGenerationResponse(BaseModel):
+    """Response from resume generation endpoint."""
+
+    success: bool = Field(description="Whether the generation completed successfully.")
+    items_generated: int = Field(description="Total number of resume items created.")
+    resume_items: list[ResumeItemResponse] = Field(
+        description="List of generated resume items."
+    )
+    consent_level: str = Field(
+        description="Consent level used for generation ('full', 'no_llm', or 'none')."
+    )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="List of errors encountered during generation (if any).",
+    )
+
 
 class ProjectRankingItem(BaseModel):
     """Ranked project based on user contribution."""
