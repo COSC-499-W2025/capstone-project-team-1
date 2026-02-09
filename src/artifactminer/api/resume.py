@@ -101,7 +101,7 @@ async def generate_resume_for_project(
         return resume_items, errors
         
     except Exception as e:
-        error_msg = f"Failed to analyze {repo_stat.project_name}: {str(e)}"
+        error_msg = f"Failed to analyze {repo_stat.project_name}: {type(e).__name__}: {str(e)}"
         print(f"[resume_generate] Error: {error_msg}")
         errors.append(error_msg)
         return [], errors
@@ -117,7 +117,26 @@ async def generate_resume_items(
     This endpoint triggers on-demand resume item generation by running
     DeepRepoAnalyzer on specified projects and persisting the extracted insights.
     
-    The generation process:
+    ## How to Get Project IDs
+    
+    Project IDs are the database primary keys for RepoStat entries. To retrieve them:
+    
+    1. **List all projects**: `GET /projects` returns all projects with their IDs
+    2. **Get specific project**: `GET /projects/{project_id}` returns details for one project
+    3. **After analysis**: When you call `POST /analyze/repo` or upload a ZIP via `POST /zip`,
+       the response includes the project ID in the `repo_stat_id` field
+    
+    Example workflow:
+    ```
+    # Step 1: Analyze a repository
+    POST /analyze/repo -> {"id": 1, "project_name": "my-app", ...}
+    
+    # Step 2: Generate resume items using the project ID
+    POST /resume/generate {"project_ids": [1], "regenerate": false}
+    ```
+    
+    ## Generation Process
+    
     1. Validates that all project IDs exist and are not soft-deleted
     2. Retrieves user email and consent level
     3. For each project:
@@ -132,11 +151,13 @@ async def generate_resume_items(
         db: Database session (injected)
     
     Returns:
-        ResumeGenerationResponse with generated items and metadata
+        ResumeGenerationResponse with generated items, metadata, and success status.
+        The `success` field is True only if at least one resume item was generated.
     
     Raises:
         HTTPException 400: If user email not configured
         HTTPException 404: If any project_id not found or soft-deleted
+        HTTPException 500: If database commit fails
     
     Milestone Requirement: #331 - POST /resume/generate endpoint
     """
@@ -189,7 +210,7 @@ async def generate_resume_items(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save resume items: {str(e)}",
+            detail=f"Failed to save resume items: {type(e).__name__}: {str(e)}",
         )
     
     # Convert to response format
@@ -205,13 +226,16 @@ async def generate_resume_items(
         for item in all_resume_items
     ]
     
+    # Determine success: True only if at least one item was generated
+    is_success = len(all_resume_items) > 0
+    
     print(
         f"[resume_generate] Completed: {len(all_resume_items)} items generated, "
-        f"{len(all_errors)} errors"
+        f"{len(all_errors)} errors, success={is_success}"
     )
     
     return ResumeGenerationResponse(
-        success=True,
+        success=is_success,
         items_generated=len(all_resume_items),
         resume_items=response_items,
         consent_level=consent_level,

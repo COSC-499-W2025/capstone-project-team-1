@@ -50,9 +50,21 @@ def client():
 @patch("artifactminer.api.resume.Path")
 def test_generate_single_project(mock_path, mock_collect, mock_analyzer, client):
     """Successfully generates resume items for a single project."""
+    from artifactminer.skills.deep_analysis import Insight, DeepAnalysisResult
+    
     mock_path.return_value.exists.return_value = True
     mock_collect.return_value = ["commit additions"]
-    mock_analyzer.return_value.analyze.return_value = Mock(insights=[], skills=[])
+    
+    # Mock insights to create actual resume items
+    mock_insight = Insight(
+        title="Test Insight",
+        evidence=["test evidence 1", "test evidence 2"],
+        why_it_matters="This demonstrates testing skills"
+    )
+    mock_analyzer.return_value.analyze.return_value = DeepAnalysisResult(
+        insights=[mock_insight],
+        skills=[]
+    )
 
     resp = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
     
@@ -61,6 +73,7 @@ def test_generate_single_project(mock_path, mock_collect, mock_analyzer, client)
     assert data["success"] is True
     assert data["consent_level"] == "no_llm"
     assert isinstance(data["resume_items"], list)
+    assert data["items_generated"] > 0
 
 
 @patch("artifactminer.api.resume.DeepRepoAnalyzer")
@@ -93,7 +106,7 @@ def test_generate_empty_project_list(client):
 @patch("artifactminer.api.resume.collect_user_additions")
 @patch("artifactminer.api.resume.Path")
 def test_generate_with_errors(mock_path, mock_collect, mock_analyzer, client):
-    """Handles analyzer errors gracefully."""
+    """Handles analyzer errors gracefully and returns success=False when no items generated."""
     mock_path.return_value.exists.return_value = True
     mock_collect.side_effect = Exception("Git error")
     mock_analyzer.return_value.analyze.side_effect = Exception("Analysis failed")
@@ -102,5 +115,31 @@ def test_generate_with_errors(mock_path, mock_collect, mock_analyzer, client):
     
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
+    assert data["success"] is False  # No items generated due to errors
     assert len(data["errors"]) > 0
+    assert data["items_generated"] == 0
+
+
+@patch("artifactminer.api.resume.DeepRepoAnalyzer")
+@patch("artifactminer.api.resume.collect_user_additions")
+@patch("artifactminer.api.resume.Path")
+def test_generate_with_empty_insights(mock_path, mock_collect, mock_analyzer, client):
+    """Returns success=False when analysis completes but produces no insights."""
+    from artifactminer.skills.deep_analysis import DeepAnalysisResult
+    
+    mock_path.return_value.exists.return_value = True
+    mock_collect.return_value = ["commit additions"]
+    
+    # Mock analysis that returns empty insights
+    mock_analyzer.return_value.analyze.return_value = DeepAnalysisResult(
+        insights=[],
+        skills=[]
+    )
+
+    resp = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
+    
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is False  # No items generated
+    assert data["items_generated"] == 0
+    assert len(data["errors"]) == 0  # No errors, just no insights
