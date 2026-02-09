@@ -16,12 +16,42 @@ from .schemas import (
     ProjectDetailResponse,
     ProjectSkillItem,
     ProjectResumeItem,
+    ProjectRoleUpdateRequest,
+    ProjectRoleResponse,
+    EvidenceCreateRequest,
+    EvidenceResponse,
+    EvidenceDeleteResponse,
+    EvidenceType,
 )
-from ..db import RepoStat, get_db
+from ..db import RepoStat, UserRepoStat, ProjectEvidence, get_db
 from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+def _get_latest_user_repo_stat_for_project(db: Session, repo_stat: RepoStat) -> UserRepoStat | None:
+    return (
+        db.query(UserRepoStat)
+        .filter(
+            UserRepoStat.project_name == repo_stat.project_name,
+            UserRepoStat.project_path == repo_stat.project_path,
+        )
+        .order_by(UserRepoStat.id.desc())
+        .first()
+    )
+
+
+def _get_active_project(project_id: int, db: Session) -> RepoStat:
+    """Return the project or raise 404 if missing / soft-deleted."""
+    project = (
+        db.query(RepoStat)
+        .filter(RepoStat.id == project_id, RepoStat.deleted_at.is_(None))
+        .first()
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
 
 
 @router.get("", response_model=list[ProjectResponse])
@@ -59,6 +89,9 @@ async def get_project(
     if not repo_stat:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    latest_user_stat = _get_latest_user_repo_stat_for_project(db, repo_stat)
+    role = latest_user_stat.user_role if latest_user_stat else None
+
     skills = [
         ProjectSkillItem(
             skill_name=ps.skill.name,
@@ -78,6 +111,18 @@ async def get_project(
         for ri in repo_stat.resume_items
     ]
 
+    evidence = [
+        EvidenceResponse(
+            id=ev.id,
+            type=ev.type,
+            content=ev.content,
+            source=ev.source,
+            date=ev.date,
+            project_id=repo_stat.id,
+        )
+        for ev in repo_stat.evidence
+    ]
+
     return ProjectDetailResponse(
         id=repo_stat.id,
         project_name=repo_stat.project_name,
@@ -91,9 +136,150 @@ async def get_project(
         primary_language=repo_stat.primary_language,
         ranking_score=repo_stat.ranking_score,
         health_score=repo_stat.health_score,
+        role=role,
         skills=skills,
         resume_items=resume_items,
+        evidence=evidence,
     )
+
+
+@router.put("/{project_id}/role", response_model=ProjectRoleResponse)
+@router.post("/{project_id}/role", response_model=ProjectRoleResponse)
+async def upsert_project_role(
+    project_id: int,
+    payload: ProjectRoleUpdateRequest,
+    db: Session = Depends(get_db),
+) -> ProjectRoleResponse:
+    """Set or update the user's role for a project."""
+    repo_stat = (
+        db.query(RepoStat)
+        .filter(RepoStat.id == project_id, RepoStat.deleted_at.is_(None))
+        .first()
+    )
+    if not repo_stat:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    normalized_role = payload.role.strip()
+    if not normalized_role:
+        raise HTTPException(status_code=422, detail="Role must not be empty")
+
+    updated_rows = (
+        db.query(UserRepoStat)
+        .filter(
+            UserRepoStat.project_name == repo_stat.project_name,
+            UserRepoStat.project_path == repo_stat.project_path,
+        )
+        .update({UserRepoStat.user_role: normalized_role}, synchronize_session=False)
+    )
+
+    if updated_rows == 0:
+        db.add(
+            UserRepoStat(
+                project_name=repo_stat.project_name,
+                project_path=repo_stat.project_path,
+                user_role=normalized_role,
+            )
+        )
+
+    db.commit()
+
+    return ProjectRoleResponse(
+        project_id=repo_stat.id,
+        project_name=repo_stat.project_name,
+        role=normalized_role,
+    )
+
+
+@router.post(
+    "/{project_id}/evidence",
+    response_model=EvidenceResponse,
+    status_code=201,
+)
+async def create_evidence(
+    project_id: int,
+    body: EvidenceCreateRequest,
+    db: Session = Depends(get_db),
+) -> EvidenceResponse:
+    """Attach evidence of success to a project."""
+    project = _get_active_project(project_id, db)
+
+    evidence = ProjectEvidence(
+        repo_stat_id=project.id,
+        type=body.type,
+        content=body.content,
+        source=body.source,
+        date=body.date,
+    )
+    db.add(evidence)
+    db.commit()
+    db.refresh(evidence)
+
+    return EvidenceResponse(
+        id=evidence.id,
+        type=evidence.type,
+        content=evidence.content,
+        source=evidence.source,
+        date=evidence.date,
+        project_id=project.id,
+    )
+
+
+@router.get("/{project_id}/evidence", response_model=list[EvidenceResponse])
+async def list_evidence(
+    project_id: int,
+    type: EvidenceType | None = Query(default=None, description="Filter by evidence type"),
+    db: Session = Depends(get_db),
+) -> list[EvidenceResponse]:
+    """List all evidence for a project, with optional type filter."""
+    project = _get_active_project(project_id, db)
+
+    query = db.query(ProjectEvidence).filter(
+        ProjectEvidence.repo_stat_id == project.id
+    )
+    if type is not None:
+        query = query.filter(ProjectEvidence.type == type)
+
+    rows = query.order_by(ProjectEvidence.created_at).all()
+    return [
+        EvidenceResponse(
+            id=ev.id,
+            type=ev.type,
+            content=ev.content,
+            source=ev.source,
+            date=ev.date,
+            project_id=project.id,
+        )
+        for ev in rows
+    ]
+
+
+@router.delete(
+    "/{project_id}/evidence/{evidence_id}",
+    response_model=EvidenceDeleteResponse,
+)
+async def delete_evidence(
+    project_id: int,
+    evidence_id: int,
+    db: Session = Depends(get_db),
+) -> EvidenceDeleteResponse:
+    """Remove a single evidence item from a project."""
+    project = _get_active_project(project_id, db)
+
+    evidence = (
+        db.query(ProjectEvidence)
+        .filter(
+            ProjectEvidence.id == evidence_id,
+            ProjectEvidence.repo_stat_id == project.id,
+        )
+        .first()
+    )
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
+
+    db.delete(evidence)
+    db.commit()
+
+    return EvidenceDeleteResponse(success=True, deleted_id=evidence_id)
 
 
 def fetch_project_timeline(
