@@ -38,6 +38,8 @@ We wish to complete all Milestone 2 objectives soon. I plan to work with Evan on
 
 ## Term 2 Week 3: Jan 19- Jan 25:
 
+## Term 2 Week 3: Jan 19- 25:
+
 #### Previous Week:
 The previous week was focused on creating a test bench to experiment with adding local LLMs through Ollama.
 
