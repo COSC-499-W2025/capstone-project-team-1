@@ -1,9 +1,48 @@
 """Shared Pydantic models for Artifact Miner API contracts."""
 
+from __future__ import annotations
+
+import datetime as _dt
 from datetime import datetime, UTC
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# ---------------------------------------------------------------------------
+# Evidence types
+# ---------------------------------------------------------------------------
+
+EvidenceType = Literal["metric", "feedback", "evaluation", "award", "custom"]
+
+
+class EvidenceCreateRequest(BaseModel):
+    """Request payload for creating project evidence."""
+
+    type: EvidenceType
+    content: str = Field(min_length=1)
+    source: Optional[str] = None
+    date: Optional[_dt.date] = None
+
+
+class EvidenceResponse(BaseModel):
+    """Response shape for a single evidence item."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: EvidenceType
+    content: str
+    source: Optional[str] = None
+    date: Optional[_dt.date] = None
+    project_id: int
+
+
+class EvidenceDeleteResponse(BaseModel):
+    """Response shape for evidence deletion."""
+
+    success: bool
+    deleted_id: int
 
 
 
@@ -166,8 +205,28 @@ class ProjectDetailResponse(BaseModel):
     primary_language: str | None = None
     ranking_score: float | None = None
     health_score: float | None = None
+    role: str | None = None
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
+    evidence: list[EvidenceResponse] = []
+
+
+class ProjectRoleUpdateRequest(BaseModel):
+    """Payload for setting a user's role on a project."""
+
+    role: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Role of the user in this project (e.g., Lead Developer).",
+    )
+
+
+class ProjectRoleResponse(BaseModel):
+    """Response after creating/updating a project role."""
+
+    project_id: int
+    project_name: str
+    role: str
 
 
 class ProjectTimelineItem(BaseModel):
@@ -217,6 +276,19 @@ class SkillChronologyItem(BaseModel):
     )
 
 
+class SkillResponse(BaseModel):
+    """Response shape for skill listing."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    category: str | None = None
+    project_count: int | None = Field(
+        default=None, description="Number of projects using this skill."
+    )
+
+
 class ResumeItemResponse(BaseModel):
     """Response shape for resume/portfolio items."""
 
@@ -228,6 +300,9 @@ class ResumeItemResponse(BaseModel):
     category: str | None = None
     project_name: str | None = Field(
         default=None, description="Associated project name."
+    )
+    role: str | None = Field(
+        default=None, description="User role in the associated project."
     )
     created_at: datetime
 
@@ -249,6 +324,37 @@ class DeleteResponse(BaseModel):
     success: bool = Field(description="Whether the delete operation succeeded.")
     message: str = Field(description="Human-readable result message.")
     deleted_id: int = Field(description="ID of the deleted resource.")
+
+
+class ResumeGenerationRequest(BaseModel):
+    """Request payload for resume generation."""
+
+    project_ids: list[int] = Field(
+        description="List of project IDs (repo_stat IDs) to generate resume items for.",
+        min_length=1,
+    )
+    regenerate: bool = Field(
+        default=False,
+        description="If True, delete existing resume items for these projects before regenerating.",
+    )
+
+
+class ResumeGenerationResponse(BaseModel):
+    """Response from resume generation endpoint."""
+
+    success: bool = Field(description="Whether the generation completed successfully.")
+    items_generated: int = Field(description="Total number of resume items created.")
+    resume_items: list[ResumeItemResponse] = Field(
+        description="List of generated resume items."
+    )
+    consent_level: str = Field(
+        description="Consent level used for generation ('full', 'no_llm', or 'none')."
+    )
+    errors: list[str] = Field(
+        default_factory=list,
+        description="List of errors encountered during generation (if any).",
+    )
+
 
 class ProjectRankingItem(BaseModel):
     """Ranked project based on user contribution."""
@@ -327,7 +433,7 @@ class AnalyzeResponse(BaseModel):
     consent_level: str
     user_email: str
 
-class SummaryResponse(BaseModel):
+class SummaryListResponse(BaseModel):
     summaries: list[SummaryResult]
 
 class FileValues(BaseModel):
@@ -356,4 +462,3 @@ class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
     summary_text: str
-

@@ -120,6 +120,7 @@ def test_get_project_by_id_response_fields(client):
     assert "primary_language" in data
     assert "ranking_score" in data
     assert "health_score" in data
+    assert "role" in data
 
     # Relationship fields
     assert "skills" in data
@@ -144,5 +145,54 @@ def test_get_project_by_id_soft_deleted(client):
 
     # Try to get the deleted project
     response = client.get(f"/projects/{project_id}")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
+def test_project_role_upsert_and_get_project(client):
+    """POST/PUT /projects/{id}/role sets and updates role shown in project detail."""
+    project_id = client.get("/projects").json()[0]["id"]
+
+    create_resp = client.post(
+        f"/projects/{project_id}/role",
+        json={"role": "Backend Engineer"},
+    )
+    assert create_resp.status_code == 200
+    assert create_resp.json()["role"] == "Backend Engineer"
+
+    detail_resp = client.get(f"/projects/{project_id}")
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["role"] == "Backend Engineer"
+
+    update_resp = client.put(
+        f"/projects/{project_id}/role",
+        json={"role": "Lead Developer"},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["role"] == "Lead Developer"
+
+    detail_resp_after = client.get(f"/projects/{project_id}")
+    assert detail_resp_after.status_code == 200
+    assert detail_resp_after.json()["role"] == "Lead Developer"
+
+
+def test_project_role_upsert_rejects_blank_value(client):
+    """Role must not be empty/whitespace."""
+    project_id = client.get("/projects").json()[0]["id"]
+
+    response = client.post(
+        f"/projects/{project_id}/role",
+        json={"role": "   "},
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Role must not be empty"
+
+
+def test_project_role_upsert_not_found(client):
+    """Role upsert returns 404 for unknown project id."""
+    response = client.post(
+        "/projects/99999/role",
+        json={"role": "Contributor"},
+    )
     assert response.status_code == 404
     assert response.json()["detail"] == "Project not found"
