@@ -4,14 +4,12 @@
 # also using basic string matching in order to comply with non-AI file analysis.
 
 
+from git import List, Tuple
 from pypdf import PdfReader
 
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
-
-from artifactminer.api.schemas import FileValues
- 
 #CRAWLER INTEGRATION
-async def get_crawler_pdf_contents(file_values : list[FileValues]) -> str:
+async def get_crawler_pdf_contents(file_values : List[Tuple[str, str, str]]) -> str:
     
 
     if file_values is None:
