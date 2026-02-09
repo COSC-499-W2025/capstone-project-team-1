@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
 - [Term 2 Week 3 (Jan 19 - Jan 25)](#logs---term-2-week-3)
 - [Term 2 Week 2 (Jan 12 - Jan 18)](#logs---term-2-week-2)
 - [Term 2 Week 1 (Jan 5 - Jan 11)](Stavan_T2_Week1.md)
@@ -7,6 +8,77 @@
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 4-5
+
+## Connection to Previous Week
+Last week I focused on interactive CLI mode and team integration work. Over this two-week period, I shifted toward API retrieval/evidence pipeline work, tracked work through GitHub issues, and moved core evidence persistence PRs into review.
+
+---
+
+## Coding Tasks
+
+* Added projects retrieval APIs and schemas: `GET /projects` and `GET /projects/{id}`, plus response models and pagination ordering updates ([PR #342](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/342), [PR #343](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/343); closes [Issue #327](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/327), [Issue #328](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/328)).
+
+* Added API tests for project list/detail retrieval to validate endpoint behavior and response structure.
+
+* Added `GET /skills` endpoint with response schema, dedup logic fixes, and endpoint tests ([PR #350](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/350)).
+
+* Implemented the structured evidence foundation bridge for PR-1 and moved it into active review ([PR #357](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/357)).
+
+* Persisted deep analysis insights as project evidence, added persistence migration tests, and moved PR-2 into review ([PR #358](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/358)).
+
+* Created and organized GitHub issue breakdown for API/OpenTUI/resume/evidence work, including [Issue #318](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/318), [Issue #330](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/330), [Issue #331](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/331), [Issue #336](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/336), [Issue #338](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/338), [Issue #339](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/339), and [Issue #341](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/341).
+
+* Merged development sync updates as part of integration flow ([PR #349](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/349)).
+
+---
+
+## Testing & Debugging Tasks
+
+* Added tests for `GET /projects` and `GET /projects/{id}` endpoints (`tests/api/test_projects.py`).
+
+* Added evidence persistence coverage in API/evidence tests to verify deep-insight migration into project evidence rows (`tests/api/test_analyze.py`, `tests/evidence/test_orchestrator.py`, `tests/test_persistence.py`).
+
+* Debugged and validated evidence model typing/refactor so extractor output remained compatible with persistence and tests while PR-1/PR-2 were in review.
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #344](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/344) (OpenTUI API client layer), [PR #345](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/345) (AppContext state provider), and [PR #347](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/347) (real file picker).
+
+* Reviewed [PR #351](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/351) (GET `/resume/{id}`), [PR #359](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/359) (project user-role support), and [PR #361](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/361) (mock projects v2 fixture + reproducible generation script).
+
+* Requested follow-up fixes on evidence/retrieval-related changes; multiple team commits were pushed as requested changes.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this period; main effort was integration coordination across concurrent API and evidence changes.
+
+---
+
+## Plan for Next Week
+
+* Work on PR2 and PR3 GitHub issues: [Issue #338](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/338), [Issue #339](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/339).
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Add `GET /projects` + `GET /projects/{id}` | ✅ Done | [PR #342](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/342), [PR #343](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/343) |
+| Add `GET /skills` endpoint | ✅ Done | [PR #350](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/350) |
+| Add projects API tests | ✅ Done | `tests/api/test_projects.py` |
+| Evidence PR-1 foundation bridge | 🔄 In review | [PR #357](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/357) |
+| Evidence PR-2 persistence + migration tests | 🔄 In review | [PR #358](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/358) |
+| Review PRs (#344, #345, #347, #351, #359, #361) | ✅ Done | Reviewed + follow-up requested changes |
+| Plan PR2,3 GitHub issues | ⏳ Not started yet | [Issue #338](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/338), [Issue #339](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/339) |
+
+![Tasks Week 4-5](Tasks_T2_Week4-5.png)
 
 ---
 
