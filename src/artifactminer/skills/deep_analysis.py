@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 from artifactminer.skills.models import ExtractedSkill
 from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
+from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
+from artifactminer.skills.signals.infra_signals import get_infra_signals
+from artifactminer.mappings import CATEGORIES
 
 
 @dataclass
@@ -20,11 +23,38 @@ class Insight:
 
 
 @dataclass
+class GitStatsResult:
+    """Git contribution metrics for a user in a repo."""
+
+    commit_count_window: int = 0
+    commit_frequency: float = 0.0
+    contribution_percent: float = 0.0
+    first_commit_date: Any = None
+    last_commit_date: Any = None
+    has_branches: bool = False
+    branch_count: int = 0
+    has_tags: bool = False
+    merge_commits: int = 0
+
+
+@dataclass
+class InfraSignalsResult:
+    """Infrastructure and DevOps configuration signals."""
+
+    ci_cd_tools: List[str] = field(default_factory=list)
+    docker_tools: List[str] = field(default_factory=list)
+    env_build_tools: List[str] = field(default_factory=list)
+    all_tools: List[str] = field(default_factory=list)
+
+
+@dataclass
 class DeepAnalysisResult:
     """Baseline skills plus higher-order insights."""
 
     skills: List[ExtractedSkill]
     insights: List[Insight]
+    git_stats: GitStatsResult | None = None
+    infra_signals: InfraSignalsResult | None = None
 
 
 class DeepRepoAnalyzer:
@@ -45,7 +75,12 @@ class DeepRepoAnalyzer:
             "why": "Structured modeling and interfaces reflect design thinking beyond scripts.",
         },
         "Robustness and error handling": {
-            "skills": {"Exception Design", "Context Management", "Error Handling", "Logging"},
+            "skills": {
+                "Exception Design",
+                "Context Management",
+                "Error Handling",
+                "Logging",
+            },
             "why": "Custom exceptions, managed resources, and logging reduce brittleness in failure scenarios.",
         },
         "Async and concurrency": {
@@ -79,7 +114,66 @@ class DeepRepoAnalyzer:
             consent_level=consent_level,
         )
         insights = self._derive_insights(skills)
-        return DeepAnalysisResult(skills=skills, insights=insights)
+
+        git_stats = self._extract_git_stats(repo_path, user_email, user_contributions)
+        infra_signals = self._extract_infra_signals(repo_path, user_contributions)
+
+        return DeepAnalysisResult(
+            skills=skills,
+            insights=insights,
+            git_stats=git_stats,
+            infra_signals=infra_signals,
+        )
+
+    def _extract_git_stats(
+        self,
+        repo_path: str,
+        user_email: str,
+        user_contributions: Dict | None,
+    ) -> GitStatsResult | None:
+        """Extract git contribution metrics for the user."""
+        touched_paths = (
+            user_contributions.get("touched_paths") if user_contributions else None
+        )
+        stats = get_git_stats(repo_path, user_email, touched_paths=touched_paths)
+        patterns = detect_git_patterns(repo_path, touched_paths=touched_paths)
+
+        if not stats and not patterns:
+            return None
+
+        return GitStatsResult(
+            commit_count_window=stats.get("commit_count_window", 0),
+            commit_frequency=stats.get("commit_frequency", 0.0),
+            contribution_percent=stats.get("contribution_percent", 0.0),
+            first_commit_date=stats.get("first_commit_date"),
+            last_commit_date=stats.get("last_commit_date"),
+            has_branches=patterns.get("has_branches", False),
+            branch_count=patterns.get("branch_count", 0),
+            has_tags=patterns.get("has_tags", False),
+            merge_commits=patterns.get("merge_commits", 0),
+        )
+
+    def _extract_infra_signals(
+        self,
+        repo_path: str,
+        user_contributions: Dict | None,
+    ) -> InfraSignalsResult | None:
+        """Extract infrastructure and DevOps configuration signals."""
+        touched_paths = (
+            user_contributions.get("touched_paths") if user_contributions else None
+        )
+        signals = get_infra_signals(repo_path, touched_paths=touched_paths)
+
+        if not signals:
+            return None
+
+        summary = signals.get("summary", {})
+        return InfraSignalsResult(
+            ci_cd_tools=summary.get("ci_cd_tools", []),
+            docker_tools=summary.get("docker_tools", []),
+            env_build_tools=summary.get("env_build_tools", []),
+            all_tools=summary.get("all_tools", []),
+        )
 
     def _validate_insight_rules(self) -> None:
         """Fail fast if insight rules reference skills that do not exist."""
@@ -87,7 +181,9 @@ class DeepRepoAnalyzer:
         for title, rule in self._INSIGHT_RULES.items():
             missing = set(rule["skills"]) - available_skills
             if missing:
-                raise ValueError(f"Insight '{title}' references unknown skills: {sorted(missing)}")
+                raise ValueError(
+                    f"Insight '{title}' references unknown skills: {sorted(missing)}"
+                )
 
     def _derive_insights(self, skills: List[ExtractedSkill]) -> List[Insight]:
         insight_results: List[Insight] = []
