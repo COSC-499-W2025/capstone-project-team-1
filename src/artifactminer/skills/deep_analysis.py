@@ -10,7 +10,6 @@ from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
 from artifactminer.skills.signals.infra_signals import get_infra_signals
-from artifactminer.mappings import CATEGORIES
 
 
 @dataclass
