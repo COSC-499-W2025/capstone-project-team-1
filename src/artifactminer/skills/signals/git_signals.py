@@ -8,7 +8,7 @@ from typing import Any, Dict, Set
 import git
 
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo
-from artifactminer.skills.signals.file_signals import path_in_touched
+from artifactminer.RepositoryIntelligence.repo_intelligence_user import getUserRepoStats
 
 
 def get_git_stats(
@@ -19,6 +19,8 @@ def get_git_stats(
     touched_paths: Set[str] | None = None,
 ) -> Dict[str, Any]:
     """Extract git contribution metrics for a user.
+
+    Delegates to getUserRepoStats for core metrics, adds windowed commit count.
 
     Returns:
         Dict with keys:
@@ -32,22 +34,11 @@ def get_git_stats(
         return {}
 
     try:
-        repo = git.Repo(repo_path)
+        user_stats = getUserRepoStats(repo_path, user_email)
     except Exception:
         return {}
 
-    user_email = user_email.strip().lower()
-    now = datetime.now()
-    window_start = now - timedelta(days=window_days)
-
-    all_commits = list(repo.iter_commits())
-    user_commits = [
-        c
-        for c in all_commits
-        if (getattr(c.author, "email", "") or "").lower() == user_email
-    ]
-
-    if not user_commits:
+    if user_stats.total_commits is None or user_stats.total_commits == 0:
         return {
             "commit_count_window": 0,
             "commit_frequency": 0.0,
@@ -56,29 +47,34 @@ def get_git_stats(
             "last_commit_date": None,
         }
 
-    commits_in_window = [
-        c
-        for c in user_commits
-        if datetime.fromtimestamp(c.committed_date) >= window_start
-    ]
-
-    first_commit = datetime.fromtimestamp(user_commits[-1].committed_date)
-    last_commit = datetime.fromtimestamp(user_commits[0].committed_date)
-
-    delta = last_commit - first_commit
-    weeks = delta.total_seconds() / 604800 if delta.total_seconds() > 0 else 1
-    commit_frequency = len(user_commits) / weeks
-
-    total_count = len(all_commits) if all_commits else 1
-    contribution_percent = (len(user_commits) / total_count) * 100
+    commits_in_window = _count_commits_in_window(repo_path, user_email, window_days)
 
     return {
-        "commit_count_window": len(commits_in_window),
-        "commit_frequency": round(commit_frequency, 2),
-        "contribution_percent": round(contribution_percent, 2),
-        "first_commit_date": first_commit,
-        "last_commit_date": last_commit,
+        "commit_count_window": commits_in_window,
+        "commit_frequency": user_stats.commitFrequency or 0.0,
+        "contribution_percent": user_stats.userStatspercentages or 0.0,
+        "first_commit_date": user_stats.first_commit,
+        "last_commit_date": user_stats.last_commit,
     }
+
+
+def _count_commits_in_window(repo_path: str, user_email: str, window_days: int) -> int:
+    """Count user commits within the specified time window."""
+    try:
+        repo = git.Repo(repo_path)
+    except Exception:
+        return 0
+
+    user_email = user_email.strip().lower()
+    now = datetime.now()
+    window_start = now - timedelta(days=window_days)
+
+    count = 0
+    for c in repo.iter_commits():
+        if (getattr(c.author, "email", "") or "").lower() == user_email:
+            if datetime.fromtimestamp(c.committed_date) >= window_start:
+                count += 1
+    return count
 
 
 def detect_git_patterns(
