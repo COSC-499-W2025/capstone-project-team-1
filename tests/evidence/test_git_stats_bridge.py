@@ -6,10 +6,36 @@ from artifactminer.evidence.extractors.git_stats_bridge import git_stats_to_evid
 from artifactminer.skills.deep_analysis import GitStatsResult
 
 
-def test_git_stats_to_evidence_returns_empty_for_zero_commits():
-    git_stats = GitStatsResult(commit_count_window=0)
-    result = git_stats_to_evidence(git_stats)
+def test_git_stats_to_evidence_returns_empty_for_none():
+    result = git_stats_to_evidence(None)
     assert result == []
+
+
+def test_git_stats_to_evidence_generates_other_evidence_when_commit_window_zero():
+    """Verify that when commit_count_window is 0, other evidence is still generated."""
+    git_stats = GitStatsResult(
+        commit_count_window=0,
+        contribution_percent=25.5,
+        commit_frequency=2.0,
+        last_commit_date=datetime(2024, 6, 1),
+    )
+    result = git_stats_to_evidence(git_stats)
+
+    # Should generate contribution and frequency evidence
+    assert len(result) == 2
+    
+    contribution_item = next((i for i in result if "Contributed" in i.content), None)
+    assert contribution_item is not None
+    assert contribution_item.type == "metric"
+    assert "25.5%" in contribution_item.content
+    
+    freq_item = next((i for i in result if "frequency" in i.content), None)
+    assert freq_item is not None
+    assert freq_item.type == "metric"
+    
+    # Should NOT generate "commits in last 90 days" evidence
+    window_item = next((i for i in result if "commits in last 90 days" in i.content), None)
+    assert window_item is None
 
 
 def test_git_stats_to_evidence_converts_contribution_percent():
@@ -22,7 +48,7 @@ def test_git_stats_to_evidence_converts_contribution_percent():
     result = git_stats_to_evidence(git_stats)
 
     assert len(result) >= 1
-    contribution_item = next((i for i in result if i.type == "contribution"), None)
+    contribution_item = next((i for i in result if i.type == "metric" and "Contributed" in i.content), None)
     assert contribution_item is not None
     assert "25.5%" in contribution_item.content
     assert contribution_item.source == "git_stats"
@@ -36,7 +62,7 @@ def test_git_stats_to_evidence_includes_activity():
     )
     result = git_stats_to_evidence(git_stats)
 
-    activity_items = [i for i in result if i.type == "activity"]
+    activity_items = [i for i in result if i.type == "metric"]
     assert len(activity_items) >= 2
 
     freq_item = next((i for i in activity_items if "frequency" in i.content), None)
@@ -55,7 +81,7 @@ def test_git_stats_to_evidence_includes_workflow_patterns():
     )
     result = git_stats_to_evidence(git_stats)
 
-    workflow_items = [i for i in result if i.type == "workflow"]
+    workflow_items = [i for i in result if i.type == "metric" and any(k in i.content for k in ("workflow", "tags", "merge"))]
     assert len(workflow_items) >= 3
 
     branch_item = next(
