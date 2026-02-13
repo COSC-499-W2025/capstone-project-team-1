@@ -140,12 +140,12 @@ class DeepRepoAnalyzer:
             user_contributions.get("touched_paths") if user_contributions else None
         )
         if user_stats is not None:
-            stats = {
-                "commit_frequency": user_stats.commitFrequency,
-                "contribution_percent": user_stats.userStatspercentages,
-                "first_commit_date": user_stats.first_commit,
-                "last_commit_date": user_stats.last_commit,
-            }
+            stats = get_git_stats(
+                repo_path,
+                user_email,
+                touched_paths=touched_paths,
+                user_stats=user_stats,
+            )
         else:
             stats = get_git_stats(repo_path, user_email, touched_paths=touched_paths)
         patterns = detect_git_patterns(repo_path, touched_paths=touched_paths)

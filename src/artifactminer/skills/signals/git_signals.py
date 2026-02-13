@@ -17,6 +17,7 @@ def get_git_stats(
     *,
     window_days: int = 90,
     touched_paths: Set[str] | None = None,
+    user_stats: Any = None,
 ) -> Dict[str, Any]:
     """Extract git contribution metrics for a user.
 
@@ -33,10 +34,11 @@ def get_git_stats(
     if not isGitRepo(repo_path):
         return {}
 
-    try:
-        user_stats = getUserRepoStats(repo_path, user_email)
-    except Exception:
-        return {}
+    if user_stats is None:
+        try:
+            user_stats = getUserRepoStats(repo_path, user_email)
+        except Exception:
+            return {}
 
     if user_stats.total_commits is None or user_stats.total_commits == 0:
         return {

@@ -65,6 +65,34 @@ class TestGetGitStats:
         assert result["first_commit_date"] == datetime(2024, 1, 1)
         assert result["last_commit_date"] == datetime(2024, 6, 1)
 
+    @patch("artifactminer.skills.signals.git_signals.isGitRepo")
+    @patch("artifactminer.skills.signals.git_signals.getUserRepoStats")
+    @patch("artifactminer.skills.signals.git_signals._count_commits_in_window")
+    def test_uses_preloaded_user_stats_when_provided(
+        self, mock_count, mock_get_stats, mock_is_git, tmp_path
+    ):
+        mock_is_git.return_value = True
+        preloaded_stats = MagicMock()
+        preloaded_stats.total_commits = 3
+        preloaded_stats.commitFrequency = 1.25
+        preloaded_stats.userStatspercentages = 18.0
+        preloaded_stats.first_commit = datetime(2024, 2, 1)
+        preloaded_stats.last_commit = datetime(2024, 5, 1)
+        mock_count.return_value = 2
+
+        result = get_git_stats(
+            str(tmp_path),
+            "user@example.com",
+            user_stats=preloaded_stats,
+        )
+
+        mock_get_stats.assert_not_called()
+        assert result["commit_count_window"] == 2
+        assert result["commit_frequency"] == 1.25
+        assert result["contribution_percent"] == 18.0
+        assert result["first_commit_date"] == datetime(2024, 2, 1)
+        assert result["last_commit_date"] == datetime(2024, 5, 1)
+
     @patch("artifactminer.skills.signals.git_signals.git.Repo")
     def test_count_commits_in_window(self, mock_repo, tmp_path):
         now = datetime.now()
