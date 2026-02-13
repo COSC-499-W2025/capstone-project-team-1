@@ -9,7 +9,8 @@ from ..db import get_db, RepoStat, ResumeItem
 from .schemas import ResumeItemResponse, ResumeGenerationRequest, ResumeGenerationResponse
 from .analyze import get_user_email, get_consent_level
 from ..skills.deep_analysis import DeepRepoAnalyzer
-from ..skills.persistence import persist_extracted_skills, persist_insights_as_resume_items
+from ..skills.persistence import persist_extracted_skills
+from ..evidence.orchestrator import persist_insights_as_project_evidence
 from ..RepositoryIntelligence.repo_intelligence_user import collect_user_additions
 
 router = APIRouter(
@@ -28,7 +29,7 @@ async def generate_resume_for_project(
     """Generate resume items for a single project.
     
     Extracts logic from analyze.py to allow on-demand resume generation.
-    Runs DeepRepoAnalyzer on a project and persists insights as resume items.
+    Runs DeepRepoAnalyzer on a project and persists insights as project evidence.
     
     Args:
         db: Database session
@@ -86,12 +87,19 @@ async def generate_resume_for_project(
             commit=False,
         )
         
-        # Persist insights as resume items
-        resume_items = persist_insights_as_resume_items(
+        persist_insights_as_project_evidence(
             db=db,
             repo_stat_id=repo_stat.id,
             insights=deep_result.insights,
+            repo_last_commit=repo_stat.last_commit,
             commit=False,
+        )
+
+        # /resume/generate no longer creates Deep Insight ResumeItem rows.
+        resume_items = (
+            db.query(ResumeItem)
+            .filter(ResumeItem.repo_stat_id == repo_stat.id)
+            .all()
         )
         
         print(
@@ -241,4 +249,3 @@ async def generate_resume_items(
         consent_level=consent_level,
         errors=all_errors,
     )
-

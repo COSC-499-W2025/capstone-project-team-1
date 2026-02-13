@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any, Dict, Set
 
 import git
@@ -68,14 +68,17 @@ def _count_commits_in_window(repo_path: str, user_email: str, window_days: int) 
         return 0
 
     user_email = user_email.strip().lower()
-    now = datetime.now()
+    now = datetime.now(UTC)
     window_start = now - timedelta(days=window_days)
 
     count = 0
-    for c in repo.iter_commits():
+    # Filter at git query level to avoid scanning full history on large repos.
+    for c in repo.iter_commits(
+        author=user_email,
+        since=window_start.isoformat(),
+    ):
         if (getattr(c.author, "email", "") or "").lower() == user_email:
-            if datetime.fromtimestamp(c.committed_date) >= window_start:
-                count += 1
+            count += 1
     return count
 
 
