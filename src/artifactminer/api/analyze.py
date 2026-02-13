@@ -55,7 +55,11 @@ from ..RepositoryIntelligence.repo_intelligence_user import (
 )
 from ..skills.deep_analysis import DeepRepoAnalyzer
 from ..skills.persistence import persist_extracted_skills
-from ..evidence.orchestrator import persist_insights_as_project_evidence
+from ..evidence.orchestrator import (
+    persist_generated_evidence,
+    persist_insights_as_project_evidence,
+)
+from ..evidence.extractors import git_stats_to_evidence, infra_signals_to_evidence
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
@@ -428,8 +432,31 @@ async def analyze_zip(
                 repo_stat_id=repo_stat.id,
                 insights=deep_result.insights,
                 repo_last_commit=repo_stat.last_commit,
-                commit=False,  # Batch commit at end
+                commit=False,
             )
+
+            if deep_result.git_stats:
+                git_evidence = git_stats_to_evidence(deep_result.git_stats)
+                persist_generated_evidence(
+                    db=db,
+                    repo_stat_id=repo_stat.id,
+                    evidence_items=git_evidence,
+                    commit=False,
+                )
+
+            if deep_result.infra_signals:
+                infra_evidence = infra_signals_to_evidence(
+                    deep_result.infra_signals,
+                    evidence_date=repo_stat.last_commit.date()
+                    if repo_stat.last_commit
+                    else None,
+                )
+                persist_generated_evidence(
+                    db=db,
+                    repo_stat_id=repo_stat.id,
+                    evidence_items=infra_evidence,
+                    commit=False,
+                )
 
             print(
                 f"[analyze] Completed {repo_path.name}: {skills_count} skills, {insights_count} insights"
