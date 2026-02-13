@@ -39,7 +39,7 @@ async def generate_resume_for_project(
         regenerate: If True, delete existing resume items first
     
     Returns:
-        Tuple of (list of created ResumeItem objects, list of error messages)
+        Tuple of (list of generated ResumeItem objects, list of error messages)
     """
     errors = []
     
@@ -96,17 +96,11 @@ async def generate_resume_for_project(
         )
 
         # /resume/generate no longer creates Deep Insight ResumeItem rows.
-        resume_items = (
-            db.query(ResumeItem)
-            .filter(ResumeItem.repo_stat_id == repo_stat.id)
-            .all()
-        )
-        
         print(
-            f"[resume_generate] Generated {len(resume_items)} items for {repo_stat.project_name}"
+            f"[resume_generate] Generated 0 resume items for {repo_stat.project_name}; insights saved to evidence"
         )
-        
-        return resume_items, errors
+
+        return [], errors
         
     except Exception as e:
         error_msg = f"Failed to analyze {repo_stat.project_name}: {type(e).__name__}: {str(e)}"
@@ -151,7 +145,7 @@ async def generate_resume_items(
        - Optionally deletes existing resume items (if regenerate=True)
        - Collects user contributions from git history
        - Runs DeepRepoAnalyzer to extract skills and insights
-       - Persists insights as resume items
+       - Persists insights as project evidence
     4. Returns all generated resume items
     
     Args:
