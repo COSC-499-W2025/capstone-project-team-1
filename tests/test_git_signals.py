@@ -1,6 +1,6 @@
 """Unit tests for git_signals module."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -96,15 +96,10 @@ class TestGetGitStats:
     @patch("artifactminer.skills.signals.git_signals.git.Repo")
     def test_count_commits_in_window(self, mock_repo, tmp_path):
         now = datetime.now()
-        three_months_ago = now - timedelta(days=90)
 
         commit_recent = MagicMock()
         commit_recent.author.email = "user@example.com"
         commit_recent.committed_date = now.timestamp()
-
-        commit_old = MagicMock()
-        commit_old.author.email = "user@example.com"
-        commit_old.committed_date = three_months_ago.timestamp()
 
         commit_other = MagicMock()
         commit_other.author.email = "other@example.com"
@@ -112,7 +107,6 @@ class TestGetGitStats:
 
         mock_repo.return_value.iter_commits.return_value = [
             commit_recent,
-            commit_old,
             commit_other,
         ]
 
@@ -121,6 +115,10 @@ class TestGetGitStats:
         count = _count_commits_in_window(str(tmp_path), "user@example.com", 30)
 
         assert count == 1
+        mock_repo.return_value.iter_commits.assert_called_once()
+        _, kwargs = mock_repo.return_value.iter_commits.call_args
+        assert kwargs["author"] == "user@example.com"
+        assert "since" in kwargs
 
 
 class TestDetectGitPatterns:

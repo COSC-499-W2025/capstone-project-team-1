@@ -146,7 +146,22 @@ def detect_env_build(
     Returns list of dicts with keys: tool, path, category, evidence_type
     """
     results: List[Dict[str, Any]] = []
+    seen_entries: Set[Tuple[str, str, str]] = set()
     root = Path(repo_path)
+
+    def _add_result(tool_name: str, rel_path: str, category: str) -> None:
+        key = (tool_name, rel_path, category)
+        if key in seen_entries:
+            return
+        seen_entries.add(key)
+        results.append(
+            {
+                "tool": tool_name,
+                "path": rel_path,
+                "category": category,
+                "evidence_type": "env_build",
+            }
+        )
 
     for pattern, (tool_name, category) in ENV_BUILD_PATTERNS.items():
         if touched_paths is not None and not path_in_touched(pattern, touched_paths):
@@ -154,39 +169,17 @@ def detect_env_build(
 
         candidate = root / pattern
         if candidate.is_file():
-            results.append(
-                {
-                    "tool": tool_name,
-                    "path": pattern,
-                    "category": category,
-                    "evidence_type": "env_build",
-                }
-            )
+            _add_result(tool_name, pattern, category)
         elif candidate.is_dir():
             for child in candidate.rglob("*"):
                 if child.is_file():
                     rel = str(child.relative_to(root))
-                    results.append(
-                        {
-                            "tool": tool_name,
-                            "path": rel,
-                            "category": category,
-                            "evidence_type": "env_build",
-                        }
-                    )
-
-        for match in root.rglob(pattern):
-            if match.is_file():
-                rel = str(match.relative_to(root))
-                if rel not in [r["path"] for r in results]:
-                    results.append(
-                        {
-                            "tool": tool_name,
-                            "path": rel,
-                            "category": category,
-                            "evidence_type": "env_build",
-                        }
-                    )
+                    _add_result(tool_name, rel, category)
+        else:
+            for match in root.rglob(pattern):
+                if match.is_file():
+                    rel = str(match.relative_to(root))
+                    _add_result(tool_name, rel, category)
 
     return results
 

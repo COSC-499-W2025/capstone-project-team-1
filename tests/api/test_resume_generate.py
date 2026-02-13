@@ -49,13 +49,13 @@ def client():
 @patch("artifactminer.api.resume.collect_user_additions")
 @patch("artifactminer.api.resume.Path")
 def test_generate_single_project(mock_path, mock_collect, mock_analyzer, client):
-    """Successfully generates resume items for a single project."""
+    """Generates evidence/skills without creating Deep Insight resume items."""
     from artifactminer.skills.deep_analysis import Insight, DeepAnalysisResult
     
     mock_path.return_value.exists.return_value = True
     mock_collect.return_value = ["commit additions"]
     
-    # Mock insights to create actual resume items
+    # Mock insights: these should now persist as ProjectEvidence, not ResumeItem rows.
     mock_insight = Insight(
         title="Test Insight",
         evidence=["test evidence 1", "test evidence 2"],
@@ -70,10 +70,13 @@ def test_generate_single_project(mock_path, mock_collect, mock_analyzer, client)
     
     assert resp.status_code == 200
     data = resp.json()
-    assert data["success"] is True
+    assert data["success"] is False
     assert data["consent_level"] == "no_llm"
     assert isinstance(data["resume_items"], list)
-    assert data["items_generated"] > 0
+    assert data["items_generated"] == 0
+    evidence = client.get("/projects/1/evidence")
+    assert evidence.status_code == 200
+    assert len(evidence.json()) > 0
 
 
 @patch("artifactminer.api.resume.DeepRepoAnalyzer")
