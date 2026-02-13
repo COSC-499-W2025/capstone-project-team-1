@@ -1,9 +1,11 @@
 """ASGI application exposing Artifact Miner backend services."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException
@@ -51,6 +53,14 @@ def create_app() -> FastAPI:
         title="Artifact Miner API",
         description="Backend services powering the Artifact Miner TUI.",
         version="0.1.0",
+    )
+
+    thumbnails_dir = Path("./uploads/thumbnails")
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/uploads/thumbnails",
+        StaticFiles(directory=str(thumbnails_dir)),
+        name="project-thumbnails",
     )
 
     # Create database tables on startup

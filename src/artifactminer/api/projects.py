@@ -1,9 +1,12 @@
 """Project-related API endpoints (timeline, delete, etc.)."""
 
 from datetime import timedelta, date, datetime, UTC
+from pathlib import Path
 from typing import List
+from urllib.parse import urlparse
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -18,6 +21,7 @@ from .schemas import (
     ProjectResumeItem,
     ProjectRoleUpdateRequest,
     ProjectRoleResponse,
+    ProjectThumbnailResponse,
     EvidenceCreateRequest,
     EvidenceResponse,
     EvidenceDeleteResponse,
@@ -28,6 +32,10 @@ from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+THUMBNAILS_DIR = Path("./uploads/thumbnails")
+MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024 # 5 MB
+ALLOWED_THUMBNAIL_SUFFIXES = {".png", ".jpg", ".jpeg"}
+ALLOWED_THUMBNAIL_CONTENT_TYPES = {"image/png", "image/jpeg"}
 
 
 def _get_latest_user_repo_stat_for_project(db: Session, repo_stat: RepoStat) -> UserRepoStat | None:
@@ -54,6 +62,78 @@ def _get_active_project(project_id: int, db: Session) -> RepoStat:
     return project
 
 
+def _normalize_thumbnail_url(thumbnail_url: str | None) -> str | None:
+    if thumbnail_url is None:
+        return None
+    normalized = thumbnail_url.strip()
+    return normalized or None
+
+
+def _validate_external_thumbnail_url(thumbnail_url: str) -> None:
+    parsed = urlparse(thumbnail_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise HTTPException(
+            status_code=422,
+            detail="thumbnail_url must be a valid http(s) URL",
+        )
+
+
+def _thumbnail_local_path(thumbnail_url: str | None) -> Path | None:
+    if not thumbnail_url:
+        return None
+
+    if thumbnail_url.startswith("/uploads/thumbnails/"):
+        filename = Path(thumbnail_url).name
+    elif thumbnail_url.startswith("uploads/thumbnails/"):
+        filename = Path(thumbnail_url).name
+    else:
+        return None
+
+    resolved = (THUMBNAILS_DIR / filename).resolve()
+    if not resolved.is_relative_to(THUMBNAILS_DIR.resolve()):
+        return None
+    return resolved
+
+
+def _delete_existing_local_thumbnail(thumbnail_url: str | None) -> None:
+    local_path = _thumbnail_local_path(thumbnail_url)
+    if local_path and local_path.exists():
+        try:
+            local_path.unlink()
+        except OSError:
+            pass
+
+
+async def _save_thumbnail_upload(file: UploadFile) -> str:
+    filename = (file.filename or "").strip()
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_THUMBNAIL_SUFFIXES:
+        raise HTTPException(
+            status_code=422,
+            detail="Only PNG and JPG images are allowed.",
+        )
+
+    content_type = (file.content_type or "").lower()
+    if content_type and content_type not in ALLOWED_THUMBNAIL_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=422,
+            detail="Only PNG and JPG images are allowed.",
+        )
+
+    content = await file.read(MAX_THUMBNAIL_BYTES + 1)
+    await file.close()
+    if not content:
+        raise HTTPException(status_code=422, detail="Uploaded thumbnail is empty.")
+    if len(content) > MAX_THUMBNAIL_BYTES:
+        raise HTTPException(status_code=413, detail="Thumbnail exceeds 5 MB size limit.")
+
+    THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+    saved_filename = f"{uuid4().hex}{suffix}"
+    saved_path = THUMBNAILS_DIR / saved_filename
+    saved_path.write_bytes(content)
+    return f"/uploads/thumbnails/{saved_filename}"
+
+
 @router.get("", response_model=list[ProjectResponse])
 async def get_projects(
     limit: int | None = Query(default=None, ge=1, description="Max results to return"),
@@ -75,7 +155,7 @@ async def get_projects(
     return query.all()
 
 
-@router.get("/{project_id}", response_model=ProjectDetailResponse)
+@router.get("/{project_id:int}", response_model=ProjectDetailResponse)
 async def get_project(
     project_id: int,
     db: Session = Depends(get_db),
@@ -137,14 +217,59 @@ async def get_project(
         ranking_score=repo_stat.ranking_score,
         health_score=repo_stat.health_score,
         role=role,
+        thumbnail_url=repo_stat.thumbnail_url,
         skills=skills,
         resume_items=resume_items,
         evidence=evidence,
     )
 
 
-@router.put("/{project_id}/role", response_model=ProjectRoleResponse)
-@router.post("/{project_id}/role", response_model=ProjectRoleResponse)
+@router.post("/{project_id:int}/thumbnail", response_model=ProjectThumbnailResponse)
+async def upsert_project_thumbnail(
+    project_id: int,
+    file: UploadFile | None = File(default=None),
+    thumbnail_url: str | None = Form(default=None),
+    db: Session = Depends(get_db),
+) -> ProjectThumbnailResponse:
+    """Set or update a project's thumbnail from either upload or external URL."""
+    project = _get_active_project(project_id, db)
+    normalized_url = _normalize_thumbnail_url(thumbnail_url)
+
+    if file is not None and normalized_url is not None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide exactly one of 'file' or 'thumbnail_url'.",
+        )
+    if file is None and normalized_url is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide exactly one of 'file' or 'thumbnail_url'.",
+        )
+
+    if file is not None:
+        new_thumbnail_url = await _save_thumbnail_upload(file)
+    else:
+        assert normalized_url is not None
+        _validate_external_thumbnail_url(normalized_url)
+        new_thumbnail_url = normalized_url
+
+    previous_thumbnail_url = project.thumbnail_url
+    if previous_thumbnail_url != new_thumbnail_url:
+        _delete_existing_local_thumbnail(previous_thumbnail_url)
+
+    project.thumbnail_url = new_thumbnail_url
+    db.commit()
+    db.refresh(project)
+
+    return ProjectThumbnailResponse(
+        project_id=project.id,
+        project_name=project.project_name,
+        thumbnail_url=project.thumbnail_url,
+    )
+
+
+@router.put("/{project_id:int}/role", response_model=ProjectRoleResponse)
+@router.post("/{project_id:int}/role", response_model=ProjectRoleResponse)
 async def upsert_project_role(
     project_id: int,
     payload: ProjectRoleUpdateRequest,
@@ -191,7 +316,7 @@ async def upsert_project_role(
 
 
 @router.post(
-    "/{project_id}/evidence",
+    "/{project_id:int}/evidence",
     response_model=EvidenceResponse,
     status_code=201,
 )
@@ -224,7 +349,7 @@ async def create_evidence(
     )
 
 
-@router.get("/{project_id}/evidence", response_model=list[EvidenceResponse])
+@router.get("/{project_id:int}/evidence", response_model=list[EvidenceResponse])
 async def list_evidence(
     project_id: int,
     type: EvidenceType | None = Query(default=None, description="Filter by evidence type"),
@@ -254,7 +379,7 @@ async def list_evidence(
 
 
 @router.delete(
-    "/{project_id}/evidence/{evidence_id}",
+    "/{project_id:int}/evidence/{evidence_id:int}",
     response_model=EvidenceDeleteResponse,
 )
 async def delete_evidence(
@@ -361,7 +486,7 @@ async def get_project_timeline(
     )
 
 
-@router.delete("/{project_id}", response_model=DeleteResponse)
+@router.delete("/{project_id:int}", response_model=DeleteResponse)
 async def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
