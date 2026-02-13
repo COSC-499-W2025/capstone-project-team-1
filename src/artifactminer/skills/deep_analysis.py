@@ -104,6 +104,7 @@ class DeepRepoAnalyzer:
         user_email: str,
         user_contributions: Dict | None = None,
         consent_level: str = "none",
+        user_stats: Any = None,
     ) -> DeepAnalysisResult:
         """Run baseline skill extraction, then derive insights from user-attributed skills."""
         skills = self.extractor.extract_skills(
@@ -115,7 +116,9 @@ class DeepRepoAnalyzer:
         )
         insights = self._derive_insights(skills)
 
-        git_stats = self._extract_git_stats(repo_path, user_email, user_contributions)
+        git_stats = self._extract_git_stats(
+            repo_path, user_email, user_contributions, user_stats
+        )
         infra_signals = self._extract_infra_signals(repo_path, user_contributions)
 
         return DeepAnalysisResult(
@@ -130,12 +133,21 @@ class DeepRepoAnalyzer:
         repo_path: str,
         user_email: str,
         user_contributions: Dict | None,
+        user_stats: Any = None,
     ) -> GitStatsResult | None:
         """Extract git contribution metrics for the user."""
         touched_paths = (
             user_contributions.get("touched_paths") if user_contributions else None
         )
-        stats = get_git_stats(repo_path, user_email, touched_paths=touched_paths)
+        if user_stats is not None:
+            stats = {
+                "commit_frequency": user_stats.commitFrequency,
+                "contribution_percent": user_stats.userStatspercentages,
+                "first_commit_date": user_stats.first_commit,
+                "last_commit_date": user_stats.last_commit,
+            }
+        else:
+            stats = get_git_stats(repo_path, user_email, touched_paths=touched_paths)
         patterns = detect_git_patterns(repo_path, touched_paths=touched_paths)
 
         if not stats and not patterns:
