@@ -14,24 +14,24 @@ class TestGetGitStats:
         assert result == {}
 
     @patch("artifactminer.skills.signals.git_signals.isGitRepo")
-    @patch("artifactminer.skills.signals.git_signals.git.Repo")
-    def test_returns_empty_dict_on_repo_exception(
-        self, mock_repo, mock_is_git, tmp_path
+    @patch("artifactminer.skills.signals.git_signals.getUserRepoStats")
+    def test_returns_empty_dict_on_exception(
+        self, mock_get_stats, mock_is_git, tmp_path
     ):
         mock_is_git.return_value = True
-        mock_repo.side_effect = Exception("repo error")
+        mock_get_stats.side_effect = Exception("repo error")
         result = get_git_stats(str(tmp_path), "user@example.com")
         assert result == {}
 
     @patch("artifactminer.skills.signals.git_signals.isGitRepo")
-    @patch("artifactminer.skills.signals.git_signals.git.Repo")
+    @patch("artifactminer.skills.signals.git_signals.getUserRepoStats")
     def test_returns_zero_stats_for_user_with_no_commits(
-        self, mock_repo, mock_is_git, tmp_path
+        self, mock_get_stats, mock_is_git, tmp_path
     ):
         mock_is_git.return_value = True
-        mock_repo_instance = MagicMock()
-        mock_repo_instance.iter_commits.return_value = []
-        mock_repo.return_value = mock_repo_instance
+        mock_stats = MagicMock()
+        mock_stats.total_commits = None
+        mock_get_stats.return_value = mock_stats
 
         result = get_git_stats(str(tmp_path), "user@example.com")
 
@@ -42,44 +42,57 @@ class TestGetGitStats:
         assert result["last_commit_date"] is None
 
     @patch("artifactminer.skills.signals.git_signals.isGitRepo")
-    @patch("artifactminer.skills.signals.git_signals.git.Repo")
-    def test_calculates_commit_metrics_correctly(
-        self, mock_repo, mock_is_git, tmp_path
+    @patch("artifactminer.skills.signals.git_signals.getUserRepoStats")
+    @patch("artifactminer.skills.signals.git_signals._count_commits_in_window")
+    def test_delegates_to_getUserRepoStats(
+        self, mock_count, mock_get_stats, mock_is_git, tmp_path
     ):
         mock_is_git.return_value = True
-        mock_repo_instance = MagicMock()
-
-        now_ts = datetime.now().timestamp()
-        two_weeks_ago_ts = (datetime.now() - timedelta(days=14)).timestamp()
-
-        user_commit1 = MagicMock()
-        user_commit1.author.email = "User@Example.com"
-        user_commit1.committed_date = now_ts
-        user_commit1.parents = []
-
-        user_commit2 = MagicMock()
-        user_commit2.author.email = "user@example.com"
-        user_commit2.committed_date = two_weeks_ago_ts
-        user_commit2.parents = []
-
-        other_commit = MagicMock()
-        other_commit.author.email = "other@example.com"
-        other_commit.committed_date = now_ts
-        other_commit.parents = []
-
-        mock_repo_instance.iter_commits.return_value = [
-            user_commit1,
-            user_commit2,
-            other_commit,
-        ]
-        mock_repo.return_value = mock_repo_instance
+        mock_stats = MagicMock()
+        mock_stats.total_commits = 10
+        mock_stats.commitFrequency = 2.5
+        mock_stats.userStatspercentages = 33.33
+        mock_stats.first_commit = datetime(2024, 1, 1)
+        mock_stats.last_commit = datetime(2024, 6, 1)
+        mock_get_stats.return_value = mock_stats
+        mock_count.return_value = 5
 
         result = get_git_stats(str(tmp_path), "user@example.com", window_days=30)
 
-        assert result["commit_count_window"] == 2
-        assert result["contribution_percent"] == pytest.approx(66.67, rel=0.01)
-        assert result["first_commit_date"] is not None
-        assert result["last_commit_date"] is not None
+        assert result["commit_count_window"] == 5
+        assert result["commit_frequency"] == 2.5
+        assert result["contribution_percent"] == 33.33
+        assert result["first_commit_date"] == datetime(2024, 1, 1)
+        assert result["last_commit_date"] == datetime(2024, 6, 1)
+
+    @patch("artifactminer.skills.signals.git_signals.git.Repo")
+    def test_count_commits_in_window(self, mock_repo, tmp_path):
+        now = datetime.now()
+        three_months_ago = now - timedelta(days=90)
+
+        commit_recent = MagicMock()
+        commit_recent.author.email = "user@example.com"
+        commit_recent.committed_date = now.timestamp()
+
+        commit_old = MagicMock()
+        commit_old.author.email = "user@example.com"
+        commit_old.committed_date = three_months_ago.timestamp()
+
+        commit_other = MagicMock()
+        commit_other.author.email = "other@example.com"
+        commit_other.committed_date = now.timestamp()
+
+        mock_repo.return_value.iter_commits.return_value = [
+            commit_recent,
+            commit_old,
+            commit_other,
+        ]
+
+        from artifactminer.skills.signals.git_signals import _count_commits_in_window
+
+        count = _count_commits_in_window(str(tmp_path), "user@example.com", 30)
+
+        assert count == 1
 
 
 class TestDetectGitPatterns:
