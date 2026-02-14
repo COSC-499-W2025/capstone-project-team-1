@@ -13,7 +13,10 @@ from pydantic import BaseModel, ConfigDict, Field
 # Evidence types
 # ---------------------------------------------------------------------------
 
-EvidenceType = Literal["metric", "feedback", "evaluation", "award", "custom"]
+EvidenceType = Literal[
+    "metric", "feedback", "evaluation", "award", "custom",
+    "testing", "documentation", "code_quality", "test_coverage",
+]
 
 
 class EvidenceCreateRequest(BaseModel):
