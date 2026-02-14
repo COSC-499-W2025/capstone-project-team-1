@@ -118,3 +118,43 @@ def test_empty_repo_returns_no_signals():
     assert result.has_tests is False
     assert result.has_readme is False
     assert result.has_lint_config is False
+
+
+def test_detect_test_signals_finds_javascript_tests_and_jest_config():
+    repo = _make_repo(
+        {
+            "__tests__/sum.test.js": "test('sum', () => {})",
+            "jest.config.js": "module.exports = {};",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert result["test_file_count"] >= 1
+    assert "jest" in result["test_frameworks"]
+    assert "pytest" not in result["test_frameworks"]
+
+
+def test_detect_test_signals_finds_go_tests_and_module_file():
+    repo = _make_repo(
+        {
+            "go.mod": "module example.com/app",
+            "internal/service/service_test.go": "package service",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert result["test_file_count"] >= 1
+    assert "go test" in result["test_frameworks"]
+
+
+def test_detect_test_signals_finds_java_test_file_patterns():
+    repo = _make_repo(
+        {
+            "build.gradle": "plugins { id 'java' }",
+            "src/test/java/com/example/AppTest.java": "class AppTest {}",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert result["test_file_count"] >= 1
+    assert "junit" in result["test_frameworks"]
