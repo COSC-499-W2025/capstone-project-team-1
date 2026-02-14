@@ -63,9 +63,6 @@ from ..evidence.extractors import (
     git_stats_to_evidence,
     infra_signals_to_evidence,
     repo_quality_to_evidence,
-    coverage_to_evidence,
-    docs_to_evidence,
-    quality_to_evidence,
 )
 from ..helpers.project_ranker import rank_projects
 
@@ -476,23 +473,6 @@ async def analyze_zip(
                     db=db,
                     repo_stat_id=repo_stat.id,
                     evidence_items=quality_evidence,
-                    commit=False,
-                )
-
-                rq = deep_result.repo_quality
-                coverage_ev = coverage_to_evidence(
-                    {"percent": 100.0 if rq.has_tests else 0.0}
-                )
-                docs_ev = docs_to_evidence(
-                    {"has_docs": rq.has_readme or rq.has_docs_dir}
-                )
-                quality_ev = quality_to_evidence(
-                    {"issues": 0}
-                )
-                persist_generated_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=coverage_ev + docs_ev + quality_ev,
                     commit=False,
                 )
 
