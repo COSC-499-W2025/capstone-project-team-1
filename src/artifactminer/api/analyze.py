@@ -269,6 +269,23 @@ def _get_progress_callback() -> Callable[[int, int, str], None] | None:
     return None
 
 
+def _persist_optional_evidence(
+    db: Session,
+    *,
+    repo_stat_id: int,
+    evidence_items: list,
+) -> None:
+    """Persist generated evidence rows when there are items to store."""
+    if not evidence_items:
+        return
+    persist_generated_evidence(
+        db=db,
+        repo_stat_id=repo_stat_id,
+        evidence_items=evidence_items,
+        commit=False,
+    )
+
+
 @router.post("/{zip_id}", response_model=AnalyzeResponse)
 async def analyze_zip(
     zip_id: int,
@@ -441,38 +458,36 @@ async def analyze_zip(
                 repo_last_commit=repo_last_commit,
                 commit=False,
             )
+            evidence_date = repo_last_commit.date() if repo_last_commit else None
 
             if deep_result.git_stats:
                 git_evidence = git_stats_to_evidence(deep_result.git_stats)
-                persist_generated_evidence(
+                _persist_optional_evidence(
                     db=db,
                     repo_stat_id=repo_stat.id,
                     evidence_items=git_evidence,
-                    commit=False,
                 )
 
             if deep_result.infra_signals:
                 infra_evidence = infra_signals_to_evidence(
                     deep_result.infra_signals,
-                    evidence_date=repo_last_commit.date() if repo_last_commit else None,
+                    evidence_date=evidence_date,
                 )
-                persist_generated_evidence(
+                _persist_optional_evidence(
                     db=db,
                     repo_stat_id=repo_stat.id,
                     evidence_items=infra_evidence,
-                    commit=False,
                 )
 
             if deep_result.repo_quality:
                 quality_evidence = repo_quality_to_evidence(
                     deep_result.repo_quality,
-                    evidence_date=repo_last_commit.date() if repo_last_commit else None,
+                    evidence_date=evidence_date,
                 )
-                persist_generated_evidence(
+                _persist_optional_evidence(
                     db=db,
                     repo_stat_id=repo_stat.id,
                     evidence_items=quality_evidence,
-                    commit=False,
                 )
 
             print(
