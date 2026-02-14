@@ -245,7 +245,7 @@ def detect_quality_signals(
             if "[flake8]" in content or "flake8" in content:
                 has_lint_config = True
                 tools.add("flake8")
-        elif tool_type in ("mypy", ".mypy.ini"):
+        elif tool_type == "mypy":
             has_type_check = True
             tools.add("mypy")
         elif tool_type == "editorconfig":
