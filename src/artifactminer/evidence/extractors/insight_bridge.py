@@ -6,7 +6,7 @@ from datetime import date, datetime
 from typing import Iterable
 
 from artifactminer.evidence.models import EvidenceItem
-from artifactminer.skills.deep_analysis import Insight
+from artifactminer.skills.models import Insight
 
 
 def _coerce_date(value: object) -> date | None:
