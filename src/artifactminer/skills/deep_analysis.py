@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
 from artifactminer.skills.models import ExtractedSkill
 from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
 from artifactminer.skills.signals.infra_signals import get_infra_signals
+from artifactminer.skills.signals.repo_quality_signals import get_repo_quality_signals
 
 
 @dataclass
@@ -47,6 +48,22 @@ class InfraSignalsResult:
 
 
 @dataclass
+class RepoQualityResult:
+    """Repository quality signals: testing, documentation, code quality."""
+
+    test_file_count: int = 0
+    has_tests: bool = False
+    test_frameworks: List[str] = field(default_factory=list)
+    has_readme: bool = False
+    has_changelog: bool = False
+    has_docs_dir: bool = False
+    has_lint_config: bool = False
+    has_precommit: bool = False
+    has_type_check: bool = False
+    quality_tools: List[str] = field(default_factory=list)
+
+
+@dataclass
 class DeepAnalysisResult:
     """Baseline skills plus higher-order insights."""
 
@@ -54,6 +71,7 @@ class DeepAnalysisResult:
     insights: List[Insight]
     git_stats: GitStatsResult | None = None
     infra_signals: InfraSignalsResult | None = None
+    repo_quality: RepoQualityResult | None = None
 
 
 class DeepRepoAnalyzer:
@@ -119,12 +137,14 @@ class DeepRepoAnalyzer:
             repo_path, user_email, user_contributions, user_stats
         )
         infra_signals = self._extract_infra_signals(repo_path, user_contributions)
+        repo_quality = self._extract_repo_quality(repo_path, user_contributions)
 
         return DeepAnalysisResult(
             skills=skills,
             insights=insights,
             git_stats=git_stats,
             infra_signals=infra_signals,
+            repo_quality=repo_quality,
         )
 
     def _extract_git_stats(
@@ -184,6 +204,37 @@ class DeepRepoAnalyzer:
             docker_tools=summary.get("docker_tools", []),
             env_build_tools=summary.get("env_build_tools", []),
             all_tools=summary.get("all_tools", []),
+        )
+
+    def _extract_repo_quality(
+        self,
+        repo_path: str,
+        user_contributions: Dict | None,
+    ) -> RepoQualityResult | None:
+        """Extract repository quality signals."""
+        touched_paths = (
+            user_contributions.get("touched_paths") if user_contributions else None
+        )
+        signals = get_repo_quality_signals(repo_path, touched_paths=touched_paths)
+
+        if not signals:
+            return None
+
+        tests = signals.get("tests", {})
+        docs = signals.get("docs", {})
+        quality = signals.get("quality", {})
+
+        return RepoQualityResult(
+            test_file_count=tests.get("test_file_count", 0),
+            has_tests=tests.get("has_tests", False),
+            test_frameworks=tests.get("test_frameworks", []),
+            has_readme=docs.get("has_readme", False),
+            has_changelog=docs.get("has_changelog", False),
+            has_docs_dir=docs.get("has_docs_dir", False),
+            has_lint_config=quality.get("has_lint_config", False),
+            has_precommit=quality.get("has_precommit", False),
+            has_type_check=quality.get("has_type_check", False),
+            quality_tools=quality.get("quality_tools", []),
         )
 
     def _validate_insight_rules(self) -> None:
