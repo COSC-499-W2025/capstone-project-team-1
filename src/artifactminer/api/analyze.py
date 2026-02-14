@@ -375,8 +375,11 @@ async def analyze_zip(
         try:
             repo_stats = getRepoStats(repo_path)
             repo_stat = saveRepoStats(repo_stats, db=db)
+            if repo_stat is None:
+                raise ValueError(f"Failed to persist repo stats for {repo_path.name}")
 
             # repo_stat is now the SQLAlchemy model instance with .id
+            repo_last_commit = repo_stat.last_commit if repo_stat and repo_stat.last_commit else None
 
             user_stats = None
             user_contribution_pct = None
@@ -435,7 +438,7 @@ async def analyze_zip(
                 db=db,
                 repo_stat_id=repo_stat.id,
                 insights=deep_result.insights,
-                repo_last_commit=repo_stat.last_commit,
+                repo_last_commit=repo_last_commit,
                 commit=False,
             )
 
@@ -451,9 +454,7 @@ async def analyze_zip(
             if deep_result.infra_signals:
                 infra_evidence = infra_signals_to_evidence(
                     deep_result.infra_signals,
-                    evidence_date=repo_stat.last_commit.date()
-                    if repo_stat.last_commit
-                    else None,
+                    evidence_date=repo_last_commit.date() if repo_last_commit else None,
                 )
                 persist_generated_evidence(
                     db=db,
@@ -465,9 +466,7 @@ async def analyze_zip(
             if deep_result.repo_quality:
                 quality_evidence = repo_quality_to_evidence(
                     deep_result.repo_quality,
-                    evidence_date=repo_stat.last_commit.date()
-                    if repo_stat.last_commit
-                    else None,
+                    evidence_date=repo_last_commit.date() if repo_last_commit else None,
                 )
                 persist_generated_evidence(
                     db=db,

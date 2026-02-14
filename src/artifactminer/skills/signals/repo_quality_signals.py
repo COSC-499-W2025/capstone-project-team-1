@@ -6,6 +6,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Dict, Set
 
+from artifactminer.skills.models import RepoQualityResult
 from artifactminer.skills.signals.file_signals import path_in_touched
 
 
@@ -137,6 +138,15 @@ def _infer_frameworks_from_test_files(paths: Set[str]) -> set[str]:
     return frameworks
 
 
+def _is_in_test_dir(rel_path: str) -> bool:
+    normalized = rel_path.replace("\\", "/").strip("/").lower()
+    for dir_name in TEST_DIR_PATTERNS:
+        target = dir_name.replace("\\", "/").strip("/").lower()
+        if normalized == target or normalized.startswith(f"{target}/"):
+            return True
+    return False
+
+
 def detect_test_signals(
     repo_path: str,
     *,
@@ -145,31 +155,22 @@ def detect_test_signals(
     """Detect test infrastructure in repository."""
     root = Path(repo_path)
     seen_files: Set[str] = set()
-    test_dirs = 0
+    test_dirs = sum(1 for dir_name in TEST_DIR_PATTERNS if (root / dir_name).is_dir())
     frameworks: set[str] = set()
 
-    for pattern in TEST_FILE_PATTERNS:
-        for match in root.rglob(pattern):
-            if not match.is_file():
-                continue
-            rel = str(match.relative_to(root))
-            if touched_paths and not path_in_touched(rel, touched_paths):
-                continue
-            seen_files.add(rel)
+    for match in root.rglob("*"):
+        if not match.is_file():
+            continue
+        rel = str(match.relative_to(root))
+        if touched_paths and not path_in_touched(rel, touched_paths):
+            continue
 
-    for dir_name in TEST_DIR_PATTERNS:
-        candidate = root / dir_name
-        if candidate.is_dir():
-            test_dirs += 1
-            for test_file in candidate.rglob("*"):
-                if not test_file.is_file():
-                    continue
-                rel = str(test_file.relative_to(root))
-                if touched_paths and not path_in_touched(rel, touched_paths):
-                    continue
-                if fnmatch(test_file.name, "*.md"):
-                    continue
-                seen_files.add(rel)
+        if any(fnmatch(match.name, pattern) for pattern in TEST_FILE_PATTERNS):
+            seen_files.add(rel)
+            continue
+
+        if _is_in_test_dir(rel) and not fnmatch(match.name, "*.md"):
+            seen_files.add(rel)
 
     frameworks.update(_has_test_config(root, touched_paths))
     frameworks.update(_infer_frameworks_from_test_files(seen_files))
@@ -265,8 +266,6 @@ def get_repo_quality_signals(
     touched_paths: Set[str] | None = None,
 ):
     """Aggregate all repository quality signals into a dataclass."""
-    from artifactminer.skills.deep_analysis import RepoQualityResult
-
     tests = detect_test_signals(repo_path, touched_paths=touched_paths)
     docs = detect_docs_signals(repo_path, touched_paths=touched_paths)
     quality = detect_quality_signals(repo_path, touched_paths=touched_paths)
@@ -277,6 +276,7 @@ def get_repo_quality_signals(
         test_frameworks=tests.get("test_frameworks", []),
         has_readme=docs.get("has_readme", False),
         has_changelog=docs.get("has_changelog", False),
+        has_contributing=docs.get("has_contributing", False),
         has_docs_dir=docs.get("has_docs_dir", False),
         has_lint_config=quality.get("has_lint_config", False),
         has_precommit=quality.get("has_precommit", False),

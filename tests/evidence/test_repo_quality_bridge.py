@@ -35,6 +35,7 @@ def test_repo_quality_to_evidence_converts_docs_signals():
     quality = RepoQualityResult(
         has_readme=True,
         has_changelog=True,
+        has_contributing=True,
         has_docs_dir=True,
     )
     result = repo_quality_to_evidence(quality)
@@ -42,6 +43,7 @@ def test_repo_quality_to_evidence_converts_docs_signals():
     docs_item = next((i for i in result if i.type == "documentation"), None)
     assert docs_item is not None
     assert "README" in docs_item.content
+    assert "CONTRIBUTING" in docs_item.content
 
 
 def test_repo_quality_to_evidence_converts_quality_signals():
@@ -103,6 +105,26 @@ def test_repo_quality_to_evidence_negative_docs():
     assert docs_item is not None
     assert "missing" in docs_item.content.lower()
     assert docs_item.source == "docs_signals"
+
+
+def test_repo_quality_to_evidence_changelog_counts_as_docs():
+    quality = RepoQualityResult(has_tests=True, test_file_count=1, has_changelog=True)
+    result = repo_quality_to_evidence(quality)
+
+    docs_items = [i for i in result if i.type == "documentation"]
+    assert docs_items
+    assert any("CHANGELOG" in i.content for i in docs_items)
+    assert all("missing" not in i.content.lower() for i in docs_items)
+
+
+def test_repo_quality_to_evidence_contributing_counts_as_docs():
+    quality = RepoQualityResult(has_tests=True, test_file_count=1, has_contributing=True)
+    result = repo_quality_to_evidence(quality)
+
+    docs_items = [i for i in result if i.type == "documentation"]
+    assert docs_items
+    assert any("CONTRIBUTING" in i.content for i in docs_items)
+    assert all("missing" not in i.content.lower() for i in docs_items)
 
 
 def test_repo_quality_to_evidence_no_negative_when_present():
