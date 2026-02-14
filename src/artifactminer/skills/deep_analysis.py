@@ -215,27 +215,7 @@ class DeepRepoAnalyzer:
         touched_paths = (
             user_contributions.get("touched_paths") if user_contributions else None
         )
-        signals = get_repo_quality_signals(repo_path, touched_paths=touched_paths)
-
-        if not signals:
-            return None
-
-        tests = signals.get("tests", {})
-        docs = signals.get("docs", {})
-        quality = signals.get("quality", {})
-
-        return RepoQualityResult(
-            test_file_count=tests.get("test_file_count", 0),
-            has_tests=tests.get("has_tests", False),
-            test_frameworks=tests.get("test_frameworks", []),
-            has_readme=docs.get("has_readme", False),
-            has_changelog=docs.get("has_changelog", False),
-            has_docs_dir=docs.get("has_docs_dir", False),
-            has_lint_config=quality.get("has_lint_config", False),
-            has_precommit=quality.get("has_precommit", False),
-            has_type_check=quality.get("has_type_check", False),
-            quality_tools=quality.get("quality_tools", []),
-        )
+        return get_repo_quality_signals(repo_path, touched_paths=touched_paths) or None
 
     def _validate_insight_rules(self) -> None:
         """Fail fast if insight rules reference skills that do not exist."""

@@ -8,10 +8,13 @@ from artifactminer.evidence.extractors.repo_quality_bridge import (
 from artifactminer.skills.deep_analysis import RepoQualityResult
 
 
-def test_repo_quality_to_evidence_returns_empty_for_no_signals():
+def test_repo_quality_to_evidence_returns_negative_for_bare_defaults():
     quality = RepoQualityResult()
     result = repo_quality_to_evidence(quality)
-    assert result == []
+    types = {item.type for item in result}
+    # No tests and no docs → negative signals
+    assert "test_coverage" in types
+    assert "documentation" in types
 
 
 def test_repo_quality_to_evidence_converts_testing_signals():
@@ -78,3 +81,40 @@ def test_repo_quality_to_evidence_combines_all_signals():
     assert "testing" in types
     assert "documentation" in types
     assert "code_quality" in types
+
+
+def test_repo_quality_to_evidence_negative_coverage():
+    """No tests → negative test_coverage evidence."""
+    quality = RepoQualityResult(has_tests=False, has_readme=True)
+    result = repo_quality_to_evidence(quality)
+
+    cov_item = next((i for i in result if i.type == "test_coverage"), None)
+    assert cov_item is not None
+    assert "0.0%" in cov_item.content
+    assert cov_item.source == "test_coverage_signals"
+
+
+def test_repo_quality_to_evidence_negative_docs():
+    """No docs → negative documentation evidence."""
+    quality = RepoQualityResult(has_tests=True, test_file_count=1, has_readme=False, has_docs_dir=False)
+    result = repo_quality_to_evidence(quality)
+
+    docs_item = next((i for i in result if i.type == "documentation"), None)
+    assert docs_item is not None
+    assert "missing" in docs_item.content.lower()
+    assert docs_item.source == "docs_signals"
+
+
+def test_repo_quality_to_evidence_no_negative_when_present():
+    """Has tests and docs → no negative signals."""
+    quality = RepoQualityResult(
+        test_file_count=3,
+        has_tests=True,
+        has_readme=True,
+    )
+    result = repo_quality_to_evidence(quality)
+
+    assert not any(i.type == "test_coverage" for i in result)
+    # Should have positive documentation, not negative
+    doc_items = [i for i in result if i.type == "documentation"]
+    assert all("missing" not in i.content.lower() for i in doc_items)
