@@ -110,6 +110,13 @@ def test_detect_quality_signals_respects_touched_paths():
     assert result["has_precommit"] is False
 
 
+def test_detect_quality_signals_detects_mypy_from_dot_mypy_ini():
+    repo = _make_repo({".mypy.ini": "[mypy]\npython_version = 3.11\n"})
+    result = detect_quality_signals(repo)
+    assert result["has_type_check"] is True
+    assert "mypy" in result["quality_tools"]
+
+
 def test_get_repo_quality_signals_aggregates_all():
     repo = _make_repo(
         {
