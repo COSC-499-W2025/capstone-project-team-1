@@ -94,3 +94,21 @@ def test_git_stats_to_evidence_includes_workflow_patterns():
 
     merge_item = next((i for i in workflow_items if "merge" in i.content.lower()), None)
     assert merge_item is not None
+
+
+def test_git_stats_to_evidence_keeps_workflow_when_commit_window_zero():
+    git_stats = GitStatsResult(
+        commit_count_window=0,
+        contribution_percent=0.0,
+        commit_frequency=0.0,
+        has_branches=True,
+        branch_count=4,
+        has_tags=True,
+        merge_commits=3,
+    )
+    result = git_stats_to_evidence(git_stats)
+
+    assert not any("commits in last 90 days" in item.content for item in result)
+    assert any("branching workflow" in item.content for item in result)
+    assert any("git tags" in item.content for item in result)
+    assert any("merge commits" in item.content for item in result)
