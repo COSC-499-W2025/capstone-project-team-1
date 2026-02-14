@@ -2,15 +2,60 @@
 
 from __future__ import annotations
 
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Dict, Set
 
 from artifactminer.skills.signals.file_signals import path_in_touched
 
 
-TEST_FILE_PATTERNS = ["test_*.py", "*_test.py", "tests.py"]
-TEST_DIR_PATTERNS = ["tests", "test"]
-TEST_CONFIG_FILES = ["pytest.ini", "pyproject.toml", "setup.cfg", "tox.ini"]
+TEST_FILE_PATTERNS = [
+    "test_*.py",
+    "*_test.py",
+    "tests.py",
+    "*.test.js",
+    "*.spec.js",
+    "*.test.jsx",
+    "*.spec.jsx",
+    "*.test.ts",
+    "*.spec.ts",
+    "*.test.tsx",
+    "*.spec.tsx",
+    "*_test.go",
+    "*Test.java",
+    "*_spec.rb",
+    "*_test.rb",
+    "*_test.rs",
+]
+TEST_DIR_PATTERNS = [
+    "tests",
+    "test",
+    "__tests__",
+    "spec",
+    "src/test",
+    "src/tests",
+    "src/test/java",
+]
+TEST_CONFIG_FILES = [
+    "pytest.ini",
+    "pyproject.toml",
+    "setup.cfg",
+    "tox.ini",
+    "jest.config.js",
+    "jest.config.cjs",
+    "jest.config.mjs",
+    "jest.config.ts",
+    "jest.config.json",
+    "karma.conf.js",
+    "karma.conf.ts",
+    "go.mod",
+    "build.gradle",
+    "build.gradle.kts",
+    "pom.xml",
+    "Cargo.toml",
+    "Gemfile",
+    ".rspec",
+]
 
 DOCS_PATTERNS = {
     "README.md": "readme",
@@ -35,22 +80,52 @@ QUALITY_PATTERNS = {
 
 
 def _has_test_config(root: Path, touched_paths: Set[str] | None) -> list[str]:
-    found = []
+    found = set()
     for cfg in TEST_CONFIG_FILES:
         if touched_paths and not path_in_touched(cfg, touched_paths):
             continue
         p = root / cfg
         if p.is_file():
             content = p.read_text(errors="ignore").lower()
-            if (
-                cfg == "pytest.ini"
-                or "[pytest]" in content
-                or "[tool:pytest]" in content
-            ):
-                found.append("pytest")
+            if cfg == "pytest.ini" or "[pytest]" in content or "[tool:pytest]" in content:
+                found.add("pytest")
             if "tox" in content:
-                found.append("tox")
-    return found
+                found.add("tox")
+            if cfg.startswith("jest.config") or "\"jest\"" in content or "'jest'" in content:
+                found.add("jest")
+            if cfg.startswith("karma.conf"):
+                found.add("karma")
+            if cfg == "go.mod":
+                found.add("go test")
+            if cfg in {"build.gradle", "build.gradle.kts", "pom.xml"}:
+                found.add("junit")
+            if cfg == "Cargo.toml":
+                found.add("cargo test")
+            if cfg in {"Gemfile", ".rspec"}:
+                found.add("rspec")
+    return sorted(found)
+
+
+def _infer_frameworks_from_test_files(paths: Set[str]) -> set[str]:
+    frameworks: set[str] = set()
+    for rel in paths:
+        lower = rel.lower()
+        if lower.endswith(".py"):
+            frameworks.add("pytest")
+        if any(
+            lower.endswith(suffix)
+            for suffix in (".test.js", ".spec.js", ".test.jsx", ".spec.jsx", ".test.ts", ".spec.ts", ".test.tsx", ".spec.tsx")
+        ):
+            frameworks.add("jest")
+        if lower.endswith("_test.go"):
+            frameworks.add("go test")
+        if lower.endswith("test.java"):
+            frameworks.add("junit")
+        if lower.endswith("_spec.rb") or lower.endswith("_test.rb"):
+            frameworks.add("rspec")
+        if lower.endswith("_test.rs"):
+            frameworks.add("cargo test")
+    return frameworks
 
 
 def detect_test_signals(
@@ -62,10 +137,12 @@ def detect_test_signals(
     root = Path(repo_path)
     seen_files: Set[str] = set()
     test_dirs = 0
-    frameworks = set()
+    frameworks: set[str] = set()
 
     for pattern in TEST_FILE_PATTERNS:
         for match in root.rglob(pattern):
+            if not match.is_file():
+                continue
             rel = str(match.relative_to(root))
             if touched_paths and not path_in_touched(rel, touched_paths):
                 continue
@@ -75,15 +152,18 @@ def detect_test_signals(
         candidate = root / dir_name
         if candidate.is_dir():
             test_dirs += 1
-            for py in candidate.rglob("*.py"):
-                rel = str(py.relative_to(root))
+            for test_file in candidate.rglob("*"):
+                if not test_file.is_file():
+                    continue
+                rel = str(test_file.relative_to(root))
                 if touched_paths and not path_in_touched(rel, touched_paths):
+                    continue
+                if fnmatch(test_file.name, "*.md"):
                     continue
                 seen_files.add(rel)
 
     frameworks.update(_has_test_config(root, touched_paths))
-    if seen_files:
-        frameworks.add("pytest")
+    frameworks.update(_infer_frameworks_from_test_files(seen_files))
 
     return {
         "test_file_count": len(seen_files),
