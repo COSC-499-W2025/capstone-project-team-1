@@ -177,3 +177,46 @@ def test_detect_test_signals_finds_java_test_file_patterns():
     assert result["has_tests"] is True
     assert result["test_file_count"] >= 1
     assert "junit" in result["test_frameworks"]
+
+
+def test_detect_test_signals_finds_typescript_tests_with_jest_config():
+    repo = _make_repo(
+        {
+            "src/math.spec.ts": "describe('math', () => {})",
+            "jest.config.ts": "export default {};",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert result["test_file_count"] >= 1
+    assert "jest" in result["test_frameworks"]
+
+
+def test_detect_test_signals_finds_ruby_spec_files():
+    repo = _make_repo(
+        {
+            "Gemfile": "source 'https://rubygems.org'",
+            "spec/models/user_spec.rb": "RSpec.describe User do end",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert "rspec" in result["test_frameworks"]
+
+
+def test_detect_test_signals_finds_rust_test_files():
+    repo = _make_repo(
+        {
+            "Cargo.toml": "[package]\nname = 'demo'",
+            "tests/math_test.rs": "#[test]\nfn adds() {}",
+        }
+    )
+    result = detect_test_signals(repo)
+    assert result["has_tests"] is True
+    assert "cargo test" in result["test_frameworks"]
+
+
+def test_detect_docs_signals_touched_paths_are_case_insensitive():
+    repo = _make_repo({"readme.md": "# Project"})
+    result = detect_docs_signals(repo, touched_paths={"README.md"})
+    assert result["has_readme"] is True
