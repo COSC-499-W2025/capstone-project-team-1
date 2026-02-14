@@ -254,12 +254,12 @@ async def upsert_project_thumbnail(
         new_thumbnail_url = normalized_url
 
     previous_thumbnail_url = project.thumbnail_url
-    if previous_thumbnail_url != new_thumbnail_url:
-        _delete_existing_local_thumbnail(previous_thumbnail_url)
-
     project.thumbnail_url = new_thumbnail_url
     db.commit()
     db.refresh(project)
+
+    if previous_thumbnail_url != new_thumbnail_url:
+        _delete_existing_local_thumbnail(previous_thumbnail_url)
 
     return ProjectThumbnailResponse(
         project_id=project.id,
