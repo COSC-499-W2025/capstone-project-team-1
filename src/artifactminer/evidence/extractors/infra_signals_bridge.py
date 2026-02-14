@@ -6,7 +6,7 @@ from datetime import date
 from typing import List
 
 from artifactminer.evidence.models import EvidenceItem
-from artifactminer.skills.deep_analysis import InfraSignalsResult
+from artifactminer.skills.models import InfraSignalsResult
 
 
 def infra_signals_to_evidence(

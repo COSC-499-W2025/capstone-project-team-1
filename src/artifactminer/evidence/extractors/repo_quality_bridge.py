@@ -6,9 +6,14 @@ from datetime import date
 from typing import List
 
 from artifactminer.evidence.models import EvidenceItem
-from artifactminer.skills.deep_analysis import RepoQualityResult
+from artifactminer.skills.models import RepoQualityResult
 
-_DOCS_FLAGS = [("has_readme", "README"), ("has_changelog", "CHANGELOG"), ("has_docs_dir", "docs/")]
+_DOCS_FLAGS = [
+    ("has_readme", "README"),
+    ("has_changelog", "CHANGELOG"),
+    ("has_contributing", "CONTRIBUTING"),
+    ("has_docs_dir", "docs/"),
+]
 _QUALITY_FLAGS = [("has_lint_config", "lint"), ("has_precommit", "pre-commit"), ("has_type_check", "type checking")]
 
 
@@ -63,7 +68,7 @@ def repo_quality_to_evidence(
             date=evidence_date,
         ))
 
-    if not quality.has_readme and not quality.has_docs_dir:
+    if not docs_parts:
         items.append(EvidenceItem(
             type="documentation",
             content="Documentation is missing.",
