@@ -107,14 +107,14 @@ def test_get_repo_quality_signals_aggregates_all():
         }
     )
     result = get_repo_quality_signals(repo)
-    assert result["tests"]["has_tests"] is True
-    assert result["docs"]["has_readme"] is True
-    assert result["quality"]["has_lint_config"] is True
+    assert result.has_tests is True
+    assert result.has_readme is True
+    assert result.has_lint_config is True
 
 
 def test_empty_repo_returns_no_signals():
     repo = _make_repo({})
     result = get_repo_quality_signals(repo)
-    assert result["tests"]["has_tests"] is False
-    assert result["docs"]["has_readme"] is False
-    assert result["quality"]["has_lint_config"] is False
+    assert result.has_tests is False
+    assert result.has_readme is False
+    assert result.has_lint_config is False
