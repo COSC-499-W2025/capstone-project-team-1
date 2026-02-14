@@ -4,15 +4,30 @@ from artifactminer.evidence.extractors.code_quality_bridge import quality_to_evi
 
 
 def test_quality_to_evidence_with_issues():
-    quality_data = {"issues": 5, "has_type_hints": True}
-    result = quality_to_evidence(quality_data)
-    assert len(result) >= 1
+    result = quality_to_evidence({"issues": 5})
+    assert len(result) == 1
     assert result[0].type == "code_quality"
     assert result[0].source == "code_quality_signals"
+    assert "5 issues" in result[0].content
 
 
 def test_quality_to_evidence_no_issues():
-    quality_data = {"issues": 0, "has_type_hints": True}
-    result = quality_to_evidence(quality_data)
-    # No issues, no evidence items
+    result = quality_to_evidence({"issues": 0})
+    assert result == []
+
+
+def test_quality_to_evidence_missing_key():
+    result = quality_to_evidence({})
+    assert result == []
+
+
+def test_quality_to_evidence_empty_dict():
+    result = quality_to_evidence({})
+    assert result == []
+
+
+def test_quality_to_evidence_none_value():
+    # .get() returns 0 default, but if someone passes None explicitly
+    result = quality_to_evidence({"issues": None})
+    # None > 0 is False in Python, so no evidence
     assert result == []
