@@ -79,6 +79,15 @@ QUALITY_PATTERNS = {
 }
 
 
+def _path_in_touched_ci(path: str, touched_paths: Set[str] | None) -> bool:
+    if not touched_paths:
+        return True
+    if path_in_touched(path, touched_paths):
+        return True
+    lower_path = path.lower()
+    return any(tp.lower().endswith(lower_path) for tp in touched_paths)
+
+
 def _has_test_config(root: Path, touched_paths: Set[str] | None) -> list[str]:
     found = set()
     for cfg in TEST_CONFIG_FILES:
@@ -181,11 +190,14 @@ def detect_docs_signals(
     """Detect documentation in repository."""
     root = Path(repo_path)
     found = {}
+    entries = {}
+    if root.exists():
+        entries = {entry.name.lower(): entry for entry in root.iterdir()}
 
     for pattern, doc_type in DOCS_PATTERNS.items():
-        if touched_paths and not path_in_touched(pattern, touched_paths):
+        if not _path_in_touched_ci(pattern, touched_paths):
             continue
-        candidate = root / pattern
+        candidate = entries.get(pattern.lower(), root / pattern)
         if candidate.is_file() or candidate.is_dir():
             found[doc_type] = True
 

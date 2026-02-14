@@ -57,6 +57,18 @@ def test_detect_docs_signals_finds_readme():
     assert result["has_changelog"] is True
 
 
+def test_detect_docs_signals_handles_lowercase_readme():
+    repo = _make_repo({"readme.md": "# Project"})
+    result = detect_docs_signals(repo)
+    assert result["has_readme"] is True
+
+
+def test_detect_docs_signals_handles_titlecase_readme():
+    repo = _make_repo({"Readme.md": "# Project"})
+    result = detect_docs_signals(repo)
+    assert result["has_readme"] is True
+
+
 def test_detect_docs_signals_respects_touched_paths():
     repo = _make_repo(
         {
