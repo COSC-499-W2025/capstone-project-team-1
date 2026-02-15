@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import fields
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Dict, Set
@@ -266,20 +267,10 @@ def get_repo_quality_signals(
     touched_paths: Set[str] | None = None,
 ):
     """Aggregate all repository quality signals into a dataclass."""
-    tests = detect_test_signals(repo_path, touched_paths=touched_paths)
-    docs = detect_docs_signals(repo_path, touched_paths=touched_paths)
-    quality = detect_quality_signals(repo_path, touched_paths=touched_paths)
-
-    return RepoQualityResult(
-        test_file_count=tests.get("test_file_count", 0),
-        has_tests=tests.get("has_tests", False),
-        test_frameworks=tests.get("test_frameworks", []),
-        has_readme=docs.get("has_readme", False),
-        has_changelog=docs.get("has_changelog", False),
-        has_contributing=docs.get("has_contributing", False),
-        has_docs_dir=docs.get("has_docs_dir", False),
-        has_lint_config=quality.get("has_lint_config", False),
-        has_precommit=quality.get("has_precommit", False),
-        has_type_check=quality.get("has_type_check", False),
-        quality_tools=quality.get("quality_tools", []),
-    )
+    merged = {
+        **detect_test_signals(repo_path, touched_paths=touched_paths),
+        **detect_docs_signals(repo_path, touched_paths=touched_paths),
+        **detect_quality_signals(repo_path, touched_paths=touched_paths),
+    }
+    valid = {f.name for f in fields(RepoQualityResult)}
+    return RepoQualityResult(**{k: v for k, v in merged.items() if k in valid})
