@@ -354,6 +354,7 @@ class ResumeGenerationResponse(BaseModel):
 
     - `success=True`: All projects were processed without errors
     - `success=False`: One or more projects encountered errors during processing
+    - `warnings`: Non-critical issues (for example git metadata collection failures)
     - `items_generated`: Count of evidence items created (not resume items)
     - `resume_items`: Always empty list (insights stored as ProjectEvidence)
     """
@@ -374,6 +375,10 @@ class ResumeGenerationResponse(BaseModel):
     errors: list[str] = Field(
         default_factory=list,
         description="List of errors encountered during generation (if any).",
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="List of non-critical warnings encountered during generation.",
     )
 
 
