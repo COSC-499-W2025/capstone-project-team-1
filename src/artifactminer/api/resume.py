@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..db import get_db, RepoStat, ResumeItem
+from ..db import get_db, ProjectEvidence, RepoStat, ResumeItem
 from .schemas import (
     ResumeItemResponse,
     ResumeGenerationRequest,
@@ -40,7 +40,7 @@ async def generate_resume_for_project(
         repo_stat: RepoStat model for the project
         user_email: User's email for contribution tracking
         consent_level: Consent level for LLM usage ('full', 'no_llm', or 'none')
-        regenerate: If True, delete existing resume items first
+        regenerate: If True, delete existing generated evidence and legacy resume items first
 
     Returns:
         Tuple of (count of evidence items generated, critical errors, warnings)
@@ -48,16 +48,22 @@ async def generate_resume_for_project(
     errors = []
     warnings = []
 
-    # Delete existing resume items if regenerate is requested
+    # Delete existing generated rows if regenerate is requested
     if regenerate:
-        deleted_count = (
+        deleted_resume_items = (
             db.query(ResumeItem)
             .filter(ResumeItem.repo_stat_id == repo_stat.id)
             .delete()
         )
-        if deleted_count > 0:
+        deleted_evidence_items = (
+            db.query(ProjectEvidence)
+            .filter(ProjectEvidence.repo_stat_id == repo_stat.id)
+            .delete()
+        )
+        if deleted_resume_items > 0 or deleted_evidence_items > 0:
             print(
-                f"[resume_generate] Deleted {deleted_count} existing items for {repo_stat.project_name}"
+                f"[resume_generate] Deleted {deleted_resume_items} ResumeItem and "
+                f"{deleted_evidence_items} ProjectEvidence rows for {repo_stat.project_name}"
             )
 
     # Collect user additions for analysis context
@@ -157,7 +163,7 @@ async def generate_resume_items(
     1. Validates that all project IDs exist and are not soft-deleted
     2. Retrieves user email and consent level
     3. For each project:
-       - Optionally deletes existing resume items (if regenerate=True)
+       - Optionally deletes existing ProjectEvidence and legacy ResumeItem rows (if regenerate=True)
        - Collects user contributions from git history
        - Runs DeepRepoAnalyzer to extract skills and insights
        - Persists insights as project evidence (not ResumeItem rows)

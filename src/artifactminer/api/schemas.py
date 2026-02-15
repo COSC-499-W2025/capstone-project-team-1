@@ -340,7 +340,10 @@ class ResumeGenerationRequest(BaseModel):
     )
     regenerate: bool = Field(
         default=False,
-        description="If True, delete existing resume items for these projects before regenerating.",
+        description=(
+            "If True, delete existing generated ProjectEvidence rows (and any legacy ResumeItem rows) "
+            "for these projects before regenerating."
+        ),
     )
 
 

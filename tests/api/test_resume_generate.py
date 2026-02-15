@@ -244,3 +244,45 @@ def test_items_generated_counts_persisted_rows_not_raw_insights(
     second = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
     assert second.status_code == 200
     assert second.json()["items_generated"] == 0
+
+
+@patch("artifactminer.api.resume.DeepRepoAnalyzer")
+@patch("artifactminer.api.resume.collect_user_additions")
+@patch("artifactminer.api.resume.Path")
+def test_regenerate_replaces_existing_project_evidence(
+    mock_path, mock_collect, mock_analyzer, client
+):
+    """regenerate=True clears prior ProjectEvidence before persisting new results."""
+    from artifactminer.skills.deep_analysis import Insight, DeepAnalysisResult
+
+    mock_path.return_value.exists.return_value = True
+    mock_collect.return_value = ["commit additions"]
+
+    first_insight = Insight(
+        title="Original Insight",
+        evidence=["source A"],
+        why_it_matters="first version",
+    )
+    second_insight = Insight(
+        title="Regenerated Insight",
+        evidence=["source B"],
+        why_it_matters="second version",
+    )
+    mock_analyzer.return_value.analyze.side_effect = [
+        DeepAnalysisResult(insights=[first_insight], skills=[]),
+        DeepAnalysisResult(insights=[second_insight], skills=[]),
+    ]
+
+    first = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
+    assert first.status_code == 200
+    assert first.json()["items_generated"] == 1
+
+    second = client.post("/resume/generate", json={"project_ids": [1], "regenerate": True})
+    assert second.status_code == 200
+    assert second.json()["items_generated"] == 1
+
+    evidence_resp = client.get("/projects/1/evidence")
+    assert evidence_resp.status_code == 200
+    evidence = evidence_resp.json()
+    assert len(evidence) == 1
+    assert evidence[0]["content"].startswith("Regenerated Insight:")
