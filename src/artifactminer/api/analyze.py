@@ -54,10 +54,8 @@ from ..RepositoryIntelligence.repo_intelligence_user import (
     generate_summaries_for_ranked,
 )
 from ..skills.deep_analysis import DeepRepoAnalyzer
-from ..skills.persistence import (
-    persist_extracted_skills,
-    persist_insights_as_resume_items,
-)
+from ..skills.persistence import persist_extracted_skills
+from ..evidence.orchestrator import persist_insights_as_project_evidence
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
@@ -290,7 +288,7 @@ async def analyze_zip(
     - Call Evan's getUserRepoStats() → save to UserRepoStat table
     - Call Stavans's DeepRepoAnalyzer.analyze() → extract skills + insights
     - Call Shlok's persist_extracted_skills() → save skills
-    - Call Shlok's persist_insights_as_resume_items() → save resume items
+    - Call evidence orchestrator → save deep insights as ProjectEvidence
 
     **Step 4 - Post-Processing:**
     - Call Shlok's rank_projects() → update RepoStat.ranking_score
@@ -423,10 +421,11 @@ async def analyze_zip(
                 commit=False,  # Batch commit at end
             )
 
-            persist_insights_as_resume_items(
+            persist_insights_as_project_evidence(
                 db=db,
                 repo_stat_id=repo_stat.id,
                 insights=deep_result.insights,
+                repo_last_commit=repo_stat.last_commit,
                 commit=False,  # Batch commit at end
             )
 
