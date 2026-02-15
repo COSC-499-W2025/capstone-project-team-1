@@ -6,7 +6,7 @@ import datetime as _dt
 from datetime import datetime, UTC
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +315,14 @@ class ResumeItemEditRequest(BaseModel):
     category: str | None = Field(
         default=None, description="New category for the resume item."
     )
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "ResumeItemEditRequest":
+        if self.title is None and self.content is None and self.category is None:
+            raise ValueError(
+                "At least one of title, content, or category must be provided"
+            )
+        return self
 
 
 class ResumeItemResponse(BaseModel):
