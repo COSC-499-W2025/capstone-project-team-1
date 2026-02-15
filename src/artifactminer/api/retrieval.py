@@ -1,13 +1,13 @@
 """Read-only retrieval endpoints for skills, resume items, and summaries.
 
 These endpoints serve data for the final portfolio/resume generation.
-All are GET-only with no side effects.
+All are GET-only with no side effects (write operations moved to resume.py).
 """
 
 from datetime import datetime
 from typing import List
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.orm import Session
 
 from sqlalchemy import or_, func
@@ -17,7 +17,6 @@ from .schemas import (
     SkillChronologyItem,
     SkillResponse,
     ResumeItemResponse,
-    ResumeItemEditRequest,
     SummaryResponse,
     UserAIIntelligenceSummaryResponse,
 )
@@ -274,52 +273,6 @@ async def get_resume_item_by_id(
 
     if repo_stat is not None and repo_stat.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Resume item not found")
-
-    return ResumeItemResponse(
-        id=resume_item.id,
-        title=resume_item.title,
-        content=resume_item.content,
-        category=resume_item.category,
-        project_name=repo_stat.project_name if repo_stat else None,
-        created_at=resume_item.created_at,
-    )
-
-
-@router.post("/resume/{resume_id}/edit", response_model=ResumeItemResponse)
-async def edit_resume_item(
-    resume_id: int = Path(..., gt=0),
-    request: ResumeItemEditRequest = Body(...),
-    db: Session = Depends(get_db),
-) -> ResumeItemResponse:
-    """Edit a resume item's title, content, and/or category.
-
-    Accepts partial updates - only provided fields are updated.
-    Returns 404 if the item doesn't exist or its associated project is soft-deleted.
-    """
-    result = (
-        db.query(ResumeItem, RepoStat)
-        .outerjoin(RepoStat, ResumeItem.repo_stat_id == RepoStat.id)
-        .filter(ResumeItem.id == resume_id)
-        .first()
-    )
-
-    if result is None:
-        raise HTTPException(status_code=404, detail="Resume item not found")
-
-    resume_item, repo_stat = result
-
-    if repo_stat is not None and repo_stat.deleted_at is not None:
-        raise HTTPException(status_code=404, detail="Resume item not found")
-
-    if request.title is not None:
-        resume_item.title = request.title
-    if request.content is not None:
-        resume_item.content = request.content
-    if request.category is not None:
-        resume_item.category = request.category
-
-    db.commit()
-    db.refresh(resume_item)
 
     return ResumeItemResponse(
         id=resume_item.id,
