@@ -460,35 +460,13 @@ async def analyze_zip(
             )
             evidence_date = repo_last_commit.date() if repo_last_commit else None
 
-            if deep_result.git_stats:
-                git_evidence = git_stats_to_evidence(deep_result.git_stats)
-                _persist_optional_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=git_evidence,
-                )
-
-            if deep_result.infra_signals:
-                infra_evidence = infra_signals_to_evidence(
-                    deep_result.infra_signals,
-                    evidence_date=evidence_date,
-                )
-                _persist_optional_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=infra_evidence,
-                )
-
-            if deep_result.repo_quality:
-                quality_evidence = repo_quality_to_evidence(
-                    deep_result.repo_quality,
-                    evidence_date=evidence_date,
-                )
-                _persist_optional_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=quality_evidence,
-                )
+            for signal, converter in [
+                (deep_result.git_stats, lambda s: git_stats_to_evidence(s)),
+                (deep_result.infra_signals, lambda s: infra_signals_to_evidence(s, evidence_date=evidence_date)),
+                (deep_result.repo_quality, lambda s: repo_quality_to_evidence(s, evidence_date=evidence_date)),
+            ]:
+                if signal:
+                    _persist_optional_evidence(db=db, repo_stat_id=repo_stat.id, evidence_items=converter(signal))
 
             print(
                 f"[analyze] Completed {repo_path.name}: {skills_count} skills, {insights_count} insights"

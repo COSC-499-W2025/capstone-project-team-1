@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import fields
 from typing import Any, Dict, List
 
 from artifactminer.skills.models import (
@@ -103,31 +104,18 @@ class DeepRepoAnalyzer:
         touched_paths = (
             user_contributions.get("touched_paths") if user_contributions else None
         )
+        kwargs = {"touched_paths": touched_paths}
         if user_stats is not None:
-            stats = get_git_stats(
-                repo_path,
-                user_email,
-                touched_paths=touched_paths,
-                user_stats=user_stats,
-            )
-        else:
-            stats = get_git_stats(repo_path, user_email, touched_paths=touched_paths)
+            kwargs["user_stats"] = user_stats
+        stats = get_git_stats(repo_path, user_email, **kwargs)
         patterns = detect_git_patterns(repo_path, touched_paths=touched_paths)
 
         if not stats and not patterns:
             return None
 
-        return GitStatsResult(
-            commit_count_window=stats.get("commit_count_window", 0),
-            commit_frequency=stats.get("commit_frequency", 0.0),
-            contribution_percent=stats.get("contribution_percent", 0.0),
-            first_commit_date=stats.get("first_commit_date"),
-            last_commit_date=stats.get("last_commit_date"),
-            has_branches=patterns.get("has_branches", False),
-            branch_count=patterns.get("branch_count", 0),
-            has_tags=patterns.get("has_tags", False),
-            merge_commits=patterns.get("merge_commits", 0),
-        )
+        merged = {**(stats or {}), **(patterns or {})}
+        valid = {f.name for f in fields(GitStatsResult)}
+        return GitStatsResult(**{k: merged.get(k) for k in valid if k in merged})
 
     def _extract_infra_signals(
         self,
@@ -139,17 +127,12 @@ class DeepRepoAnalyzer:
             user_contributions.get("touched_paths") if user_contributions else None
         )
         signals = get_infra_signals(repo_path, touched_paths=touched_paths)
-
         if not signals:
             return None
 
         summary = signals.get("summary", {})
-        return InfraSignalsResult(
-            ci_cd_tools=summary.get("ci_cd_tools", []),
-            docker_tools=summary.get("docker_tools", []),
-            env_build_tools=summary.get("env_build_tools", []),
-            all_tools=summary.get("all_tools", []),
-        )
+        valid = {f.name for f in fields(InfraSignalsResult)}
+        return InfraSignalsResult(**{k: summary.get(k) for k in valid if k in summary})
 
     def _extract_repo_quality(
         self,
