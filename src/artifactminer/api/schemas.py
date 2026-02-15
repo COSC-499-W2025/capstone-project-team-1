@@ -303,6 +303,20 @@ class SkillResponse(BaseModel):
     )
 
 
+class ResumeItemEditRequest(BaseModel):
+    """Request payload for editing a resume item."""
+
+    title: str | None = Field(
+        default=None, min_length=1, description="New title for the resume item."
+    )
+    content: str | None = Field(
+        default=None, min_length=1, description="New content for the resume item."
+    )
+    category: str | None = Field(
+        default=None, description="New category for the resume item."
+    )
+
+
 class ResumeItemResponse(BaseModel):
     """Response shape for resume/portfolio items."""
 
@@ -541,8 +555,6 @@ class PortfolioGenerationResponse(BaseModel):
     summaries: list[SummaryResponse]
     skills_chronology: list[SkillChronologyItem]
     errors: list[str] = Field(default_factory=list)
-
-
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
