@@ -6,15 +6,8 @@ from datetime import date, datetime
 from typing import Iterable
 
 from artifactminer.evidence.models import EvidenceItem
+from artifactminer.evidence.utils import coerce_date
 from artifactminer.skills.models import Insight
-
-
-def _coerce_date(value: object) -> date | None:
-    if isinstance(value, date) and not isinstance(value, datetime):
-        return value
-    if isinstance(value, datetime):
-        return value.date()
-    return None
 
 
 def insights_to_evidence(
@@ -24,7 +17,7 @@ def insights_to_evidence(
 ) -> list[EvidenceItem]:
     """Map insights to evidence rows used by the ProjectEvidence table."""
     converted: list[EvidenceItem] = []
-    evidence_date = _coerce_date(repo_last_commit)
+    evidence_date = coerce_date(repo_last_commit)
 
     for insight in insights:
         title = (insight.title or "").strip()
