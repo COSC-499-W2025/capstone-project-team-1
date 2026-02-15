@@ -45,6 +45,46 @@ def _metrics(parsed: ResumeProjectSummary) -> tuple[float, float, float]:
     return mirage_rate, grounding_rate, redundancy_rate
 
 
+def _bar(value: float, width: int = 12) -> str:
+    clamped = max(0.0, min(1.0, value))
+    filled = int(round(clamped * width))
+    return f"{'#' * filled}{'-' * (width - filled)}"
+
+
+def _render_table(
+    prompt_name: str, rows: List[tuple[str, float, float, float, float]]
+) -> str:
+    headers = ["Model", "Secs", "Mirage", "Grounding", "Redundancy"]
+    model_width = max(len(headers[0]), max(len(row[0]) for row in rows))
+    secs_width = len(headers[1])
+    lines = [f"Prompt: {prompt_name}"]
+    metric_width = 18
+    lines.append(
+        " ".join(
+            [
+                f"{headers[0]:<{model_width}}",
+                f"{headers[1]:>{secs_width}}",
+                f"{headers[2]:<{metric_width}}",
+                f"{headers[3]:<{metric_width}}",
+                f"{headers[4]:<{metric_width}}",
+            ]
+        )
+    )
+    for model, seconds, mirage, grounding, redundancy in rows:
+        lines.append(
+            " ".join(
+                [
+                    f"{model:<{model_width}}",
+                    f"{seconds:>{secs_width}.2f}",
+                    f"{mirage:.2f} {_bar(mirage)}",
+                    f"{grounding:.2f} {_bar(grounding)}",
+                    f"{redundancy:.2f} {_bar(redundancy)}",
+                ]
+            )
+        )
+    return "\n".join(lines)
+
+
 @pytest.mark.skipif(
     not os.getenv("OPENAI_API_KEY")
     or os.getenv("OPENAI_API_KEY") == "your_openai_api_key_here",
@@ -52,7 +92,9 @@ def _metrics(parsed: ResumeProjectSummary) -> tuple[float, float, float]:
 )
 @pytest.mark.parametrize("prompt_name,prompt", prompt_variants())
 def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None:
+    baseline_start = time.monotonic()
     baseline_content = get_gpt5_nano_response_sync(prompt)
+    baseline_seconds = time.monotonic() - baseline_start
     assert baseline_content, "OpenAI response content was empty."
 
     baseline_parsed = ResumeProjectSummary.model_validate_json(baseline_content)
@@ -62,6 +104,9 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
     assert baseline_parsed.skills
 
     openai_mirage, openai_grounding, openai_redundancy = _metrics(baseline_parsed)
+    rows: List[tuple[str, float, float, float, float]] = [
+        ("gpt-5-nano", baseline_seconds, openai_mirage, openai_grounding, openai_redundancy)
+    ]
 
     for model in _available_models():
         start_time = time.monotonic()
@@ -78,18 +123,6 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
 
         parsed = ResumeProjectSummary.model_validate_json(message_content)
         mirage_rate, grounding_rate, redundancy_rate = _metrics(parsed)
+        rows.append((model, elapsed, mirage_rate, grounding_rate, redundancy_rate))
 
-        print(
-            "\n".join(
-                [
-                    f"Model: {model}",
-                    f"Prompt: {prompt_name}",
-                    "Baseline: gpt-5-nano",
-                    f"Seconds: {elapsed:.2f}",
-                    f"Mirage rate: {mirage_rate:.2f} (delta {mirage_rate - openai_mirage:+.2f})",
-                    f"Entity grounding rate: {grounding_rate:.2f} (delta {grounding_rate - openai_grounding:+.2f})",
-                    f"Redundancy rate: {redundancy_rate:.2f} (delta {redundancy_rate - openai_redundancy:+.2f})",
-                    "---",
-                ]
-            )
-        )
+    print(_render_table(prompt_name, rows))
