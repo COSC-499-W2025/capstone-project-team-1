@@ -196,6 +196,29 @@ def test_generate_with_empty_insights(mock_path, mock_collect, mock_analyzer, cl
 @patch("artifactminer.api.resume.DeepRepoAnalyzer")
 @patch("artifactminer.api.resume.collect_user_additions")
 @patch("artifactminer.api.resume.Path")
+def test_warning_does_not_flip_success_false(
+    mock_path, mock_collect, mock_analyzer, client
+):
+    """Non-critical git collection warnings do not mark the run as failed."""
+    from artifactminer.skills.deep_analysis import DeepAnalysisResult
+
+    mock_path.return_value.exists.return_value = True
+    mock_collect.side_effect = Exception("Git error")
+    mock_analyzer.return_value.analyze.return_value = DeepAnalysisResult(
+        insights=[], skills=[]
+    )
+
+    resp = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["errors"] == []
+    assert len(data["warnings"]) == 1
+
+
+@patch("artifactminer.api.resume.DeepRepoAnalyzer")
+@patch("artifactminer.api.resume.collect_user_additions")
+@patch("artifactminer.api.resume.Path")
 def test_items_generated_counts_persisted_rows_not_raw_insights(
     mock_path, mock_collect, mock_analyzer, client
 ):

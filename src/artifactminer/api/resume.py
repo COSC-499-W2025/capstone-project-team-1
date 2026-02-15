@@ -29,7 +29,7 @@ async def generate_resume_for_project(
     user_email: str,
     consent_level: str,
     regenerate: bool = False,
-) -> tuple[int, list[str]]:
+) -> tuple[int, list[str], list[str]]:
     """Generate resume items for a single project.
 
     Extracts logic from analyze.py to allow on-demand resume generation.
@@ -43,9 +43,10 @@ async def generate_resume_for_project(
         regenerate: If True, delete existing resume items first
 
     Returns:
-        Tuple of (count of evidence items generated, list of error messages)
+        Tuple of (count of evidence items generated, critical errors, warnings)
     """
     errors = []
+    warnings = []
 
     # Delete existing resume items if regenerate is requested
     if regenerate:
@@ -70,9 +71,9 @@ async def generate_resume_for_project(
             )
             additions_text = "\n".join(user_additions)
         except Exception as e:
-            error_msg = f"Could not collect additions for {repo_stat.project_name}: {e}"
-            print(f"[resume_generate] Warning: {error_msg}")
-            errors.append(error_msg)
+            warning_msg = f"Could not collect additions for {repo_stat.project_name}: {e}"
+            print(f"[resume_generate] Warning: {warning_msg}")
+            warnings.append(warning_msg)
 
     # Run deep analysis to extract insights
     analyzer = DeepRepoAnalyzer(enable_llm=False)
@@ -111,7 +112,7 @@ async def generate_resume_for_project(
             f"[resume_generate] Generated {evidence_count} evidence items for {repo_stat.project_name}"
         )
 
-        return evidence_count, errors
+        return evidence_count, errors, warnings
 
     except Exception as e:
         error_msg = (
@@ -119,7 +120,7 @@ async def generate_resume_for_project(
         )
         print(f"[resume_generate] Error: {error_msg}")
         errors.append(error_msg)
-        return 0, errors
+        return 0, errors, warnings
 
 
 @router.post("/generate", response_model=ResumeGenerationResponse)
@@ -214,9 +215,10 @@ async def generate_resume_items(
     # Generate evidence items for each project
     total_evidence_count = 0
     all_errors = []
+    all_warnings = []
 
     for project in projects:
-        evidence_count, errors = await generate_resume_for_project(
+        evidence_count, errors, warnings = await generate_resume_for_project(
             db=db,
             repo_stat=project,
             user_email=user_email,
@@ -225,6 +227,7 @@ async def generate_resume_items(
         )
         total_evidence_count += evidence_count
         all_errors.extend(errors)
+        all_warnings.extend(warnings)
 
     # Commit all changes
     try:
@@ -243,7 +246,7 @@ async def generate_resume_items(
 
     print(
         f"[resume_generate] Completed: {total_evidence_count} evidence items generated, "
-        f"{len(all_errors)} errors, success={is_success}"
+        f"{len(all_errors)} errors, {len(all_warnings)} warnings, success={is_success}"
     )
 
     return ResumeGenerationResponse(
@@ -252,4 +255,5 @@ async def generate_resume_items(
         resume_items=[],
         consent_level=consent_level,
         errors=all_errors,
+        warnings=all_warnings,
     )
