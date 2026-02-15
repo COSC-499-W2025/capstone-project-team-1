@@ -91,7 +91,14 @@ def test_structured_output_benchmark(model: str) -> None:
 
     cold_seconds, warm_seconds = timings
     print(
-        f"Model={model} cold_seconds={cold_seconds:.2f} warm_seconds={warm_seconds:.2f}"
+        "\n".join(
+            [
+                f"Model: {model}",
+                f"Cold seconds: {cold_seconds:.2f}",
+                f"Warm seconds: {warm_seconds:.2f}",
+                "---",
+            ]
+        )
     )
     # if last_parsed is not None:
     #     print(last_parsed.model_dump_json(indent=2))
