@@ -191,3 +191,33 @@ def test_generate_with_empty_insights(mock_path, mock_collect, mock_analyzer, cl
     assert data["success"] is True  # Success = no errors, even with 0 insights
     assert data["items_generated"] == 0
     assert len(data["errors"]) == 0  # No errors, just no insights
+
+
+@patch("artifactminer.api.resume.DeepRepoAnalyzer")
+@patch("artifactminer.api.resume.collect_user_additions")
+@patch("artifactminer.api.resume.Path")
+def test_items_generated_counts_persisted_rows_not_raw_insights(
+    mock_path, mock_collect, mock_analyzer, client
+):
+    """Counts persisted evidence rows after dedupe, not raw insight list length."""
+    from artifactminer.skills.deep_analysis import Insight, DeepAnalysisResult
+
+    mock_path.return_value.exists.return_value = True
+    mock_collect.return_value = ["commit additions"]
+
+    duplicate_insight = Insight(
+        title="Deduped Insight",
+        evidence=["same source"],
+        why_it_matters="This should dedupe on second run",
+    )
+    mock_analyzer.return_value.analyze.return_value = DeepAnalysisResult(
+        insights=[duplicate_insight], skills=[]
+    )
+
+    first = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
+    assert first.status_code == 200
+    assert first.json()["items_generated"] == 1
+
+    second = client.post("/resume/generate", json={"project_ids": [1], "regenerate": False})
+    assert second.status_code == 200
+    assert second.json()["items_generated"] == 0

@@ -95,7 +95,7 @@ async def generate_resume_for_project(
             commit=False,
         )
 
-        persist_insights_as_project_evidence(
+        persisted_evidence = persist_insights_as_project_evidence(
             db=db,
             repo_stat_id=repo_stat.id,
             insights=deep_result.insights,
@@ -105,8 +105,8 @@ async def generate_resume_for_project(
 
         # /resume/generate no longer creates Deep Insight ResumeItem rows.
         # Insights are persisted as ProjectEvidence instead.
-        # Count evidence items created from insights.
-        evidence_count = len(deep_result.insights)
+        # Count actual evidence rows persisted after filtering/dedupe/max-cap rules.
+        evidence_count = len(persisted_evidence)
         print(
             f"[resume_generate] Generated {evidence_count} evidence items for {repo_stat.project_name}"
         )
