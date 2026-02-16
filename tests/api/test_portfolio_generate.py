@@ -257,3 +257,96 @@ def test_portfolio_generate_missing_email_returns_400():
         assert "email" in resp.json()["detail"].lower()
     finally:
         app.dependency_overrides.clear()
+
+
+def test_portfolio_generate_uses_strict_path_boundaries():
+    """Prefix-like paths (e.g. /extracted/10) must not match /extracted/1 scope."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(bind=engine)
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    def override_get_db():
+        db = TestingSessionLocal()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app = create_app()
+    app.dependency_overrides[get_db] = override_get_db
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db = TestingSessionLocal()
+    db.add(Question(id=1, key="email", question_text="Email?", order=1, required=True))
+    db.add(UserAnswer(question_id=1, answer_text="student@example.com", answered_at=now))
+    db.add(Consent(id=1, consent_level="no_llm", accepted_at=now))
+
+    db.add_all(
+        [
+            UploadedZip(
+                id=70,
+                filename="portfolio.zip",
+                path="/uploads/p.zip",
+                portfolio_id="p-boundary",
+                extraction_path="/extracted/1",
+            ),
+            RepoStat(
+                id=70,
+                project_name="InScope",
+                project_path="/extracted/1/repo",
+                last_commit=now,
+            ),
+            RepoStat(
+                id=71,
+                project_name="OutOfScopePrefix",
+                project_path="/extracted/10/repo",
+                last_commit=now,
+            ),
+            ResumeItem(
+                id=70,
+                title="InScope item",
+                content="valid",
+                category="Backend",
+                repo_stat_id=70,
+            ),
+            ResumeItem(
+                id=71,
+                title="OutOfScope item",
+                content="invalid",
+                category="Backend",
+                repo_stat_id=71,
+            ),
+            UserAIntelligenceSummary(
+                id=70,
+                repo_path="/extracted/1/repo",
+                user_email="student@example.com",
+                summary_text="in-scope summary",
+                generated_at=now,
+            ),
+            UserAIntelligenceSummary(
+                id=71,
+                repo_path="/extracted/10/repo",
+                user_email="student@example.com",
+                summary_text="out-of-scope summary",
+                generated_at=now,
+            ),
+        ]
+    )
+    db.commit()
+    db.close()
+
+    client = TestClient(app)
+    try:
+        resp = client.post("/portfolio/generate", json={"portfolio_id": "p-boundary"})
+        assert resp.status_code == 200
+        payload = resp.json()
+
+        assert [p["project_name"] for p in payload["projects"]] == ["InScope"]
+        assert [s["summary_text"] for s in payload["summaries"]] == ["in-scope summary"]
+        assert [r["title"] for r in payload["resume_items"]] == ["InScope item"]
+    finally:
+        app.dependency_overrides.clear()

@@ -41,6 +41,10 @@ def _project_sort_key(project: RepoStat) -> tuple[bool, float, bool, float, int]
     )
 
 
+def _build_path_boundary_filter(column, paths: list[str]):
+    return or_(*[or_(column == path, column.like(f"{path}/%")) for path in paths])
+
+
 def _apply_preferences(
     projects: list[RepoStat], prefs: RepresentationPreferences, errors: list[str]
 ) -> list[RepoStat]:
@@ -133,7 +137,7 @@ async def generate_portfolio(
     projects = (
         db.query(RepoStat)
         .filter(RepoStat.deleted_at.is_(None))
-        .filter(or_(*[RepoStat.project_path.like(f"{p}%") for p in extraction_prefixes]))
+        .filter(_build_path_boundary_filter(RepoStat.project_path, extraction_prefixes))
         .all()
     )
 
@@ -173,7 +177,11 @@ async def generate_portfolio(
         summary_rows = (
             db.query(UserAIntelligenceSummary)
             .filter(UserAIntelligenceSummary.user_email == user_email)
-            .filter(or_(*[UserAIntelligenceSummary.repo_path.like(f"{path}%") for path in selected_paths]))
+            .filter(
+                _build_path_boundary_filter(
+                    UserAIntelligenceSummary.repo_path, selected_paths
+                )
+            )
             .order_by(UserAIntelligenceSummary.generated_at.desc())
             .all()
         )
