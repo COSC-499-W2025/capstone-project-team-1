@@ -45,7 +45,6 @@ class EvidenceDeleteResponse(BaseModel):
     deleted_id: int
 
 
-
 class HealthStatus(BaseModel):
     """Response shape for service health and readiness checks."""
 
@@ -108,10 +107,11 @@ class UserAnswerResponse(BaseModel):
     answer_text: str
     answered_at: datetime
 
+
 class UserAnswerCreate(BaseModel):
     """Response shape for email api request and response"""
-    email: str  
 
+    email: str
 
 
 class ZipUploadResponse(BaseModel):
@@ -119,7 +119,9 @@ class ZipUploadResponse(BaseModel):
 
     zip_id: int = Field(description="Unique identifier for the uploaded ZIP file.")
     filename: str = Field(description="Original filename of the uploaded ZIP.")
-    portfolio_id: str = Field(description="UUID linking this ZIP to a portfolio session.")
+    portfolio_id: str = Field(
+        description="UUID linking this ZIP to a portfolio session."
+    )
 
 
 class PortfolioZipItem(BaseModel):
@@ -136,7 +138,9 @@ class PortfolioResponse(BaseModel):
     """Response shape for portfolio ZIP listing."""
 
     portfolio_id: str = Field(description="UUID of the portfolio.")
-    zips: list[PortfolioZipItem] = Field(description="All ZIPs linked to this portfolio.")
+    zips: list[PortfolioZipItem] = Field(
+        description="All ZIPs linked to this portfolio."
+    )
 
 
 class DirectoriesResponse(BaseModel):
@@ -147,7 +151,7 @@ class DirectoriesResponse(BaseModel):
     directories: list[str] = Field(
         description="List of top-level directories in the ZIP file."
     )
-    cleanedfilespath : list[str] = Field(
+    cleanedfilespath: list[str] = Field(
         description="Get the file path(s) from a zip direcotry."
     )
 
@@ -327,7 +331,8 @@ class SummaryResponse(BaseModel):
     user_email: str
     summary_text: str
     generated_at: datetime
-      
+
+
 class DeleteResponse(BaseModel):
     """Response shape for delete operations."""
 
@@ -345,17 +350,37 @@ class ResumeGenerationRequest(BaseModel):
     )
     regenerate: bool = Field(
         default=False,
-        description="If True, delete existing resume items for these projects before regenerating.",
+        description=(
+            "If True, delete existing generated ProjectEvidence rows (and any legacy ResumeItem rows) "
+            "for these projects before regenerating."
+        ),
     )
 
 
 class ResumeGenerationResponse(BaseModel):
-    """Response from resume generation endpoint."""
+    """Response from resume generation endpoint.
 
-    success: bool = Field(description="Whether the generation completed successfully.")
-    items_generated: int = Field(description="Total number of resume items created.")
+    ## Success Semantics
+
+    The `success` field indicates whether generation completed without critical errors.
+    Insights are persisted as `ProjectEvidence` rows, not `ResumeItem` rows.
+
+    - `success=True`: All projects were processed without errors
+    - `success=False`: One or more projects encountered errors during processing
+    - `warnings`: Non-critical issues (for example git metadata collection failures)
+    - `items_generated`: Count of evidence items created (not resume items)
+    - `resume_items`: Always empty list (insights stored as ProjectEvidence)
+    """
+
+    success: bool = Field(
+        description="True if generation completed without critical errors."
+    )
+    items_generated: int = Field(
+        description="Total number of evidence items created (not resume items)."
+    )
     resume_items: list[ResumeItemResponse] = Field(
-        description="List of generated resume items."
+        default_factory=list,
+        description="Always empty. Insights are stored as ProjectEvidence, not ResumeItem rows.",
     )
     consent_level: str = Field(
         description="Consent level used for generation ('full', 'no_llm', or 'none')."
@@ -363,6 +388,10 @@ class ResumeGenerationResponse(BaseModel):
     errors: list[str] = Field(
         default_factory=list,
         description="List of errors encountered during generation (if any).",
+    )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="List of non-critical warnings encountered during generation.",
     )
 
 
@@ -373,7 +402,7 @@ class ProjectRankingItem(BaseModel):
     score: float = Field(description="User's contribution percentage (0-100).")
     total_commits: int = Field(description="Total commits in the project.")
     user_commits: int = Field(description="Commits by the user.")
-      
+
 
 class RepoAnalysisResult(BaseModel):
     """Result of analyzing a single repository."""
@@ -434,6 +463,7 @@ class AnalyzeRequest(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     """Response from the master analyze endpoint."""
+
     zip_id: int
     extraction_path: str
     repos_found: int
@@ -443,19 +473,23 @@ class AnalyzeResponse(BaseModel):
     consent_level: str
     user_email: str
 
+
 class SummaryListResponse(BaseModel):
     summaries: list[SummaryResult]
 
+
 class FileValues(BaseModel):
-    file_path : str
-    file_name : str
-    file_ext : str
-    
+    file_path: str
+    file_name: str
+    file_ext: str
+
+
 class CrawlerFiles(BaseModel):
     """gets the according file and path data from the crawler"""
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    zip_id : int
-    crawl_path_and_file_name_and_ext : list[FileValues]
+    zip_id: int
+    crawl_path_and_file_name_and_ext: list[FileValues]
 
 
 class RepresentationPreferences(BaseModel):
@@ -467,6 +501,7 @@ class RepresentationPreferences(BaseModel):
     project_order: list[str] = Field(
         default_factory=list, description="Manual project ordering override."
     )
+
 
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str

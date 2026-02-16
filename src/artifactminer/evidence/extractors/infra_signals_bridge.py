@@ -24,7 +24,7 @@ def infra_signals_to_evidence(
         tools_str = ", ".join(sorted(set(infra_signals.ci_cd_tools)))
         items.append(
             EvidenceItem(
-                type="infrastructure",
+                type="metric",
                 content=f"CI/CD: {tools_str}",
                 source="infra_signals",
                 date=evidence_date,
@@ -35,7 +35,7 @@ def infra_signals_to_evidence(
         tools_str = ", ".join(sorted(set(infra_signals.docker_tools)))
         items.append(
             EvidenceItem(
-                type="infrastructure",
+                type="metric",
                 content=f"Containerization: {tools_str}",
                 source="infra_signals",
                 date=evidence_date,
@@ -47,7 +47,7 @@ def infra_signals_to_evidence(
         tools_str = ", ".join(sorted(set(env_build)))
         items.append(
             EvidenceItem(
-                type="infrastructure",
+                type="metric",
                 content=f"Build/Deploy tools: {tools_str}",
                 source="infra_signals",
                 date=evidence_date,

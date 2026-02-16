@@ -23,7 +23,7 @@ def test_infra_signals_to_evidence_converts_ci_cd_tools():
 
     assert len(result) >= 1
     ci_cd_item = next(
-        (i for i in result if i.type == "infrastructure" and "CI/CD" in i.content), None
+        (i for i in result if i.type == "metric" and "CI/CD" in i.content), None
     )
     assert ci_cd_item is not None
     assert "GitHub Actions" in ci_cd_item.content
