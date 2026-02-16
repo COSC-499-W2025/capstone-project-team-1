@@ -57,7 +57,9 @@ def assemble_markdown(output: ResumeOutput) -> str:
             if project.primary_language:
                 meta_parts.append(f"**Language:** {project.primary_language}")
             if project.user_contribution_pct is not None:
-                meta_parts.append(f"**Contribution:** {project.user_contribution_pct:.0f}%")
+                meta_parts.append(
+                    f"**Contribution:** {project.user_contribution_pct:.0f}%"
+                )
             if meta_parts:
                 lines.append(" | ".join(meta_parts))
 
@@ -99,7 +101,9 @@ def assemble_markdown(output: ResumeOutput) -> str:
     time_str = f"{output.generation_time_seconds:.0f}s"
     if output.models_used:
         model_str = ", ".join(output.models_used)
-        lines.append(f"*Generated with multi-stage pipeline ({model_str}) in {time_str}*")
+        lines.append(
+            f"*Generated with multi-stage pipeline ({model_str}) in {time_str}*"
+        )
     else:
         model_str = output.model_used or "template"
         lines.append(f"*Generated with {model_str} in {time_str}*")
@@ -125,6 +129,7 @@ def assemble_json(output: ResumeOutput) -> str:
             "stage": output.stage,
             "generation_time_seconds": output.generation_time_seconds,
             "errors": output.errors,
+            "quality_metrics": output.quality_metrics,
         },
     }
 
@@ -156,6 +161,7 @@ def assemble_json(output: ResumeOutput) -> str:
             if section:
                 proj_data["description"] = section.description
                 proj_data["bullets"] = section.bullets
+                proj_data["bullet_fact_ids"] = section.bullet_fact_ids
                 proj_data["narrative"] = section.narrative
 
             data["projects"].append(proj_data)

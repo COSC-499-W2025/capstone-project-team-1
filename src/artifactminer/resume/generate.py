@@ -249,7 +249,7 @@ def generate_resume(
     Args:
         zip_path: Absolute path to the ZIP file containing git repos
         user_email: User's email for attribution in git history
-        llm_model: Local GGUF model to use (default: qwen3-1.7b)
+        llm_model: Local GGUF model to use (default: qwen3-1.7b-q8)
         progress_callback: Optional callback for progress updates
 
     Returns:
@@ -267,7 +267,7 @@ def generate_resume(
         print(f"[resume] {msg}")
 
     # Ensure the LLM model is available before starting analysis
-    model = llm_model or "qwen3-1.7b"
+    model = llm_model or "qwen3-1.7b-q8"
     from .llm_client import ensure_model_available
 
     log(f"Ensuring model '{model}' is available...")

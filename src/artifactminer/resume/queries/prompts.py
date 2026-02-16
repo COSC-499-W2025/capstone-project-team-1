@@ -12,7 +12,10 @@ Prompts are designed for small models (<=4B params):
 
 from __future__ import annotations
 
+import json
+
 from ..models import (
+    EvidenceLinkedFact,
     ProjectDataBundle,
     PortfolioDataBundle,
     RawProjectFacts,
@@ -230,10 +233,126 @@ Write the profile now (plain text, no preamble):"""
 # Multi-stage pipeline prompts (Strategy B)
 # ---------------------------------------------------------------------------
 
+
+def build_extraction_evidence_catalog(
+    bundle: ProjectDataBundle,
+    *,
+    max_items: int = 28,
+) -> dict[str, str]:
+    """Build a compact evidence catalog keyed by deterministic IDs (E1, E2...)."""
+    raw_items: list[str] = []
+
+    # Commit evidence (highest-signal first)
+    ordered_categories = ["feature", "bugfix", "refactor", "test", "docs", "chore"]
+    by_category = {g.category: g.messages for g in bundle.commit_groups}
+    for category in ordered_categories:
+        for msg in by_category.get(category, [])[:6]:
+            raw_items.append(f"commit:{category}:{msg}")
+
+    # Structural constructs
+    for route in bundle.constructs.routes[:10]:
+        raw_items.append(f"route:{route}")
+    for cls in bundle.constructs.classes[:10]:
+        raw_items.append(f"class:{cls}")
+    for fn in bundle.constructs.key_functions[:10]:
+        raw_items.append(f"function:{fn}")
+
+    # Stack and module scope
+    for framework in bundle.frameworks[:8]:
+        raw_items.append(f"framework:{framework}")
+    for module, files in sorted(bundle.module_groups.items())[:8]:
+        raw_items.append(f"module:{module} ({len(files)} files)")
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for item in raw_items:
+        key = item.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(item)
+        if len(deduped) >= max_items:
+            break
+
+    return {f"E{i}": item for i, item in enumerate(deduped, start=1)}
+
+
+def _iter_fact_items(facts: RawProjectFacts) -> list[EvidenceLinkedFact]:
+    """Return evidence-linked facts with backward-compatible fallback synthesis."""
+    if facts.fact_items:
+        return facts.fact_items
+
+    synthesized: list[EvidenceLinkedFact] = []
+    for idx, text in enumerate(facts.facts, start=1):
+        synthesized.append(
+            EvidenceLinkedFact(
+                fact_id=f"F{idx}",
+                text=text,
+                evidence_keys=[],
+            )
+        )
+    return synthesized
+
+
+def _resume_output_to_json_payload(output: ResumeOutput) -> dict:
+    """Serialize resume output into the structured schema payload shape."""
+    projects_payload: list[dict] = []
+    for name, section in output.project_sections.items():
+        bullet_ids = section.bullet_fact_ids or []
+        bullets: list[dict] = []
+        for i, bullet_text in enumerate(section.bullets):
+            fact_ids = bullet_ids[i] if i < len(bullet_ids) else []
+            bullets.append(
+                {
+                    "text": bullet_text,
+                    "fact_ids": fact_ids,
+                }
+            )
+        projects_payload.append(
+            {
+                "project_name": name,
+                "description": section.description,
+                "bullets": bullets,
+                "narrative": section.narrative,
+            }
+        )
+
+    skills_payload = {
+        "languages": [],
+        "frameworks_libraries": [],
+        "tools_infrastructure": [],
+        "practices": [],
+    }
+
+    if output.skills_section:
+        for raw_line in output.skills_section.splitlines():
+            line = raw_line.strip()
+            if not line or ":" not in line:
+                continue
+            key, value = line.split(":", 1)
+            entries = [item.strip() for item in value.split(",") if item.strip()]
+            k = key.strip().casefold()
+            if "language" in k:
+                skills_payload["languages"].extend(entries)
+            elif "framework" in k or "librar" in k:
+                skills_payload["frameworks_libraries"].extend(entries)
+            elif "tool" in k or "infrastructure" in k:
+                skills_payload["tools_infrastructure"].extend(entries)
+            else:
+                skills_payload["practices"].extend(entries)
+
+    return {
+        "professional_summary": output.professional_summary,
+        "skills": skills_payload,
+        "projects": projects_payload,
+        "developer_profile": output.developer_profile,
+    }
+
+
 EXTRACTION_SYSTEM = (
     "You are a data extraction assistant. "
     "Extract structured facts from project data. "
-    "Output only the requested format with section markers. "
+    "Output only valid JSON for the requested schema. "
     "Reference only information present in the data."
 )
 
@@ -241,14 +360,15 @@ DRAFT_SYSTEM = (
     "You are a resume writer for software engineers. "
     "Write professional, achievement-focused resume content. "
     "Reference only technologies and facts provided. "
-    "Output clean plain text with section markers as written."
+    "Output only valid JSON for the requested schema."
 )
 
 POLISH_SYSTEM = (
     "You are a senior resume editor. "
     "Refine and polish resume content while preserving factual accuracy. "
     "Apply the user's feedback precisely. "
-    "Maintain a consistent, professional tone throughout."
+    "Maintain a consistent, professional tone throughout. "
+    "Output only valid JSON for the requested schema."
 )
 
 
@@ -259,24 +379,33 @@ def build_extraction_prompt(bundle: ProjectDataBundle) -> str:
     Extracts top 5 resume-worthy facts per project. Simple, single-task prompt.
     """
     context = bundle.to_prompt_context()
+    evidence_catalog = build_extraction_evidence_catalog(bundle)
+    evidence_lines = [f"- {k}: {v}" for k, v in evidence_catalog.items()]
+    evidence_block = (
+        "\n".join(evidence_lines) if evidence_lines else "- E1: no evidence entries"
+    )
 
-    return f"""Your task: extract the top resume-worthy facts from this project.
+    return f"""Your task: extract the top resume-worthy facts from this project as strict JSON.
 
-Output format:
-PROJECT_SUMMARY: [1 sentence describing what the project does]
-FACTS:
-- [fact 1: a specific technical achievement]
-- [fact 2: a specific technical achievement]
-- [fact 3: a specific technical achievement]
-- [fact 4: a specific technical achievement (if available)]
-- [fact 5: a specific technical achievement (if available)]
-ROLE: [1 sentence about the developer's specific contribution]
+Return exactly one JSON object with this shape:
+{{
+  "project_summary": "1 sentence describing what the project does",
+  "facts": [
+    {{"fact_id": "F1", "fact": "specific technical achievement", "evidence_keys": ["E1", "E4"]}},
+    {{"fact_id": "F2", "fact": "specific technical achievement", "evidence_keys": ["E2"]}}
+  ],
+  "role": "1 sentence about the developer contribution"
+}}
 
 Rules:
-- Each fact must reference a concrete feature, endpoint, class, or fix from the data.
-- Write 3-5 facts depending on how much data is available.
-- Facts should be short phrases, not full sentences.
-- The ROLE should mention contribution percentage if available.
+- Return 3-5 facts.
+- Use fact IDs F1, F2, F3, ... in order.
+- Each fact must reference concrete work from the evidence catalog.
+- Each fact must cite 1-3 evidence keys from the catalog.
+- Keep facts concise and factual.
+
+Evidence catalog:
+{evidence_block}
 
 Project data:
 {context}"""
@@ -295,11 +424,15 @@ def build_draft_prompt(
     facts_lines: list[str] = []
     for name, facts in raw_facts.items():
         facts_lines.append(f"PROJECT: {name}")
-        facts_lines.append(f"SUMMARY: {facts.summary}")
-        if facts.facts:
+        if facts.summary:
+            facts_lines.append(f"PROJECT_SUMMARY: {facts.summary}")
+        fact_items = _iter_fact_items(facts)
+        if fact_items:
             facts_lines.append("FACTS:")
-            for f in facts.facts:
-                facts_lines.append(f"- {f}")
+            for item in fact_items:
+                ev = ", ".join(item.evidence_keys[:3]) if item.evidence_keys else ""
+                ev_suffix = f" | evidence: {ev}" if ev else ""
+                facts_lines.append(f"- {item.fact_id}: {item.text}{ev_suffix}")
         if facts.role:
             facts_lines.append(f"ROLE: {facts.role}")
         facts_lines.append("")
@@ -312,38 +445,42 @@ def build_draft_prompt(
         f"Languages: {', '.join(portfolio.languages_used[:6])}",
     ]
     if portfolio.frameworks_used:
-        portfolio_lines.append(f"Frameworks: {', '.join(portfolio.frameworks_used[:8])}")
+        portfolio_lines.append(
+            f"Frameworks: {', '.join(portfolio.frameworks_used[:8])}"
+        )
     if portfolio.top_skills:
         portfolio_lines.append(f"Skills: {', '.join(portfolio.top_skills[:10])}")
     portfolio_text = "\n".join(portfolio_lines)
 
-    return f"""Your task: write a complete first-draft resume using the extracted project facts below.
+    return f"""Your task: write a complete first-draft resume as strict JSON.
 
-Output format:
-PROFESSIONAL_SUMMARY: [2-3 sentences summarizing the developer's experience]
-
-SKILLS:
-Languages: [comma-separated list]
-Frameworks & Libraries: [comma-separated list]
-Tools & Infrastructure: [comma-separated list if applicable]
-Practices: [comma-separated list if applicable]
-
-For each project, write:
-PROJECT: [name]
-DESCRIPTION: [1 sentence]
-BULLETS:
-- [bullet 1]
-- [bullet 2]
-- [bullet 3]
-NARRATIVE: [1 sentence about contribution]
-
-DEVELOPER_PROFILE: [2-3 sentences about the developer's strengths]
+Return exactly one JSON object with this shape:
+{{
+  "professional_summary": "2-3 sentences",
+  "skills": {{
+    "languages": ["Python"],
+    "frameworks_libraries": ["FastAPI"],
+    "tools_infrastructure": ["Docker"],
+    "practices": ["Testing"]
+  }},
+  "projects": [
+    {{
+      "project_name": "project name",
+      "description": "1 sentence",
+      "bullets": [
+        {{"text": "achievement bullet", "fact_ids": ["F1", "F2"]}}
+      ],
+      "narrative": "1 sentence about contribution"
+    }}
+  ],
+  "developer_profile": "2-3 sentences"
+}}
 
 Rules:
-- Use the extracted facts as the basis for each project section.
-- Write in third person implied (no "I" or "they").
-- Each bullet should reference a specific technical achievement.
-- Name the exact technologies used.
+- Use only provided project facts.
+- Each project bullet must cite at least one fact_id from that project.
+- Use exact project names from the input.
+- Keep tone professional and specific.
 
 Portfolio context:
 {portfolio_text}
@@ -351,7 +488,7 @@ Portfolio context:
 Extracted project facts:
 {facts_text}
 
-Write the complete resume draft now:"""
+Return JSON now:"""
 
 
 def build_polish_prompt(
@@ -363,33 +500,10 @@ def build_polish_prompt(
 
     Takes the draft resume and user feedback to produce the final version.
     """
-    # Format the draft sections
-    draft_lines: list[str] = []
-
-    if draft_output.professional_summary:
-        draft_lines.append(f"PROFESSIONAL_SUMMARY: {draft_output.professional_summary}")
-        draft_lines.append("")
-
-    if draft_output.skills_section:
-        draft_lines.append(f"SKILLS:\n{draft_output.skills_section}")
-        draft_lines.append("")
-
-    for name, section in draft_output.project_sections.items():
-        draft_lines.append(f"PROJECT: {name}")
-        if section.description:
-            draft_lines.append(f"DESCRIPTION: {section.description}")
-        if section.bullets:
-            draft_lines.append("BULLETS:")
-            for b in section.bullets:
-                draft_lines.append(f"- {b}")
-        if section.narrative:
-            draft_lines.append(f"NARRATIVE: {section.narrative}")
-        draft_lines.append("")
-
-    if draft_output.developer_profile:
-        draft_lines.append(f"DEVELOPER_PROFILE: {draft_output.developer_profile}")
-
-    draft_text = "\n".join(draft_lines)
+    draft_text = json.dumps(
+        _resume_output_to_json_payload(draft_output),
+        indent=2,
+    )
 
     # Format user feedback
     feedback_lines: list[str] = []
@@ -410,29 +524,34 @@ def build_polish_prompt(
         for removal in feedback.removals:
             feedback_lines.append(f"  - {removal}")
 
-    feedback_text = "\n".join(feedback_lines) if feedback_lines else "No specific feedback provided. Polish for clarity and consistency."
+    feedback_text = (
+        "\n".join(feedback_lines)
+        if feedback_lines
+        else "No specific feedback provided. Polish for clarity and consistency."
+    )
 
-    return f"""Your task: polish this resume draft, applying the user's feedback.
+    return f"""Your task: polish this structured resume draft while preserving factual grounding.
 
-Output the polished resume in the same format as the draft:
-PROFESSIONAL_SUMMARY: [polished text]
-SKILLS: [organized skills]
-PROJECT: [name]
-DESCRIPTION: [polished text]
-BULLETS: [polished bullets]
-NARRATIVE: [polished text]
-DEVELOPER_PROFILE: [polished text]
+Return exactly one JSON object with the same schema as the draft:
+{{
+  "professional_summary": "...",
+  "skills": {{"languages": [], "frameworks_libraries": [], "tools_infrastructure": [], "practices": []}},
+  "projects": [
+    {{"project_name": "...", "description": "...", "bullets": [{{"text": "...", "fact_ids": ["F1"]}}], "narrative": "..."}}
+  ],
+  "developer_profile": "..."
+}}
 
 Rules:
-- Preserve all factual claims from the draft unless the user asked to remove them.
-- Apply the user's corrections and tone preferences.
-- Improve prose quality, flow, and consistency.
-- Keep the same section structure.
+- Preserve factual claims unless user feedback requests removal.
+- Keep every bullet tied to at least one valid fact_id.
+- Apply user tone and correction requests.
+- Improve clarity and flow while keeping structure stable.
 
 User feedback:
 {feedback_text}
 
-Draft resume:
+Draft resume JSON:
 {draft_text}
 
-Write the polished resume now:"""
+Return polished JSON now:"""

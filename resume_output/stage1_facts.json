@@ -1,0 +1,90 @@
+{
+  "go-task-runner": {
+    "summary": "A web API built with Go to manage task scheduling and execution.",
+    "facts": [
+      "Added 120 lines to the codebase",
+      "Implemented JSON result export functionality",
+      "Integrated dry-run testing capability",
+      "Maintained 100% coverage across 4 modules",
+      "Achieved 100% conventional commit quality"
+    ],
+    "role": "Developer contributed 30% to core functionality"
+  },
+  "personal-portfolio-site": {
+    "summary": "A lightweight static portfolio showcasing projects, skills, and coursework.",
+    "facts": [
+      "Added 110 lines and deleted 1 line across 6 files over 21 days",
+      "Achieved 100% contribution",
+      "Implemented hero CTA and project grid",
+      "Enhanced accessibility with keyboard navigation",
+      "Refactored footer slot and improved readability"
+    ],
+    "role": "Developer contributed 100% to this project"
+  },
+  "sensor-fleet-backend": {
+    "summary": "A Web API for managing sensor data with robust health and monitoring features.",
+    "facts": [
+      "Added uptime and calibration endpoints",
+      "Implemented alerts endpoint for threshold-based notifications",
+      "Enhanced sensor reading handling and in-memory storage",
+      "Comprehensive testing with 7 test functions",
+      "100% coverage of 4/4 modules across 210 days"
+    ],
+    "role": "Developer contributed 43% to core functionality"
+  },
+  "infra-terraform": {
+    "summary": "This project manages Terraform configurations for infrastructure deployment.",
+    "facts": [
+      "Added 111 lines and deleted 20 lines across 6 files",
+      "Active span: 876 days with 100% module coverage",
+      "Commit quality: 100% conventional, 3 categories",
+      "Contribution: 30% by developer",
+      "Implemented cost center tagging and logging bucket"
+    ],
+    "role": "Developer (contributing 30%)"
+  },
+  "algorithms-toolkit": {
+    "summary": "A CLI toolkit for algorithm implementation and testing.",
+    "facts": [
+      "Added 162 lines to codebase",
+      "Implemented binary search and rotated list utilities",
+      "Covered Dijkstra, quicksort, mergesort, and more",
+      "Includes comprehensive test suite (10 tests)",
+      "CLI examples available for BFS, DFS, and graph traversal",
+      "Designed for interview prep with concise functions"
+    ],
+    "role": "Developer contributed 100% to core functionality and testing"
+  },
+  "java-chat-service": {
+    "summary": "A Java-based chat service with real-time messaging capabilities.",
+    "facts": [
+      "Implemented search, JSON, and message count features",
+      "Integrated with in-memory storage for messages",
+      "Achieved 30% developer contribution",
+      "Maintained 100% commit quality standards",
+      "Reduced file changes to zero over 7 days"
+    ],
+    "role": "Developer (30% contribution)"
+  },
+  "campus-navigation-api": {
+    "summary": "A TypeScript/Express API for campus navigation and schedule-aware routing.",
+    "facts": [
+      "Added 194 lines to the codebase",
+      "Implemented health, building, and route endpoints",
+      "Achieved 36% developer contribution",
+      "Supports fallback routes and detailed documentation"
+    ],
+    "role": "Developer (36% contribution)"
+  },
+  "ml-lab-notebooks": {
+    "summary": "A Python library for numerical computing, data analysis, machine learning, and testing.",
+    "facts": [
+      "Added rooms_per_area heuristic",
+      "Implemented logistic regression experiment with sklearn",
+      "Integrated z-score utility and cross-validation TODO",
+      "Enhanced regression baseline documentation",
+      "Achieved 32% contribution in development"
+    ],
+    "role": "Developer contributed 32% to this project"
+  }
+}

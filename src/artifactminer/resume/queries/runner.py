@@ -14,6 +14,7 @@ import re
 from typing import Callable, Optional
 
 from ..models import (
+    EvidenceLinkedFact,
     ProjectDataBundle,
     PortfolioDataBundle,
     ProjectSection,
@@ -32,9 +33,11 @@ from .prompts import (
     build_skills_prompt,
     build_profile_prompt,
     build_extraction_prompt,
+    build_extraction_evidence_catalog,
     build_draft_prompt,
     build_polish_prompt,
 )
+from .schemas import Stage1ExtractionResponse, StageDraftResponse
 
 log = logging.getLogger(__name__)
 
@@ -119,7 +122,9 @@ def _query(
 
     # Merge per-model defaults with explicit overrides
     sampling = get_sampling_params(model)
-    effective_temp = temperature if temperature is not None else sampling.get("temperature", 0.2)
+    effective_temp = (
+        temperature if temperature is not None else sampling.get("temperature", 0.2)
+    )
     effective_top_p = top_p if top_p is not None else sampling.get("top_p")
     effective_rep_pen = (
         repetition_penalty
@@ -136,6 +141,223 @@ def _query(
         top_p=effective_top_p,
         repetition_penalty=effective_rep_pen,
     )
+
+
+def _query_structured(
+    prompt: str,
+    model: str,
+    system: str,
+    schema: type,
+    *,
+    temperature: float = 0.1,
+) -> object:
+    """Execute a structured JSON query using constrained decoding."""
+    from ..llm_client import query_llm
+
+    return query_llm(
+        prompt=prompt,
+        schema=schema,
+        model=model,
+        system=system,
+        temperature=temperature,
+    )
+
+
+def _should_use_structured_json(model: str) -> bool:
+    """Gate structured JSON mode by local model availability."""
+    from ..llm_client import check_llm_available
+
+    return check_llm_available(model)
+
+
+def _normalize_fact_id(raw: str, fallback_index: int) -> str:
+    """Normalize fact ids to F<N> shape."""
+    text = (raw or "").strip().upper()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits:
+        return f"F{int(digits)}"
+    return f"F{fallback_index}"
+
+
+def _format_skills_from_structured(skills: object) -> str:
+    """Render structured skills payload into stable text categories."""
+    if not hasattr(skills, "languages"):
+        return ""
+
+    lines: list[str] = []
+    languages = getattr(skills, "languages", []) or []
+    frameworks = getattr(skills, "frameworks_libraries", []) or []
+    tools = getattr(skills, "tools_infrastructure", []) or []
+    practices = getattr(skills, "practices", []) or []
+
+    if languages:
+        lines.append(f"Languages: {', '.join(languages)}")
+    if frameworks:
+        lines.append(f"Frameworks & Libraries: {', '.join(frameworks)}")
+    if tools:
+        lines.append(f"Tools & Infrastructure: {', '.join(tools)}")
+    if practices:
+        lines.append(f"Practices: {', '.join(practices)}")
+
+    return "\n".join(lines)
+
+
+def _fact_pool_by_project(
+    raw_facts: dict[str, RawProjectFacts],
+) -> dict[str, dict[str, str]]:
+    """Build {project -> {fact_id -> fact_text}} with backwards compatibility."""
+    pool: dict[str, dict[str, str]] = {}
+    for project_name, facts in raw_facts.items():
+        fact_map: dict[str, str] = {}
+        if facts.fact_items:
+            for idx, item in enumerate(facts.fact_items, start=1):
+                fid = _normalize_fact_id(item.fact_id, idx)
+                text = _clean_inline_text(item.text)
+                if text:
+                    fact_map[fid] = text
+        if not fact_map and facts.facts:
+            for idx, text in enumerate(facts.facts, start=1):
+                cleaned = _clean_inline_text(text)
+                if cleaned:
+                    fact_map[f"F{idx}"] = cleaned
+        pool[project_name] = fact_map
+    return pool
+
+
+def _fact_to_repair_bullet(fact_text: str) -> str:
+    """Convert a short fact into a conservative resume bullet sentence."""
+    cleaned = _clean_inline_text(fact_text)
+    if not cleaned:
+        return ""
+    if cleaned[-1] in ".!?":
+        return cleaned
+    return f"{cleaned}."
+
+
+def _synthesize_sections_from_raw_facts(
+    raw_facts: dict[str, RawProjectFacts],
+) -> dict[str, ProjectSection]:
+    """Create minimal project sections from Stage-1 facts when generation is sparse."""
+    sections: dict[str, ProjectSection] = {}
+    for project_name, fact_map in _fact_pool_by_project(raw_facts).items():
+        if not fact_map:
+            continue
+        fact_ids = list(fact_map.keys())
+        bullets = [_fact_to_repair_bullet(fact_map[fid]) for fid in fact_ids[:3]]
+        bullet_fact_ids = [[fid] for fid in fact_ids[:3]]
+
+        source = raw_facts.get(project_name)
+        description = _clean_inline_text(source.summary if source else "")
+        if not description:
+            description = _clean_inline_text(bullets[0])
+        narrative = _clean_inline_text(source.role if source else "")
+
+        sections[project_name] = ProjectSection(
+            description=description,
+            bullets=bullets,
+            bullet_fact_ids=bullet_fact_ids,
+            narrative=narrative,
+        )
+
+    return sections
+
+
+def _apply_citation_gate(
+    output: ResumeOutput,
+    raw_facts: dict[str, RawProjectFacts],
+) -> dict[str, float | int]:
+    """Validate bullet citations and auto-repair unsupported bullets."""
+    fact_pool = _fact_pool_by_project(raw_facts)
+
+    total_bullets = 0
+    valid_bullets = 0
+    repaired_bullets = 0
+    unresolved_bullets = 0
+
+    all_fact_ids: set[tuple[str, str]] = set()
+    cited_fact_ids: set[tuple[str, str]] = set()
+
+    for project_name, facts in fact_pool.items():
+        for fact_id in facts:
+            all_fact_ids.add((project_name, fact_id))
+
+    for project_name, section in output.project_sections.items():
+        facts = fact_pool.get(project_name, {})
+        available_fact_ids = list(facts.keys())
+        used_fact_ids: set[str] = set()
+
+        bullet_ids = list(section.bullet_fact_ids or [])
+        while len(bullet_ids) < len(section.bullets):
+            bullet_ids.append([])
+
+        repaired_texts: list[str] = []
+        repaired_ids: list[list[str]] = []
+
+        for idx, bullet in enumerate(section.bullets):
+            total_bullets += 1
+            raw_ids = bullet_ids[idx]
+            normalized_ids = [
+                _normalize_fact_id(fid, i + 1)
+                for i, fid in enumerate(raw_ids)
+                if str(fid).strip()
+            ]
+            valid_ids = [fid for fid in normalized_ids if fid in facts]
+
+            if valid_ids:
+                valid_bullets += 1
+                repaired_texts.append(_clean_inline_text(bullet))
+                repaired_ids.append(valid_ids)
+                for fid in valid_ids:
+                    used_fact_ids.add(fid)
+                    cited_fact_ids.add((project_name, fid))
+                continue
+
+            # Hybrid repair strategy:
+            # 1) Prefer an unused fact, 2) otherwise reuse the first available.
+            chosen_fact_id: str | None = None
+            for fid in available_fact_ids:
+                if fid not in used_fact_ids:
+                    chosen_fact_id = fid
+                    break
+            if chosen_fact_id is None and available_fact_ids:
+                chosen_fact_id = available_fact_ids[0]
+
+            if chosen_fact_id:
+                repaired_texts.append(_fact_to_repair_bullet(facts[chosen_fact_id]))
+                repaired_ids.append([chosen_fact_id])
+                valid_bullets += 1
+                repaired_bullets += 1
+                used_fact_ids.add(chosen_fact_id)
+                cited_fact_ids.add((project_name, chosen_fact_id))
+            else:
+                repaired_texts.append(_clean_inline_text(bullet))
+                repaired_ids.append([])
+                unresolved_bullets += 1
+
+        # If project has no bullets, synthesize up to 3 from facts.
+        if not repaired_texts and available_fact_ids:
+            for fid in available_fact_ids[:3]:
+                total_bullets += 1
+                valid_bullets += 1
+                repaired_bullets += 1
+                repaired_texts.append(_fact_to_repair_bullet(facts[fid]))
+                repaired_ids.append([fid])
+                cited_fact_ids.add((project_name, fid))
+
+        section.bullets = [text for text in repaired_texts if text]
+        section.bullet_fact_ids = repaired_ids[: len(section.bullets)]
+
+    citation_precision = (valid_bullets / total_bullets) if total_bullets else 0.0
+    fact_coverage = len(cited_fact_ids) / len(all_fact_ids) if all_fact_ids else 0.0
+
+    return {
+        "total_bullets": total_bullets,
+        "valid_bullets": valid_bullets,
+        "repaired_bullets": repaired_bullets,
+        "unresolved_bullets": unresolved_bullets,
+        "citation_precision": round(citation_precision, 4),
+        "fact_coverage": round(fact_coverage, 4),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -166,11 +388,13 @@ def _parse_project_response(text: str) -> ProjectSection:
             found_structured_markers = True
             current_key = marker.group(1).lower()
             tail = marker.group(2).strip()
-            if tail:
-                parsed_sections[current_key].append(tail)
+            if tail and current_key in parsed_sections:
+                key = str(current_key)
+                parsed_sections[key].append(tail)
             continue
-        if current_key:
-            parsed_sections[current_key].append(line)
+        if current_key in parsed_sections:
+            key = str(current_key)
+            parsed_sections[key].append(line)
 
     if found_structured_markers:
         section.description = _clean_text_block(
@@ -302,10 +526,13 @@ def _normalize_skills_section(raw: str, portfolio: PortfolioDataBundle) -> str:
         header = _SKILLS_HEADER_RE.match(line)
         if header:
             current_category = _normalize_category_name(header.group(1))
-            categories[current_category].extend(_split_skills(header.group(2)))
+            if current_category in categories:
+                categories[current_category].extend(_split_skills(header.group(2)))
             continue
 
-        if current_category and (line.startswith(("-", "*", "•")) or "," in line):
+        if current_category in categories and (
+            line.startswith(("-", "*", "•")) or "," in line
+        ):
             categories[current_category].extend(_split_skills(line))
 
     # Fill gaps with deterministic portfolio data
@@ -658,6 +885,68 @@ def run_extraction_query(
         progress(f"  [Stage 1] Extracting facts for {bundle.project_name}...")
 
     prompt = build_extraction_prompt(bundle)
+    evidence_catalog = build_extraction_evidence_catalog(bundle)
+
+    # Preferred path: strict JSON schema.
+    if _should_use_structured_json(model):
+        try:
+            parsed = _query_structured(
+                prompt,
+                model,
+                EXTRACTION_SYSTEM,
+                Stage1ExtractionResponse,
+                temperature=0.1,
+            )
+            if not isinstance(parsed, Stage1ExtractionResponse):
+                raise RuntimeError("Structured extraction returned invalid type")
+
+            fact_items: list[EvidenceLinkedFact] = []
+            fallback_evidence = (
+                [next(iter(evidence_catalog))] if evidence_catalog else []
+            )
+
+            for idx, item in enumerate(parsed.facts, start=1):
+                fact_text = _clean_inline_text(item.fact)
+                if not fact_text:
+                    continue
+                fact_id = _normalize_fact_id(item.fact_id, idx)
+                evidence_keys = [
+                    str(key).strip()
+                    for key in item.evidence_keys
+                    if str(key).strip() in evidence_catalog
+                ]
+                if not evidence_keys:
+                    evidence_keys = fallback_evidence
+
+                fact_items.append(
+                    EvidenceLinkedFact(
+                        fact_id=fact_id,
+                        text=fact_text,
+                        evidence_keys=evidence_keys,
+                    )
+                )
+
+            if not fact_items:
+                raise RuntimeError("Structured extraction produced no usable facts")
+
+            output = RawProjectFacts(
+                project_name=bundle.project_name,
+                summary=_clean_inline_text(parsed.project_summary),
+                facts=[item.text for item in fact_items],
+                fact_items=fact_items,
+                evidence_catalog=evidence_catalog,
+                role=_clean_inline_text(parsed.role),
+                source_format="json",
+            )
+            return output
+        except Exception as exc:
+            log.warning(
+                "Structured stage-1 extraction failed for %s (%s). Falling back to text parser.",
+                bundle.project_name,
+                exc,
+            )
+
+    # Fallback path: legacy text parser.
     response = _query(
         prompt,
         model,
@@ -670,7 +959,22 @@ def run_extraction_query(
             f"LLM returned empty response for extraction of {bundle.project_name}"
         )
 
-    return _parse_extraction_response(response, bundle.project_name)
+    parsed_text = _parse_extraction_response(response, bundle.project_name)
+    parsed_text.evidence_catalog = evidence_catalog
+    parsed_text.source_format = "text"
+
+    fallback_evidence = [next(iter(evidence_catalog))] if evidence_catalog else []
+    parsed_text.fact_items = [
+        EvidenceLinkedFact(
+            fact_id=f"F{idx}",
+            text=_clean_inline_text(text),
+            evidence_keys=fallback_evidence,
+        )
+        for idx, text in enumerate(parsed_text.facts, start=1)
+        if _clean_inline_text(text)
+    ]
+
+    return parsed_text
 
 
 def run_draft_queries(
@@ -689,6 +993,96 @@ def run_draft_queries(
         progress("[Stage 2] Generating draft resume...")
 
     prompt = build_draft_prompt(raw_facts, portfolio)
+
+    # Preferred path: strict JSON schema.
+    if _should_use_structured_json(model):
+        try:
+            parsed = _query_structured(
+                prompt,
+                model,
+                DRAFT_SYSTEM,
+                StageDraftResponse,
+                temperature=0.2,
+            )
+            if not isinstance(parsed, StageDraftResponse):
+                raise RuntimeError("Structured draft returned invalid type")
+
+            output = ResumeOutput(stage="draft")
+            output.professional_summary = _clean_summary_or_profile(
+                parsed.professional_summary
+            )
+            output.skills_section = _format_skills_from_structured(parsed.skills)
+            output.developer_profile = _clean_summary_or_profile(
+                parsed.developer_profile
+            )
+
+            # Keep project names aligned with Stage-1 keys when possible.
+            canonical_names = {name.casefold(): name for name in raw_facts}
+            for project in parsed.projects:
+                name = project.project_name.strip()
+                canonical = canonical_names.get(name.casefold(), name)
+                bullets: list[str] = []
+                bullet_fact_ids: list[list[str]] = []
+                for bullet in project.bullets:
+                    text = _clean_inline_text(bullet.text)
+                    if not text:
+                        continue
+                    bullets.append(text)
+                    bullet_fact_ids.append(
+                        [
+                            _normalize_fact_id(fid, i + 1)
+                            for i, fid in enumerate(bullet.fact_ids)
+                            if str(fid).strip()
+                        ]
+                    )
+
+                output.project_sections[canonical] = ProjectSection(
+                    description=_clean_inline_text(project.description),
+                    bullets=bullets,
+                    bullet_fact_ids=bullet_fact_ids,
+                    narrative=_clean_inline_text(project.narrative),
+                )
+
+            output.portfolio_data = portfolio
+            output.raw_project_facts = raw_facts
+            output.quality_metrics["schema"] = {
+                "draft_json": 1,
+                "draft_text_fallback": 0,
+            }
+
+            if not output.project_sections:
+                output.project_sections = _synthesize_sections_from_raw_facts(raw_facts)
+            if not output.professional_summary:
+                output.professional_summary = (
+                    f"Software developer with experience across {portfolio.total_projects} projects "
+                    f"using {', '.join(portfolio.languages_used[:3])}."
+                )
+            if not output.developer_profile:
+                output.developer_profile = (
+                    "Builds practical systems with a strong implementation focus "
+                    "across backend, tooling, and delivery workflows."
+                )
+            if not output.skills_section:
+                output.skills_section = _normalize_skills_section("", portfolio)
+
+            # Citation gate: validate and auto-repair unsupported bullets.
+            citation_metrics = _apply_citation_gate(output, raw_facts)
+            output.quality_metrics["citations"] = citation_metrics
+
+            if output.skills_section and portfolio:
+                output.skills_section = _normalize_skills_section(
+                    output.skills_section,
+                    portfolio,
+                )
+
+            return output
+        except Exception as exc:
+            log.warning(
+                "Structured stage-2 draft failed (%s). Falling back to text parser.",
+                exc,
+            )
+
+    # Fallback path: legacy text parser.
     response = _query(
         prompt,
         model,
@@ -702,6 +1096,7 @@ def run_draft_queries(
     output = _parse_draft_response(response)
     output.portfolio_data = portfolio
     output.raw_project_facts = raw_facts
+    output.quality_metrics["schema"] = {"draft_json": 0, "draft_text_fallback": 1}
 
     # Fallback: if parsing didn't find project sections, try single-project parsing
     if not output.project_sections:
@@ -710,12 +1105,29 @@ def run_draft_queries(
             for name in raw_facts:
                 output.project_sections[name] = section
                 break
+    if not output.project_sections:
+        output.project_sections = _synthesize_sections_from_raw_facts(raw_facts)
+    if not output.professional_summary:
+        output.professional_summary = (
+            f"Software developer with experience across {portfolio.total_projects} projects "
+            f"using {', '.join(portfolio.languages_used[:3])}."
+        )
+    if not output.developer_profile:
+        output.developer_profile = (
+            "Builds practical systems with a strong implementation focus "
+            "across backend, tooling, and delivery workflows."
+        )
+    if not output.skills_section:
+        output.skills_section = _normalize_skills_section("", portfolio)
 
     # Normalize skills section
     if output.skills_section and portfolio:
         output.skills_section = _normalize_skills_section(
             output.skills_section, portfolio
         )
+
+    citation_metrics = _apply_citation_gate(output, raw_facts)
+    output.quality_metrics["citations"] = citation_metrics
 
     return output
 
@@ -736,6 +1148,108 @@ def run_polish_query(
         progress("[Stage 3] Polishing resume with feedback...")
 
     prompt = build_polish_prompt(draft_output, feedback)
+    raw_facts = draft_output.raw_project_facts or {}
+
+    # Preferred path: strict JSON schema.
+    if _should_use_structured_json(model):
+        try:
+            parsed = _query_structured(
+                prompt,
+                model,
+                POLISH_SYSTEM,
+                StageDraftResponse,
+                temperature=0.2,
+            )
+            if not isinstance(parsed, StageDraftResponse):
+                raise RuntimeError("Structured polish returned invalid type")
+
+            output = ResumeOutput(stage="polish")
+            output.professional_summary = _clean_summary_or_profile(
+                parsed.professional_summary
+            )
+            output.skills_section = _format_skills_from_structured(parsed.skills)
+            output.developer_profile = _clean_summary_or_profile(
+                parsed.developer_profile
+            )
+
+            canonical_names = {
+                name.casefold(): name for name in draft_output.project_sections
+            }
+            for project in parsed.projects:
+                name = project.project_name.strip()
+                canonical = canonical_names.get(name.casefold(), name)
+                bullets: list[str] = []
+                bullet_fact_ids: list[list[str]] = []
+                for bullet in project.bullets:
+                    text = _clean_inline_text(bullet.text)
+                    if not text:
+                        continue
+                    bullets.append(text)
+                    bullet_fact_ids.append(
+                        [
+                            _normalize_fact_id(fid, i + 1)
+                            for i, fid in enumerate(bullet.fact_ids)
+                            if str(fid).strip()
+                        ]
+                    )
+
+                output.project_sections[canonical] = ProjectSection(
+                    description=_clean_inline_text(project.description),
+                    bullets=bullets,
+                    bullet_fact_ids=bullet_fact_ids,
+                    narrative=_clean_inline_text(project.narrative),
+                )
+
+            output.portfolio_data = draft_output.portfolio_data
+            output.raw_project_facts = raw_facts
+            output.quality_metrics["schema"] = {
+                "polish_json": 1,
+                "polish_text_fallback": 0,
+            }
+
+            # Preserve draft sections if polish omitted them
+            if not output.professional_summary and draft_output.professional_summary:
+                output.professional_summary = draft_output.professional_summary
+            if not output.skills_section and draft_output.skills_section:
+                output.skills_section = draft_output.skills_section
+            if not output.developer_profile and draft_output.developer_profile:
+                output.developer_profile = draft_output.developer_profile
+            if not output.project_sections and draft_output.project_sections:
+                output.project_sections = dict(draft_output.project_sections)
+            if not output.project_sections:
+                output.project_sections = _synthesize_sections_from_raw_facts(raw_facts)
+            if not output.professional_summary and output.portfolio_data:
+                output.professional_summary = (
+                    f"Software developer with experience across {output.portfolio_data.total_projects} projects "
+                    f"using {', '.join(output.portfolio_data.languages_used[:3])}."
+                )
+            if not output.developer_profile:
+                output.developer_profile = (
+                    "Builds practical systems with a strong implementation focus "
+                    "across backend, tooling, and delivery workflows."
+                )
+            if not output.skills_section and output.portfolio_data:
+                output.skills_section = _normalize_skills_section(
+                    "",
+                    output.portfolio_data,
+                )
+
+            if output.skills_section and output.portfolio_data:
+                output.skills_section = _normalize_skills_section(
+                    output.skills_section,
+                    output.portfolio_data,
+                )
+
+            citation_metrics = _apply_citation_gate(output, raw_facts)
+            output.quality_metrics["citations"] = citation_metrics
+            return output
+        except Exception as exc:
+            log.warning(
+                "Structured stage-3 polish failed (%s). Falling back to text parser.",
+                exc,
+            )
+
+    # Fallback path: legacy text parser.
     response = _query(
         prompt,
         model,
@@ -747,12 +1261,19 @@ def run_polish_query(
         # Fall back to the draft if polish fails
         log.warning("Polish stage returned empty response, using draft")
         draft_output.stage = "polish"
+        draft_output.quality_metrics.setdefault("schema", {})
+        draft_output.quality_metrics["schema"].update(
+            {"polish_json": 0, "polish_text_fallback": 1}
+        )
+        citation_metrics = _apply_citation_gate(draft_output, raw_facts)
+        draft_output.quality_metrics["citations"] = citation_metrics
         return draft_output
 
     output = _parse_draft_response(response)
     output.stage = "polish"
     output.portfolio_data = draft_output.portfolio_data
-    output.raw_project_facts = draft_output.raw_project_facts
+    output.raw_project_facts = raw_facts
+    output.quality_metrics["schema"] = {"polish_json": 0, "polish_text_fallback": 1}
 
     # Preserve draft sections if polish didn't produce them
     if not output.professional_summary and draft_output.professional_summary:
@@ -763,11 +1284,31 @@ def run_polish_query(
         output.developer_profile = draft_output.developer_profile
     if not output.project_sections and draft_output.project_sections:
         output.project_sections = dict(draft_output.project_sections)
+    if not output.project_sections:
+        output.project_sections = _synthesize_sections_from_raw_facts(raw_facts)
+    if not output.professional_summary and output.portfolio_data:
+        output.professional_summary = (
+            f"Software developer with experience across {output.portfolio_data.total_projects} projects "
+            f"using {', '.join(output.portfolio_data.languages_used[:3])}."
+        )
+    if not output.developer_profile:
+        output.developer_profile = (
+            "Builds practical systems with a strong implementation focus "
+            "across backend, tooling, and delivery workflows."
+        )
+    if not output.skills_section and output.portfolio_data:
+        output.skills_section = _normalize_skills_section(
+            "",
+            output.portfolio_data,
+        )
 
     # Normalize skills
     if output.skills_section and output.portfolio_data:
         output.skills_section = _normalize_skills_section(
             output.skills_section, output.portfolio_data
         )
+
+    citation_metrics = _apply_citation_gate(output, raw_facts)
+    output.quality_metrics["citations"] = citation_metrics
 
     return output

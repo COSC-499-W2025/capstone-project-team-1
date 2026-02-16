@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from artifactminer.resume.llm_client import query_llm_text
 
-DEFAULT_MODEL = "qwen3-1.7b"
+DEFAULT_MODEL = "qwen3-1.7b-q8"
 
 
 def get_local_llm_response(prompt: str, model: str = DEFAULT_MODEL) -> str:

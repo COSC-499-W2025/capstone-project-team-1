@@ -35,8 +35,8 @@ class CommitGroup:
 class CodeConstructs:
     """Concrete code constructs found via regex scanning."""
 
-    routes: List[str] = field(default_factory=list)       # e.g. "GET /api/users"
-    classes: List[str] = field(default_factory=list)       # e.g. "UserService"
+    routes: List[str] = field(default_factory=list)  # e.g. "GET /api/users"
+    classes: List[str] = field(default_factory=list)  # e.g. "UserService"
     test_functions: List[str] = field(default_factory=list)  # e.g. "test_login"
     key_functions: List[str] = field(default_factory=list)  # e.g. "authenticate"
 
@@ -47,6 +47,9 @@ class ProjectSection:
 
     description: str = ""
     bullets: List[str] = field(default_factory=list)
+    bullet_fact_ids: List[List[str]] = field(
+        default_factory=list
+    )  # one list per bullet
     narrative: str = ""
 
 
@@ -180,7 +183,11 @@ class ProjectDataBundle:
         """Normalize a commit message for dedup comparison."""
         text = msg.lower().strip()
         # Strip conventional commit prefix (feat: fix: etc.)
-        text = re.sub(r"^(feat|fix|refactor|test|docs|chore|style|perf|ci|build)(\(.+?\))?:\s*", "", text)
+        text = re.sub(
+            r"^(feat|fix|refactor|test|docs|chore|style|perf|ci|build)(\(.+?\))?:\s*",
+            "",
+            text,
+        )
         # Strip ticket numbers like PROJ-123, #456
         text = re.sub(r"(#\d+|\b[A-Z]+-\d+\b)", "", text)
         # Collapse whitespace
@@ -322,20 +329,34 @@ class RawProjectFacts:
     """Stage 1 output — structured facts extracted by LFM2.5-1.2B."""
 
     project_name: str = ""
-    summary: str = ""           # 1 sentence: what the project does
-    facts: List[str] = field(default_factory=list)   # 3-5 bullet facts
-    role: str = ""              # developer's specific contribution
+    summary: str = ""  # 1 sentence: what the project does
+    facts: List[str] = field(default_factory=list)  # 3-5 bullet facts
+    fact_items: List["EvidenceLinkedFact"] = field(default_factory=list)
+    evidence_catalog: Dict[str, str] = field(default_factory=dict)
+    role: str = ""  # developer's specific contribution
+    source_format: str = "text"  # "json" | "text"
+
+
+@dataclass
+class EvidenceLinkedFact:
+    """A Stage 1 fact tied to deterministic evidence keys."""
+
+    fact_id: str
+    text: str
+    evidence_keys: List[str] = field(default_factory=list)
 
 
 @dataclass
 class UserFeedback:
     """User corrections/preferences between draft and polish stages."""
 
-    section_edits: Dict[str, str] = field(default_factory=dict)  # section_name -> corrected text
-    additions: List[str] = field(default_factory=list)            # additional info to include
-    removals: List[str] = field(default_factory=list)             # claims to remove
-    tone: str = ""                                                 # e.g. "more technical", "formal"
-    general_notes: str = ""                                        # free-form instructions
+    section_edits: Dict[str, str] = field(
+        default_factory=dict
+    )  # section_name -> corrected text
+    additions: List[str] = field(default_factory=list)  # additional info to include
+    removals: List[str] = field(default_factory=list)  # claims to remove
+    tone: str = ""  # e.g. "more technical", "formal"
+    general_notes: str = ""  # free-form instructions
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +383,9 @@ class ResumeOutput:
     # Metadata
     portfolio_data: Optional[PortfolioDataBundle] = None
     model_used: str = ""
-    models_used: List[str] = field(default_factory=list)  # multi-stage tracks all models
+    models_used: List[str] = field(
+        default_factory=list
+    )  # multi-stage tracks all models
     generation_time_seconds: float = 0.0
     errors: List[str] = field(default_factory=list)
+    quality_metrics: Dict[str, Any] = field(default_factory=dict)

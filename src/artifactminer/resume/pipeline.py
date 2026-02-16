@@ -210,9 +210,13 @@ def _extract_project(
         first = getattr(user_stats, "first_commit", None)
         last = getattr(user_stats, "last_commit", None)
         if first:
-            bundle.first_commit = first.isoformat() if hasattr(first, "isoformat") else str(first)
+            bundle.first_commit = (
+                first.isoformat() if hasattr(first, "isoformat") else str(first)
+            )
         if last:
-            bundle.last_commit = last.isoformat() if hasattr(last, "isoformat") else str(last)
+            bundle.last_commit = (
+                last.isoformat() if hasattr(last, "isoformat") else str(last)
+            )
 
     return bundle
 
@@ -301,6 +305,7 @@ def generate_resume_v3(
 
     # Ensure model is available
     from .llm_client import ensure_model_available
+
     prog(f"Ensuring model '{llm_model}' is available...")
     ensure_model_available(llm_model)
 
@@ -316,7 +321,7 @@ def generate_resume_v3(
 
     bundles: List[ProjectDataBundle] = []
     for i, repo_path in enumerate(repos):
-        prog(f"Analyzing [{i+1}/{len(repos)}]: {repo_path.name}")
+        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
         try:
             bundle = _extract_project(
                 repo_path,
@@ -394,7 +399,76 @@ def generate_resume_v3(
 
 
 # ---------------------------------------------------------------------------
-# Multi-stage pipeline (Strategy B)
+# Multi-stage pipeline — stage-by-stage API
+# ---------------------------------------------------------------------------
+
+
+def extract_and_distill(
+    zip_path: str,
+    user_email: str,
+    *,
+    llm_model: str = "lfm2-2.6b-q8",
+    progress_callback: Optional[Callable[[str], None]] = None,
+) -> tuple[List[ProjectDataBundle], PortfolioDataBundle, list[str]]:
+    """
+    Run EXTRACT + DISTILL phases (deterministic, no LLM inference needed).
+
+    Returns (bundles, portfolio, errors).
+    """
+    errors: list[str] = []
+
+    def prog(msg: str) -> None:
+        if progress_callback:
+            progress_callback(msg)
+        log.info(msg)
+
+    prog(f"Extracting {zip_path}...")
+    extract_dir = extract_zip(zip_path)
+
+    repos = discover_git_repos(extract_dir)
+    if not repos:
+        raise RuntimeError("No git repositories found in ZIP")
+    prog(f"Found {len(repos)} repositories")
+
+    bundles: List[ProjectDataBundle] = []
+    for i, repo_path in enumerate(repos):
+        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
+        try:
+            bundle = _extract_project(
+                repo_path,
+                user_email,
+                llm_model=llm_model,
+                progress=prog,
+            )
+            bundles.append(bundle)
+        except Exception as e:
+            error_msg = f"Error analyzing {repo_path.name}: {e}"
+            prog(f"  ERROR: {error_msg}")
+            errors.append(error_msg)
+
+    if not bundles:
+        raise RuntimeError("No repositories could be analyzed")
+
+    portfolio = _build_portfolio(user_email, bundles)
+    prog(
+        f"Portfolio: {portfolio.total_projects} projects, "
+        f"{len(portfolio.top_skills)} skills"
+    )
+
+    # Distill contexts
+    prog("Distilling project contexts...")
+    for bundle in bundles:
+        bundle.distilled_context = distill_project_context(bundle)
+        prog(
+            f"  Distilled {bundle.project_name}: "
+            f"~{bundle.distilled_context.token_estimate} tokens"
+        )
+
+    return bundles, portfolio, errors
+
+
+# ---------------------------------------------------------------------------
+# Multi-stage pipeline — monolithic entry point (kept for non-interactive use)
 # ---------------------------------------------------------------------------
 
 
@@ -402,27 +476,27 @@ def generate_resume_v3_multistage(
     zip_path: str,
     user_email: str,
     *,
-    stage1_model: str = "lfm2.5-1.2b-q4",
+    stage1_model: str = "lfm2-2.6b-q8",
     stage2_model: str = "qwen3-1.7b-q8",
-    stage3_model: str = "qwen3-4b-q4",
+    stage3_model: str = "qwen3-1.7b-q8",
     user_feedback: Optional[UserFeedback] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> ResumeOutput:
     """
     Multi-stage pipeline entry point.
 
-    Stage 1: LFM2.5-1.2B extracts structured facts per project (with distilled context)
+    Stage 1: LFM2-2.6B extracts structured facts per project (with distilled context)
     Stage 2: Qwen3-1.7B generates a first-draft resume
-    Stage 3: Qwen3-4B polishes with user feedback (skipped if no feedback)
+    Stage 3: Qwen3-1.7B (or custom) polishes with user feedback (skipped if no feedback)
 
     Model switching uses _restart_server() (~4-6s per switch on M2).
 
     Args:
         zip_path: Path to ZIP file containing git repositories
         user_email: User's git email for attribution
-        stage1_model: Model for fact extraction (default: lfm2.5-1.2b-q4)
+        stage1_model: Model for fact extraction (default: lfm2-2.6b-q8)
         stage2_model: Model for draft generation (default: qwen3-1.7b-q8)
-        stage3_model: Model for polish/refinement (default: qwen3-4b-q4)
+        stage3_model: Model for polish/refinement (default: qwen3-1.7b-q8)
         user_feedback: Optional feedback to apply in Stage 3
         progress_callback: Optional callback for progress messages
 
@@ -432,6 +506,27 @@ def generate_resume_v3_multistage(
     start_time = datetime.now()
     errors: list[str] = []
     models_used: list[str] = []
+    quality_metrics: dict[str, dict] = {
+        "schema": {
+            "stage1_total": 0,
+            "stage1_json": 0,
+            "stage1_text_fallback": 0,
+            "stage2_json": 0,
+            "stage2_text_fallback": 0,
+            "stage3_json": 0,
+            "stage3_text_fallback": 0,
+        },
+        "citations": {},
+    }
+
+    def merge_quality_metrics(source: dict) -> None:
+        for key, value in source.items():
+            if isinstance(value, dict):
+                target = quality_metrics.setdefault(key, {})
+                if isinstance(target, dict):
+                    target.update(value)
+            else:
+                quality_metrics[key] = value
 
     def prog(msg: str) -> None:
         if progress_callback:
@@ -457,7 +552,7 @@ def generate_resume_v3_multistage(
 
     bundles: List[ProjectDataBundle] = []
     for i, repo_path in enumerate(repos):
-        prog(f"Analyzing [{i+1}/{len(repos)}]: {repo_path.name}")
+        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
         try:
             bundle = _extract_project(
                 repo_path,
@@ -489,19 +584,21 @@ def generate_resume_v3_multistage(
             f"~{bundle.distilled_context.token_estimate} tokens"
         )
 
-    # ── STAGE 1: EXTRACTION (LFM2.5-1.2B) ────────────────────────────
+    # ── STAGE 1: EXTRACTION (structured facts) ───────────────────────
     prog(f"Stage 1: Extracting facts with {stage1_model}...")
     models_used.append(stage1_model)
     raw_facts: dict[str, RawProjectFacts] = {}
 
     for bundle in bundles:
+        quality_metrics["schema"]["stage1_total"] += 1
         try:
             facts = run_extraction_query(bundle, stage1_model, progress=prog)
             raw_facts[bundle.project_name] = facts
-            prog(
-                f"  Extracted {bundle.project_name}: "
-                f"{len(facts.facts)} facts"
-            )
+            if facts.source_format == "json":
+                quality_metrics["schema"]["stage1_json"] += 1
+            else:
+                quality_metrics["schema"]["stage1_text_fallback"] += 1
+            prog(f"  Extracted {bundle.project_name}: {len(facts.facts)} facts")
         except Exception as e:
             prog(f"  Extraction failed for {bundle.project_name}: {e}")
             errors.append(f"Stage 1 failed for {bundle.project_name}: {e}")
@@ -517,6 +614,10 @@ def generate_resume_v3_multistage(
         draft_output = run_draft_queries(
             raw_facts, portfolio, stage2_model, progress=prog
         )
+        merge_quality_metrics(draft_output.quality_metrics)
+        schema = quality_metrics.get("schema", {})
+        schema["stage2_json"] = int(schema.get("draft_json", 0))
+        schema["stage2_text_fallback"] = int(schema.get("draft_text_fallback", 0))
         prog(
             f"  Draft generated: {len(draft_output.project_sections)} projects, "
             f"summary={'yes' if draft_output.professional_summary else 'no'}"
@@ -531,8 +632,9 @@ def generate_resume_v3_multistage(
             raw_project_facts=raw_facts,
             errors=errors,
         )
+        quality_metrics["schema"]["stage2_text_fallback"] = 1
 
-    # ── STAGE 3: POLISH (Qwen3-4B) ──────────────────────────────────
+    # ── STAGE 3: POLISH (feedback-guided refinement) ────────────────
     if user_feedback is not None:
         prog(f"Stage 3: Polishing with {stage3_model}...")
         models_used.append(stage3_model)
@@ -541,12 +643,17 @@ def generate_resume_v3_multistage(
             final_output = run_polish_query(
                 draft_output, user_feedback, stage3_model, progress=prog
             )
+            merge_quality_metrics(final_output.quality_metrics)
+            schema = quality_metrics.get("schema", {})
+            schema["stage3_json"] = int(schema.get("polish_json", 0))
+            schema["stage3_text_fallback"] = int(schema.get("polish_text_fallback", 0))
             prog("  Polish complete")
         except Exception as e:
             prog(f"Stage 3 polish failed, using draft: {e}")
             errors.append(f"Stage 3 polish failed: {e}")
             final_output = draft_output
             final_output.stage = "polish"
+            quality_metrics["schema"]["stage3_text_fallback"] = 1
     else:
         prog("Stage 3: Skipped (no user feedback provided)")
         final_output = draft_output
@@ -559,6 +666,7 @@ def generate_resume_v3_multistage(
     final_output.portfolio_data = portfolio
     final_output.raw_project_facts = raw_facts
     final_output.errors = errors
+    final_output.quality_metrics = quality_metrics
 
     prog(
         f"Multi-stage generation complete in {elapsed:.1f}s "

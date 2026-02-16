@@ -1,0 +1,31 @@
+{
+  "stage": "polish",
+  "generation_time_seconds": 346.185927,
+  "models_used": [
+    "lfm2-2.6b-q8",
+    "qwen3-1.7b-q8",
+    "qwen3-1.7b-q8"
+  ],
+  "errors": [],
+  "schema": {
+    "stage1_total": 8,
+    "stage1_json": 8,
+    "stage1_text_fallback": 0,
+    "stage2_json": 1,
+    "stage2_text_fallback": 0,
+    "stage3_json": 1,
+    "stage3_text_fallback": 0,
+    "draft_json": 1,
+    "draft_text_fallback": 0,
+    "polish_json": 1,
+    "polish_text_fallback": 0
+  },
+  "citations": {
+    "total_bullets": 24,
+    "valid_bullets": 24,
+    "repaired_bullets": 0,
+    "unresolved_bullets": 0,
+    "citation_precision": 1.0,
+    "fact_coverage": 0.8889
+  }
+}

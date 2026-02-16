@@ -25,6 +25,7 @@ from artifactminer.resume.queries.prompts import (
     build_polish_prompt,
 )
 from artifactminer.resume.queries.runner import (
+    _apply_citation_gate,
     _parse_draft_response,
     _parse_extraction_response,
     run_draft_queries,
@@ -136,6 +137,15 @@ def _make_draft_output() -> ResumeOutput:
     )
 
 
+@pytest.fixture(autouse=True)
+def _disable_structured_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep unit tests deterministic by forcing legacy text parser mode."""
+    monkeypatch.setattr(
+        "artifactminer.resume.queries.runner._should_use_structured_json",
+        lambda _model: False,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Model types
 # ---------------------------------------------------------------------------
@@ -192,11 +202,13 @@ class TestExtractionPrompt:
     """Tests for Stage 1 extraction prompt."""
 
     def test_extraction_prompt_contains_format(self) -> None:
-        """Extraction prompt should specify PROJECT_SUMMARY/FACTS/ROLE format."""
+        """Extraction prompt should specify JSON schema fields."""
         prompt = build_extraction_prompt(_make_bundle())
-        assert "PROJECT_SUMMARY:" in prompt
-        assert "FACTS:" in prompt
-        assert "ROLE:" in prompt
+        assert '"project_summary"' in prompt
+        assert '"facts"' in prompt
+        assert '"role"' in prompt
+        assert '"fact_id"' in prompt
+        assert '"evidence_keys"' in prompt
 
     def test_extraction_prompt_contains_project_data(self) -> None:
         """Extraction prompt should include project context."""
@@ -207,7 +219,7 @@ class TestExtractionPrompt:
     def test_extraction_prompt_format_before_data(self) -> None:
         """Output format should appear before project data."""
         prompt = build_extraction_prompt(_make_bundle())
-        format_pos = prompt.index("PROJECT_SUMMARY:")
+        format_pos = prompt.index('"project_summary"')
         data_pos = prompt.index("Project data:")
         assert format_pos < data_pos
 
@@ -257,13 +269,14 @@ class TestDraftPrompt:
     """Tests for Stage 2 draft prompt."""
 
     def test_draft_prompt_contains_format(self) -> None:
-        """Draft prompt should specify all resume sections."""
+        """Draft prompt should specify full JSON output contract."""
         prompt = build_draft_prompt(_make_raw_facts(), _make_portfolio())
-        assert "PROFESSIONAL_SUMMARY:" in prompt
-        assert "SKILLS:" in prompt
-        assert "DESCRIPTION:" in prompt
-        assert "BULLETS:" in prompt
-        assert "DEVELOPER_PROFILE:" in prompt
+        assert '"professional_summary"' in prompt
+        assert '"skills"' in prompt
+        assert '"project_name"' in prompt
+        assert '"bullets"' in prompt
+        assert '"developer_profile"' in prompt
+        assert '"fact_ids"' in prompt
 
     def test_draft_prompt_contains_extracted_facts(self) -> None:
         """Draft prompt should include the extracted facts."""
@@ -506,7 +519,9 @@ class TestRunPolishQuery:
         assert output.professional_summary == draft.professional_summary
 
     @patch("artifactminer.resume.queries.runner._query")
-    def test_preserves_draft_sections_on_partial_polish(self, mock_query: MagicMock) -> None:
+    def test_preserves_draft_sections_on_partial_polish(
+        self, mock_query: MagicMock
+    ) -> None:
         """Should preserve draft sections not returned by polish."""
         mock_query.return_value = "PROFESSIONAL_SUMMARY: Updated summary."
         draft = _make_draft_output()
@@ -518,6 +533,55 @@ class TestRunPolishQuery:
         # Draft sections should be preserved
         assert output.developer_profile == draft.developer_profile
         assert output.skills_section  # should be preserved from draft
+
+
+class TestCitationGate:
+    """Tests for fact citation validation and auto-repair behavior."""
+
+    def test_repairs_invalid_bullets_using_stage1_facts(self) -> None:
+        """Bullets with missing/invalid citations should be repaired conservatively."""
+        output = ResumeOutput(
+            stage="draft",
+            project_sections={
+                "my-web-api": ProjectSection(
+                    description="Task API",
+                    bullets=["Did some backend work", "Improved reliability"],
+                    bullet_fact_ids=[[], ["F99"]],
+                    narrative="Contributed significantly.",
+                )
+            },
+        )
+
+        raw_facts = _make_raw_facts()
+        metrics = _apply_citation_gate(output, raw_facts)
+
+        section = output.project_sections["my-web-api"]
+        assert metrics["repaired_bullets"] >= 1
+        assert metrics["citation_precision"] == 1.0
+        assert len(section.bullets) == 2
+        assert all(ids for ids in section.bullet_fact_ids)
+
+    def test_synthesizes_bullets_when_missing(self) -> None:
+        """If a project has no bullets, gate should synthesize from facts."""
+        output = ResumeOutput(
+            stage="draft",
+            project_sections={
+                "my-web-api": ProjectSection(
+                    description="Task API",
+                    bullets=[],
+                    bullet_fact_ids=[],
+                    narrative="Contributed significantly.",
+                )
+            },
+        )
+
+        raw_facts = _make_raw_facts()
+        metrics = _apply_citation_gate(output, raw_facts)
+
+        section = output.project_sections["my-web-api"]
+        assert section.bullets
+        assert metrics["repaired_bullets"] >= 1
+        assert metrics["fact_coverage"] > 0
 
 
 # ---------------------------------------------------------------------------

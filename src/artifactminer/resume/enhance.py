@@ -302,14 +302,14 @@ def generate_template_skills(portfolio: PortfolioFacts) -> str:
 
 def enhance_with_llm(
     portfolio: PortfolioFacts,
-    model: str = "qwen3-1.7b",
+    model: str = "qwen3-1.7b-q8",
 ) -> ResumeContent:
     """
     Enhance portfolio facts with LLM-generated prose.
 
     Args:
         portfolio: Pre-built PortfolioFacts from static analysis
-        model: Ollama model to use
+        model: Local GGUF model alias to use
 
     Returns:
         ResumeContent with generated bullets and summaries

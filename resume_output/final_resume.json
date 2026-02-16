@@ -1,0 +1,287 @@
+{
+  "professional_summary": "Software engineer with 8+ years of experience in full-stack development, data analysis, and machine learning. Skilled in Python, JavaScript, and Go, with a focus on robust API development, testing, and infrastructure management. Proven track record of delivering high-quality, maintainable code with strong technical and collaborative skills.",
+  "skills_section": "Languages: Python, JavaScript, Go, html, css, Java, TypeScript\nFrameworks & Libraries: Data Analysis, Data Validation, Express, FastAPI, Machine Learning, Numerical Computing, Testing\nPractices: Technical Writing, Context Management, Resource Management, Command Line Tools, Advanced Collections, TypeScript Typing",
+  "developer_profile": "",
+  "projects": [
+    {
+      "name": "go-task-runner",
+      "type": "Web API",
+      "primary_language": "Go",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 1,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-08-31T17:00:00",
+        "last_commit": "2021-02-09T16:00:00"
+      },
+      "description": "A web API built with Go to manage task execution and scheduling.",
+      "bullets": [
+        "Added 120 lines to the codebase",
+        "Implemented JSON result export functionality",
+        "Integrated dry-run testing capability",
+        "Maintained 100% module coverage",
+        "Achieved 30% developer contribution"
+      ],
+      "narrative": "Contributed 30% to core functionality by implementing robust task management and testing features."
+    },
+    {
+      "name": "personal-portfolio-site",
+      "type": "Library",
+      "primary_language": "JavaScript",
+      "frameworks": [],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 4,
+        "refactor": 1,
+        "test": 1,
+        "docs": 7,
+        "chore": 8
+      },
+      "period": {
+        "first_commit": "2020-12-31T16:00:00",
+        "last_commit": "2021-09-17T17:00:00"
+      },
+      "description": "A lightweight static portfolio showcasing projects, skills, and coursework.",
+      "bullets": [
+        "Added 110 lines and deleted 1 line across 6 files over 21 days",
+        "Achieved 100% contribution",
+        "Implemented hero CTA and project grid",
+        "Enhanced accessibility with keyboard navigation",
+        "Refactored footer slot and improved readability"
+      ],
+      "narrative": "Delivered a fully functional and accessible portfolio with significant code improvements and design enhancements."
+    },
+    {
+      "name": "sensor-fleet-backend",
+      "type": "Web API",
+      "primary_language": "Python",
+      "frameworks": [
+        "FastAPI",
+        "Data Validation",
+        "Testing"
+      ],
+      "contribution_pct": 43.47826086956522,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-06-30T17:00:00",
+        "last_commit": "2022-01-26T16:00:00"
+      },
+      "description": "A web API for managing sensor data with robust health and monitoring features.",
+      "bullets": [
+        "Added uptime and calibration endpoints",
+        "Implemented alerts endpoint for threshold-based notifications",
+        "Enhanced sensor reading storage and processing",
+        "Comprehensive testing coverage (7 tests)",
+        "In-memory storage with FastAPI and Python 3.10+"
+      ],
+      "narrative": "Developed a scalable and monitoring-ready backend with strong testing and storage capabilities."
+    },
+    {
+      "name": "infra-terraform",
+      "type": "Library",
+      "primary_language": "tf",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2023-06-30T17:00:00",
+        "last_commit": "2025-11-23T15:14:35"
+      },
+      "description": "This project manages Terraform configurations for infrastructure deployment.",
+      "bullets": [
+        "Added 111 lines and deleted 20 lines across 6 files",
+        "Active span: 876 days with 100% module coverage",
+        "Commit quality: 100% conventional, 3 categories",
+        "Contribution: 30% by developer",
+        "Implemented cost center tagging and logging bucket"
+      ],
+      "narrative": "Contributed 30% to infrastructure management by implementing cost tracking and logging features."
+    },
+    {
+      "name": "algorithms-toolkit",
+      "type": "CLI Tool",
+      "primary_language": "Python",
+      "frameworks": [
+        "Testing"
+      ],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 6,
+        "test": 6,
+        "docs": 4,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-03-31T17:00:00",
+        "last_commit": "2021-09-12T17:00:00"
+      },
+      "description": "A CLI toolkit for algorithmic tasks using Python.",
+      "bullets": [
+        "Added 162 lines to codebase",
+        "Implemented 10 test functions",
+        "Covered key features: search, sort, binary search, two-sum",
+        "Includes helpers for reverse, dijkstra, and rotations",
+        "Designed for interview prep with concise outputs"
+      ],
+      "narrative": "Developed a comprehensive toolkit for algorithmic tasks with strong testing and design."
+    },
+    {
+      "name": "java-chat-service",
+      "type": "Software Project",
+      "primary_language": "Java",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-03-31T17:00:00",
+        "last_commit": "2020-08-22T17:00:00"
+      },
+      "description": "A Java-based chat service delivering real-time messaging via HTTP.",
+      "bullets": [
+        "Implemented search, JSON, and message count features",
+        "Integrated with in-memory storage for messages",
+        "Achieved 30% developer contribution",
+        "Maintained 100% commit quality standards",
+        "Reduced file changes to zero over 7 days"
+      ],
+      "narrative": "Contributed 30% to core functionality by implementing a robust chat service."
+    },
+    {
+      "name": "campus-navigation-api",
+      "type": "Web API",
+      "primary_language": "TypeScript",
+      "frameworks": [
+        "TypeScript",
+        "Express"
+      ],
+      "contribution_pct": 36.0,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 3,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2022-01-31T16:00:00",
+        "last_commit": "2022-08-01T17:00:00"
+      },
+      "description": "A web API for campus navigation and schedule-aware routing.",
+      "bullets": [
+        "Added 194 lines to the codebase",
+        "Implemented TypeScript and Express stack",
+        "Achieved 36% developer contribution",
+        "Covered 100% of modules with active development",
+        "Maintained high commit quality standards"
+      ],
+      "narrative": "Developed a scalable API with strong technical and collaborative skills."
+    },
+    {
+      "name": "ml-lab-notebooks",
+      "type": "Library",
+      "primary_language": "Python",
+      "frameworks": [
+        "Numerical Computing",
+        "Data Analysis",
+        "Machine Learning",
+        "Testing"
+      ],
+      "contribution_pct": 31.818181818181817,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 1,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2023-02-28T16:00:00",
+        "last_commit": "2023-07-28T17:00:00"
+      },
+      "description": "A Python library for numerical computing, data analysis, machine learning, and testing.",
+      "bullets": [
+        "Added rooms_per_area heuristic",
+        "Implemented logistic regression experiment with sklearn",
+        "Enhanced z-score utility and cross-validation TODO",
+        "Logging coefficients for regression runs",
+        "Achieved 32% contribution in development"
+      ],
+      "narrative": "Contributed 32% to the development of a powerful machine learning library."
+    }
+  ],
+  "metadata": {
+    "model_used": "qwen3-1.7b-q8",
+    "models_used": [
+      "lfm2.5-1.2b-bf16",
+      "qwen3-1.7b-q8"
+    ],
+    "stage": "draft-final",
+    "generation_time_seconds": 345.176983,
+    "errors": []
+  },
+  "portfolio": {
+    "total_projects": 8,
+    "total_commits": 86,
+    "languages_used": [
+      "Python",
+      "JavaScript",
+      "Go",
+      "html",
+      "css",
+      "Java",
+      "TypeScript"
+    ],
+    "frameworks_used": [
+      "Data Analysis",
+      "Data Validation",
+      "Express",
+      "FastAPI",
+      "Machine Learning",
+      "Numerical Computing",
+      "Testing",
+      "TypeScript"
+    ],
+    "project_types": {
+      "Web API": 3,
+      "Library": 3,
+      "CLI Tool": 1,
+      "Software Project": 1
+    },
+    "top_skills": [
+      "Technical Writing",
+      "Python",
+      "Testing",
+      "JavaScript",
+      "Context Management",
+      "Go",
+      "FastAPI",
+      "Data Validation",
+      "Resource Management",
+      "Command Line Tools",
+      "Advanced Collections",
+      "Java",
+      "TypeScript",
+      "Express",
+      "TypeScript Typing",
+      "Numerical Computing",
+      "Data Analysis",
+      "Machine Learning"
+    ]
+  }
+}
