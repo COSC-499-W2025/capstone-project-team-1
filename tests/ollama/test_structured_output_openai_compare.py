@@ -34,20 +34,70 @@ load_dotenv()
 # Configurable benchmark model list
 BENCHMARK_MODELS: List[str] = [
     "gpt-5-nano",
-    "deepseek-coder:6.7b",
-    "gemma3:1b",
+    # LLAMA
+    "llama3.2:1b",
+    "llama3.2:3b",
+    "llama3.1:8b",
+    # GEMMA
     "gemma3:4b",
-    "granite3.2-vision:2b",
-    "llama2:7b",
-    "meditron:7b",
-    "moondream:1.8b",
-    "qwen2.5-coder:7b",
-    "qwen3:0.6b",
+    "gemma3:12b",
+    "gemma2:2b",
+    "gemma2:9b",
+    "gemma:7b",
+    # QWEN
+    "qwen2.5:0.5b",
+    "qwen2.5:1.5b",
+    "qwen2.5:3b",
+    "qwen2.5:7b",
+    "qwen2.5:14b",
     "qwen3:4b",
+    "qwen3:8b",
+    "qwen3:14b",
+    # DEEPSEEK
+    "deepseek-r1:1.5b",
+    "deepseek-r1:7b",
+    "deepseek-r1:8b",
+    "deepseek-r1:14b",
+    # PHI
+    "phi3:3.8b",
+    "phi3:14b",
+    "phi3.5:3.8b",
+    "phi4:14b",
+    "phi4-mini:3.8b",
+    "phi4-mini-reasoning:3.8b",
+    # MISTRAL
+    "mistral:7b",
+    "mistral-nemo:12b",
+    "mixtral:8x7b",
+    # IBM GRANITE
+    "granite3-dense:2b",
+    "granite3-dense:8b",
+    "granite3.3:2b",
+    "granite3.3:8b",
+    "granite4:3b",
+    # CODE MODELS
+    "deepseek-coder:1.3b",
+    "deepseek-coder:6.7b",
+    "starcoder2:3b",
+    "starcoder2:7b",
+    "codegemma:2b",
+    "codegemma:7b",
+    "stable-code:3b",
+    "codellama:7b",
+    # SMALL + CHAT MODELS
+    "tinyllama:1.1b",
+    "smollm2:1.7b",
+    "falcon3:3b",
+    "falcon3:7b",
+    "olmo2:7b",
+    "openchat:7b",
+    "neural-chat:7b",
+    "starling-lm:7b",
+    "dolphin-mistral:7b",
+    "zephyr:7b",
+    # COHERE
+    "command-r7b",
 ]
-
-# Maximum model size in billions of parameters (0.0 means no limit)
-MAX_MODEL_SIZE_B: float = 4
 
 
 def _select_benchmark_models() -> List[str]:
@@ -64,10 +114,6 @@ def _select_benchmark_models() -> List[str]:
     
     # Filter Ollama models from BENCHMARK_MODELS
     ollama_candidates = [m for m in BENCHMARK_MODELS if m != "gpt-5-nano"]
-    
-    if MAX_MODEL_SIZE_B > 0.0:
-        # Apply size limit and check installation
-        ollama_candidates = select_small_models(ollama_candidates, max_b=MAX_MODEL_SIZE_B)
     
     # Only include models that are actually installed
     for model in ollama_candidates:
@@ -99,17 +145,21 @@ def _bar(value: float, width: int = 12) -> str:
 
 
 def _render_table(
-    prompt_name: str, rows: List[tuple[str, float, float, float, float]]
+    prompt_name: str,
+    rows: List[tuple[str, float, float, float, float]],
+    baseline_seconds: float,
 ) -> str:
     headers = [
         "Model",
         "Secs",
+        "Δ vs ChatGPT (s)",
         "Mirage (lower is better)",
         "Grounding (higher is better)",
         "Redundancy (lower is better)",
     ]
     model_width = max(len(headers[0]), max(len(row[0]) for row in rows))
     secs_width = len(headers[1])
+    delta_width = len(headers[2])
     lines = [f"Prompt: {prompt_name}"]
     bar_width = 12
     metric_width = max(
@@ -120,18 +170,22 @@ def _render_table(
             [
                 f"{headers[0]:<{model_width}}",
                 f"{headers[1]:>{secs_width}}",
-                f"{headers[2]:<{metric_width}}",
+                f"{headers[2]:>{delta_width}}",
                 f"{headers[3]:<{metric_width}}",
                 f"{headers[4]:<{metric_width}}",
+                f"{headers[5]:<{metric_width}}",
             ]
         )
     )
     for model, seconds, mirage, grounding, redundancy in rows:
+        delta = seconds - baseline_seconds
+        delta_str = f"{delta:+.2f}"
         lines.append(
             " ".join(
                 [
                     f"{model:<{model_width}}",
                     f"{seconds:>{secs_width}.2f}",
+                    f"{delta_str:>{delta_width}}",
                     f"{mirage:.2f} {_bar(mirage, bar_width)}",
                     f"{grounding:.2f} {_bar(grounding, bar_width)}",
                     f"{redundancy:.2f} {_bar(redundancy, bar_width)}",
@@ -212,7 +266,7 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
     if len(rows) == 1:
         pytest.fail("No Ollama models returned valid JSON for this prompt.")
 
-    print(_render_table(prompt_name, rows))
+    print(_render_table(prompt_name, rows, baseline_seconds))
 
     top_candidates = sorted(candidates, key=lambda item: item[4], reverse=True)[:3]
     print("Top 3 responses:")
