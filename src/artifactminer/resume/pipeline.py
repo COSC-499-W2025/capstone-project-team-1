@@ -27,7 +27,12 @@ from .extractors import (
     extract_structure,
     extract_constructs,
     infer_project_type,
+    extract_git_stats,
+    extract_test_ratio,
+    extract_commit_quality,
+    extract_cross_module_breadth,
 )
+from .distill import distill_project_context, distill_portfolio_context
 from .queries.runner import run_project_query, run_portfolio_queries
 from .assembler import assemble_markdown, assemble_json
 
@@ -135,6 +140,23 @@ def _extract_project(
         readme_text=readme_text,
     )
 
+    # --- New Strategy A extractors ---
+    if progress:
+        progress(f"  Extracting git stats...")
+    git_stats = extract_git_stats(str(repo_path), user_email)
+
+    if progress:
+        progress(f"  Computing test ratio...")
+    test_ratio = extract_test_ratio(str(repo_path), module_groups)
+
+    if progress:
+        progress(f"  Scoring commit quality...")
+    commit_quality = extract_commit_quality(commit_groups)
+
+    if progress:
+        progress(f"  Measuring module breadth...")
+    module_breadth = extract_cross_module_breadth(module_groups, directory_overview)
+
     # --- Assemble ProjectDataBundle ---
     # Clean up languages (reuse facts.py logic already applied)
     raw_langs = repo_stats.Languages or []
@@ -167,6 +189,10 @@ def _extract_project(
         detected_skills=facts.detected_skills,
         skill_evidence=facts.skill_evidence,
         insights=facts.insights,
+        git_stats=git_stats,
+        test_ratio=test_ratio,
+        commit_quality=commit_quality,
+        module_breadth=module_breadth,
     )
 
     # User-specific stats
@@ -313,6 +339,15 @@ def generate_resume_v3(
         f"{len(portfolio.top_skills)} skills, "
         f"{len(portfolio.languages_used)} languages"
     )
+
+    # ── PHASE 1.5: DISTILL ───────────────────────────────────────────
+    prog("Distilling project contexts...")
+    for bundle in bundles:
+        bundle.distilled_context = distill_project_context(bundle)
+        prog(
+            f"  Distilled {bundle.project_name}: "
+            f"~{bundle.distilled_context.token_estimate} tokens"
+        )
 
     # ── PHASE 2: QUERY ────────────────────────────────────────────────
     output = ResumeOutput(

@@ -20,7 +20,7 @@ import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import Type, TypeVar, cast
+from typing import Any, Type, TypeVar, cast
 
 import httpx
 from openai import OpenAI
@@ -79,16 +79,39 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
         32768,
     ),
     "lfm2-2.6b-q8": (
-        "meta-llama/Llama-2-2.6b-GGUF",
+        "LiquidAI/LFM2-2.6B-GGUF",
         "LFM2-2.6B-Q8_0.gguf",
         20480,
     ),
+    "lfm2.5-1.2b-q4": (
+        "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
+        "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+        32768,
+    ),
     "lfm2.5-1.2b-bf16": (
-        "meta-llama/Llama-2.5-1.2B-Instruct-GGUF",
+        "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
         "LFM2.5-1.2B-Instruct-BF16.gguf",
-        20480,
+        32768,
     ),
 }
+
+# Per-model sampling defaults — matched to each model family's characteristics.
+# Keys use prefix matching: "lfm2.5" matches "lfm2.5-1.2b-q4", etc.
+MODEL_SAMPLING_DEFAULTS: dict[str, dict[str, float]] = {
+    "lfm2.5": {"temperature": 0.1, "top_p": 0.1, "repetition_penalty": 1.05},
+    "qwen2.5-coder": {"temperature": 0.15, "top_p": 0.9},
+    "qwen3": {"temperature": 0.2, "top_p": 0.9},
+    "default": {"temperature": 0.2, "top_p": 0.9},
+}
+
+
+def get_sampling_params(model: str) -> dict[str, float]:
+    """Return the sampling parameters for a model, using prefix matching."""
+    for prefix, params in MODEL_SAMPLING_DEFAULTS.items():
+        if prefix != "default" and model.startswith(prefix):
+            return dict(params)
+    return dict(MODEL_SAMPLING_DEFAULTS["default"])
+
 
 # ---------------------------------------------------------------------------
 # Model path / GPU helpers (unchanged)
@@ -443,11 +466,14 @@ def query_llm_text(
     system: str | None = None,
     temperature: float = 0.3,
     max_tokens: int = 12288,
+    top_p: float | None = None,
+    repetition_penalty: float | None = None,
 ) -> str:
     """
     Query the LLM for plain text output.
 
     With --reasoning-budget 0, thinking is disabled at the server level.
+    Accepts optional top_p and repetition_penalty for per-model tuning.
     """
     _ensure_server_running(model)
     client = _get_client()
@@ -461,12 +487,22 @@ def query_llm_text(
         cast(ChatCompletionMessageParam, {"role": "user", "content": prompt})
     )
 
-    response = client.chat.completions.create(
-        model="local",
-        messages=messages,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
+    extra_body: dict[str, Any] = {}
+    if top_p is not None:
+        extra_body["top_p"] = top_p
+    if repetition_penalty is not None:
+        extra_body["repetition_penalty"] = repetition_penalty
+
+    kwargs: dict[str, Any] = {
+        "model": "local",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    if extra_body:
+        kwargs["extra_body"] = extra_body
+
+    response = client.chat.completions.create(**kwargs)
 
     return response.choices[0].message.content or ""
 
@@ -502,6 +538,8 @@ async def query_llm_text_async(
     system: str | None = None,
     temperature: float = 0.3,
     max_tokens: int = 12288,
+    top_p: float | None = None,
+    repetition_penalty: float | None = None,
 ) -> str:
     """Async version of query_llm_text. Runs inference in a thread pool."""
     return await asyncio.to_thread(
@@ -511,4 +549,6 @@ async def query_llm_text_async(
         system=system,
         temperature=temperature,
         max_tokens=max_tokens,
+        top_p=top_p,
+        repetition_penalty=repetition_penalty,
     )

@@ -100,18 +100,32 @@ def _query(
     model: str,
     system: str,
     *,
-    temperature: float = 0.2,
+    temperature: float | None = None,
     max_tokens: int = 1024,
+    top_p: float | None = None,
+    repetition_penalty: float | None = None,
 ) -> str:
-    """Execute a single LLM query, returning raw text."""
-    from ..llm_client import query_llm_text
+    """Execute a single LLM query with per-model sampling defaults."""
+    from ..llm_client import get_sampling_params, query_llm_text
+
+    # Merge per-model defaults with explicit overrides
+    sampling = get_sampling_params(model)
+    effective_temp = temperature if temperature is not None else sampling.get("temperature", 0.2)
+    effective_top_p = top_p if top_p is not None else sampling.get("top_p")
+    effective_rep_pen = (
+        repetition_penalty
+        if repetition_penalty is not None
+        else sampling.get("repetition_penalty")
+    )
 
     return query_llm_text(
         prompt=prompt,
         model=model,
         system=system,
-        temperature=temperature,
+        temperature=effective_temp,
         max_tokens=max_tokens,
+        top_p=effective_top_p,
+        repetition_penalty=effective_rep_pen,
     )
 
 
@@ -412,7 +426,6 @@ def run_project_query(
         prompt,
         model,
         PROJECT_SYSTEM,
-        temperature=0.15,
         max_tokens=768,
     )
 
@@ -444,7 +457,6 @@ def run_portfolio_queries(
             summary_prompt,
             model,
             SUMMARY_SYSTEM,
-            temperature=0.15,
             max_tokens=256,
         )
     )
@@ -457,7 +469,6 @@ def run_portfolio_queries(
         skills_prompt,
         model,
         SUMMARY_SYSTEM,
-        temperature=0.1,
         max_tokens=320,
     )
     skills = _normalize_skills_section(raw_skills, portfolio)
@@ -471,7 +482,6 @@ def run_portfolio_queries(
             profile_prompt,
             model,
             SUMMARY_SYSTEM,
-            temperature=0.15,
             max_tokens=320,
         )
     )

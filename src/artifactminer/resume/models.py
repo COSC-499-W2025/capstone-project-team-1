@@ -9,6 +9,7 @@ Three bundles flow through the pipeline:
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -47,6 +48,58 @@ class ProjectSection:
     description: str = ""
     bullets: List[str] = field(default_factory=list)
     narrative: str = ""
+
+
+@dataclass
+class GitStats:
+    """Quantitative impact signals per user per repo."""
+
+    lines_added: int = 0
+    lines_deleted: int = 0
+    net_lines: int = 0
+    files_touched: int = 0
+    file_hotspots: List[tuple] = field(default_factory=list)  # (filename, edit_count)
+    active_days: int = 0
+    active_span_days: int = 0
+    avg_commit_size: float = 0.0
+
+
+@dataclass
+class TestRatio:
+    """Test-to-source file ratio for a repo."""
+
+    test_files: int = 0
+    source_files: int = 0
+    test_ratio: float = 0.0
+    has_ci: bool = False
+
+
+@dataclass
+class CommitQuality:
+    """Overall commit quality metrics."""
+
+    conventional_pct: float = 0.0
+    avg_message_length: float = 0.0
+    type_diversity: int = 0
+    longest_streak: int = 0
+
+
+@dataclass
+class ModuleBreadth:
+    """Breadth of contribution across the codebase."""
+
+    modules_touched: int = 0
+    total_modules: int = 0
+    breadth_pct: float = 0.0
+    deepest_path: str = ""
+
+
+@dataclass
+class DistilledContext:
+    """Token-budgeted, ranked context block ready for the LLM."""
+
+    text: str = ""
+    token_estimate: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +155,15 @@ class ProjectDataBundle:
     # Insights (from existing DeepRepoAnalyzer)
     insights: List[Dict[str, Any]] = field(default_factory=list)
 
+    # New Strategy A extractors
+    git_stats: GitStats = field(default_factory=GitStats)
+    test_ratio: TestRatio = field(default_factory=TestRatio)
+    commit_quality: CommitQuality = field(default_factory=CommitQuality)
+    module_breadth: ModuleBreadth = field(default_factory=ModuleBreadth)
+
+    # Distilled context (set by distill_project_context, used by to_prompt_context)
+    distilled_context: Optional[DistilledContext] = None
+
     def all_commit_messages(self) -> List[str]:
         """Flat list of all commit messages across groups."""
         msgs: List[str] = []
@@ -113,8 +175,57 @@ class ProjectDataBundle:
         """Breakdown dict: {"feature": 15, "bugfix": 8, ...}."""
         return {g.category: g.count for g in self.commit_groups if g.count > 0}
 
+    @staticmethod
+    def _normalize_commit_msg(msg: str) -> str:
+        """Normalize a commit message for dedup comparison."""
+        text = msg.lower().strip()
+        # Strip conventional commit prefix (feat: fix: etc.)
+        text = re.sub(r"^(feat|fix|refactor|test|docs|chore|style|perf|ci|build)(\(.+?\))?:\s*", "", text)
+        # Strip ticket numbers like PROJ-123, #456
+        text = re.sub(r"(#\d+|\b[A-Z]+-\d+\b)", "", text)
+        # Collapse whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+        return text
+
+    @staticmethod
+    def _dedup_commit_messages(messages: List[str]) -> List[str]:
+        """Deduplicate near-identical commit messages using word-level Jaccard."""
+        if len(messages) <= 1:
+            return list(messages)
+
+        normalized = [
+            (msg, set(ProjectDataBundle._normalize_commit_msg(msg).split()))
+            for msg in messages
+        ]
+
+        kept: List[str] = []
+        kept_word_sets: List[set] = []
+
+        for msg, words in normalized:
+            if not words:
+                continue
+            is_dup = False
+            for existing_words in kept_word_sets:
+                intersection = len(words & existing_words)
+                union = len(words | existing_words)
+                if union > 0 and intersection / union >= 0.6:
+                    is_dup = True
+                    break
+            if not is_dup:
+                kept.append(msg)
+                kept_word_sets.append(words)
+
+        return kept
+
     def to_prompt_context(self) -> str:
-        """Compact text for LLM prompt inclusion."""
+        """Compact text for LLM prompt inclusion with commit dedup.
+
+        If a distilled context has been set (via distill_project_context),
+        returns that instead of building from raw fields.
+        """
+        if self.distilled_context is not None:
+            return self.distilled_context.text
+
         lines: List[str] = []
 
         lines.append(f"PROJECT: {self.project_name}")
@@ -146,11 +257,12 @@ class ProjectDataBundle:
             excerpt = self.readme_text[:600].strip()
             lines.append(f"\nREADME excerpt:\n{excerpt}")
 
-        # Commit messages by type
+        # Commit messages by type — deduplicated
         for group in self.commit_groups:
             if group.messages:
+                deduped = self._dedup_commit_messages(group.messages[:10])
                 lines.append(f"\n{group.category.upper()} commits ({group.count}):")
-                for msg in group.messages[:10]:
+                for msg in deduped:
                     lines.append(f"  - {msg}")
 
         # Code constructs
