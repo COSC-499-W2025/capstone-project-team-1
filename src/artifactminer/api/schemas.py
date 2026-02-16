@@ -503,6 +503,46 @@ class RepresentationPreferences(BaseModel):
     )
 
 
+class PortfolioGenerationRequest(BaseModel):
+    """Request payload for on-demand portfolio assembly."""
+
+    portfolio_id: str = Field(
+        min_length=1,
+        description="Portfolio UUID returned by ZIP uploads.",
+    )
+
+
+class PortfolioProjectItem(BaseModel):
+    """Project entry included in portfolio generation output."""
+
+    id: int
+    project_name: str
+    project_path: str
+    languages: list | None = None
+    frameworks: list | None = None
+    first_commit: datetime | None = None
+    last_commit: datetime | None = None
+    ranking_score: float | None = None
+    health_score: float | None = None
+
+
+class PortfolioGenerationResponse(BaseModel):
+    """Composed portfolio payload for export or UI rendering."""
+
+    success: bool = Field(description="True when at least one project is included.")
+    portfolio_id: str
+    consent_level: str
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    preferences: RepresentationPreferences
+    projects: list[PortfolioProjectItem]
+    resume_items: list[ResumeItemResponse]
+    summaries: list[SummaryResponse]
+    skills_chronology: list[SkillChronologyItem]
+    errors: list[str] = Field(default_factory=list)
+
+
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
