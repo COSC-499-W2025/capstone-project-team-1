@@ -2,7 +2,7 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_pdf_contents
+from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_file_contents
 from artifactminer.api.analyze import extract_zip_to_persistent_location
 from artifactminer.db.models import UploadedZip
 import artifactminer.directorycrawler.directory_walk as directory_walk
@@ -45,6 +45,6 @@ async def get_file_intelligence_contents(zip_id: int, db: Session = Depends(get_
     
     file_values = filedict[0].values() #getting file name, path, and extension
 
-    str_response = await get_crawler_pdf_contents(file_values=file_values)
+    str_response = await get_crawler_file_contents(file_values=file_values)
 
     return str_response

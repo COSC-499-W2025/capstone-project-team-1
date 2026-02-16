@@ -1,7 +1,7 @@
 
 from pathlib import Path
 from artifactminer.directorycrawler.directory_walk import user_keep_extension
-from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_pdf_contents
+from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_file_contents
 import shutil
 
 MOCK_CONFIG_PATH =  Path(__file__).parent/ "../directorycrawler" / "mocks" / "config_mock"
@@ -79,8 +79,6 @@ def test_ignore_files(client):
     {'file_path': '.extracted/1/allowed1.c', 'file_name': 'allowed1.c', 'file_ext': '.c'},
     {'file_path': '.extracted/1/allowed2.c', 'file_name': 'allowed2.c', 'file_ext': '.c'},
     
-
-
     ]
     assert payload["crawl_path_and_file_name_and_ext"] == expected_files
 
@@ -135,10 +133,37 @@ async def test_get_crawler_content_pdf_analysis(client):
     tuple_file_values = [(fv["file_name"],fv["file_path"], fv["file_ext"])
     for fv in file_values]
 
-    response = await get_crawler_pdf_contents(file_values=tuple_file_values)
+    response = await get_crawler_file_contents(file_values=tuple_file_values)
 
     assert isinstance(response, str)
     
 
+async def test_get_crawler_content_markdown_analysis(client, tmp_path, monkeypatch):
+
+    pdf_path = Path(__file__).parent/ "../directorycrawler" / "mocks" / "markdowndirectory.zip"
+    response = upload_zip_for_test(client=client, path=pdf_path)
+    payload = response.json()
+
+    assert payload["zip_id"] == 1
+    assert payload["filename"] == "markdowndirectory.zip"
+    assert response.status_code == 200
+
+    zip_id = payload["zip_id"]
+
+    response = client.get("/crawler", params={"zip_id" : zip_id})
+    
+    payload = response.json()
+
+    file_values = payload["crawl_path_and_file_name_and_ext"]
+
+    #convert object to tuple 
+    tuple_file_values = [(fv["file_name"],fv["file_path"], fv["file_ext"])
+    for fv in file_values]
+
+    response = await get_crawler_file_contents(file_values=tuple_file_values)
+    assert isinstance(response, str)
+
+
+    
 
     
