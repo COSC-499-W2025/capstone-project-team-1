@@ -169,6 +169,7 @@ class ProjectResponse(BaseModel):
     first_commit: datetime | None = None
     last_commit: datetime | None = None
     is_collaborative: bool
+    thumbnail_url: str | None = None
 
 
 class ProjectSkillItem(BaseModel):
@@ -210,9 +211,18 @@ class ProjectDetailResponse(BaseModel):
     ranking_score: float | None = None
     health_score: float | None = None
     role: str | None = None
+    thumbnail_url: str | None = None
     skills: list[ProjectSkillItem] = []
     resume_items: list[ProjectResumeItem] = []
     evidence: list[EvidenceResponse] = []
+
+
+class ProjectThumbnailResponse(BaseModel):
+    """Response after creating/updating a project's thumbnail."""
+
+    project_id: int
+    project_name: str
+    thumbnail_url: str
 
 
 class ProjectRoleUpdateRequest(BaseModel):
