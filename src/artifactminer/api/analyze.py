@@ -54,10 +54,12 @@ from ..RepositoryIntelligence.repo_intelligence_user import (
     generate_summaries_for_ranked,
 )
 from ..skills.deep_analysis import DeepRepoAnalyzer
-from ..skills.persistence import (
-    persist_extracted_skills,
-    persist_insights_as_resume_items,
+from ..skills.persistence import persist_extracted_skills
+from ..evidence.orchestrator import (
+    persist_generated_evidence,
+    persist_insights_as_project_evidence,
 )
+from ..evidence.extractors import git_stats_to_evidence, infra_signals_to_evidence
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
@@ -141,7 +143,7 @@ def discover_git_repos(base_path: Path) -> List[Path]:
 def discover_git_repos_from_multiple_paths(base_paths: List[Path]) -> List[Path]:
     """
     Discover git repositories across multiple extraction paths.
-    
+
     Used for incremental portfolio uploads where multiple ZIPs contribute
     to the same portfolio. Deduplicates repositories by name to avoid
     analyzing the same project twice.
@@ -154,12 +156,12 @@ def discover_git_repos_from_multiple_paths(base_paths: List[Path]) -> List[Path]
     """
     all_repos = []
     seen_repo_names = set()
-    
+
     for base_path in base_paths:
         if not base_path.exists():
             print(f"[analyze] Skipping non-existent path: {base_path}")
             continue
-            
+
         repos = discover_git_repos(base_path)
         for repo in repos:
             if repo.name not in seen_repo_names:
@@ -167,7 +169,7 @@ def discover_git_repos_from_multiple_paths(base_paths: List[Path]) -> List[Path]
                 seen_repo_names.add(repo.name)
             else:
                 print(f"[analyze] Skipping duplicate repo: {repo.name}")
-    
+
     return all_repos
 
 
@@ -257,6 +259,7 @@ def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
 
     return extraction_dir
 
+
 def _get_progress_callback() -> Callable[[int, int, str], None] | None:
     """Dependency hook for CLI-only progress reporting (API uses None)."""
     return None
@@ -290,7 +293,7 @@ async def analyze_zip(
     - Call Evan's getUserRepoStats() → save to UserRepoStat table
     - Call Stavans's DeepRepoAnalyzer.analyze() → extract skills + insights
     - Call Shlok's persist_extracted_skills() → save skills
-    - Call Shlok's persist_insights_as_resume_items() → save resume items
+    - Call evidence orchestrator → save deep insights as ProjectEvidence
 
     **Step 4 - Post-Processing:**
     - Call Shlok's rank_projects() → update RepoStat.ranking_score
@@ -406,10 +409,11 @@ async def analyze_zip(
 
             deep_result = analyzer.analyze(
                 repo_path=str(repo_path),
-                repo_stat=repo_stat,  # Pass the SQLAlchemy model
+                repo_stat=repo_stat,
                 user_email=user_email,
                 user_contributions={"additions": additions_text},
                 consent_level=consent_level,
+                user_stats=user_stats,
             )
 
             skills_count = len(deep_result.skills)
@@ -423,12 +427,36 @@ async def analyze_zip(
                 commit=False,  # Batch commit at end
             )
 
-            persist_insights_as_resume_items(
+            persist_insights_as_project_evidence(
                 db=db,
                 repo_stat_id=repo_stat.id,
                 insights=deep_result.insights,
-                commit=False,  # Batch commit at end
+                repo_last_commit=repo_stat.last_commit,
+                commit=False,
             )
+
+            if deep_result.git_stats:
+                git_evidence = git_stats_to_evidence(deep_result.git_stats)
+                persist_generated_evidence(
+                    db=db,
+                    repo_stat_id=repo_stat.id,
+                    evidence_items=git_evidence,
+                    commit=False,
+                )
+
+            if deep_result.infra_signals:
+                infra_evidence = infra_signals_to_evidence(
+                    deep_result.infra_signals,
+                    evidence_date=repo_stat.last_commit.date()
+                    if repo_stat.last_commit
+                    else None,
+                )
+                persist_generated_evidence(
+                    db=db,
+                    repo_stat_id=repo_stat.id,
+                    evidence_items=infra_evidence,
+                    commit=False,
+                )
 
             print(
                 f"[analyze] Completed {repo_path.name}: {skills_count} skills, {insights_count} insights"

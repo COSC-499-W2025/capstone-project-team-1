@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from artifactminer.api import analyze as analyze_module
+from artifactminer.skills.deep_analysis import DeepAnalysisResult, Insight
 
 
 def _setup_test_dirs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
@@ -64,6 +65,15 @@ def _set_consent(client, level: str = "none"):
     """Set consent level."""
     response = client.put("/consent", json={"consent_level": level})
     assert response.status_code == 200
+
+
+def _find_project_id_by_name(client, project_name: str) -> int:
+    """Find a project ID by project name from the projects endpoint."""
+    projects = client.get("/projects").json()
+    for project in projects:
+        if project["project_name"] == project_name:
+            return project["id"]
+    raise AssertionError(f"Project not found in /projects response: {project_name}")
 
 
 class TestAnalyzeEndpoint:
@@ -255,6 +265,88 @@ class TestAnalyzeWithRealRepos:
         # Should contain the projects folder
         extracted_contents = list(expected_extraction.rglob("*"))
         assert len(extracted_contents) > 0
+
+    def test_analyze_persists_project_evidence_not_deep_insight_resume_items(
+        self, client, tmp_path, monkeypatch, mock_projects_zip
+    ):
+        """Analyze persists deep insights to ProjectEvidence only."""
+        if not mock_projects_zip.exists():
+            pytest.skip("mock_projects.zip not found")
+
+        uploads_dir, _ = _setup_test_dirs(monkeypatch, tmp_path)
+
+        from artifactminer.api import zip as zip_module
+
+        monkeypatch.setattr(zip_module, "UPLOADS_DIR", uploads_dir)
+
+        class FakeAnalyzer:
+            def __init__(self, enable_llm=False):  # noqa: ARG002
+                pass
+
+            def analyze(
+                self,
+                repo_path,
+                repo_stat,
+                user_email,
+                user_contributions,
+                consent_level,
+                user_stats=None,
+            ):  # noqa: ARG002
+                return DeepAnalysisResult(
+                    skills=[],
+                    insights=[
+                        Insight(
+                            title="API design and architecture",
+                            evidence=["dependency injection", "schema validation"],
+                            why_it_matters="Shows mature service boundaries.",
+                        )
+                    ],
+                )
+
+        async def fake_generate_summaries_for_ranked(db, top=3, extraction_path=None):  # noqa: ARG001
+            return []
+
+        monkeypatch.setattr(analyze_module, "DeepRepoAnalyzer", FakeAnalyzer)
+        monkeypatch.setattr(analyze_module, "rank_projects", lambda *args, **kwargs: [])
+        monkeypatch.setattr(
+            analyze_module,
+            "generate_summaries_for_ranked",
+            fake_generate_summaries_for_ranked,
+        )
+
+        files = {
+            "file": (
+                "mock_projects.zip",
+                open(mock_projects_zip, "rb"),
+                "application/zip",
+            )
+        }
+        upload_response = client.post("/zip/upload", files=files)
+        assert upload_response.status_code == 200
+        zip_id = upload_response.json()["zip_id"]
+
+        _seed_user_email(client)
+        _set_consent(client, "none")
+
+        response = client.post(f"/analyze/{zip_id}")
+        assert response.status_code == 200
+        data = response.json()
+
+        successful = [repo for repo in data["repos_analyzed"] if not repo.get("error")]
+        assert len(successful) > 0
+
+        for repo in successful:
+            project_id = _find_project_id_by_name(client, repo["project_name"])
+            evidence = client.get(f"/projects/{project_id}/evidence")
+            assert evidence.status_code == 200
+            items = evidence.json()
+            assert len(items) > 0
+            assert items[0]["type"] == "evaluation"
+
+            project_detail = client.get(f"/projects/{project_id}")
+            assert project_detail.status_code == 200
+            resume_items = project_detail.json()["resume_items"]
+            assert all(item.get("category") != "Deep Insight" for item in resume_items)
 
 
 class TestAnalyzeHelperFunctions:

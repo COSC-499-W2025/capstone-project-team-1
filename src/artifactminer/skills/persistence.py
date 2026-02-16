@@ -1,17 +1,10 @@
-"""Persistence helpers for extracted skills and resume items.
-
-This module provides functions to save skill extraction and deep analysis
-results to the database. It handles both repository-level skills (ProjectSkill)
-and user-attributed skills (UserProjectSkill) for collaborative repos.
-"""
+"""Persistence helpers for extracted skills."""
 
 from __future__ import annotations
 
 from typing import List
 
 from artifactminer.skills.models import ExtractedSkill
-from artifactminer.skills.deep_analysis import Insight
-from artifactminer.db.models import ResumeItem, RepoStat
 
 
 def persist_extracted_skills(
@@ -122,70 +115,3 @@ def persist_extracted_skills(
     if commit:
         db.commit()
     return saved
-
-
-def persist_insights_as_resume_items(
-    db,
-    repo_stat_id: int,
-    insights: List[Insight],
-    commit: bool = True,
-):
-    """Persist deep analysis insights as resume items.
-
-    Converts Insight objects (from DeepRepoAnalyzer) into ResumeItem rows
-    that can be used for resume generation.
-
-    Args:
-        db: SQLAlchemy Session instance.
-        repo_stat_id: Foreign key to the RepoStat being analyzed.
-        insights: List of Insight objects from deep analysis.
-        commit: If True (default), commits the transaction.
-
-    Returns:
-        List of created/updated ResumeItem objects, or empty list if
-        insights is empty.
-
-    Raises:
-        ValueError: If RepoStat doesn't exist.
-    """
-    if not insights:
-        return []
-
-    if not db.query(RepoStat).filter(RepoStat.id == repo_stat_id).first():
-        raise ValueError(f"RepoStat {repo_stat_id} does not exist")
-
-    saved_items = []
-
-    for insight in insights:
-        # Format: "Title: evidence1 evidence2. Why it matters"
-        content_text = (
-            f"{insight.title}: {' '.join(insight.evidence)}. {insight.why_it_matters}"
-        )
-
-        # Deduplicate by title within the same repo
-        existing = (
-            db.query(ResumeItem)
-            .filter(
-                ResumeItem.repo_stat_id == repo_stat_id,
-                ResumeItem.title == insight.title,
-            )
-            .first()
-        )
-
-        if existing:
-            existing.content = content_text
-            saved_items.append(existing)
-        else:
-            new_item = ResumeItem(
-                repo_stat_id=repo_stat_id,
-                title=insight.title,
-                content=content_text,
-                category="Deep Insight",
-            )
-            db.add(new_item)
-            saved_items.append(new_item)
-
-    if commit:
-        db.commit()
-
-    return saved_items

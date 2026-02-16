@@ -70,6 +70,7 @@ class RepoStat(Base):#model for storing repository statistics
     ranked_at = Column(DateTime, nullable=True)
     deleted_at = Column(DateTime, nullable=True)
     health_score = Column(Float, nullable=True)  # Repository health indicator (0-100)
+    thumbnail_url = Column(String, nullable=True)  # Project thumbnail (uploaded local URL path or external URL)
 
     # Relationships
     project_skills = relationship("ProjectSkill", back_populates="repo_stat", cascade="all, delete-orphan")

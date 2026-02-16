@@ -1,9 +1,11 @@
 """ASGI application exposing Artifact Miner backend services."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, Depends
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from fastapi import HTTPException
@@ -31,6 +33,7 @@ from .projects import router as projects_router
 from .analyze import router as analyze_router
 from .crawler import router as crawler_router
 from .user_info import router as user_info_router
+from .portfolio import router as portfolio_router
 from .file_intelligence import router as file_intelligence_router
 from .resume import router as resume_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
@@ -51,6 +54,14 @@ def create_app() -> FastAPI:
         title="Artifact Miner API",
         description="Backend services powering the Artifact Miner TUI.",
         version="0.1.0",
+    )
+
+    thumbnails_dir = Path("./uploads/thumbnails")
+    thumbnails_dir.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/uploads/thumbnails",
+        StaticFiles(directory=str(thumbnails_dir)),
+        name="project-thumbnails",
     )
 
     # Create database tables on startup
@@ -219,6 +230,7 @@ def create_app() -> FastAPI:
     app.include_router(projects_router)
     app.include_router(openai_router)
     app.include_router(retrieval_router)
+    app.include_router(portfolio_router)
     app.include_router(resume_router)
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
