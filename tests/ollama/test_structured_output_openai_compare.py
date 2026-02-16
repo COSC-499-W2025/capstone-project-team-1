@@ -144,6 +144,22 @@ def _bar(value: float, width: int = 12) -> str:
     return f"{'#' * filled}{'-' * (width - filled)}"
 
 
+def _progress_line(completed: int, total: int, elapsed: float) -> str:
+    if total <= 0:
+        return "Progress: 0/0"
+    ratio = completed / total
+    bar = _bar(ratio, 24)
+    eta_seconds = (elapsed / completed * (total - completed)) if completed else 0.0
+    return (
+        f"Progress: {completed}/{total} [{bar}] "
+        f"elapsed {elapsed:.1f}s, ETA {eta_seconds:.1f}s"
+    )
+
+
+def _print_progress(completed: int, total: int, elapsed: float) -> None:
+    print(_progress_line(completed, total, elapsed), flush=True)
+
+
 def _render_table(
     prompt_name: str,
     rows: List[tuple[str, float, float, float, float]],
@@ -158,22 +174,33 @@ def _render_table(
         "Redundancy (lower is better)",
     ]
     model_width = max(len(headers[0]), max(len(row[0]) for row in rows))
-    secs_width = len(headers[1])
-    delta_width = len(headers[2])
+    secs_width = max(len(headers[1]), len(f"{max(row[1] for row in rows):.2f}"))
+    delta_width = max(len(headers[2]), len("+0.00"))
     lines = [f"Prompt: {prompt_name}"]
     bar_width = 12
     metric_width = max(
-        max(len(header) for header in headers[2:]), len(f"0.00 {'#' * bar_width}")
+        max(len(header) for header in headers[3:]), len(f"0.00 {'#' * bar_width}")
     )
+    header_line = " ".join(
+        [
+            f"{headers[0]:<{model_width}}",
+            f"{headers[1]:>{secs_width}}",
+            f"{headers[2]:>{delta_width}}",
+            f"{headers[3]:<{metric_width}}",
+            f"{headers[4]:<{metric_width}}",
+            f"{headers[5]:<{metric_width}}",
+        ]
+    )
+    lines.append(header_line)
     lines.append(
         " ".join(
             [
-                f"{headers[0]:<{model_width}}",
-                f"{headers[1]:>{secs_width}}",
-                f"{headers[2]:>{delta_width}}",
-                f"{headers[3]:<{metric_width}}",
-                f"{headers[4]:<{metric_width}}",
-                f"{headers[5]:<{metric_width}}",
+                "-" * model_width,
+                "-" * secs_width,
+                "-" * delta_width,
+                "-" * metric_width,
+                "-" * metric_width,
+                "-" * metric_width,
             ]
         )
     )
@@ -202,6 +229,8 @@ def _render_table(
 )
 @pytest.mark.parametrize("prompt_name,prompt", prompt_variants())
 def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None:
+    run_start = time.monotonic()
+    print(f"\nRunning prompt: {prompt_name}", flush=True)
     baseline_start = time.monotonic()
     baseline_content = get_gpt5_nano_response_sync(prompt)
     baseline_seconds = time.monotonic() - baseline_start
@@ -228,26 +257,75 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
         )
     ]
     invalid_models: List[str] = []
+    error_models: List[str] = []
+    response_outputs: List[tuple[str, str, bool]] = [
+        ("gpt-5-nano", baseline_content.strip(), True)
+    ]
 
-    for model in _select_benchmark_models():
+    selected_models = _select_benchmark_models()
+    total_models = len(selected_models)
+    completed = 1  # baseline already done
+    _print_progress(completed, total_models, time.monotonic() - run_start)
+
+    for model in selected_models:
         if model == "gpt-5-nano":
             continue  # Already processed as baseline
         start_time = time.monotonic()
-        response = chat(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            format=ResumeProjectSummary.model_json_schema(),
-            options={"temperature": 0},
-        )
+        try:
+            response = chat(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                format=ResumeProjectSummary.model_json_schema(),
+                options={"temperature": 0},
+            )
+        except Exception as exc:
+            elapsed = time.monotonic() - start_time
+            error_models.append(f"{model} ({exc})")
+            response_outputs.append((model, "", False))
+            completed += 1
+            print(
+                f"Done {model} in {elapsed:.2f}s (error). "
+                f"Total elapsed {time.monotonic() - run_start:.1f}s",
+                flush=True,
+            )
+            _print_progress(completed, total_models, time.monotonic() - run_start)
+            continue
+
         elapsed = time.monotonic() - start_time
 
         message_content = response.message.content
-        assert message_content, "Ollama response content was empty."
+        if not message_content:
+            invalid_models.append(f"{model} (empty response)")
+            response_outputs.append((model, "", False))
+            completed += 1
+            print(
+                f"Done {model} in {elapsed:.2f}s (empty). "
+                f"Total elapsed {time.monotonic() - run_start:.1f}s",
+                flush=True,
+            )
+            _print_progress(completed, total_models, time.monotonic() - run_start)
+            continue
 
+        is_valid = True
         try:
             parsed = ResumeProjectSummary.model_validate_json(message_content)
         except ValidationError:
             invalid_models.append(model)
+            is_valid = False
+
+        response_outputs.append((model, message_content.strip(), is_valid))
+
+        completed += 1
+        status = "ok" if is_valid else "invalid JSON"
+        print(
+            f"Done {model} in {elapsed:.2f}s ({status}). "
+            f"Total elapsed {time.monotonic() - run_start:.1f}s"
+            ,
+            flush=True,
+        )
+        _print_progress(completed, total_models, time.monotonic() - run_start)
+
+        if not is_valid:
             continue
 
         mirage_rate, grounding_rate, redundancy_rate = _metrics(parsed)
@@ -266,27 +344,43 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
     if len(rows) == 1:
         pytest.fail("No Ollama models returned valid JSON for this prompt.")
 
-    print(_render_table(prompt_name, rows, baseline_seconds))
+    output_lines: List[str] = []
+    output_lines.append(_render_table(prompt_name, rows, baseline_seconds))
 
     top_candidates = sorted(candidates, key=lambda item: item[4], reverse=True)[:3]
-    print("Top 3 responses:")
+    output_lines.append("Top 3 responses:")
     for rank, (model, mirage, grounding, redundancy, score, content) in enumerate(
         top_candidates, start=1
     ):
-        print(
-            "\n".join(
-                [
-                    f"#{rank} {model}",
-                    f"Score: {score:.3f}",
-                    f"Mirage: {mirage:.2f}",
-                    f"Grounding: {grounding:.2f}",
-                    f"Redundancy: {redundancy:.2f}",
-                    "Response:",
-                    content,
-                    "---",
-                ]
-            )
+        output_lines.extend(
+            [
+                f"#{rank} {model}",
+                f"Score: {score:.3f}",
+                f"Mirage: {mirage:.2f}",
+                f"Grounding: {grounding:.2f}",
+                f"Redundancy: {redundancy:.2f}",
+                "Response:",
+                content,
+                "---",
+            ]
         )
 
     if invalid_models:
-        print(f"Invalid JSON outputs: {', '.join(invalid_models)}")
+        output_lines.append(f"Invalid JSON outputs: {', '.join(invalid_models)}")
+    if error_models:
+        output_lines.append(f"Errored models: {', '.join(error_models)}")
+
+    output_text = "\n".join(output_lines)
+    print(output_text)
+
+    md_lines = list(output_lines)
+    md_lines.append("All responses:")
+    for model, content, is_valid in response_outputs:
+        status = "valid JSON" if is_valid else "invalid JSON"
+        md_lines.extend([f"{model} ({status})", content, "---"])
+
+    report_path = Path(__file__).resolve().parents[2] / "docs" / "ollama-benchmark.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    with report_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(md_lines))
+        handle.write("\n\n")
