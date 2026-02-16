@@ -3,18 +3,36 @@
 from __future__ import annotations
 
 import time
+import sys
+from pathlib import Path
 from typing import List
 
 import pytest
 from ollama import chat, list as ollama_list
 from pydantic import BaseModel, Field
 
-OLLAMA_MODELS: List[str] = [
-    "gemma3:4b",
+MODULE_DIR = Path(__file__).resolve().parent
+if str(MODULE_DIR) not in sys.path:
+    sys.path.insert(0, str(MODULE_DIR))
+
+from structured_output_common import select_small_models
+
+# Configurable benchmark model list
+BENCHMARK_MODELS: List[str] = [
+    "deepseek-coder:6.7b",
     "gemma3:1b",
-    "llama3.2:1b",
-    "llama3.2:3b",
+    "gemma3:4b",
+    "granite3.2-vision:2b",
+    "llama2:7b",
+    "meditron:7b",
+    "moondream:1.8b",
+    "qwen2.5-coder:7b",
+    "qwen3:0.6b",
+    "qwen3:4b",
 ]
+
+# Maximum model size in billions of parameters (0.0 means no limit)
+MAX_MODEL_SIZE_B: float = 7.0
 
 PROJECT_SNAPSHOT = """
 Project: Campus Resource Tracker
@@ -53,15 +71,28 @@ def _build_prompt() -> str:
     )
 
 
-def _available_models() -> List[str]:
+def _select_benchmark_models() -> List[str]:
+    """Select models from BENCHMARK_MODELS, filtered by installation and size limit.
+    
+    Checks installation status and applies MAX_MODEL_SIZE_B filter.
+    """
     available = {m.model for m in ollama_list().models}
-    missing = [m for m in OLLAMA_MODELS if m not in available]
-    if missing:
-        pytest.skip(f"Missing Ollama models: {', '.join(missing)}")
-    return list(OLLAMA_MODELS)
+    candidates = list(BENCHMARK_MODELS)
+    
+    if MAX_MODEL_SIZE_B > 0.0:
+        # Apply size limit
+        candidates = select_small_models(candidates, max_b=MAX_MODEL_SIZE_B)
+    
+    # Only include models that are actually installed
+    selected = [m for m in candidates if m in available]
+    
+    if not selected:
+        pytest.skip("No models from BENCHMARK_MODELS are available.")
+    
+    return selected
 
 
-@pytest.mark.parametrize("model", _available_models())
+@pytest.mark.parametrize("model", _select_benchmark_models())
 def test_structured_output_benchmark(model: str) -> None:
     prompt = _build_prompt()
 

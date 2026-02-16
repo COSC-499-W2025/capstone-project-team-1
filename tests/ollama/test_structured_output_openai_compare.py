@@ -11,6 +11,7 @@ from typing import List
 import pytest
 from dotenv import load_dotenv
 from ollama import chat, list as ollama_list
+from pydantic import ValidationError
 
 MODULE_DIR = Path(__file__).resolve().parent
 if str(MODULE_DIR) not in sys.path:
@@ -25,16 +26,57 @@ from structured_output_common import (
     mirage_metric,
     prompt_variants,
     redundancy_metric,
+    select_small_models,
 )
 
 load_dotenv()
 
+# Configurable benchmark model list
+BENCHMARK_MODELS: List[str] = [
+    "gpt-5-nano",
+    "deepseek-coder:6.7b",
+    "gemma3:1b",
+    "gemma3:4b",
+    "granite3.2-vision:2b",
+    "llama2:7b",
+    "meditron:7b",
+    "moondream:1.8b",
+    "qwen2.5-coder:7b",
+    "qwen3:0.6b",
+    "qwen3:4b",
+]
 
-def _available_models() -> List[str]:
+# Maximum model size in billions of parameters (0.0 means no limit)
+MAX_MODEL_SIZE_B: float = 4
+
+
+def _select_benchmark_models() -> List[str]:
+    """Select models from BENCHMARK_MODELS, filtered by installation and size limit.
+    
+    Always includes 'gpt-5-nano' (OpenAI baseline) unconditionally.
+    For Ollama models: checks installation status and applies MAX_MODEL_SIZE_B filter.
+    """
     available = {m.model for m in ollama_list().models}
-    selected = [m for m in OLLAMA_MODELS if m in available]
-    if not selected:
-        pytest.skip("No requested Ollama models are available.")
+    selected: List[str] = []
+    
+    # Always include OpenAI baseline
+    selected.append("gpt-5-nano")
+    
+    # Filter Ollama models from BENCHMARK_MODELS
+    ollama_candidates = [m for m in BENCHMARK_MODELS if m != "gpt-5-nano"]
+    
+    if MAX_MODEL_SIZE_B > 0.0:
+        # Apply size limit and check installation
+        ollama_candidates = select_small_models(ollama_candidates, max_b=MAX_MODEL_SIZE_B)
+    
+    # Only include models that are actually installed
+    for model in ollama_candidates:
+        if model in available:
+            selected.append(model)
+    
+    if len(selected) == 1:  # Only gpt-5-nano
+        pytest.skip("No Ollama models from BENCHMARK_MODELS are available.")
+    
     return selected
 
 
@@ -43,6 +85,11 @@ def _metrics(parsed: ResumeProjectSummary) -> tuple[float, float, float]:
     grounding_rate, _, _ = entity_grounding_metric(parsed, PROJECT_SNAPSHOT)
     redundancy_rate, _, _ = redundancy_metric(parsed)
     return mirage_rate, grounding_rate, redundancy_rate
+
+
+def _score(mirage: float, grounding: float, redundancy: float) -> float:
+    # Higher is better: reward grounding, penalize mirage and redundancy.
+    return ((1.0 - mirage) + grounding + (1.0 - redundancy)) / 3.0
 
 
 def _bar(value: float, width: int = 12) -> str:
@@ -54,11 +101,20 @@ def _bar(value: float, width: int = 12) -> str:
 def _render_table(
     prompt_name: str, rows: List[tuple[str, float, float, float, float]]
 ) -> str:
-    headers = ["Model", "Secs", "Mirage", "Grounding", "Redundancy"]
+    headers = [
+        "Model",
+        "Secs",
+        "Mirage (lower is better)",
+        "Grounding (higher is better)",
+        "Redundancy (lower is better)",
+    ]
     model_width = max(len(headers[0]), max(len(row[0]) for row in rows))
     secs_width = len(headers[1])
     lines = [f"Prompt: {prompt_name}"]
-    metric_width = 18
+    bar_width = 12
+    metric_width = max(
+        max(len(header) for header in headers[2:]), len(f"0.00 {'#' * bar_width}")
+    )
     lines.append(
         " ".join(
             [
@@ -76,9 +132,9 @@ def _render_table(
                 [
                     f"{model:<{model_width}}",
                     f"{seconds:>{secs_width}.2f}",
-                    f"{mirage:.2f} {_bar(mirage)}",
-                    f"{grounding:.2f} {_bar(grounding)}",
-                    f"{redundancy:.2f} {_bar(redundancy)}",
+                    f"{mirage:.2f} {_bar(mirage, bar_width)}",
+                    f"{grounding:.2f} {_bar(grounding, bar_width)}",
+                    f"{redundancy:.2f} {_bar(redundancy, bar_width)}",
                 ]
             )
         )
@@ -107,8 +163,21 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
     rows: List[tuple[str, float, float, float, float]] = [
         ("gpt-5-nano", baseline_seconds, openai_mirage, openai_grounding, openai_redundancy)
     ]
+    candidates: List[tuple[str, float, float, float, float, str]] = [
+        (
+            "gpt-5-nano",
+            openai_mirage,
+            openai_grounding,
+            openai_redundancy,
+            _score(openai_mirage, openai_grounding, openai_redundancy),
+            baseline_content.strip(),
+        )
+    ]
+    invalid_models: List[str] = []
 
-    for model in _available_models():
+    for model in _select_benchmark_models():
+        if model == "gpt-5-nano":
+            continue  # Already processed as baseline
         start_time = time.monotonic()
         response = chat(
             model=model,
@@ -121,8 +190,49 @@ def test_structured_output_openai_compare(prompt_name: str, prompt: str) -> None
         message_content = response.message.content
         assert message_content, "Ollama response content was empty."
 
-        parsed = ResumeProjectSummary.model_validate_json(message_content)
+        try:
+            parsed = ResumeProjectSummary.model_validate_json(message_content)
+        except ValidationError:
+            invalid_models.append(model)
+            continue
+
         mirage_rate, grounding_rate, redundancy_rate = _metrics(parsed)
         rows.append((model, elapsed, mirage_rate, grounding_rate, redundancy_rate))
+        candidates.append(
+            (
+                model,
+                mirage_rate,
+                grounding_rate,
+                redundancy_rate,
+                _score(mirage_rate, grounding_rate, redundancy_rate),
+                message_content.strip(),
+            )
+        )
+
+    if len(rows) == 1:
+        pytest.fail("No Ollama models returned valid JSON for this prompt.")
 
     print(_render_table(prompt_name, rows))
+
+    top_candidates = sorted(candidates, key=lambda item: item[4], reverse=True)[:3]
+    print("Top 3 responses:")
+    for rank, (model, mirage, grounding, redundancy, score, content) in enumerate(
+        top_candidates, start=1
+    ):
+        print(
+            "\n".join(
+                [
+                    f"#{rank} {model}",
+                    f"Score: {score:.3f}",
+                    f"Mirage: {mirage:.2f}",
+                    f"Grounding: {grounding:.2f}",
+                    f"Redundancy: {redundancy:.2f}",
+                    "Response:",
+                    content,
+                    "---",
+                ]
+            )
+        )
+
+    if invalid_models:
+        print(f"Invalid JSON outputs: {', '.join(invalid_models)}")

@@ -41,6 +41,8 @@ PROMPT_VARIANTS: List[Tuple[str, str]] = [
 ]
 
 _TOKEN_PATTERN = re.compile(r"[a-z0-9+.#/-]+")
+_SIZE_TAG_PATTERN = re.compile(r":(?P<size>\d+(?:\.\d+)?)b$", re.IGNORECASE)
+_SMALL_TAGS = {"mini", "small", "tiny"}
 _STOPWORDS = {
     "a",
     "an",
@@ -128,6 +130,24 @@ def prompt_variants() -> List[Tuple[str, str]]:
     return [(name, build_prompt(instructions)) for name, instructions in PROMPT_VARIANTS]
 
 
+def select_small_models(available: List[str], max_b: float = 7.0) -> List[str]:
+    selected: List[str] = []
+    for model in available:
+        tag = model.split(":", 1)[-1].lower() if ":" in model else ""
+        if tag in _SMALL_TAGS:
+            selected.append(model)
+            continue
+        match = _SIZE_TAG_PATTERN.search(model)
+        if match and float(match.group("size")) <= max_b:
+            selected.append(model)
+
+    if selected:
+        return selected
+
+    # Fallback to known small models list if tags do not match.
+    return [model for model in OLLAMA_MODELS if model in set(available)]
+
+
 def tokenize(text: str) -> List[str]:
     return [t for t in _TOKEN_PATTERN.findall(text.lower()) if len(t) > 1]
 
@@ -178,22 +198,21 @@ def entity_grounding_metric(
 
 
 def redundancy_metric(parsed: ResumeProjectSummary) -> Tuple[float, int, int]:
-    def normalize_item(item: str) -> str:
-        return " ".join(_TOKEN_PATTERN.findall(item.lower())).strip()
+    def meaningful_tokens(text: str) -> List[str]:
+        tokens = _TOKEN_PATTERN.findall(text.lower())
+        return [t for t in tokens if t not in _STOPWORDS and len(t) > 2]
 
-    def count_duplicates(items: List[str]) -> Tuple[int, int]:
-        normalized = [normalize_item(item) for item in items if item.strip()]
-        counts: dict[str, int] = {}
-        for item in normalized:
-            counts[item] = counts.get(item, 0) + 1
-        duplicates = sum(count - 1 for count in counts.values() if count > 1)
-        return duplicates, len(normalized)
+    items = [*parsed.highlights, *parsed.skills]
+    token_counts: dict[str, int] = {}
+    total_tokens = 0
+    for item in items:
+        for token in meaningful_tokens(item):
+            total_tokens += 1
+            token_counts[token] = token_counts.get(token, 0) + 1
 
-    highlight_dupes, highlight_total = count_duplicates(parsed.highlights)
-    skill_dupes, skill_total = count_duplicates(parsed.skills)
-    duplicate_count = highlight_dupes + skill_dupes
-    total_items = highlight_total + skill_total
-    if total_items == 0:
+    if total_tokens == 0:
         return 0.0, 0, 0
-    rate = duplicate_count / total_items
-    return rate, duplicate_count, total_items
+
+    repeated_tokens = sum(count - 1 for count in token_counts.values() if count > 1)
+    rate = repeated_tokens / total_tokens
+    return rate, repeated_tokens, total_tokens
