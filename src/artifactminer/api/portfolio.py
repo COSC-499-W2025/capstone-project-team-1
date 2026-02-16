@@ -92,14 +92,26 @@ async def generate_portfolio(
     if not portfolio_id:
         raise HTTPException(status_code=422, detail="portfolio_id cannot be empty.")
 
+    portfolio_exists = (
+        db.query(UploadedZip.id)
+        .filter(UploadedZip.portfolio_id == portfolio_id)
+        .first()
+    )
+    if not portfolio_exists:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
     zips = (
         db.query(UploadedZip)
         .filter(UploadedZip.portfolio_id == portfolio_id)
+        .filter(UploadedZip.extraction_path.isnot(None))
         .order_by(UploadedZip.uploaded_at.asc())
         .all()
     )
     if not zips:
-        raise HTTPException(status_code=404, detail="Portfolio not found.")
+        raise HTTPException(
+            status_code=400,
+            detail="Portfolio has no analyzed ZIPs yet. Run /analyze/{zip_id} for uploaded ZIPs first.",
+        )
 
     extraction_prefixes = sorted(
         {
@@ -137,7 +149,11 @@ async def generate_portfolio(
             .join(RepoStat, ResumeItem.repo_stat_id == RepoStat.id)
             .filter(RepoStat.deleted_at.is_(None))
             .filter(ResumeItem.repo_stat_id.in_(selected_project_ids))
-            .order_by(RepoStat.last_commit.desc().nullslast(), ResumeItem.created_at.desc())
+            .order_by(
+                RepoStat.last_commit.desc().nullslast(),
+                ResumeItem.created_at.desc(),
+                ResumeItem.id.desc(),
+            )
             .all()
         )
         resume_items = [
