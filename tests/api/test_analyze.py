@@ -283,7 +283,15 @@ class TestAnalyzeWithRealRepos:
             def __init__(self, enable_llm=False):  # noqa: ARG002
                 pass
 
-            def analyze(self, repo_path, repo_stat, user_email, user_contributions, consent_level):  # noqa: ARG002
+            def analyze(
+                self,
+                repo_path,
+                repo_stat,
+                user_email,
+                user_contributions,
+                consent_level,
+                user_stats=None,
+            ):  # noqa: ARG002
                 return DeepAnalysisResult(
                     skills=[],
                     insights=[
