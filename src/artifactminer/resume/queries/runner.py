@@ -17,14 +17,23 @@ from ..models import (
     ProjectDataBundle,
     PortfolioDataBundle,
     ProjectSection,
+    RawProjectFacts,
+    ResumeOutput,
+    UserFeedback,
 )
 from .prompts import (
     PROJECT_SYSTEM,
     SUMMARY_SYSTEM,
+    EXTRACTION_SYSTEM,
+    DRAFT_SYSTEM,
+    POLISH_SYSTEM,
     build_project_prompt,
     build_summary_prompt,
     build_skills_prompt,
     build_profile_prompt,
+    build_extraction_prompt,
+    build_draft_prompt,
+    build_polish_prompt,
 )
 
 log = logging.getLogger(__name__)
@@ -487,3 +496,278 @@ def run_portfolio_queries(
     )
 
     return summary, skills, profile
+
+
+# ---------------------------------------------------------------------------
+# Multi-stage pipeline queries (Strategy B)
+# ---------------------------------------------------------------------------
+
+_FACTS_SECTION_RE = re.compile(
+    r"^\s*(?:[-*•]|\d+[.)])\s+(.+)$",
+)
+
+_EXTRACTION_HEADER_RE = re.compile(
+    r"^\s*(PROJECT_SUMMARY|FACTS|ROLE)\s*:\s*(.*)$",
+    re.I,
+)
+
+
+def _parse_extraction_response(text: str, project_name: str) -> RawProjectFacts:
+    """Parse the structured PROJECT_SUMMARY/FACTS/ROLE response from Stage 1."""
+    facts = RawProjectFacts(project_name=project_name)
+
+    if not text or not text.strip():
+        return facts
+
+    current_section: str | None = None
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        header = _EXTRACTION_HEADER_RE.match(line)
+        if header:
+            current_section = header.group(1).upper()
+            tail = header.group(2).strip()
+            if current_section == "PROJECT_SUMMARY" and tail:
+                facts.summary = _clean_inline_text(tail)
+            elif current_section == "ROLE" and tail:
+                facts.role = _clean_inline_text(tail)
+            continue
+
+        if current_section == "FACTS":
+            bullet = _FACTS_SECTION_RE.match(line)
+            if bullet:
+                cleaned = _clean_inline_text(bullet.group(1))
+                if cleaned:
+                    facts.facts.append(cleaned)
+        elif current_section == "PROJECT_SUMMARY" and not facts.summary:
+            facts.summary = _clean_inline_text(line)
+        elif current_section == "ROLE" and not facts.role:
+            facts.role = _clean_inline_text(line)
+
+    return facts
+
+
+def _parse_draft_response(text: str) -> ResumeOutput:
+    """Parse the complete draft resume from Stage 2 into a ResumeOutput."""
+    output = ResumeOutput(stage="draft")
+
+    if not text or not text.strip():
+        return output
+
+    current_section: str | None = None
+    current_project: str | None = None
+    project_lines: dict[str, dict[str, list[str]]] = {}
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        # Check for top-level markers
+        if line.upper().startswith("PROFESSIONAL_SUMMARY:"):
+            current_section = "summary"
+            tail = line.split(":", 1)[1].strip()
+            if tail:
+                output.professional_summary = _clean_inline_text(tail)
+            continue
+
+        if line.upper().startswith("DEVELOPER_PROFILE:"):
+            current_section = "profile"
+            tail = line.split(":", 1)[1].strip()
+            if tail:
+                output.developer_profile = _clean_inline_text(tail)
+            continue
+
+        if line.upper().startswith("SKILLS:"):
+            current_section = "skills"
+            tail = line.split(":", 1)[1].strip()
+            if tail:
+                output.skills_section = tail
+            continue
+
+        if line.upper().startswith("PROJECT:"):
+            current_section = "project"
+            current_project = line.split(":", 1)[1].strip()
+            project_lines[current_project] = {
+                "description": [],
+                "bullets": [],
+                "narrative": [],
+            }
+            continue
+
+        # Parse project sub-sections (check for markers in any project_* state)
+        if current_project and (
+            current_section == "project"
+            or (current_section and current_section.startswith("project_"))
+        ):
+            marker = _SECTION_HEADER_LINE_RE.match(line)
+            if marker:
+                key = marker.group(1).lower()
+                tail = marker.group(2).strip()
+                if tail and key in project_lines[current_project]:
+                    project_lines[current_project][key].append(tail)
+                current_section = f"project_{key}"
+                continue
+
+        if current_section == "project_description" and current_project:
+            project_lines[current_project]["description"].append(line)
+        elif current_section == "project_bullets" and current_project:
+            bullet = _BULLET_LINE_RE.match(line)
+            if bullet:
+                project_lines[current_project]["bullets"].append(
+                    _clean_inline_text(bullet.group(1))
+                )
+        elif current_section == "project_narrative" and current_project:
+            project_lines[current_project]["narrative"].append(line)
+        elif current_section == "summary" and not output.professional_summary:
+            output.professional_summary = _clean_inline_text(line)
+        elif current_section == "profile" and not output.developer_profile:
+            output.developer_profile = _clean_inline_text(line)
+        elif current_section == "skills":
+            output.skills_section += "\n" + line
+
+    # Build project sections
+    for name, parts in project_lines.items():
+        section = ProjectSection(
+            description=_clean_inline_text(" ".join(parts["description"])),
+            bullets=[b for b in parts["bullets"] if b],
+            narrative=_clean_inline_text(" ".join(parts["narrative"])),
+        )
+        output.project_sections[name] = section
+
+    if output.skills_section:
+        output.skills_section = output.skills_section.strip()
+
+    return output
+
+
+def run_extraction_query(
+    bundle: ProjectDataBundle,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> RawProjectFacts:
+    """
+    Stage 1: Extract structured facts from a project using LFM2.5-1.2B.
+
+    Returns RawProjectFacts with summary, facts list, and role.
+    """
+    if progress:
+        progress(f"  [Stage 1] Extracting facts for {bundle.project_name}...")
+
+    prompt = build_extraction_prompt(bundle)
+    response = _query(
+        prompt,
+        model,
+        EXTRACTION_SYSTEM,
+        max_tokens=512,
+    )
+
+    if not response.strip():
+        raise RuntimeError(
+            f"LLM returned empty response for extraction of {bundle.project_name}"
+        )
+
+    return _parse_extraction_response(response, bundle.project_name)
+
+
+def run_draft_queries(
+    raw_facts: dict[str, RawProjectFacts],
+    portfolio: PortfolioDataBundle,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> ResumeOutput:
+    """
+    Stage 2: Generate a first-draft resume from extracted facts using Qwen3-1.7B.
+
+    Returns a complete ResumeOutput with stage="draft".
+    """
+    if progress:
+        progress("[Stage 2] Generating draft resume...")
+
+    prompt = build_draft_prompt(raw_facts, portfolio)
+    response = _query(
+        prompt,
+        model,
+        DRAFT_SYSTEM,
+        max_tokens=2048,
+    )
+
+    if not response.strip():
+        raise RuntimeError("LLM returned empty response for draft generation")
+
+    output = _parse_draft_response(response)
+    output.portfolio_data = portfolio
+    output.raw_project_facts = raw_facts
+
+    # Fallback: if parsing didn't find project sections, try single-project parsing
+    if not output.project_sections:
+        section = _parse_project_response(response)
+        if section.description or section.bullets:
+            for name in raw_facts:
+                output.project_sections[name] = section
+                break
+
+    # Normalize skills section
+    if output.skills_section and portfolio:
+        output.skills_section = _normalize_skills_section(
+            output.skills_section, portfolio
+        )
+
+    return output
+
+
+def run_polish_query(
+    draft_output: ResumeOutput,
+    feedback: UserFeedback,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> ResumeOutput:
+    """
+    Stage 3: Polish the draft resume with user feedback using Qwen3-4B.
+
+    Returns the final polished ResumeOutput with stage="polish".
+    """
+    if progress:
+        progress("[Stage 3] Polishing resume with feedback...")
+
+    prompt = build_polish_prompt(draft_output, feedback)
+    response = _query(
+        prompt,
+        model,
+        POLISH_SYSTEM,
+        max_tokens=2048,
+    )
+
+    if not response.strip():
+        # Fall back to the draft if polish fails
+        log.warning("Polish stage returned empty response, using draft")
+        draft_output.stage = "polish"
+        return draft_output
+
+    output = _parse_draft_response(response)
+    output.stage = "polish"
+    output.portfolio_data = draft_output.portfolio_data
+    output.raw_project_facts = draft_output.raw_project_facts
+
+    # Preserve draft sections if polish didn't produce them
+    if not output.professional_summary and draft_output.professional_summary:
+        output.professional_summary = draft_output.professional_summary
+    if not output.skills_section and draft_output.skills_section:
+        output.skills_section = draft_output.skills_section
+    if not output.developer_profile and draft_output.developer_profile:
+        output.developer_profile = draft_output.developer_profile
+    if not output.project_sections and draft_output.project_sections:
+        output.project_sections = dict(draft_output.project_sections)
+
+    # Normalize skills
+    if output.skills_section and output.portfolio_data:
+        output.skills_section = _normalize_skills_section(
+            output.skills_section, output.portfolio_data
+        )
+
+    return output

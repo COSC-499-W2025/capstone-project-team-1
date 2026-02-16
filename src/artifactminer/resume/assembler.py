@@ -97,8 +97,12 @@ def assemble_markdown(output: ResumeOutput) -> str:
     # Footer
     lines.append("---")
     time_str = f"{output.generation_time_seconds:.0f}s"
-    model_str = output.model_used or "template"
-    lines.append(f"*Generated with {model_str} in {time_str}*")
+    if output.models_used:
+        model_str = ", ".join(output.models_used)
+        lines.append(f"*Generated with multi-stage pipeline ({model_str}) in {time_str}*")
+    else:
+        model_str = output.model_used or "template"
+        lines.append(f"*Generated with {model_str} in {time_str}*")
 
     return "\n".join(lines)
 
@@ -117,6 +121,8 @@ def assemble_json(output: ResumeOutput) -> str:
         "projects": [],
         "metadata": {
             "model_used": output.model_used,
+            "models_used": output.models_used,
+            "stage": output.stage,
             "generation_time_seconds": output.generation_time_seconds,
             "errors": output.errors,
         },

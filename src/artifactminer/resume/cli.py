@@ -138,6 +138,156 @@ def generate_v3(
 
 
 # ---------------------------------------------------------------------------
+# Multi-stage pipeline (Strategy B)
+# ---------------------------------------------------------------------------
+
+
+@app.command("generate-multistage")
+def generate_multistage(
+    zip_path: Path = typer.Option(
+        ...,
+        "--zip",
+        "-z",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+        help="Path to ZIP file containing git repositories",
+    ),
+    email: str = typer.Option(
+        ...,
+        "--email",
+        "-e",
+        help="User's email for git attribution",
+    ),
+    stage1_model: str = typer.Option(
+        "lfm2.5-1.2b-q4",
+        "--stage1-model",
+        help="Model for fact extraction (Stage 1)",
+    ),
+    stage2_model: str = typer.Option(
+        "qwen3-1.7b-q8",
+        "--stage2-model",
+        help="Model for draft generation (Stage 2)",
+    ),
+    stage3_model: str = typer.Option(
+        "qwen3-4b-q4",
+        "--stage3-model",
+        help="Model for polish/refinement (Stage 3)",
+    ),
+    feedback_tone: Optional[str] = typer.Option(
+        None,
+        "--tone",
+        help="Tone preference for polish stage (e.g., 'more technical', 'formal')",
+    ),
+    feedback_notes: Optional[str] = typer.Option(
+        None,
+        "--feedback",
+        help="General feedback/instructions for polish stage",
+    ),
+    output_json: Optional[Path] = typer.Option(
+        None,
+        "--output-json",
+        help="Output JSON file path",
+    ),
+    output_markdown: Optional[Path] = typer.Option(
+        None,
+        "--output-markdown",
+        "--output-md",
+        help="Output Markdown file path",
+    ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Show detailed progress",
+    ),
+) -> None:
+    """
+    Generate resume using multi-stage pipeline (Strategy B).
+
+    Stage 1: Extract structured facts (LFM2.5-1.2B)
+    Stage 2: Generate first draft (Qwen3-1.7B)
+    Stage 3: Polish with feedback (Qwen3-4B, optional)
+
+    Examples:
+        python -m artifactminer.resume generate-multistage --zip ~/repos.zip --email john@example.com
+        python -m artifactminer.resume generate-multistage --zip ~/repos.zip --email john@example.com --tone "more technical" --feedback "Emphasize backend work"
+    """
+    from .pipeline import generate_resume_v3_multistage
+    from .assembler import assemble_markdown, assemble_json
+    from .models import UserFeedback
+
+    def progress(msg: str) -> None:
+        if verbose:
+            typer.echo(msg)
+
+    # Build user feedback if provided
+    user_feedback = None
+    if feedback_tone or feedback_notes:
+        user_feedback = UserFeedback(
+            tone=feedback_tone or "",
+            general_notes=feedback_notes or "",
+        )
+
+    try:
+        result = generate_resume_v3_multistage(
+            zip_path=str(zip_path.resolve()),
+            user_email=email.lower().strip(),
+            stage1_model=stage1_model,
+            stage2_model=stage2_model,
+            stage3_model=stage3_model,
+            user_feedback=user_feedback,
+            progress_callback=progress if verbose else None,
+        )
+
+        # Generate outputs
+        markdown = assemble_markdown(result)
+        json_str = assemble_json(result)
+
+        # Always print markdown to stdout
+        typer.echo("\n" + "=" * 60)
+        typer.echo(markdown)
+
+        # Save to files if requested
+        if output_json:
+            output_json.parent.mkdir(parents=True, exist_ok=True)
+            output_json.write_text(json_str)
+            typer.echo(f"\nJSON output written to: {output_json}")
+
+        if output_markdown:
+            output_markdown.parent.mkdir(parents=True, exist_ok=True)
+            output_markdown.write_text(markdown)
+            typer.echo(f"Markdown output written to: {output_markdown}")
+
+        # Print summary
+        portfolio = result.portfolio_data
+        typer.echo("\n" + "=" * 60)
+        typer.echo("GENERATION SUMMARY (multi-stage)")
+        typer.echo("=" * 60)
+        if portfolio:
+            typer.echo(f"Projects analyzed: {portfolio.total_projects}")
+            typer.echo(f"Total commits: {portfolio.total_commits}")
+            typer.echo(f"Skills detected: {len(portfolio.top_skills)}")
+        typer.echo(f"Stage: {result.stage}")
+        typer.echo(f"Models used: {', '.join(result.models_used)}")
+        typer.echo(f"Generation time: {result.generation_time_seconds:.1f}s")
+
+        if result.errors:
+            typer.echo(f"\nWarnings ({len(result.errors)}):", err=True)
+            for err in result.errors:
+                typer.secho(f"  - {err}", fg=typer.colors.YELLOW, err=True)
+
+    except Exception as exc:
+        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
+        if verbose:
+            import traceback
+
+            traceback.print_exc()
+        raise typer.Exit(1) from exc
+
+
+# ---------------------------------------------------------------------------
 # v2 pipeline (kept for rollback)
 # ---------------------------------------------------------------------------
 

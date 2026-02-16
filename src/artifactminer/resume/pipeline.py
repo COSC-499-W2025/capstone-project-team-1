@@ -19,7 +19,9 @@ from typing import Callable, List, Optional
 from .models import (
     ProjectDataBundle,
     PortfolioDataBundle,
+    RawProjectFacts,
     ResumeOutput,
+    UserFeedback,
 )
 from .extractors import (
     extract_readme,
@@ -33,7 +35,13 @@ from .extractors import (
     extract_cross_module_breadth,
 )
 from .distill import distill_project_context, distill_portfolio_context
-from .queries.runner import run_project_query, run_portfolio_queries
+from .queries.runner import (
+    run_project_query,
+    run_portfolio_queries,
+    run_extraction_query,
+    run_draft_queries,
+    run_polish_query,
+)
 from .assembler import assemble_markdown, assemble_json
 
 # Reuse existing infrastructure
@@ -383,3 +391,178 @@ def generate_resume_v3(
     prog(f"Generation complete in {elapsed:.1f}s")
 
     return output
+
+
+# ---------------------------------------------------------------------------
+# Multi-stage pipeline (Strategy B)
+# ---------------------------------------------------------------------------
+
+
+def generate_resume_v3_multistage(
+    zip_path: str,
+    user_email: str,
+    *,
+    stage1_model: str = "lfm2.5-1.2b-q4",
+    stage2_model: str = "qwen3-1.7b-q8",
+    stage3_model: str = "qwen3-4b-q4",
+    user_feedback: Optional[UserFeedback] = None,
+    progress_callback: Optional[Callable[[str], None]] = None,
+) -> ResumeOutput:
+    """
+    Multi-stage pipeline entry point.
+
+    Stage 1: LFM2.5-1.2B extracts structured facts per project (with distilled context)
+    Stage 2: Qwen3-1.7B generates a first-draft resume
+    Stage 3: Qwen3-4B polishes with user feedback (skipped if no feedback)
+
+    Model switching uses _restart_server() (~4-6s per switch on M2).
+
+    Args:
+        zip_path: Path to ZIP file containing git repositories
+        user_email: User's git email for attribution
+        stage1_model: Model for fact extraction (default: lfm2.5-1.2b-q4)
+        stage2_model: Model for draft generation (default: qwen3-1.7b-q8)
+        stage3_model: Model for polish/refinement (default: qwen3-4b-q4)
+        user_feedback: Optional feedback to apply in Stage 3
+        progress_callback: Optional callback for progress messages
+
+    Returns:
+        ResumeOutput with all sections populated
+    """
+    start_time = datetime.now()
+    errors: list[str] = []
+    models_used: list[str] = []
+
+    def prog(msg: str) -> None:
+        if progress_callback:
+            progress_callback(msg)
+        log.info(msg)
+
+    # Ensure all stage models are available
+    from .llm_client import ensure_model_available
+
+    for model_name in [stage1_model, stage2_model, stage3_model]:
+        prog(f"Checking model '{model_name}'...")
+        ensure_model_available(model_name)
+
+    # ── PHASE 1: EXTRACT + DISTILL ───────────────────────────────────
+    prog(f"Extracting {zip_path}...")
+    extract_dir = extract_zip(zip_path)
+    prog(f"Extracted to {extract_dir}")
+
+    repos = discover_git_repos(extract_dir)
+    if not repos:
+        raise RuntimeError("No git repositories found in ZIP")
+    prog(f"Found {len(repos)} repositories")
+
+    bundles: List[ProjectDataBundle] = []
+    for i, repo_path in enumerate(repos):
+        prog(f"Analyzing [{i+1}/{len(repos)}]: {repo_path.name}")
+        try:
+            bundle = _extract_project(
+                repo_path,
+                user_email,
+                llm_model=stage1_model,
+                progress=prog,
+            )
+            bundles.append(bundle)
+        except Exception as e:
+            error_msg = f"Error analyzing {repo_path.name}: {e}"
+            prog(f"  ERROR: {error_msg}")
+            errors.append(error_msg)
+
+    if not bundles:
+        raise RuntimeError("No repositories could be analyzed")
+
+    portfolio = _build_portfolio(user_email, bundles)
+    prog(
+        f"Portfolio: {portfolio.total_projects} projects, "
+        f"{len(portfolio.top_skills)} skills"
+    )
+
+    # Distill contexts
+    prog("Distilling project contexts...")
+    for bundle in bundles:
+        bundle.distilled_context = distill_project_context(bundle)
+        prog(
+            f"  Distilled {bundle.project_name}: "
+            f"~{bundle.distilled_context.token_estimate} tokens"
+        )
+
+    # ── STAGE 1: EXTRACTION (LFM2.5-1.2B) ────────────────────────────
+    prog(f"Stage 1: Extracting facts with {stage1_model}...")
+    models_used.append(stage1_model)
+    raw_facts: dict[str, RawProjectFacts] = {}
+
+    for bundle in bundles:
+        try:
+            facts = run_extraction_query(bundle, stage1_model, progress=prog)
+            raw_facts[bundle.project_name] = facts
+            prog(
+                f"  Extracted {bundle.project_name}: "
+                f"{len(facts.facts)} facts"
+            )
+        except Exception as e:
+            prog(f"  Extraction failed for {bundle.project_name}: {e}")
+            errors.append(f"Stage 1 failed for {bundle.project_name}: {e}")
+
+    if not raw_facts:
+        raise RuntimeError("Stage 1 extraction produced no results")
+
+    # ── STAGE 2: DRAFT (Qwen3-1.7B) ─────────────────────────────────
+    prog(f"Stage 2: Generating draft with {stage2_model}...")
+    models_used.append(stage2_model)
+
+    try:
+        draft_output = run_draft_queries(
+            raw_facts, portfolio, stage2_model, progress=prog
+        )
+        prog(
+            f"  Draft generated: {len(draft_output.project_sections)} projects, "
+            f"summary={'yes' if draft_output.professional_summary else 'no'}"
+        )
+    except Exception as e:
+        prog(f"Stage 2 draft failed: {e}")
+        errors.append(f"Stage 2 draft failed: {e}")
+        # Build a minimal output from extracted facts
+        draft_output = ResumeOutput(
+            stage="draft",
+            portfolio_data=portfolio,
+            raw_project_facts=raw_facts,
+            errors=errors,
+        )
+
+    # ── STAGE 3: POLISH (Qwen3-4B) ──────────────────────────────────
+    if user_feedback is not None:
+        prog(f"Stage 3: Polishing with {stage3_model}...")
+        models_used.append(stage3_model)
+
+        try:
+            final_output = run_polish_query(
+                draft_output, user_feedback, stage3_model, progress=prog
+            )
+            prog("  Polish complete")
+        except Exception as e:
+            prog(f"Stage 3 polish failed, using draft: {e}")
+            errors.append(f"Stage 3 polish failed: {e}")
+            final_output = draft_output
+            final_output.stage = "polish"
+    else:
+        prog("Stage 3: Skipped (no user feedback provided)")
+        final_output = draft_output
+
+    # ── FINALIZE ─────────────────────────────────────────────────────
+    elapsed = (datetime.now() - start_time).total_seconds()
+    final_output.generation_time_seconds = elapsed
+    final_output.model_used = stage2_model  # primary model
+    final_output.models_used = models_used
+    final_output.portfolio_data = portfolio
+    final_output.raw_project_facts = raw_facts
+    final_output.errors = errors
+
+    prog(
+        f"Multi-stage generation complete in {elapsed:.1f}s "
+        f"(models: {', '.join(models_used)})"
+    )
+
+    return final_output

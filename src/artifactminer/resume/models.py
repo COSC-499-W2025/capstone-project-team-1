@@ -313,6 +313,32 @@ class PortfolioDataBundle:
 
 
 # ---------------------------------------------------------------------------
+# Multi-stage pipeline types (Strategy B)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class RawProjectFacts:
+    """Stage 1 output — structured facts extracted by LFM2.5-1.2B."""
+
+    project_name: str = ""
+    summary: str = ""           # 1 sentence: what the project does
+    facts: List[str] = field(default_factory=list)   # 3-5 bullet facts
+    role: str = ""              # developer's specific contribution
+
+
+@dataclass
+class UserFeedback:
+    """User corrections/preferences between draft and polish stages."""
+
+    section_edits: Dict[str, str] = field(default_factory=dict)  # section_name -> corrected text
+    additions: List[str] = field(default_factory=list)            # additional info to include
+    removals: List[str] = field(default_factory=list)             # claims to remove
+    tone: str = ""                                                 # e.g. "more technical", "formal"
+    general_notes: str = ""                                        # free-form instructions
+
+
+# ---------------------------------------------------------------------------
 # ASSEMBLE phase output
 # ---------------------------------------------------------------------------
 
@@ -329,8 +355,13 @@ class ResumeOutput:
     skills_section: str = ""
     developer_profile: str = ""
 
+    # Multi-stage raw material (Strategy B)
+    raw_project_facts: Dict[str, RawProjectFacts] = field(default_factory=dict)
+    stage: str = "single"  # "single" | "extract" | "draft" | "polish"
+
     # Metadata
     portfolio_data: Optional[PortfolioDataBundle] = None
     model_used: str = ""
+    models_used: List[str] = field(default_factory=list)  # multi-stage tracks all models
     generation_time_seconds: float = 0.0
     errors: List[str] = field(default_factory=list)

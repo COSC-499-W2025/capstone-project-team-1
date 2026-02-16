@@ -12,7 +12,13 @@ Prompts are designed for small models (<=4B params):
 
 from __future__ import annotations
 
-from ..models import ProjectDataBundle, PortfolioDataBundle
+from ..models import (
+    ProjectDataBundle,
+    PortfolioDataBundle,
+    RawProjectFacts,
+    ResumeOutput,
+    UserFeedback,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -218,3 +224,215 @@ Project data:
 {context}
 
 Write the profile now (plain text, no preamble):"""
+
+
+# ---------------------------------------------------------------------------
+# Multi-stage pipeline prompts (Strategy B)
+# ---------------------------------------------------------------------------
+
+EXTRACTION_SYSTEM = (
+    "You are a data extraction assistant. "
+    "Extract structured facts from project data. "
+    "Output only the requested format with section markers. "
+    "Reference only information present in the data."
+)
+
+DRAFT_SYSTEM = (
+    "You are a resume writer for software engineers. "
+    "Write professional, achievement-focused resume content. "
+    "Reference only technologies and facts provided. "
+    "Output clean plain text with section markers as written."
+)
+
+POLISH_SYSTEM = (
+    "You are a senior resume editor. "
+    "Refine and polish resume content while preserving factual accuracy. "
+    "Apply the user's feedback precisely. "
+    "Maintain a consistent, professional tone throughout."
+)
+
+
+def build_extraction_prompt(bundle: ProjectDataBundle) -> str:
+    """
+    Build a Stage 1 extraction prompt for LFM2.5-1.2B.
+
+    Extracts top 5 resume-worthy facts per project. Simple, single-task prompt.
+    """
+    context = bundle.to_prompt_context()
+
+    return f"""Your task: extract the top resume-worthy facts from this project.
+
+Output format:
+PROJECT_SUMMARY: [1 sentence describing what the project does]
+FACTS:
+- [fact 1: a specific technical achievement]
+- [fact 2: a specific technical achievement]
+- [fact 3: a specific technical achievement]
+- [fact 4: a specific technical achievement (if available)]
+- [fact 5: a specific technical achievement (if available)]
+ROLE: [1 sentence about the developer's specific contribution]
+
+Rules:
+- Each fact must reference a concrete feature, endpoint, class, or fix from the data.
+- Write 3-5 facts depending on how much data is available.
+- Facts should be short phrases, not full sentences.
+- The ROLE should mention contribution percentage if available.
+
+Project data:
+{context}"""
+
+
+def build_draft_prompt(
+    raw_facts: dict[str, RawProjectFacts],
+    portfolio: PortfolioDataBundle,
+) -> str:
+    """
+    Build a Stage 2 draft prompt for Qwen3-1.7B.
+
+    Takes extracted facts from Stage 1 and produces a first-draft resume.
+    """
+    # Format the extracted facts
+    facts_lines: list[str] = []
+    for name, facts in raw_facts.items():
+        facts_lines.append(f"PROJECT: {name}")
+        facts_lines.append(f"SUMMARY: {facts.summary}")
+        if facts.facts:
+            facts_lines.append("FACTS:")
+            for f in facts.facts:
+                facts_lines.append(f"- {f}")
+        if facts.role:
+            facts_lines.append(f"ROLE: {facts.role}")
+        facts_lines.append("")
+
+    facts_text = "\n".join(facts_lines)
+
+    # Portfolio context
+    portfolio_lines = [
+        f"Total projects: {portfolio.total_projects}",
+        f"Languages: {', '.join(portfolio.languages_used[:6])}",
+    ]
+    if portfolio.frameworks_used:
+        portfolio_lines.append(f"Frameworks: {', '.join(portfolio.frameworks_used[:8])}")
+    if portfolio.top_skills:
+        portfolio_lines.append(f"Skills: {', '.join(portfolio.top_skills[:10])}")
+    portfolio_text = "\n".join(portfolio_lines)
+
+    return f"""Your task: write a complete first-draft resume using the extracted project facts below.
+
+Output format:
+PROFESSIONAL_SUMMARY: [2-3 sentences summarizing the developer's experience]
+
+SKILLS:
+Languages: [comma-separated list]
+Frameworks & Libraries: [comma-separated list]
+Tools & Infrastructure: [comma-separated list if applicable]
+Practices: [comma-separated list if applicable]
+
+For each project, write:
+PROJECT: [name]
+DESCRIPTION: [1 sentence]
+BULLETS:
+- [bullet 1]
+- [bullet 2]
+- [bullet 3]
+NARRATIVE: [1 sentence about contribution]
+
+DEVELOPER_PROFILE: [2-3 sentences about the developer's strengths]
+
+Rules:
+- Use the extracted facts as the basis for each project section.
+- Write in third person implied (no "I" or "they").
+- Each bullet should reference a specific technical achievement.
+- Name the exact technologies used.
+
+Portfolio context:
+{portfolio_text}
+
+Extracted project facts:
+{facts_text}
+
+Write the complete resume draft now:"""
+
+
+def build_polish_prompt(
+    draft_output: ResumeOutput,
+    feedback: UserFeedback,
+) -> str:
+    """
+    Build a Stage 3 polish prompt for Qwen3-4B.
+
+    Takes the draft resume and user feedback to produce the final version.
+    """
+    # Format the draft sections
+    draft_lines: list[str] = []
+
+    if draft_output.professional_summary:
+        draft_lines.append(f"PROFESSIONAL_SUMMARY: {draft_output.professional_summary}")
+        draft_lines.append("")
+
+    if draft_output.skills_section:
+        draft_lines.append(f"SKILLS:\n{draft_output.skills_section}")
+        draft_lines.append("")
+
+    for name, section in draft_output.project_sections.items():
+        draft_lines.append(f"PROJECT: {name}")
+        if section.description:
+            draft_lines.append(f"DESCRIPTION: {section.description}")
+        if section.bullets:
+            draft_lines.append("BULLETS:")
+            for b in section.bullets:
+                draft_lines.append(f"- {b}")
+        if section.narrative:
+            draft_lines.append(f"NARRATIVE: {section.narrative}")
+        draft_lines.append("")
+
+    if draft_output.developer_profile:
+        draft_lines.append(f"DEVELOPER_PROFILE: {draft_output.developer_profile}")
+
+    draft_text = "\n".join(draft_lines)
+
+    # Format user feedback
+    feedback_lines: list[str] = []
+    if feedback.tone:
+        feedback_lines.append(f"Tone preference: {feedback.tone}")
+    if feedback.general_notes:
+        feedback_lines.append(f"General notes: {feedback.general_notes}")
+    if feedback.section_edits:
+        feedback_lines.append("Section corrections:")
+        for section_name, corrected in feedback.section_edits.items():
+            feedback_lines.append(f"  {section_name}: {corrected}")
+    if feedback.additions:
+        feedback_lines.append("Additional information to include:")
+        for addition in feedback.additions:
+            feedback_lines.append(f"  - {addition}")
+    if feedback.removals:
+        feedback_lines.append("Claims to remove:")
+        for removal in feedback.removals:
+            feedback_lines.append(f"  - {removal}")
+
+    feedback_text = "\n".join(feedback_lines) if feedback_lines else "No specific feedback provided. Polish for clarity and consistency."
+
+    return f"""Your task: polish this resume draft, applying the user's feedback.
+
+Output the polished resume in the same format as the draft:
+PROFESSIONAL_SUMMARY: [polished text]
+SKILLS: [organized skills]
+PROJECT: [name]
+DESCRIPTION: [polished text]
+BULLETS: [polished bullets]
+NARRATIVE: [polished text]
+DEVELOPER_PROFILE: [polished text]
+
+Rules:
+- Preserve all factual claims from the draft unless the user asked to remove them.
+- Apply the user's corrections and tone preferences.
+- Improve prose quality, flow, and consistency.
+- Keep the same section structure.
+
+User feedback:
+{feedback_text}
+
+Draft resume:
+{draft_text}
+
+Write the polished resume now:"""
