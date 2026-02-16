@@ -45,24 +45,28 @@ class GenerationResult:
 
     def to_json(self, indent: int = 2) -> str:
         """Serialize to JSON."""
-        return json.dumps({
-            "portfolio": self.portfolio_facts.to_dict(),
-            "resume": {
-                "project_bullets": self.resume_content.project_bullets,
-                "professional_summary": self.resume_content.professional_summary,
-                "skills_section": self.resume_content.skills_section,
-                "skill_evolution": self.resume_content.skill_evolution,
-                "developer_profile": self.resume_content.developer_profile,
-                "complexity_highlights": self.resume_content.complexity_highlights,
-                "work_breakdown": self.resume_content.work_breakdown,
-                "llm_enhanced": self.resume_content.llm_enhanced,
-                "model_used": self.resume_content.model_used,
+        return json.dumps(
+            {
+                "portfolio": self.portfolio_facts.to_dict(),
+                "resume": {
+                    "project_bullets": self.resume_content.project_bullets,
+                    "professional_summary": self.resume_content.professional_summary,
+                    "skills_section": self.resume_content.skills_section,
+                    "skill_evolution": self.resume_content.skill_evolution,
+                    "developer_profile": self.resume_content.developer_profile,
+                    "complexity_highlights": self.resume_content.complexity_highlights,
+                    "work_breakdown": self.resume_content.work_breakdown,
+                    "llm_enhanced": self.resume_content.llm_enhanced,
+                    "model_used": self.resume_content.model_used,
+                },
+                "metadata": {
+                    "generation_time_seconds": self.generation_time_seconds,
+                    "errors": self.errors,
+                },
             },
-            "metadata": {
-                "generation_time_seconds": self.generation_time_seconds,
-                "errors": self.errors,
-            }
-        }, indent=indent, default=str)
+            indent=indent,
+            default=str,
+        )
 
     def to_markdown(self) -> str:
         """Generate human-readable markdown output."""
@@ -145,8 +149,14 @@ class GenerationResult:
 
         # Footer
         lines.append("---")
-        enhanced = "LLM-enhanced" if self.resume_content.llm_enhanced else "Template-generated"
-        model = f" ({self.resume_content.model_used})" if self.resume_content.model_used else ""
+        enhanced = (
+            "LLM-enhanced" if self.resume_content.llm_enhanced else "Template-generated"
+        )
+        model = (
+            f" ({self.resume_content.model_used})"
+            if self.resume_content.model_used
+            else ""
+        )
         lines.append(f"*{enhanced}{model} in {self.generation_time_seconds:.1f}s*")
 
         return "\n".join(lines)
@@ -163,14 +173,14 @@ def extract_zip(zip_path: str, extract_to: Optional[str] = None) -> Path:
     Returns:
         Path to extraction directory
     """
-    zip_path = Path(zip_path)
-    if not zip_path.exists():
-        raise FileNotFoundError(f"ZIP file not found: {zip_path}")
+    zip_file = Path(zip_path)
+    if not zip_file.exists():
+        raise FileNotFoundError(f"ZIP file not found: {zip_file}")
 
     if extract_to:
         extract_dir = Path(extract_to)
     else:
-        extract_dir = zip_path.parent / f"{zip_path.stem}_extracted"
+        extract_dir = zip_file.parent / f"{zip_file.stem}_extracted"
 
     # Clean up previous extraction
     if extract_dir.exists():
@@ -178,7 +188,7 @@ def extract_zip(zip_path: str, extract_to: Optional[str] = None) -> Path:
 
     extract_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(zip_path, "r") as zf:
+    with zipfile.ZipFile(zip_file, "r") as zf:
         zf.extractall(extract_dir)
 
     return extract_dir
@@ -196,14 +206,25 @@ def discover_git_repos(base_path: Path) -> List[Path]:
     """
     repos = []
 
-    def is_git_repo(path: Path) -> bool:
-        return (path / ".git").is_dir()
+    def is_macos_metadata(path: Path) -> bool:
+        try:
+            parts = path.relative_to(base_path).parts
+        except ValueError:
+            parts = path.parts
+        return any(part == "__MACOSX" or part.startswith("._") for part in parts)
 
-    if is_git_repo(base_path):
+    def is_git_repo(path: Path) -> bool:
+        git_dir = path / ".git"
+        return git_dir.is_dir() and (git_dir / "HEAD").is_file()
+
+    if is_git_repo(base_path) and not is_macos_metadata(base_path):
         repos.append(base_path)
 
     for path in base_path.rglob("*"):
-        if path.is_dir() and is_git_repo(path):
+        if not path.is_dir() or is_macos_metadata(path):
+            continue
+
+        if is_git_repo(path):
             # Avoid nested repos
             is_nested = any(
                 is_git_repo(parent)
@@ -248,6 +269,7 @@ def generate_resume(
     # Ensure the LLM model is available before starting analysis
     model = llm_model or "qwen3-1.7b"
     from .llm_client import ensure_model_available
+
     log(f"Ensuring model '{model}' is available...")
     ensure_model_available(model)
 
@@ -281,7 +303,7 @@ def generate_resume(
 
     for i, repo_path in enumerate(repos):
         repo_name = repo_path.name
-        log(f"Analyzing [{i+1}/{len(repos)}]: {repo_name}")
+        log(f"Analyzing [{i + 1}/{len(repos)}]: {repo_name}")
 
         try:
             # Get repository stats (existing function)
@@ -335,9 +357,7 @@ def generate_resume(
                 )
                 if commit_msgs:
                     log(f"  Classifying {len(commit_msgs)} commits...")
-                    facts.commit_breakdown = classify_commits(
-                        commit_msgs, model=model
-                    )
+                    facts.commit_breakdown = classify_commits(commit_msgs, model=model)
                     facts.commit_subjects = [c.message for c in commit_msgs]
             except Exception as e:
                 log(f"  Note: commit classification skipped: {e}")
@@ -360,6 +380,7 @@ def generate_resume(
                 )
                 if style:
                     from dataclasses import asdict as _asdict
+
                     facts.style_metrics = _asdict(style)
             except Exception as e:
                 log(f"  Note: style metrics skipped: {e}")
@@ -369,14 +390,15 @@ def generate_resume(
                 complexity = compute_complexity_metrics(str(repo_path), user_email)
                 if complexity:
                     from dataclasses import asdict as _asdict2
-                    facts.complexity_highlights = [
-                        _asdict2(c) for c in complexity[:5]
-                    ]
+
+                    facts.complexity_highlights = [_asdict2(c) for c in complexity[:5]]
             except Exception as e:
                 log(f"  Note: complexity metrics skipped: {e}")
 
             project_facts_list.append(facts)
-            log(f"  ✓ {len(facts.detected_skills)} skills, {len(facts.insights)} insights")
+            log(
+                f"  ✓ {len(facts.detected_skills)} skills, {len(facts.insights)} insights"
+            )
 
         except Exception as e:
             error_msg = f"Error analyzing {repo_name}: {e}"
@@ -389,7 +411,9 @@ def generate_resume(
     # Step 4: Build portfolio facts
     log("Building portfolio summary...")
     portfolio = build_portfolio_facts(user_email, project_facts_list)
-    log(f"Portfolio: {portfolio.total_projects} projects, {len(portfolio.top_skills)} skills")
+    log(
+        f"Portfolio: {portfolio.total_projects} projects, {len(portfolio.top_skills)} skills"
+    )
 
     # Step 5: LLM narrative generation for new analysis features
 
@@ -400,6 +424,7 @@ def generate_resume(
                 SkillAppearance,
                 generate_skill_timeline_narrative,
             )
+
             appearances = [
                 SkillAppearance(
                     skill_name=s["skill"],
@@ -417,15 +442,14 @@ def generate_resume(
             log(f"  Note: skill timeline narrative skipped: {e}")
 
     # 5b: Developer style fingerprint
-    all_style_metrics = [
-        p.style_metrics for p in project_facts_list if p.style_metrics
-    ]
+    all_style_metrics = [p.style_metrics for p in project_facts_list if p.style_metrics]
     if all_style_metrics:
         try:
             from .analysis.developer_style import (
                 StyleMetrics,
                 generate_style_fingerprint,
             )
+
             # Use the first project's metrics (or aggregate later)
             m = all_style_metrics[0]
             metrics = StyleMetrics(**m)
@@ -446,6 +470,7 @@ def generate_resume(
                 FileComplexity,
                 generate_complexity_narrative,
             )
+
             metrics_list = [FileComplexity(**c) for c in all_complexity]
             log("Generating complexity narrative...")
             narrative = generate_complexity_narrative(metrics_list, model)
