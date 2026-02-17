@@ -169,6 +169,17 @@ class DistilledContext:
     token_estimate: int = 0
 
 
+@dataclass
+class LLMProjectUnderstanding:
+    """LLM-derived semantic understanding of the project from raw code snippets."""
+
+    project_purpose: str = ""
+    user_value: str = ""
+    architecture_summary: str = ""
+    key_capabilities: List[str] = field(default_factory=list)
+    implementation_highlights: List[str] = field(default_factory=list)
+
+
 # ---------------------------------------------------------------------------
 # EXTRACT phase outputs
 # ---------------------------------------------------------------------------
@@ -245,6 +256,9 @@ class ProjectDataBundle:
 
     # Distilled context (set by distill_project_context, used by to_prompt_context)
     distilled_context: Optional[DistilledContext] = None
+
+    # LLM semantic understanding from raw repo snippets
+    llm_understanding: Optional[LLMProjectUnderstanding] = None
 
     def all_commit_messages(self) -> List[str]:
         """Flat list of all commit messages across groups."""
@@ -342,6 +356,22 @@ class ProjectDataBundle:
         if self.readme_text:
             excerpt = self.readme_text[:600].strip()
             lines.append(f"\nREADME excerpt:\n{excerpt}")
+
+        # LLM semantic understanding
+        if self.llm_understanding is not None:
+            if self.llm_understanding.project_purpose:
+                lines.append(f"\nLLM purpose: {self.llm_understanding.project_purpose}")
+            if self.llm_understanding.user_value:
+                lines.append(f"LLM user value: {self.llm_understanding.user_value}")
+            if self.llm_understanding.architecture_summary:
+                lines.append(
+                    f"LLM architecture: {self.llm_understanding.architecture_summary}"
+                )
+            if self.llm_understanding.key_capabilities:
+                lines.append(
+                    "LLM capabilities: "
+                    f"{', '.join(self.llm_understanding.key_capabilities[:5])}"
+                )
 
         # Commit messages by type — deduplicated
         for group in self.commit_groups:
