@@ -18,12 +18,19 @@ from artifactminer.resume.models import (
     ProjectDataBundle,
 )
 from artifactminer.resume.queries.prompts import (
+    BULLET_SYSTEM,
+    MICRO_POLISH_SYSTEM,
     PROJECT_SYSTEM,
     SUMMARY_SYSTEM,
+    build_bullet_polish_prompt,
+    build_bullets_prompt,
+    build_micro_profile_prompt,
+    build_micro_summary_prompt,
     build_profile_prompt,
     build_project_prompt,
     build_skills_prompt,
     build_summary_prompt,
+    build_text_polish_prompt,
 )
 
 
@@ -425,3 +432,156 @@ class TestPromptBuildersParameterized:
         prompt = builder()
         for marker in required_markers:
             assert marker in prompt, f"Missing marker: {marker}"
+
+
+# ---------------------------------------------------------------------------
+# Micro-prompt structure tests (v2 architecture)
+# ---------------------------------------------------------------------------
+
+
+class TestMicroPrompts:
+    """Tests for per-section micro-prompt builders."""
+
+    def test_bullet_system_is_defined(self) -> None:
+        """BULLET_SYSTEM should be a non-empty string."""
+        assert isinstance(BULLET_SYSTEM, str)
+        assert len(BULLET_SYSTEM) > 20
+        assert "action verb" in BULLET_SYSTEM
+
+    def test_micro_polish_system_is_defined(self) -> None:
+        """MICRO_POLISH_SYSTEM should be a non-empty string."""
+        assert isinstance(MICRO_POLISH_SYSTEM, str)
+        assert len(MICRO_POLISH_SYSTEM) > 20
+        assert "factual" in MICRO_POLISH_SYSTEM
+
+    def test_bullets_prompt_contains_facts(self) -> None:
+        """build_bullets_prompt should include provided facts."""
+        facts = ["Built user registration", "Added JWT auth"]
+        prompt = build_bullets_prompt("my-api", facts)
+        assert "Built user registration" in prompt
+        assert "Added JWT auth" in prompt
+        assert "my-api" in prompt
+
+    def test_bullets_prompt_ends_with_priming(self) -> None:
+        """build_bullets_prompt should end with priming text for GBNF."""
+        prompt = build_bullets_prompt("my-api", ["fact1"])
+        assert prompt.endswith("- ")
+
+    def test_bullets_prompt_ownership_hints(self) -> None:
+        """build_bullets_prompt should include ownership-aware verb hints."""
+        solo = build_bullets_prompt("p", ["fact"], contribution_pct=100.0)
+        assert "Built" in solo
+        lead = build_bullets_prompt("p", ["fact"], contribution_pct=70.0)
+        assert "Led" in lead or "Architected" in lead
+        team = build_bullets_prompt("p", ["fact"], contribution_pct=30.0)
+        assert "Contributed" in team
+
+    def test_micro_summary_prompt_contains_portfolio(self) -> None:
+        """build_micro_summary_prompt should include portfolio stats."""
+        portfolio = _make_portfolio()
+        prompt = build_micro_summary_prompt(portfolio)
+        assert str(portfolio.total_projects) in prompt
+        assert "Python" in prompt
+
+    def test_micro_profile_prompt_contains_projects(self) -> None:
+        """build_micro_profile_prompt should include project names."""
+        portfolio = _make_portfolio()
+        prompt = build_micro_profile_prompt(portfolio)
+        assert "my-web-api" in prompt
+
+    def test_bullet_polish_prompt_contains_feedback(self) -> None:
+        """build_bullet_polish_prompt should include the feedback text."""
+        prompt = build_bullet_polish_prompt(
+            ["Built API", "Added auth", "Created CRUD"],
+            "Use stronger action verbs",
+        )
+        assert "Use stronger action verbs" in prompt
+        assert "Built API" in prompt
+        assert prompt.endswith("- ")
+
+    def test_text_polish_prompt_contains_original(self) -> None:
+        """build_text_polish_prompt should include original text and feedback."""
+        prompt = build_text_polish_prompt(
+            "Backend developer with API experience.",
+            "More technical tone",
+        )
+        assert "Backend developer" in prompt
+        assert "More technical tone" in prompt
+
+
+class TestBulletGrammar:
+    """Tests for BULLET_GRAMMAR structure."""
+
+    def test_bullet_grammar_defined(self) -> None:
+        """BULLET_GRAMMAR should be a non-empty GBNF string."""
+        from artifactminer.resume.queries.grammars import BULLET_GRAMMAR
+
+        assert isinstance(BULLET_GRAMMAR, str)
+        assert "root" in BULLET_GRAMMAR
+        assert "bullet" in BULLET_GRAMMAR
+
+    def test_polish_bullet_grammar_alias(self) -> None:
+        """POLISH_BULLET_GRAMMAR should be identical to BULLET_GRAMMAR."""
+        from artifactminer.resume.queries.grammars import (
+            BULLET_GRAMMAR,
+            POLISH_BULLET_GRAMMAR,
+        )
+
+        assert POLISH_BULLET_GRAMMAR is BULLET_GRAMMAR
+
+
+# ---------------------------------------------------------------------------
+# Data card context in build_bullets_prompt
+# ---------------------------------------------------------------------------
+
+
+class TestBulletsPromptWithDataCard:
+    """Tests for build_bullets_prompt with data_card_context parameter."""
+
+    def test_with_data_card_includes_section(self) -> None:
+        """When data_card_context is provided, prompt should include Data card section."""
+        facts = ["Built user registration", "Added JWT auth"]
+        card = "Type: Web API\nLanguage: Python\nImpact: 3,000 lines added"
+        prompt = build_bullets_prompt("my-api", facts, data_card_context=card)
+
+        assert "Data card:" in prompt
+        assert "3,000 lines added" in prompt
+        assert "quantitative" in prompt.lower()
+
+    def test_without_data_card_unchanged(self) -> None:
+        """When data_card_context is empty, prompt should be identical to original."""
+        facts = ["Built user registration", "Added JWT auth"]
+        prompt_without = build_bullets_prompt("my-api", facts)
+        prompt_empty = build_bullets_prompt("my-api", facts, data_card_context="")
+
+        assert prompt_without == prompt_empty
+        assert "Data card:" not in prompt_without
+
+    def test_with_data_card_ends_with_priming(self) -> None:
+        """Even with data card, prompt should end with priming for GBNF."""
+        facts = ["Built API"]
+        prompt = build_bullets_prompt(
+            "my-api", facts, data_card_context="Type: CLI Tool"
+        )
+        assert prompt.endswith("- ")
+
+    def test_with_data_card_includes_facts(self) -> None:
+        """Data card prompt should still include the facts section."""
+        facts = ["Built user registration", "Added JWT auth"]
+        card = "Type: Web API"
+        prompt = build_bullets_prompt("my-api", facts, data_card_context=card)
+
+        assert "Facts:" in prompt
+        assert "Built user registration" in prompt
+        assert "Added JWT auth" in prompt
+
+    def test_with_data_card_and_ownership_hint(self) -> None:
+        """Data card prompt should work with ownership hints."""
+        facts = ["Built API"]
+        card = "Type: Web API"
+        prompt = build_bullets_prompt(
+            "my-api", facts, contribution_pct=100.0, data_card_context=card
+        )
+
+        assert "Data card:" in prompt
+        assert "Built" in prompt or "Designed" in prompt

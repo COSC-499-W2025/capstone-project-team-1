@@ -9,16 +9,25 @@ import pytest
 from artifactminer.resume.models import (
     CodeConstructs,
     CommitGroup,
+    EnrichedClass,
+    EnrichedConstructs,
+    EnrichedFunction,
+    EvidenceLinkedFact,
+    GitStats,
+    ImportGraph,
     PortfolioDataBundle,
     ProjectDataBundle,
     ProjectSection,
     RawProjectFacts,
     ResumeOutput,
+    TestRatio,
     UserFeedback,
 )
 from artifactminer.resume.queries.prompts import (
+    BULLET_SYSTEM,
     DRAFT_SYSTEM,
     EXTRACTION_SYSTEM,
+    MICRO_POLISH_SYSTEM,
     POLISH_SYSTEM,
     build_draft_prompt,
     build_extraction_prompt,
@@ -26,11 +35,19 @@ from artifactminer.resume.queries.prompts import (
 )
 from artifactminer.resume.queries.runner import (
     _apply_citation_gate,
+    _build_data_card_context,
+    _build_skills_deterministic,
+    _clean_evidence_artifacts,
+    _clean_llm_artifacts,
+    _parse_bullet_response,
     _parse_draft_response,
     _parse_extraction_response,
+    compile_project_data_card,
     run_draft_queries,
+    run_draft_queries_v2,
     run_extraction_query,
     run_polish_query,
+    run_polish_query_v2,
 )
 
 
@@ -74,6 +91,13 @@ def _make_bundle(**overrides) -> ProjectDataBundle:
             classes=["User", "TaskItem"],
             test_functions=["test_list_users"],
             key_functions=["authenticate", "generate_token"],
+        ),
+        git_stats=GitStats(
+            lines_added=3000,
+            lines_deleted=500,
+            net_lines=2500,
+            files_touched=40,
+            active_days=60,
         ),
     )
     defaults.update(overrides)
@@ -852,3 +876,588 @@ class TestEnrichedExtractDistill:
         assert "external_dep:" in values_str
         assert "linter:" in values_str
         assert "hotspot:" in values_str
+
+
+# ---------------------------------------------------------------------------
+# v2 helpers
+# ---------------------------------------------------------------------------
+
+
+def _make_raw_facts_with_evidence() -> dict[str, RawProjectFacts]:
+    """Create sample extracted facts with evidence-linked items."""
+    return {
+        "my-web-api": RawProjectFacts(
+            project_name="my-web-api",
+            summary="commit:feature:A REST API for managing tasks and users.",
+            facts=[
+                "commit:feat:Built user registration endpoint with email validation",
+                "Implemented JWT-based authentication (E2) with token refresh",
+                "Created CRUD endpoints [feature] for task management",
+                "Added null-safety checks | evidence: E1, E4",
+            ],
+            fact_items=[
+                EvidenceLinkedFact(
+                    fact_id="F1",
+                    text="commit:feat:Built user registration endpoint with email validation",
+                    evidence_keys=["E1"],
+                ),
+                EvidenceLinkedFact(
+                    fact_id="F2",
+                    text="Implemented JWT-based authentication (E2) with token refresh",
+                    evidence_keys=["E2"],
+                ),
+                EvidenceLinkedFact(
+                    fact_id="F3",
+                    text="Created CRUD endpoints [feature] for task management",
+                    evidence_keys=["E3"],
+                ),
+            ],
+            role="feat: Contributed 85% of the backend code.",
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Step 2: Evidence artifact cleanup
+# ---------------------------------------------------------------------------
+
+
+class TestCleanEvidenceArtifacts:
+    """Tests for _clean_evidence_artifacts stripping."""
+
+    def test_strips_commit_prefix(self) -> None:
+        """Should remove commit:feature: and commit:feat: prefixes."""
+        assert _clean_evidence_artifacts("commit:feature:Added login") == "Added login"
+        assert _clean_evidence_artifacts("commit:feat:Added login") == "Added login"
+
+    def test_strips_inline_evidence_keys(self) -> None:
+        """Should remove (E1), (E2) markers from inline text."""
+        result = _clean_evidence_artifacts("Built API (E2) with auth")
+        assert "(E2)" not in result
+        assert "Built API" in result
+
+    def test_strips_bracket_markers(self) -> None:
+        """Should remove [feature], [docs] bracket markers."""
+        result = _clean_evidence_artifacts("Added endpoint [feature] for users")
+        assert "[feature]" not in result
+        assert "Added endpoint" in result
+
+    def test_strips_evidence_suffix(self) -> None:
+        """Should remove | evidence: E1, E4 suffixes."""
+        result = _clean_evidence_artifacts("Built API | evidence: E1, E4")
+        assert "evidence:" not in result
+        assert "Built API" in result
+
+    def test_strips_conventional_commit_prefix(self) -> None:
+        """Should remove feat:, fix: etc. prefixes."""
+        assert _clean_evidence_artifacts("feat: added login") == "added login"
+        assert _clean_evidence_artifacts("fix(auth): resolved bug") == "resolved bug"
+
+    def test_handles_empty_input(self) -> None:
+        """Should return empty string for empty input."""
+        assert _clean_evidence_artifacts("") == ""
+        assert _clean_evidence_artifacts(None) == ""
+
+
+class TestCleanLlmArtifacts:
+    """Tests for _clean_llm_artifacts stripping think tags, emoji, and mid-text prefixes."""
+
+    def test_strips_think_tags(self) -> None:
+        """Should remove </think> tags from LLM output."""
+        result = _clean_llm_artifacts("Built user registration.</think>")
+        assert "</think>" not in result
+        assert "Built user registration." in result
+
+    def test_strips_emoji_garbage(self) -> None:
+        """Should remove long runs of emoji characters."""
+        result = _clean_llm_artifacts("Built API.\n\u2705\uFE0F\U0001F525\U0001F525\U0001F525\U0001F525")
+        assert "\U0001F525" not in result
+        assert "Built API." in result
+
+    def test_strips_midtext_conventional_prefix(self) -> None:
+        """Should remove 'feat: ' appearing mid-text."""
+        result = _clean_llm_artifacts("Implemented via feat: save results to JSON file")
+        assert "feat:" not in result
+        assert "save results" in result
+
+    def test_preserves_clean_text(self) -> None:
+        """Should not alter text that has no artifacts."""
+        text = "Built user registration with email validation."
+        assert _clean_llm_artifacts(text) == text
+
+
+class TestParseBulletResponse:
+    """Tests for _parse_bullet_response with artifact cleanup."""
+
+    def test_strips_think_tags_from_bullets(self) -> None:
+        """Should produce clean bullets with no think tags."""
+        text = "- Built user registration.</think>\n- Added JWT auth.\n- Created CRUD.\n"
+        bullets = _parse_bullet_response(text)
+        assert len(bullets) == 3
+        for b in bullets:
+            assert "</think>" not in b
+
+    def test_strips_emoji_garbage_from_bullets(self) -> None:
+        """Should remove emoji garbage appended to bullets."""
+        text = (
+            "- Built API.\n"
+            "- Added auth.\n"
+            "- Created CRUD.\n"
+            "\u2705\uFE0F\U0001F525\U0001F525\U0001F525\U0001F525\U0001F525"
+        )
+        bullets = _parse_bullet_response(text)
+        assert len(bullets) == 3
+        for b in bullets:
+            assert "\U0001F525" not in b
+
+
+# ---------------------------------------------------------------------------
+# Step 3: Deterministic skills
+# ---------------------------------------------------------------------------
+
+
+class TestBuildSkillsDeterministic:
+    """Tests for _build_skills_deterministic capitalization and categorization."""
+
+    def test_capitalizes_known_skills(self) -> None:
+        """Should apply proper capitalization for known skill names."""
+        portfolio = _make_portfolio()
+        portfolio.languages_used = ["python", "javascript"]
+        portfolio.frameworks_used = ["fastapi", "sqlalchemy"]
+        skills = _build_skills_deterministic(portfolio)
+        assert "Python" in skills
+        assert "JavaScript" in skills
+        assert "FastAPI" in skills
+
+    def test_categorizes_tools_separately(self) -> None:
+        """Should put tool-like items in Tools & Infrastructure."""
+        portfolio = _make_portfolio()
+        portfolio.frameworks_used = ["Docker", "FastAPI", "Kubernetes"]
+        skills = _build_skills_deterministic(portfolio)
+        assert "Tools & Infrastructure:" in skills
+        assert "Docker" in skills.split("Tools & Infrastructure:")[1]
+
+    def test_deduplicates_across_categories(self) -> None:
+        """Should not list the same skill in multiple categories."""
+        portfolio = _make_portfolio()
+        portfolio.languages_used = ["Python"]
+        portfolio.frameworks_used = ["Python"]  # duplicate
+        portfolio.top_skills = ["Python"]  # triple
+        skills = _build_skills_deterministic(portfolio)
+        assert skills.count("Python") == 1
+
+
+# ---------------------------------------------------------------------------
+# Step 7: run_draft_queries_v2
+# ---------------------------------------------------------------------------
+
+
+class TestRunDraftQueriesV2:
+    """Tests for run_draft_queries_v2 with mocked LLM."""
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_returns_draft_with_micro_prompts(self, mock_query: MagicMock) -> None:
+        """Should return a ResumeOutput built from per-section micro-prompts."""
+        # Mock returns for bullet query, summary query, profile query
+        mock_query.side_effect = [
+            "- Designed user registration with email validation\n"
+            "- Implemented JWT authentication with token refresh\n"
+            "- Built CRUD endpoints for task management\n",
+            "Experienced developer with 1 project using Python. Builds REST APIs and backend systems.",
+            "Backend-focused developer with API and authentication expertise. Delivers reliable web services.",
+        ]
+        raw_facts = _make_raw_facts_with_evidence()
+        portfolio = _make_portfolio()
+        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+
+        assert output.stage == "draft"
+        assert "my-web-api" in output.project_sections
+        section = output.project_sections["my-web-api"]
+        assert len(section.bullets) > 0
+        assert output.professional_summary
+        assert output.developer_profile
+        assert output.skills_section
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_uses_deterministic_skills(self, mock_query: MagicMock) -> None:
+        """Skills section should be built deterministically without LLM call."""
+        mock_query.side_effect = [
+            "- Built registration\n- Added auth\n- Created CRUD\n",
+            "Developer with projects.",
+            "Backend developer.",
+        ]
+        raw_facts = _make_raw_facts_with_evidence()
+        portfolio = _make_portfolio()
+        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+
+        # 3 calls: 1 bullet + 1 summary + 1 profile (no skills LLM call)
+        assert mock_query.call_count == 3
+        assert "Languages:" in output.skills_section
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_cleans_evidence_artifacts(self, mock_query: MagicMock) -> None:
+        """Descriptions and narratives should be free of evidence artifacts."""
+        mock_query.side_effect = [
+            "- Built endpoint\n- Added auth\n- Created CRUD\n",
+            "Summary text.",
+            "Profile text.",
+        ]
+        raw_facts = _make_raw_facts_with_evidence()
+        portfolio = _make_portfolio()
+        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+
+        section = output.project_sections["my-web-api"]
+        assert "commit:" not in section.description
+        assert "(E" not in section.description
+
+
+# ---------------------------------------------------------------------------
+# Step 8: run_polish_query_v2
+# ---------------------------------------------------------------------------
+
+
+class TestRunPolishQueryV2:
+    """Tests for run_polish_query_v2 with mocked LLM."""
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_polishes_bullets_with_feedback(self, mock_query: MagicMock) -> None:
+        """Should polish bullets when feedback is provided."""
+        mock_query.side_effect = [
+            "- Engineered user registration with email validation\n"
+            "- Architected JWT authentication system\n"
+            "- Developed CRUD endpoints for task management\n",
+            "Seasoned backend engineer with REST API expertise.",
+            "Expert developer specializing in authentication systems.",
+        ]
+        draft = _make_draft_output()
+        feedback = UserFeedback(tone="more technical", general_notes="Use stronger verbs")
+        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+
+        assert output.stage == "polish"
+        assert "my-web-api" in output.project_sections
+        # Should have polished bullets (3 calls: bullets + summary + profile)
+        assert mock_query.call_count == 3
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_preserves_draft_without_feedback(self, mock_query: MagicMock) -> None:
+        """Should preserve draft content when no feedback is provided."""
+        draft = _make_draft_output()
+        feedback = UserFeedback()
+        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+
+        assert output.stage == "polish"
+        # No LLM calls should be made
+        mock_query.assert_not_called()
+        assert output.professional_summary == draft.professional_summary
+        assert output.developer_profile == draft.developer_profile
+
+    @patch("artifactminer.resume.queries.runner._query")
+    def test_applies_direct_section_edits(self, mock_query: MagicMock) -> None:
+        """Should apply section_edits directly without LLM."""
+        draft = _make_draft_output()
+        feedback = UserFeedback(
+            section_edits={"summary": "Custom summary text."},
+        )
+        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+
+        assert output.professional_summary == "Custom summary text."
+        mock_query.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Assembler metrics line
+# ---------------------------------------------------------------------------
+
+
+class TestAssemblerMetricsLine:
+    """Tests for the metrics line in assembled markdown."""
+
+    def test_metrics_line_in_markdown(self) -> None:
+        """Markdown should include a metrics line when git_stats are available."""
+        from artifactminer.resume.assembler import assemble_markdown
+
+        bundle = _make_bundle(
+            git_stats=GitStats(
+                lines_added=3000,
+                files_touched=40,
+                active_days=60,
+            ),
+        )
+        portfolio = _make_portfolio()
+        portfolio.projects = [bundle]
+
+        output = ResumeOutput(
+            stage="draft",
+            portfolio_data=portfolio,
+            project_sections={
+                "my-web-api": ProjectSection(
+                    description="A REST API.",
+                    bullets=["Built registration endpoint"],
+                ),
+            },
+        )
+        md = assemble_markdown(output)
+        assert "3,000 lines added" in md
+        assert "40 files" in md
+        assert "60 active days" in md
+
+
+# ---------------------------------------------------------------------------
+# Deterministic data card compilation (replaces Stage 1 LLM)
+# ---------------------------------------------------------------------------
+
+
+def _make_bundle_for_data_card(**overrides) -> ProjectDataBundle:
+    """Create a ProjectDataBundle with enriched fields for data card tests."""
+    defaults = dict(
+        project_name="my-web-api",
+        project_path="/tmp/my-web-api",
+        project_type="Web API",
+        languages=["Python", "JavaScript"],
+        language_percentages=[72.0, 28.0],
+        primary_language="Python",
+        frameworks=["FastAPI", "SQLAlchemy"],
+        user_contribution_pct=85.0,
+        user_total_commits=45,
+        total_commits=53,
+        first_commit="2024-01-15",
+        last_commit="2024-06-20",
+        readme_text="A REST API for managing tasks and users built with FastAPI. It supports authentication and CRUD operations.",
+        commit_groups=[
+            CommitGroup(
+                category="feature",
+                messages=[
+                    "feat: implement user registration endpoint",
+                    "feat: add task CRUD operations",
+                    "feat: add JWT authentication",
+                ],
+            ),
+            CommitGroup(
+                category="bugfix",
+                messages=["fix: handle null user in create endpoint"],
+            ),
+        ],
+        constructs=CodeConstructs(
+            routes=["GET /api/users", "POST /api/users", "GET /api/tasks"],
+            classes=["User", "TaskItem"],
+            test_functions=["test_list_users"],
+            key_functions=["authenticate", "generate_token"],
+        ),
+        git_stats=GitStats(
+            lines_added=3000,
+            lines_deleted=500,
+            net_lines=2500,
+            files_touched=40,
+            active_days=60,
+        ),
+        test_ratio=TestRatio(
+            test_files=5,
+            source_files=12,
+            test_ratio=0.42,
+            has_ci=True,
+        ),
+        enriched_constructs=EnrichedConstructs(
+            classes=[
+                EnrichedClass(name="User", method_count=3, total_loc=25, parent_class=""),
+                EnrichedClass(name="TaskItem", method_count=2, total_loc=15, parent_class="BaseModel"),
+            ],
+            functions=[
+                EnrichedFunction(name="authenticate", param_count=1, loc=5, has_return_type=True),
+            ],
+            routes=["GET /api/users", "POST /api/users", "GET /api/tasks"],
+            test_functions=["test_list_users", "test_create_user"],
+        ),
+    )
+    defaults.update(overrides)
+    return ProjectDataBundle(**defaults)
+
+
+class TestCompileProjectDataCard:
+    """Tests for compile_project_data_card deterministic fact compilation."""
+
+    def test_produces_facts_from_feature_commits(self) -> None:
+        """Should produce facts from feature commits with evidence links."""
+        bundle = _make_bundle_for_data_card()
+        result = compile_project_data_card(bundle)
+
+        assert result.project_name == "my-web-api"
+        assert result.source_format == "data_card"
+        assert len(result.facts) >= 1
+        assert len(result.fact_items) >= 1
+        # At least one fact should come from a commit
+        fact_texts = " ".join(result.facts)
+        assert "registration" in fact_texts or "CRUD" in fact_texts or "JWT" in fact_texts
+
+    def test_summary_derived_from_readme(self) -> None:
+        """Summary should come from the first sentence of the README."""
+        bundle = _make_bundle_for_data_card()
+        result = compile_project_data_card(bundle)
+
+        assert "REST API" in result.summary or "tasks" in result.summary.lower()
+
+    def test_summary_fallback_when_no_readme(self) -> None:
+        """Should fall back to project type when README is empty."""
+        bundle = _make_bundle_for_data_card(readme_text="")
+        result = compile_project_data_card(bundle)
+
+        assert "web api" in result.summary.lower() or "python" in result.summary.lower()
+
+    def test_role_reflects_contribution_pct(self) -> None:
+        """Role should reflect the contribution percentage."""
+        # Sole developer
+        bundle_sole = _make_bundle_for_data_card(user_contribution_pct=100.0)
+        result_sole = compile_project_data_card(bundle_sole)
+        assert "Sole developer" in result_sole.role
+
+        # Lead developer
+        bundle_lead = _make_bundle_for_data_card(user_contribution_pct=75.0)
+        result_lead = compile_project_data_card(bundle_lead)
+        assert "Led development" in result_lead.role
+
+        # Team contributor
+        bundle_team = _make_bundle_for_data_card(user_contribution_pct=30.0)
+        result_team = compile_project_data_card(bundle_team)
+        assert "Contributed" in result_team.role
+
+    def test_deduplicates_near_identical_commits(self) -> None:
+        """Near-duplicate commits should be collapsed."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(
+                    category="feature",
+                    messages=[
+                        "feat: add user authentication",
+                        "feat(auth): add user authentication",
+                        "feat: implement payment gateway",
+                    ],
+                ),
+            ],
+        )
+        result = compile_project_data_card(bundle)
+
+        # Should not have two facts about "user authentication"
+        auth_facts = [f for f in result.facts if "authentication" in f.lower()]
+        assert len(auth_facts) <= 1
+
+    def test_supplements_with_construct_facts(self) -> None:
+        """Should include construct-derived facts when commits are sparse."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(category="feature", messages=["feat: initial commit"]),
+            ],
+        )
+        result = compile_project_data_card(bundle)
+
+        # Should have route or class facts
+        all_text = " ".join(result.facts)
+        has_constructs = (
+            "endpoint" in all_text.lower()
+            or "class" in all_text.lower()
+            or "User" in all_text
+        )
+        assert has_constructs
+
+    def test_includes_test_coverage_fact(self) -> None:
+        """Should include a test coverage fact when test files exist."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(
+                    category="feature",
+                    messages=["feat: add login endpoint"],
+                ),
+            ],
+        )
+        result = compile_project_data_card(bundle)
+
+        test_facts = [f for f in result.facts if "test" in f.lower()]
+        assert len(test_facts) >= 1
+
+    def test_never_calls_llm(self) -> None:
+        """compile_project_data_card should never invoke the LLM."""
+        bundle = _make_bundle_for_data_card()
+        # No mock needed — if it tried to call _query it would fail
+        # since there's no server running. Just verify it returns cleanly.
+        result = compile_project_data_card(bundle)
+        assert result.source_format == "data_card"
+        assert result.evidence_catalog  # should have an evidence catalog
+
+    def test_evidence_catalog_populated(self) -> None:
+        """Evidence catalog should be populated from bundle data."""
+        bundle = _make_bundle_for_data_card()
+        result = compile_project_data_card(bundle)
+
+        assert len(result.evidence_catalog) > 0
+        values = list(result.evidence_catalog.values())
+        values_str = " ".join(values)
+        assert "commit:" in values_str
+
+    def test_max_facts_respected(self) -> None:
+        """Should not produce more facts than max_facts."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(
+                    category="feature",
+                    messages=[f"feat: feature {i}" for i in range(10)],
+                ),
+            ],
+        )
+        result = compile_project_data_card(bundle, max_facts=3)
+
+        assert len(result.facts) <= 3
+        assert len(result.fact_items) <= 3
+
+
+class TestBuildDataCardContext:
+    """Tests for _build_data_card_context structured text block."""
+
+    def test_contains_project_identity(self) -> None:
+        """Context should include project type, language, and frameworks."""
+        bundle = _make_bundle_for_data_card()
+        context = _build_data_card_context(bundle)
+
+        assert "Web API" in context
+        assert "Python" in context
+        assert "FastAPI" in context
+
+    def test_contains_impact_metrics(self) -> None:
+        """Context should include lines added, files, and active days."""
+        bundle = _make_bundle_for_data_card()
+        context = _build_data_card_context(bundle)
+
+        assert "3,000" in context
+        assert "40 files" in context
+        assert "60 active days" in context
+
+    def test_contains_constructs(self) -> None:
+        """Context should include enriched class info and routes."""
+        bundle = _make_bundle_for_data_card()
+        context = _build_data_card_context(bundle)
+
+        assert "User" in context
+        assert "3 methods" in context
+        assert "3 endpoints" in context
+
+    def test_contains_contribution_pct(self) -> None:
+        """Context should include contribution percentage."""
+        bundle = _make_bundle_for_data_card()
+        context = _build_data_card_context(bundle)
+
+        assert "85%" in context
+
+    def test_contains_test_ratio(self) -> None:
+        """Context should include test ratio information."""
+        bundle = _make_bundle_for_data_card()
+        context = _build_data_card_context(bundle)
+
+        assert "test" in context.lower()
+        assert "42%" in context
+
+    def test_handles_minimal_bundle(self) -> None:
+        """Should not crash on a bundle with minimal data."""
+        bundle = ProjectDataBundle(
+            project_name="minimal",
+            project_path="/tmp/minimal",
+        )
+        context = _build_data_card_context(bundle)
+
+        assert "Software Project" in context
