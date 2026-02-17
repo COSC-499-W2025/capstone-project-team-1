@@ -61,16 +61,18 @@ sentence    ::= [A-Z] [^.]+ "."
 
 
 # ---------------------------------------------------------------------------
-# Bullet section: exactly 3 bullet lines (micro-prompt output)
+# Bullet section: 2-4 bullet lines (micro-prompt output)
 # ---------------------------------------------------------------------------
 
 # Enforces:
 #   - <bullet line>
 #   - <bullet line>
-#   - <bullet line>
+#   - <bullet line>   (optional)
+#   - <bullet line>   (optional)
 BULLET_GRAMMAR = r"""
-root       ::= bullet bullet bullet
+root       ::= bullet bullet bullet-opt bullet-opt
 bullet     ::= "- " line "\n"
+bullet-opt ::= bullet | ""
 line       ::= [^\n]+
 """.strip()
 

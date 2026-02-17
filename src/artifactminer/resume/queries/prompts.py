@@ -363,16 +363,25 @@ def _resume_output_to_json_payload(output: ResumeOutput) -> dict:
 
 BULLET_SYSTEM = (
     "You are a resume editor for software engineers. "
-    "Rephrase technical facts as concise, achievement-focused resume bullets. "
+    "Write concise, achievement-focused resume bullets as plain bullet lines only. "
     "Each bullet starts with a strong action verb. "
     "Reference ONLY features, technologies, and specifics from the provided facts. "
+    "Prioritize shipped features and concrete implementation details over process metadata. "
     "Do NOT invent features, metrics, or technologies not present in the facts."
+)
+
+SUMMARY_MICRO_SYSTEM = (
+    "You are a resume editor for software engineers. "
+    "Write concise, factual resume prose in third-person implied voice. "
+    "Output only the requested sentences, with no preface or commentary. "
+    "Reference only projects, technologies, and scope present in the provided data."
 )
 
 MICRO_POLISH_SYSTEM = (
     "You are a senior resume editor. "
     "Improve clarity, tone, and impact of resume content. "
     "Preserve all factual claims — only improve phrasing. "
+    "Return only polished resume text with no preface or notes. "
     "Do NOT add new features, technologies, or metrics not in the original."
 )
 
@@ -388,8 +397,11 @@ def build_bullets_prompt(
     *,
     contribution_pct: float | None = None,
     data_card_context: str = "",
+    target_bullets: int = 3,
 ) -> str:
     """Build a per-project bullet generation prompt (uses BULLET_GRAMMAR)."""
+    target = max(2, min(4, target_bullets))
+
     ownership_hint = ""
     if contribution_pct is not None:
         if contribution_pct >= 95:
@@ -398,13 +410,12 @@ def build_bullets_prompt(
             )
         elif contribution_pct >= 50:
             ownership_hint = (
-                'Use "Led development of", "Architected", '
-                'or "Implemented" as action verbs.\n'
+                'Use "Implemented", "Led development of", '
+                'or "Architected" as action verbs.\n'
             )
         else:
             ownership_hint = (
-                'Use "Contributed to", "Implemented", '
-                'or "Supported" as action verbs.\n'
+                'Use "Implemented", "Built", or "Contributed to" as action verbs.\n'
             )
 
     facts_block = "\n".join(f"- {f}" for f in facts[:5])
@@ -415,22 +426,27 @@ def build_bullets_prompt(
             f"{ownership_hint}\n"
             f"Data card:\n{data_card_context}\n\n"
             f"Facts:\n{facts_block}\n\n"
-            "Using the data card and facts above, write exactly 3 professional "
-            "resume bullets.\n"
+            f"Using the data card and facts above, write exactly {target} "
+            "professional resume bullets.\n"
             "Each bullet starts with a strong action verb and "
-            "references a specific feature or technology.\n"
-            "Prefer quantitative claims when the data card provides numbers.\n"
-            "Write 3 bullets now:\n- "
+            "references a specific feature, endpoint, class, or technology.\n"
+            "Prioritize shipped functionality and technical implementation work.\n"
+            "Use testing and process metrics only when they directly support "
+            "a concrete feature claim.\n"
+            "Return bullet lines only (no headings, notes, or commentary).\n"
+            f"Write {target} bullets now:\n- "
         )
 
     return (
         f"Project: {project_name}\n"
         f"{ownership_hint}\n"
         f"Facts:\n{facts_block}\n\n"
-        "Rephrase the above facts as exactly 3 professional resume bullets.\n"
+        f"Rephrase the above facts as exactly {target} professional resume bullets.\n"
         "Each bullet starts with a strong action verb and "
-        "references a specific feature or technology.\n"
-        "Write 3 bullets now:\n- "
+        "references a specific feature, endpoint, class, or technology.\n"
+        "Prioritize shipped functionality over process metadata.\n"
+        "Return bullet lines only (no headings, notes, or commentary).\n"
+        f"Write {target} bullets now:\n- "
     )
 
 
@@ -445,8 +461,10 @@ def build_micro_summary_prompt(portfolio: "PortfolioDataBundle") -> str:
         f"Portfolio: {portfolio.total_projects} projects ({project_types}).\n"
         f"Technologies: {langs}.\n"
         f"Total commits: {portfolio.total_commits}.\n\n"
-        "Write a 2-sentence professional summary for a software engineer's resume.\n"
-        "Mention the number of projects, key technologies, and types of systems built.\n"
+        "Write exactly 2 sentences for a professional resume summary.\n"
+        "Mention project count, key technologies, and system types built.\n"
+        "Use third-person implied voice and start directly with the summary text.\n"
+        "Return summary text only (no lead-in phrase or labels).\n"
         "Write the summary now:\n"
     )
 
@@ -463,23 +481,33 @@ def build_micro_profile_prompt(portfolio: "PortfolioDataBundle") -> str:
 
     return (
         f"Projects:\n{projects_block}\n\n"
-        "Write a 2-sentence developer profile describing "
+        "Write exactly 2 sentences for a developer profile describing "
         "technical strengths and range.\n"
         "Reference specific project types and technologies from the data.\n"
+        "Use third-person implied voice and return profile text only.\n"
+        "Do not include lead-in phrases or labels.\n"
         "Write the profile now:\n"
     )
 
 
-def build_bullet_polish_prompt(bullets: list[str], feedback: str) -> str:
+def build_bullet_polish_prompt(
+    bullets: list[str],
+    feedback: str,
+    *,
+    target_bullets: int | None = None,
+) -> str:
     """Build a bullet polish prompt (uses BULLET_GRAMMAR)."""
-    bullets_block = "\n".join(f"- {b}" for b in bullets[:3])
+    target = target_bullets if target_bullets is not None else len(bullets)
+    target = max(2, min(4, target))
+    bullets_block = "\n".join(f"- {b}" for b in bullets[:4])
 
     return (
         f"Current bullets:\n{bullets_block}\n\n"
         f"Feedback: {feedback}\n\n"
-        "Improve these 3 bullets based on the feedback. "
-        "Keep all factual claims.\n"
-        "Write 3 improved bullets now:\n- "
+        f"Improve these {target} bullets based on the feedback. "
+        "Keep all factual claims and concrete technologies.\n"
+        "Return bullet lines only (no headings, notes, or commentary).\n"
+        f"Write {target} improved bullets now:\n- "
     )
 
 
@@ -489,7 +517,8 @@ def build_text_polish_prompt(text: str, feedback: str) -> str:
         f"Current text:\n{text}\n\n"
         f"Feedback: {feedback}\n\n"
         "Improve this text based on the feedback. "
-        "Keep all factual claims. Write 2-3 sentences.\n"
+        "Keep all factual claims. Write exactly 2 sentences.\n"
+        "Use third-person implied voice and return text only.\n"
         "Write the improved text now:\n"
     )
 

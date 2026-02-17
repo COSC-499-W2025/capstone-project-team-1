@@ -17,6 +17,7 @@ from typing import Callable, List, Optional
 
 from .models import (
     ChurnComplexityHotspot,
+    GitStats,
     ProjectDataBundle,
     PortfolioDataBundle,
     RawProjectFacts,
@@ -62,7 +63,7 @@ log = logging.getLogger(__name__)
 
 
 def _compute_churn_complexity(
-    git_stats: "GitStats",  # noqa: F821
+    git_stats: GitStats,
     file_complexity: list,
 ) -> list[ChurnComplexityHotspot]:
     """Cross-reference file hotspots with complexity metrics.
@@ -516,6 +517,7 @@ def generate_resume_v3_multistage(
             "stage3_text_fallback": 0,
         },
         "citations": {},
+        "prose": {},
     }
 
     def merge_quality_metrics(source: dict) -> None:

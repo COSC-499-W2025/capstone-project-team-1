@@ -29,6 +29,7 @@ from .prompts import (
     DRAFT_SYSTEM,
     POLISH_SYSTEM,
     BULLET_SYSTEM,
+    SUMMARY_MICRO_SYSTEM,
     MICRO_POLISH_SYSTEM,
     build_project_prompt,
     build_summary_prompt,
@@ -217,6 +218,37 @@ _EMOJI_GARBAGE_RE = re.compile(
     r"[\U0001F300-\U0001FAFF\u2600-\u27BF\u200D\uFE0F\u2705\u274C]{3,}",
 )
 
+_PAREN_NOTE_RE = re.compile(r"\(\s*note\s*:[^)]+\)", re.I)
+
+_META_PREAMBLE_RE = re.compile(
+    r"^(?:here is|here's|below is|this is)\b[^:\n]{0,180}:\s*",
+    re.I,
+)
+
+_FIRST_PERSON_RE = re.compile(r"\b(?:i|me|my|mine|myself)\b", re.I)
+
+_LOW_SIGNAL_FACT_RE = re.compile(
+    r"\b(?:notes?|todo|idea|conventional commit|commit quality|test-to-source ratio|"
+    r"module coverage|module breadth|active days)\b",
+    re.I,
+)
+
+_LOW_SIGNAL_BULLET_RE = re.compile(
+    r"\b(?:conventional commit|commit quality|test-to-source ratio|module coverage|"
+    r"module breadth|supported the maintenance|maintained \d+ test files?|"
+    r"0 methods|0% test-to-source)\b",
+    re.I,
+)
+
+_FEATURE_KEYWORD_RE = re.compile(
+    r"\b(?:endpoint|api|route|service|feature|auth|authentication|"
+    r"validation|class|function|cli|algorithm|query|pipeline|module|"
+    r"terraform|bucket|routing|regression|search|flag|helper|grid|"
+    r"split|export|logging|navigation|message|building|portfolio|"
+    r"dijkstra|rotate)\b",
+    re.I,
+)
+
 
 def _clean_evidence_artifacts(text: str) -> str:
     """Strip evidence markers and conventional commit prefixes from text."""
@@ -224,6 +256,7 @@ def _clean_evidence_artifacts(text: str) -> str:
         return ""
     cleaned = _EVIDENCE_ARTIFACT_RE.sub("", text)
     cleaned = _CONVENTIONAL_PREFIX_RE.sub("", cleaned)
+    cleaned = re.sub(r"^(?:notes?|todo|idea|content)\s*:\s*", "", cleaned, flags=re.I)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
@@ -234,10 +267,66 @@ def _clean_llm_artifacts(text: str) -> str:
         return ""
     cleaned = _THINK_TAG_RE.sub("", text)
     cleaned = _EMOJI_GARBAGE_RE.sub("", cleaned)
+    cleaned = _PAREN_NOTE_RE.sub("", cleaned)
     cleaned = _CONVENTIONAL_MIDTEXT_RE.sub("", cleaned)
     cleaned = _EVIDENCE_ARTIFACT_RE.sub("", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
+
+
+def _is_low_signal_fact(text: str) -> bool:
+    """Heuristic filter for facts that are weak resume evidence."""
+    cleaned = _clean_inline_text(_clean_evidence_artifacts(text))
+    if not cleaned:
+        return True
+    if _LOW_SIGNAL_FACT_RE.search(cleaned):
+        return True
+    if not _FEATURE_KEYWORD_RE.search(cleaned) and len(cleaned.split()) <= 2:
+        return True
+    return False
+
+
+def _is_low_signal_bullet(text: str) -> bool:
+    """Heuristic filter for bullets that read as process metadata."""
+    cleaned = _clean_inline_text(_clean_llm_artifacts(text))
+    if not cleaned:
+        return True
+    if _LOW_SIGNAL_BULLET_RE.search(cleaned):
+        return True
+    if not _FEATURE_KEYWORD_RE.search(cleaned) and len(cleaned.split()) <= 7:
+        return True
+    return False
+
+
+def _looks_like_meta_preamble(text: str) -> bool:
+    """Return True if text starts with assistant-style lead-in phrasing."""
+    if not text:
+        return False
+    return bool(_META_PREAMBLE_RE.match(text.strip()))
+
+
+def _contains_first_person(text: str) -> bool:
+    """Detect first-person voice that should not appear in resume prose."""
+    if not text:
+        return False
+    return bool(_FIRST_PERSON_RE.search(text))
+
+
+def _target_bullet_count(
+    facts: list[str], contribution_pct: float | None = None
+) -> int:
+    """Choose a dynamic bullet count (2-4) based on evidence density/ownership."""
+    signal = len([fact for fact in facts if not _is_low_signal_fact(fact)])
+
+    if signal <= 2:
+        return 2
+    if signal >= 5 and (contribution_pct or 0) >= 50:
+        return 4
+    if signal >= 4 and (contribution_pct or 0) >= 95:
+        return 4
+    if contribution_pct is not None and contribution_pct < 35 and signal <= 3:
+        return 2
+    return 3
 
 
 def _clean_all_facts(
@@ -245,15 +334,40 @@ def _clean_all_facts(
 ) -> dict[str, RawProjectFacts]:
     """Apply artifact cleanup to all Stage 1 facts in-place."""
     for facts in raw_facts.values():
+        original_fact_texts = list(facts.facts)
         facts.summary = _clean_evidence_artifacts(facts.summary)
         facts.role = _clean_evidence_artifacts(facts.role)
-        facts.facts = [
-            _clean_evidence_artifacts(f)
-            for f in facts.facts
-            if _clean_evidence_artifacts(f)
-        ]
+
+        cleaned_fact_items: list[EvidenceLinkedFact] = []
+        cleaned_fact_texts: list[str] = []
         for item in facts.fact_items:
             item.text = _clean_evidence_artifacts(item.text)
+            if not item.text or _is_low_signal_fact(item.text):
+                continue
+            cleaned_fact_items.append(item)
+            cleaned_fact_texts.append(item.text)
+
+        if cleaned_fact_items:
+            facts.fact_items = cleaned_fact_items
+            facts.facts = cleaned_fact_texts
+        else:
+            facts.fact_items = []
+            facts.facts = [
+                _clean_evidence_artifacts(f)
+                for f in facts.facts
+                if _clean_evidence_artifacts(f)
+                and not _is_low_signal_fact(_clean_evidence_artifacts(f))
+            ]
+
+        if not facts.facts:
+            # Preserve at least one item to keep downstream generation alive.
+            fallback = [
+                _clean_evidence_artifacts(f)
+                for f in original_fact_texts
+                if _clean_evidence_artifacts(f)
+            ]
+            facts.facts = fallback[:1]
+
     return raw_facts
 
 
@@ -262,9 +376,7 @@ def _clean_all_facts(
 # ---------------------------------------------------------------------------
 
 
-def _find_evidence_key(
-    catalog: dict[str, str], prefix: str
-) -> str | None:
+def _find_evidence_key(catalog: dict[str, str], prefix: str) -> str | None:
     """Find the first evidence catalog entry whose value starts with *prefix*."""
     for key, value in catalog.items():
         if value.startswith(prefix):
@@ -298,30 +410,22 @@ def _build_data_card_context(bundle: ProjectDataBundle) -> str:
             f"{gs.active_days} active days"
         )
     tr = bundle.test_ratio
-    if tr.test_files > 0:
+    if tr.test_files >= 2 and tr.test_ratio >= 0.2:
         lines.append(
             f"Testing: {tr.test_files} test files / {tr.source_files} source "
-            f"({tr.test_ratio:.0%} ratio)"
-            + (", CI configured" if tr.has_ci else "")
+            f"({tr.test_ratio:.0%} ratio)" + (", CI configured" if tr.has_ci else "")
         )
-    cq = bundle.commit_quality
-    if cq.type_diversity > 0:
-        lines.append(
-            f"Commit quality: {cq.conventional_pct:.0f}% conventional, "
-            f"{cq.type_diversity} types, "
-            f"longest streak {cq.longest_streak}"
-        )
+
     mb = bundle.module_breadth
-    if mb.modules_touched > 0:
-        lines.append(
-            f"Module breadth: {mb.modules_touched}/{mb.total_modules} modules "
-            f"({mb.breadth_pct:.0f}%)"
-        )
+    if mb.modules_touched > 0 and mb.total_modules > 0:
+        lines.append(f"Scope: touched {mb.modules_touched}/{mb.total_modules} modules")
 
     # --- Key constructs ---
     ec = bundle.enriched_constructs
     if ec:
         for cls in ec.classes[:4]:
+            if cls.method_count <= 0 and cls.total_loc < 10:
+                continue
             lines.append(
                 f"Class {cls.name}: {cls.method_count} methods, {cls.total_loc} LOC"
                 + (f" (extends {cls.parent_class})" if cls.parent_class else "")
@@ -453,12 +557,10 @@ def compile_project_data_card(
         deduped_set.discard(msg)  # consume it so we don't repeat
 
         cleaned = _clean_evidence_artifacts(msg)
-        if not cleaned:
+        if not cleaned or _is_low_signal_fact(cleaned):
             continue
 
-        evidence_key = _find_evidence_key(
-            evidence_catalog, f"commit:{category}:"
-        )
+        evidence_key = _find_evidence_key(evidence_catalog, f"commit:{category}:")
         evidence_keys = [evidence_key] if evidence_key else []
 
         fact_id = f"F{fact_idx}"
@@ -491,6 +593,8 @@ def compile_project_data_card(
         for cls in ec.classes[:2]:
             if len(fact_items) >= max_facts:
                 break
+            if cls.method_count <= 0 or cls.total_loc < 10:
+                continue
             cls_text = (
                 f"Implemented {cls.name} class "
                 f"({cls.method_count} methods, {cls.total_loc} LOC)"
@@ -508,7 +612,7 @@ def compile_project_data_card(
 
     # 3. Test coverage fact
     tr = bundle.test_ratio
-    if tr.test_files > 0 and len(fact_items) < max_facts:
+    if tr.test_files >= 2 and tr.test_ratio >= 0.2 and len(fact_items) < max_facts:
         test_text = (
             f"Maintained {tr.test_files} test files "
             f"({tr.test_ratio:.0%} test-to-source ratio)"
@@ -571,7 +675,11 @@ def _build_skills_deterministic(portfolio: PortfolioDataBundle) -> str:
     for skill in portfolio.top_skills[:15]:
         capitalized = _capitalize_skill(skill)
         token = _normalize_token(capitalized)
-        if token in language_tokens or token in framework_tokens or token in tool_tokens:
+        if (
+            token in language_tokens
+            or token in framework_tokens
+            or token in tool_tokens
+        ):
             continue
         if _normalize_token(skill) in _COMMON_LANGUAGES:
             categories["languages"].append(capitalized)
@@ -1066,7 +1174,101 @@ def _clean_summary_or_profile(text: str) -> str:
     cleaned = re.sub(
         r"^(SUMMARY|PROFILE|DEVELOPER PROFILE)\s*:\s*", "", cleaned, flags=re.I
     )
+    cleaned = _META_PREAMBLE_RE.sub("", cleaned)
+    cleaned = _PAREN_NOTE_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned.strip()
+
+
+def _apply_prose_hygiene(output: ResumeOutput) -> None:
+    """Apply deterministic cleanup to remove obvious prose failures."""
+    summary = _clean_summary_or_profile(output.professional_summary)
+    profile = _clean_summary_or_profile(output.developer_profile)
+
+    if _looks_like_meta_preamble(summary) or _contains_first_person(summary):
+        summary = ""
+    if _looks_like_meta_preamble(profile) or _contains_first_person(profile):
+        profile = ""
+
+    output.professional_summary = summary
+    output.developer_profile = profile
+
+    fact_pool = _fact_pool_by_project(output.raw_project_facts or {})
+
+    for project_name, section in output.project_sections.items():
+        raw_ids = list(section.bullet_fact_ids or [])
+        while len(raw_ids) < len(section.bullets):
+            raw_ids.append([])
+
+        cleaned_bullets: list[str] = []
+        cleaned_ids: list[list[str]] = []
+        seen: set[str] = set()
+
+        for idx, bullet in enumerate(section.bullets):
+            cleaned = _clean_inline_text(_clean_llm_artifacts(bullet))
+            if not cleaned or _is_low_signal_bullet(cleaned):
+                continue
+            key = cleaned.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned_bullets.append(cleaned)
+            cleaned_ids.append(raw_ids[idx])
+
+        if len(cleaned_bullets) < 2:
+            facts = fact_pool.get(project_name, {})
+            for fid, fact_text in facts.items():
+                if len(cleaned_bullets) >= 2:
+                    break
+                candidate = _fact_to_repair_bullet(fact_text)
+                if not candidate or _is_low_signal_bullet(candidate):
+                    continue
+                key = candidate.casefold()
+                if key in seen:
+                    continue
+                seen.add(key)
+                cleaned_bullets.append(candidate)
+                cleaned_ids.append([fid])
+
+        section.description = _clean_inline_text(
+            _clean_llm_artifacts(section.description)
+        )
+        section.narrative = _clean_inline_text(_clean_llm_artifacts(section.narrative))
+        section.bullets = cleaned_bullets[:4]
+        section.bullet_fact_ids = cleaned_ids[: len(section.bullets)]
+
+
+def _compute_prose_metrics(output: ResumeOutput) -> dict[str, float | int]:
+    """Compute lightweight prose quality metrics for regression tracking."""
+    bullets: list[str] = []
+    for section in output.project_sections.values():
+        bullets.extend(section.bullets)
+
+    starter_counts: dict[str, int] = {}
+    for bullet in bullets:
+        match = re.match(r"([A-Za-z]+)", bullet)
+        if not match:
+            continue
+        starter = match.group(1).casefold()
+        starter_counts[starter] = starter_counts.get(starter, 0) + 1
+
+    max_starter = max(starter_counts.values()) if starter_counts else 0
+    repetition_ratio = (max_starter / len(bullets)) if bullets else 0.0
+
+    summary = output.professional_summary or ""
+    profile = output.developer_profile or ""
+    joined = f"{summary}\n{profile}"
+
+    return {
+        "bullet_count": len(bullets),
+        "low_signal_bullets": sum(1 for b in bullets if _is_low_signal_bullet(b)),
+        "note_leaks": sum(1 for b in bullets if _PAREN_NOTE_RE.search(b)),
+        "meta_preamble_hits": int(_looks_like_meta_preamble(summary))
+        + int(_looks_like_meta_preamble(profile)),
+        "first_person_hits": len(_FIRST_PERSON_RE.findall(joined)),
+        "unique_starters": len(starter_counts),
+        "repetition_ratio": round(repetition_ratio, 4),
+    }
 
 
 def _normalize_skills_section(raw: str, portfolio: PortfolioDataBundle) -> str:
@@ -1938,11 +2140,18 @@ def _run_bullet_query(
     if not facts:
         return [], []
 
+    high_signal_facts = [
+        fact for fact in facts if fact and not _is_low_signal_fact(fact)
+    ]
+    facts_for_prompt = high_signal_facts or [fact for fact in facts if fact]
+    target_bullets = _target_bullet_count(facts_for_prompt, contribution_pct)
+
     prompt = build_bullets_prompt(
         project_name,
-        facts,
+        facts_for_prompt,
         contribution_pct=contribution_pct,
         data_card_context=data_card_context,
+        target_bullets=target_bullets,
     )
 
     try:
@@ -1956,14 +2165,31 @@ def _run_bullet_query(
         # Prepend "- " since prompt primes with it and grammar expects it
         if response and not response.startswith("- "):
             response = "- " + response
-        bullets = _parse_bullet_response(response)
+        bullets = [
+            _clean_inline_text(_clean_llm_artifacts(b))
+            for b in _parse_bullet_response(response)
+        ]
+        bullets = [b for b in bullets if b and not _is_low_signal_bullet(b)]
     except Exception as exc:
         log.warning("Bullet query failed for %s: %s", project_name, exc)
         bullets = []
 
+    if len(bullets) < target_bullets:
+        seen = {b.casefold() for b in bullets}
+        for fact in facts_for_prompt:
+            if len(bullets) >= target_bullets:
+                break
+            candidate = _fact_to_repair_bullet(fact)
+            if not candidate:
+                continue
+            key = candidate.casefold()
+            if key in seen or _is_low_signal_bullet(candidate):
+                continue
+            seen.add(key)
+            bullets.append(candidate)
+
     if not bullets:
-        # Fallback: convert cleaned facts directly
-        bullets = [_fact_to_repair_bullet(f) for f in facts[:3] if f]
+        bullets = [_fact_to_repair_bullet(f) for f in facts_for_prompt[:2] if f]
 
     # Map bullets to fact IDs (1:1 with input facts order)
     bullet_fact_ids: list[list[str]] = []
@@ -1973,7 +2199,7 @@ def _run_bullet_query(
         else:
             bullet_fact_ids.append([])
 
-    return bullets[:3], bullet_fact_ids[:3]
+    return bullets[:target_bullets], bullet_fact_ids[:target_bullets]
 
 
 def _run_summary_query(
@@ -1985,6 +2211,17 @@ def _run_summary_query(
     """Run a single summary-generation call."""
     from .grammars import SUMMARY_GRAMMAR
 
+    def _fallback_summary() -> str:
+        langs = ", ".join(portfolio.languages_used[:3])
+        project_types = ", ".join(
+            f"{count} {ptype}" for ptype, count in portfolio.project_types.items()
+        )
+        return (
+            f"Software developer with experience across {portfolio.total_projects} "
+            f"projects spanning {project_types}. "
+            f"Builds web APIs, libraries, and tooling using {langs}."
+        )
+
     if progress:
         progress("  [Stage 2] Generating professional summary...")
 
@@ -1993,22 +2230,21 @@ def _run_summary_query(
         response = _query(
             prompt,
             model,
-            BULLET_SYSTEM,
+            SUMMARY_MICRO_SYSTEM,
             max_tokens=200,
             grammar=SUMMARY_GRAMMAR,
         )
         cleaned = _clean_summary_or_profile(response)
-        if cleaned:
+        if (
+            cleaned
+            and not _looks_like_meta_preamble(cleaned)
+            and not _contains_first_person(cleaned)
+        ):
             return cleaned
     except Exception as exc:
         log.warning("Summary query failed: %s", exc)
 
-    # Deterministic fallback
-    return (
-        f"Software developer with experience across "
-        f"{portfolio.total_projects} projects "
-        f"using {', '.join(portfolio.languages_used[:3])}."
-    )
+    return _fallback_summary()
 
 
 def _run_profile_query(
@@ -2020,6 +2256,17 @@ def _run_profile_query(
     """Run a single profile-generation call."""
     from .grammars import SUMMARY_GRAMMAR
 
+    def _fallback_profile() -> str:
+        dominant_types = ", ".join(
+            f"{count} {ptype}" for ptype, count in portfolio.project_types.items()
+        )
+        core_tech = ", ".join(portfolio.languages_used[:4])
+        return (
+            f"Builds practical systems across {dominant_types} with a strong "
+            f"implementation focus. "
+            f"Works across backend APIs, libraries, and tooling using {core_tech}."
+        )
+
     if progress:
         progress("  [Stage 2] Generating developer profile...")
 
@@ -2028,21 +2275,21 @@ def _run_profile_query(
         response = _query(
             prompt,
             model,
-            BULLET_SYSTEM,
+            SUMMARY_MICRO_SYSTEM,
             max_tokens=200,
             grammar=SUMMARY_GRAMMAR,
         )
         cleaned = _clean_summary_or_profile(response)
-        if cleaned:
+        if (
+            cleaned
+            and not _looks_like_meta_preamble(cleaned)
+            and not _contains_first_person(cleaned)
+        ):
             return cleaned
     except Exception as exc:
         log.warning("Profile query failed: %s", exc)
 
-    # Deterministic fallback
-    return (
-        "Builds practical systems with a strong implementation focus "
-        "across backend, tooling, and delivery workflows."
-    )
+    return _fallback_profile()
 
 
 # ---------------------------------------------------------------------------
@@ -2080,6 +2327,8 @@ def run_draft_queries_v2(
 
     # 4. Per-project bullet generation
     output = ResumeOutput(stage="draft")
+    output.portfolio_data = portfolio
+    output.raw_project_facts = raw_facts
     bundle_map: dict[str, ProjectDataBundle] = {
         b.project_name: b for b in portfolio.projects
     }
@@ -2116,9 +2365,7 @@ def run_draft_queries_v2(
     output.professional_summary = _run_summary_query(
         portfolio, model, progress=progress
     )
-    output.developer_profile = _run_profile_query(
-        portfolio, model, progress=progress
-    )
+    output.developer_profile = _run_profile_query(portfolio, model, progress=progress)
     output.skills_section = skills_section
 
     # Fallbacks
@@ -2138,11 +2385,24 @@ def run_draft_queries_v2(
     if not output.skills_section:
         output.skills_section = _build_skills_deterministic(portfolio)
 
-    # 6. Citation gate
-    output.portfolio_data = portfolio
-    output.raw_project_facts = raw_facts
+    # 6. Deterministic prose cleanup + citation gate
+    _apply_prose_hygiene(output)
+
+    if not output.professional_summary:
+        output.professional_summary = (
+            f"Software developer with experience across "
+            f"{portfolio.total_projects} projects "
+            f"using {', '.join(portfolio.languages_used[:3])}."
+        )
+    if not output.developer_profile:
+        output.developer_profile = (
+            "Builds practical systems with a strong implementation focus "
+            "across backend, tooling, and delivery workflows."
+        )
+
     citation_metrics = _apply_citation_gate(output, raw_facts)
     output.quality_metrics["citations"] = citation_metrics
+    output.quality_metrics["prose"] = _compute_prose_metrics(output)
     output.quality_metrics["schema"] = {
         "draft_v2_micro": 1,
     }
@@ -2205,10 +2465,13 @@ def run_polish_query_v2(
     for project_name, section in draft_output.project_sections.items():
         if has_content_feedback and section.bullets:
             if progress:
-                progress(
-                    f"  [Stage 3 v2] Polishing bullets for {project_name}..."
-                )
-            prompt = build_bullet_polish_prompt(section.bullets[:3], feedback_text)
+                progress(f"  [Stage 3 v2] Polishing bullets for {project_name}...")
+            target_bullets = max(2, min(4, len(section.bullets[:4]) or 2))
+            prompt = build_bullet_polish_prompt(
+                section.bullets[:4],
+                feedback_text,
+                target_bullets=target_bullets,
+            )
             try:
                 response = _query(
                     prompt,
@@ -2219,19 +2482,23 @@ def run_polish_query_v2(
                 )
                 if response and not response.startswith("- "):
                     response = "- " + response
-                polished_bullets = _parse_bullet_response(response)
+                polished_bullets = [
+                    _clean_inline_text(_clean_llm_artifacts(b))
+                    for b in _parse_bullet_response(response)
+                ]
+                polished_bullets = [
+                    b for b in polished_bullets if b and not _is_low_signal_bullet(b)
+                ]
                 if polished_bullets:
                     output.project_sections[project_name] = ProjectSection(
                         description=section.description,
-                        bullets=polished_bullets[:3],
+                        bullets=polished_bullets[:target_bullets],
                         bullet_fact_ids=section.bullet_fact_ids,
                         narrative=section.narrative,
                     )
                     continue
             except Exception as exc:
-                log.warning(
-                    "Bullet polish failed for %s: %s", project_name, exc
-                )
+                log.warning("Bullet polish failed for %s: %s", project_name, exc)
 
         # No polish needed or polish failed — keep draft
         output.project_sections[project_name] = ProjectSection(
@@ -2274,9 +2541,7 @@ def run_polish_query_v2(
     ):
         if progress:
             progress("  [Stage 3 v2] Polishing profile...")
-        prompt = build_text_polish_prompt(
-            draft_output.developer_profile, feedback_text
-        )
+        prompt = build_text_polish_prompt(draft_output.developer_profile, feedback_text)
         try:
             response = _query(
                 prompt,
@@ -2301,9 +2566,24 @@ def run_polish_query_v2(
     if not output.project_sections:
         output.project_sections = dict(draft_output.project_sections)
 
-    # --- Citation gate ---
+    # --- Deterministic prose cleanup + citation gate ---
+    _apply_prose_hygiene(output)
+
+    if not output.professional_summary and output.portfolio_data:
+        langs = ", ".join(output.portfolio_data.languages_used[:3])
+        output.professional_summary = (
+            f"Software developer with experience across "
+            f"{output.portfolio_data.total_projects} projects using {langs}."
+        )
+    if not output.developer_profile:
+        output.developer_profile = (
+            "Builds practical systems with a strong implementation focus "
+            "across backend, tooling, and delivery workflows."
+        )
+
     citation_metrics = _apply_citation_gate(output, raw_facts)
     output.quality_metrics["citations"] = citation_metrics
+    output.quality_metrics["prose"] = _compute_prose_metrics(output)
     output.quality_metrics["schema"] = {
         "polish_v2_micro": 1,
     }
