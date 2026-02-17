@@ -1,12 +1,8 @@
 """
 CLI for resume generation.
 
-Two pipelines available:
-  - generate (v2): Static-First, LLM-Light (original)
-  - generate-v3: EXTRACT → QUERY → ASSEMBLE (new, richer data)
-
 Usage:
-    python -m artifactminer.resume generate-v3 --zip /path/to/repos.zip --email user@example.com
+    uv run python -m artifactminer.resume generate --zip ~/repos.zip --email user@example.com
 """
 
 from __future__ import annotations
@@ -22,125 +18,7 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
 # ---------------------------------------------------------------------------
-# v3 pipeline (new default)
-# ---------------------------------------------------------------------------
-
-
-@app.command("generate")
-def generate_v3(
-    zip_path: Path = typer.Option(
-        ...,
-        "--zip",
-        "-z",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        help="Path to ZIP file containing git repositories",
-    ),
-    email: str = typer.Option(
-        ...,
-        "--email",
-        "-e",
-        help="User's email for git attribution",
-    ),
-    model: str = typer.Option(
-        "qwen2.5-coder-3b-q4",
-        "--model",
-        "-m",
-        help="Local GGUF model to use (default: qwen2.5-coder-3b-q4)",
-    ),
-    output_json: Optional[Path] = typer.Option(
-        None,
-        "--output-json",
-        help="Output JSON file path",
-    ),
-    output_markdown: Optional[Path] = typer.Option(
-        None,
-        "--output-markdown",
-        "--output-md",
-        help="Output Markdown file path",
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Show detailed progress",
-    ),
-) -> None:
-    """
-    Generate resume content from a ZIP of git repositories (v3 pipeline).
-
-    Uses the EXTRACT → QUERY → ASSEMBLE pipeline with rich data extraction
-    and focused LLM calls.
-
-    Examples:
-        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com
-        python -m artifactminer.resume generate --zip ~/repos.zip --email john@example.com --model qwen2.5-coder-3b-q4
-    """
-    from .pipeline import generate_resume_v3
-    from .assembler import assemble_markdown, assemble_json
-
-    def progress(msg: str) -> None:
-        if verbose:
-            typer.echo(msg)
-
-    try:
-        result = generate_resume_v3(
-            zip_path=str(zip_path.resolve()),
-            user_email=email.lower().strip(),
-            llm_model=model,
-            progress_callback=progress if verbose else None,
-        )
-
-        # Generate outputs
-        markdown = assemble_markdown(result)
-        json_str = assemble_json(result)
-
-        # Always print markdown to stdout
-        typer.echo("\n" + "=" * 60)
-        typer.echo(markdown)
-
-        # Save to files if requested
-        if output_json:
-            output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(json_str)
-            typer.echo(f"\nJSON output written to: {output_json}")
-
-        if output_markdown:
-            output_markdown.parent.mkdir(parents=True, exist_ok=True)
-            output_markdown.write_text(markdown)
-            typer.echo(f"Markdown output written to: {output_markdown}")
-
-        # Print summary
-        portfolio = result.portfolio_data
-        typer.echo("\n" + "=" * 60)
-        typer.echo("GENERATION SUMMARY (v3)")
-        typer.echo("=" * 60)
-        if portfolio:
-            typer.echo(f"Projects analyzed: {portfolio.total_projects}")
-            typer.echo(f"Total commits: {portfolio.total_commits}")
-            typer.echo(f"Skills detected: {len(portfolio.top_skills)}")
-            typer.echo(f"Project types: {portfolio.project_types}")
-        typer.echo(f"Model used: {result.model_used}")
-        typer.echo(f"Generation time: {result.generation_time_seconds:.1f}s")
-
-        if result.errors:
-            typer.echo(f"\nWarnings ({len(result.errors)}):", err=True)
-            for err in result.errors:
-                typer.secho(f"  - {err}", fg=typer.colors.YELLOW, err=True)
-
-    except Exception as exc:
-        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
-        if verbose:
-            import traceback
-
-            traceback.print_exc()
-        raise typer.Exit(1) from exc
-
-
-# ---------------------------------------------------------------------------
-# Multi-stage interactive pipeline (Strategy B)
+# Display helpers
 # ---------------------------------------------------------------------------
 
 
@@ -153,7 +31,6 @@ def _display_extracted_facts(
     from rich.console import Console
     from rich.panel import Panel
     from rich.table import Table
-    from rich.text import Text
 
     console = Console()
 
@@ -228,7 +105,6 @@ def _display_draft(draft_output) -> None:
     """Display Stage 2 draft resume with Rich formatting."""
     from rich.console import Console
     from rich.panel import Panel
-    from rich.markdown import Markdown
 
     console = Console()
     console.print()
@@ -345,8 +221,13 @@ def _collect_feedback() -> UserFeedback | None:
     )
 
 
-@app.command("generate-multistage")
-def generate_multistage(
+# ---------------------------------------------------------------------------
+# Main pipeline command
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def generate(
     zip_path: Path = typer.Option(
         ...,
         "--zip",
@@ -366,44 +247,49 @@ def generate_multistage(
     stage1_model: str = typer.Option(
         "lfm2-2.6b-q8",
         "--stage1-model",
-        help="Model for fact extraction (Stage 1)",
+        help="Model for fact extraction (default: lfm2-2.6b-q8)",
     ),
     stage2_model: str = typer.Option(
         "qwen3-1.7b-q8",
         "--stage2-model",
-        help="Model for draft generation (Stage 2)",
-    ),
-    stage3_model: str = typer.Option(
-        "qwen3-1.7b-q8",
-        "--stage3-model",
-        help="Model for polish/refinement (Stage 3)",
+        help="Model for draft + polish (default: qwen3-1.7b-q8)",
     ),
     output_dir: Optional[Path] = typer.Option(
         None,
         "--output-dir",
         "-o",
-        help="Directory to save all outputs (facts, draft, final). Defaults to ./resume_output/",
+        help="Directory to save outputs. Defaults to ./resume_output/",
+    ),
+    no_feedback: bool = typer.Option(
+        False,
+        "--no-feedback",
+        help="Skip interactive feedback and use the draft as final output",
     ),
 ) -> None:
     """
-    Interactive multi-stage resume generation.
+    Generate a resume from a ZIP of git repositories.
 
-    Runs 3 stages with pauses between each so you can review output
-    and provide feedback before the final polish.
+    Runs a 3-stage pipeline:
 
-    Stage 1: EXTRACT + DISTILL + fact extraction (LFM2-2.6B)
-    Stage 2: First draft generation (Qwen3-1.7B) — you review this
-    Stage 3: Polish with your feedback (Qwen3-1.7B by default)
+      1. EXTRACT + DISTILL + fact extraction  (lfm2-2.6b-q8)
+      2. First-draft generation               (qwen3-1.7b-q8)
+      3. Polish with your feedback             (qwen3-1.7b-q8)
 
-    Example:
-        uv run python -m artifactminer.resume generate-multistage \\
+    After Stage 2, you'll see the draft and can provide feedback
+    (tone, additions, removals) before the final polish.
+
+    Examples:
+
+        uv run python -m artifactminer.resume generate \\
             --zip ~/repos.zip --email john@example.com
+
+        uv run python -m artifactminer.resume generate \\
+            --zip ~/repos.zip --email john@example.com --no-feedback
     """
     import json
     from datetime import datetime
     from rich.console import Console
     from rich.panel import Panel
-    from rich.progress import Progress, SpinnerColumn, TextColumn
 
     from .pipeline import extract_and_distill
     from .queries.runner import (
@@ -412,17 +298,16 @@ def generate_multistage(
         run_polish_query,
     )
     from .assembler import assemble_markdown, assemble_json
-    from .models import (
-        RawProjectFacts,
-        ResumeOutput,
-        UserFeedback,
-    )
+    from .models import RawProjectFacts, ResumeOutput
     from .llm_client import ensure_model_available
 
     console = Console()
     start_time = datetime.now()
     errors: list[str] = []
     models_used: list[str] = []
+
+    # Stage 3 reuses the Stage 2 model (same weights, no server restart)
+    stage3_model = stage2_model
 
     # Setup output directory
     out_dir = output_dir or Path("resume_output")
@@ -432,23 +317,26 @@ def generate_multistage(
         console.print(f"  [dim]{msg}[/dim]")
 
     try:
-        # ── CHECK MODELS ──────────────────────────────────────────────
+        # ── BANNER ────────────────────────────────────────────────────
         console.print(
             Panel(
-                f"[bold]Multi-Stage Resume Pipeline[/bold]\n\n"
+                f"[bold]Resume Pipeline[/bold]\n\n"
                 f"  Stage 1 model: [cyan]{stage1_model}[/cyan] (fact extraction)\n"
                 f"  Stage 2 model: [cyan]{stage2_model}[/cyan] (draft generation)\n"
                 f"  Stage 3 model: [cyan]{stage3_model}[/cyan] (polish with feedback)\n\n"
                 f"  ZIP: {zip_path}\n"
-                f"  Email: {email}",
+                f"  Email: {email}\n"
+                f"  Interactive: {'no' if no_feedback else 'yes'}",
                 border_style="blue",
             )
         )
 
-        for model_name in [stage1_model, stage2_model, stage3_model]:
+        # ── CHECK MODELS ──────────────────────────────────────────────
+        unique_models = list(dict.fromkeys([stage1_model, stage2_model, stage3_model]))
+        for model_name in unique_models:
             ensure_model_available(model_name)
 
-        # ── PHASE 1: EXTRACT + DISTILL ─────────────────────────────────
+        # ── PHASE 1: EXTRACT + DISTILL ────────────────────────────────
         console.print()
         console.rule("[bold cyan]Phase 1: Extract + Distill[/bold cyan]")
 
@@ -460,7 +348,7 @@ def generate_multistage(
         )
         errors.extend(extract_errors)
 
-        # ── STAGE 1: LLM FACT EXTRACTION ──────────────────────────────
+        # ── STAGE 1: LLM FACT EXTRACTION ─────────────────────────────
         console.print()
         console.rule(
             f"[bold cyan]Stage 1: Fact Extraction ({stage1_model})[/bold cyan]"
@@ -481,7 +369,6 @@ def generate_multistage(
             console.print("[bold red]Stage 1 produced no results. Aborting.[/bold red]")
             raise typer.Exit(1)
 
-        # Display Stage 1 results
         _display_extracted_facts(bundles, portfolio, raw_facts)
 
         # Save Stage 1 output
@@ -522,7 +409,6 @@ def generate_multistage(
         draft_output.portfolio_data = portfolio
         draft_output.raw_project_facts = raw_facts
 
-        # Display the draft
         _display_draft(draft_output)
 
         # Save draft
@@ -540,12 +426,19 @@ def generate_multistage(
         console.print(f"\n[dim]Draft saved to {out_dir}/stage2_draft.md[/dim]")
 
         # ── INTERACTIVE FEEDBACK ──────────────────────────────────────
-        user_feedback = _collect_feedback()
+        if no_feedback:
+            user_feedback = None
+            console.print(
+                "\n[yellow]--no-feedback: using draft as final output.[/yellow]"
+            )
+        else:
+            user_feedback = _collect_feedback()
 
         if user_feedback is None:
-            console.print(
-                "\n[yellow]No feedback provided — using draft as final output.[/yellow]"
-            )
+            if not no_feedback:
+                console.print(
+                    "\n[yellow]No feedback provided — using draft as final output.[/yellow]"
+                )
             final_output = draft_output
             final_output.stage = "draft-final"
         else:
@@ -573,7 +466,7 @@ def generate_multistage(
                 final_output = draft_output
                 final_output.stage = "polish-fallback"
 
-        # ── FINAL OUTPUT ───────────────────────────────────────────────
+        # ── FINAL OUTPUT ──────────────────────────────────────────────
         elapsed = (datetime.now() - start_time).total_seconds()
         final_output.generation_time_seconds = elapsed
         final_output.model_used = stage2_model
@@ -581,14 +474,12 @@ def generate_multistage(
         final_output.portfolio_data = portfolio
         final_output.errors = errors
 
-        # Display final
         console.print()
         console.rule("[bold green]FINAL RESUME[/bold green]")
 
         final_md = assemble_markdown(final_output)
         final_json = assemble_json(final_output)
 
-        # Print the final markdown
         from rich.markdown import Markdown
 
         console.print(Markdown(final_md))

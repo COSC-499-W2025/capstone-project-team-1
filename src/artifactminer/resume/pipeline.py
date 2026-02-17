@@ -1,12 +1,11 @@
 """
-v3 Resume Pipeline Orchestrator.
+Resume Pipeline Orchestrator.
 
-Three clean phases:
-  1. EXTRACT — static data gathering into ProjectDataBundle / PortfolioDataBundle
-  2. QUERY  — focused LLM calls (1 per project + 3 portfolio)
-  3. ASSEMBLE — stitch into final markdown + JSON
-
-Replaces generate.generate_resume as the main entry point.
+Multi-stage pipeline:
+  Phase 1: EXTRACT + DISTILL — static data gathering + token-budgeted compression
+  Stage 1: Fact extraction (LFM2-2.6B) — structured facts per project
+  Stage 2: Draft generation (Qwen3-1.7B) — first-draft resume
+  Stage 3: Polish (Qwen3-1.7B) — refine with user feedback
 """
 
 from __future__ import annotations
@@ -40,13 +39,10 @@ from .extractors import (
 )
 from .distill import distill_project_context, distill_portfolio_context
 from .queries.runner import (
-    run_project_query,
-    run_portfolio_queries,
     run_extraction_query,
     run_draft_queries,
     run_polish_query,
 )
-from .assembler import assemble_markdown, assemble_json
 
 # Reuse existing infrastructure
 from .generate import extract_zip, discover_git_repos
@@ -402,134 +398,7 @@ def _build_portfolio(
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 + 3: QUERY + ASSEMBLE
-# ---------------------------------------------------------------------------
-
-
-def generate_resume_v3(
-    zip_path: str,
-    user_email: str,
-    *,
-    llm_model: str = "qwen2.5-coder-3b-q4",
-    progress_callback: Optional[Callable[[str], None]] = None,
-) -> ResumeOutput:
-    """
-    Main v3 pipeline entry point.
-
-    Args:
-        zip_path: Path to ZIP file containing git repositories
-        user_email: User's git email for attribution
-        llm_model: GGUF model name (default: qwen2.5-coder-3b-q4)
-        progress_callback: Optional callback for progress messages
-
-    Returns:
-        ResumeOutput with all sections populated
-    """
-    start_time = datetime.now()
-    errors: list[str] = []
-
-    def prog(msg: str) -> None:
-        if progress_callback:
-            progress_callback(msg)
-        log.info(msg)
-
-    # Ensure model is available
-    from .llm_client import ensure_model_available
-
-    prog(f"Ensuring model '{llm_model}' is available...")
-    ensure_model_available(llm_model)
-
-    # ── PHASE 1: EXTRACT ──────────────────────────────────────────────
-    prog(f"Extracting {zip_path}...")
-    extract_dir = extract_zip(zip_path)
-    prog(f"Extracted to {extract_dir}")
-
-    repos = discover_git_repos(extract_dir)
-    if not repos:
-        raise RuntimeError("No git repositories found in ZIP")
-    prog(f"Found {len(repos)} repositories")
-
-    bundles: List[ProjectDataBundle] = []
-    for i, repo_path in enumerate(repos):
-        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
-        try:
-            bundle = _extract_project(
-                repo_path,
-                user_email,
-                llm_model=llm_model,
-                progress=prog,
-            )
-            bundles.append(bundle)
-
-            # Report extraction results
-            n_commits = sum(g.count for g in bundle.commit_groups)
-            prog(
-                f"  Done: {bundle.project_type}, {n_commits} commits, "
-                f"{len(bundle.detected_skills)} skills, "
-                f"{len(bundle.constructs.routes)} routes"
-            )
-        except Exception as e:
-            error_msg = f"Error analyzing {repo_path.name}: {e}"
-            prog(f"  ERROR: {error_msg}")
-            errors.append(error_msg)
-
-    if not bundles:
-        raise RuntimeError("No repositories could be analyzed")
-
-    portfolio = _build_portfolio(user_email, bundles)
-    prog(
-        f"Portfolio: {portfolio.total_projects} projects, "
-        f"{len(portfolio.top_skills)} skills, "
-        f"{len(portfolio.languages_used)} languages"
-    )
-
-    # ── PHASE 1.5: DISTILL ───────────────────────────────────────────
-    prog("Distilling project contexts...")
-    for bundle in bundles:
-        bundle.distilled_context = distill_project_context(bundle)
-        prog(
-            f"  Distilled {bundle.project_name}: "
-            f"~{bundle.distilled_context.token_estimate} tokens"
-        )
-
-    # ── PHASE 2: QUERY ────────────────────────────────────────────────
-    output = ResumeOutput(
-        portfolio_data=portfolio,
-        model_used=llm_model,
-        errors=errors,
-    )
-
-    # Per-project LLM queries
-    for bundle in bundles:
-        try:
-            section = run_project_query(bundle, llm_model, progress=prog)
-            output.project_sections[bundle.project_name] = section
-        except Exception as e:
-            prog(f"  LLM query failed for {bundle.project_name}: {e}")
-            errors.append(f"LLM failed for {bundle.project_name}: {e}")
-
-    # Portfolio-level LLM queries
-    try:
-        summary, skills, profile = run_portfolio_queries(
-            portfolio, llm_model, progress=prog
-        )
-        output.professional_summary = summary
-        output.skills_section = skills
-        output.developer_profile = profile
-    except Exception as e:
-        prog(f"Portfolio LLM queries failed: {e}")
-        errors.append(f"Portfolio LLM failed: {e}")
-
-    # ── PHASE 3: ASSEMBLE ─────────────────────────────────────────────
-    elapsed = (datetime.now() - start_time).total_seconds()
-    output.generation_time_seconds = elapsed
-    prog(f"Generation complete in {elapsed:.1f}s")
-
-    return output
-
-
-# ---------------------------------------------------------------------------
-# Multi-stage pipeline — stage-by-stage API
+# Shared EXTRACT + DISTILL phase
 # ---------------------------------------------------------------------------
 
 
@@ -598,7 +467,7 @@ def extract_and_distill(
 
 
 # ---------------------------------------------------------------------------
-# Multi-stage pipeline — monolithic entry point (kept for non-interactive use)
+# Multi-stage pipeline — programmatic entry point
 # ---------------------------------------------------------------------------
 
 
