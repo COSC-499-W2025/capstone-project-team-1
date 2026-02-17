@@ -25,6 +25,7 @@ class EvalRunResult:
     errors: list[str]
     schema: dict[str, Any]
     citations: dict[str, Any]
+    prose: dict[str, Any]
     markdown_path: str
     json_path: str
 
@@ -56,6 +57,13 @@ def _write_markdown_report(payload: dict[str, Any], path: Path) -> None:
     lines.append(f"- Avg citation precision: {aggregate['avg_citation_precision']:.4f}")
     lines.append(f"- Avg fact coverage: {aggregate['avg_fact_coverage']:.4f}")
     lines.append(f"- Avg repaired bullets: {aggregate['avg_repaired_bullets']:.2f}")
+    lines.append(
+        f"- Avg repetition ratio: {aggregate.get('avg_repetition_ratio', 0.0):.4f}"
+    )
+    lines.append(
+        f"- Avg low-signal bullets: {aggregate.get('avg_low_signal_bullets', 0.0):.2f}"
+    )
+    lines.append(f"- Avg prose leaks: {aggregate.get('avg_prose_leaks', 0.0):.2f}")
     lines.append("")
     lines.append("## Per-run")
     lines.append("")
@@ -74,6 +82,15 @@ def _write_markdown_report(payload: dict[str, Any], path: Path) -> None:
         lines.append(
             f"- Repaired bullets: {run['citations'].get('repaired_bullets', 0)}"
         )
+        prose = run.get("prose", {})
+        lines.append(
+            f"- Repetition ratio: {float(prose.get('repetition_ratio', 0.0)):.4f}"
+        )
+        lines.append(f"- Low-signal bullets: {int(prose.get('low_signal_bullets', 0))}")
+        leak_count = int(prose.get("meta_preamble_hits", 0)) + int(
+            prose.get("note_leaks", 0)
+        )
+        lines.append(f"- Prose leaks: {leak_count}")
         lines.append(f"- Schema stats: {json.dumps(run['schema'], sort_keys=True)}")
         if run["errors"]:
             lines.append(f"- Errors: {len(run['errors'])}")
@@ -122,6 +139,7 @@ def evaluate_multistage_pipeline(
 
         schema = dict(result.quality_metrics.get("schema", {}))
         citations = dict(result.quality_metrics.get("citations", {}))
+        prose = dict(result.quality_metrics.get("prose", {}))
         run_payload = {
             "stage": result.stage,
             "generation_time_seconds": result.generation_time_seconds,
@@ -129,6 +147,7 @@ def evaluate_multistage_pipeline(
             "errors": result.errors,
             "schema": schema,
             "citations": citations,
+            "prose": prose,
         }
         run_json_path.write_text(json.dumps(run_payload, indent=2, default=str))
 
@@ -141,6 +160,7 @@ def evaluate_multistage_pipeline(
                 errors=list(result.errors),
                 schema=schema,
                 citations=citations,
+                prose=prose,
                 markdown_path=str(run_md_path),
                 json_path=str(run_json_path),
             )
@@ -165,6 +185,25 @@ def evaluate_multistage_pipeline(
         if run_results
         else 0.0
     )
+    avg_repetition_ratio = (
+        mean(float(r.prose.get("repetition_ratio", 0.0)) for r in run_results)
+        if run_results
+        else 0.0
+    )
+    avg_low_signal_bullets = (
+        mean(float(r.prose.get("low_signal_bullets", 0.0)) for r in run_results)
+        if run_results
+        else 0.0
+    )
+    avg_prose_leaks = (
+        mean(
+            float(r.prose.get("meta_preamble_hits", 0.0))
+            + float(r.prose.get("note_leaks", 0.0))
+            for r in run_results
+        )
+        if run_results
+        else 0.0
+    )
 
     payload = {
         "generated_at": datetime.now().isoformat(),
@@ -182,6 +221,9 @@ def evaluate_multistage_pipeline(
             "avg_citation_precision": avg_citation_precision,
             "avg_fact_coverage": avg_fact_coverage,
             "avg_repaired_bullets": avg_repaired,
+            "avg_repetition_ratio": avg_repetition_ratio,
+            "avg_low_signal_bullets": avg_low_signal_bullets,
+            "avg_prose_leaks": avg_prose_leaks,
         },
         "runs": [asdict(r) for r in run_results],
     }

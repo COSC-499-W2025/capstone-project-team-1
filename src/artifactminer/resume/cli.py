@@ -252,7 +252,12 @@ def generate(
     stage2_model: str = typer.Option(
         "llama-3.2-3b-q4",
         "--stage2-model",
-        help="Model for draft + polish (default: llama-3.2-3b-q4)",
+        help="Model for draft generation (default: llama-3.2-3b-q4)",
+    ),
+    stage3_model: Optional[str] = typer.Option(
+        None,
+        "--stage3-model",
+        help="Model for polish stage (default: same as --stage2-model)",
     ),
     output_dir: Optional[Path] = typer.Option(
         None,
@@ -272,8 +277,8 @@ def generate(
     Runs a 3-stage pipeline:
 
       1. EXTRACT + DISTILL + fact extraction  (lfm2-2.6b-q8)
-      2. First-draft generation               (llama-3.2-3b-q4)
-      3. Polish with your feedback             (llama-3.2-3b-q4)
+      2. First-draft generation               (--stage2-model)
+      3. Polish with your feedback             (--stage3-model or --stage2-model)
 
     After Stage 2, you'll see the draft and can provide feedback
     (tone, additions, removals) before the final polish.
@@ -306,8 +311,8 @@ def generate(
     errors: list[str] = []
     models_used: list[str] = []
 
-    # Stage 3 reuses the Stage 2 model (same weights, no server restart)
-    stage3_model = stage2_model
+    # Stage 3 defaults to Stage 2 model unless overridden
+    stage3_model = stage3_model or stage2_model
 
     # Setup output directory
     out_dir = output_dir or Path("resume_output")
@@ -752,6 +757,13 @@ def evaluate_multistage(
     typer.echo(
         f"Avg repaired bullets: {aggregate.get('avg_repaired_bullets', 0.0):.2f}"
     )
+    typer.echo(
+        f"Avg repetition ratio: {aggregate.get('avg_repetition_ratio', 0.0):.4f}"
+    )
+    typer.echo(
+        f"Avg low-signal bullets: {aggregate.get('avg_low_signal_bullets', 0.0):.2f}"
+    )
+    typer.echo(f"Avg prose leaks: {aggregate.get('avg_prose_leaks', 0.0):.2f}")
 
     if report_paths:
         typer.echo("\nReports:")
