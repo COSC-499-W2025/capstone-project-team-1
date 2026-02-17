@@ -392,6 +392,28 @@ def _build_data_card_context(bundle: ProjectDataBundle) -> str:
     """
     lines: list[str] = []
 
+    # --- Purpose + semantic understanding ---
+    llm_understanding = bundle.llm_understanding
+    if llm_understanding and llm_understanding.project_purpose:
+        lines.append(f"Purpose: {llm_understanding.project_purpose}")
+    elif bundle.readme_text:
+        readme_snippet = bundle.readme_text[:600].strip()
+        lines.append(f"Purpose: {readme_snippet}")
+    else:
+        lines.append(f"Purpose: {bundle.project_type} project")
+
+    if llm_understanding:
+        if llm_understanding.user_value:
+            lines.append(f"User Value: {llm_understanding.user_value}")
+        if llm_understanding.architecture_summary:
+            lines.append(
+                f"Architecture Intent: {llm_understanding.architecture_summary}"
+            )
+        if llm_understanding.key_capabilities:
+            lines.append(
+                f"Capabilities: {', '.join(llm_understanding.key_capabilities[:4])}"
+            )
+
     # --- Identity ---
     lines.append(f"Type: {bundle.project_type}")
     if bundle.primary_language:
@@ -431,7 +453,10 @@ def _build_data_card_context(bundle: ProjectDataBundle) -> str:
                 + (f" (extends {cls.parent_class})" if cls.parent_class else "")
             )
         if ec.routes:
-            lines.append(f"Routes: {len(ec.routes)} endpoints")
+            lines.append(
+                f"API Endpoints: {len(ec.routes)} endpoints "
+                f"({', '.join(ec.routes[:8])})"
+            )
         if ec.test_functions:
             lines.append(f"Tests: {len(ec.test_functions)} test functions")
 
@@ -469,7 +494,7 @@ def _build_data_card_context(bundle: ProjectDataBundle) -> str:
 def compile_project_data_card(
     bundle: ProjectDataBundle,
     *,
-    max_facts: int = 5,
+    max_facts: int = 15,
     progress: Optional[Callable[[str], None]] = None,
 ) -> RawProjectFacts:
     """Deterministic Stage 1 replacement: compile a data card from a bundle.
@@ -483,9 +508,13 @@ def compile_project_data_card(
 
     evidence_catalog = build_extraction_evidence_catalog(bundle)
 
-    # --- Summary: first sentence of README, fallback to project type ---
+    # --- Summary: LLM purpose, fallback to README sentence, then project type ---
     summary = ""
-    if bundle.readme_text:
+    llm_understanding = bundle.llm_understanding
+    if llm_understanding and llm_understanding.project_purpose:
+        summary = _clean_inline_text(llm_understanding.project_purpose)
+
+    if not summary and bundle.readme_text:
         # Take the first sentence (up to first period followed by space or end)
         first_sentence = bundle.readme_text.strip().split("\n")[0].strip()
         # Strip markdown heading markers
@@ -535,7 +564,43 @@ def compile_project_data_card(
     # --- Facts: cherry-pick from commits, constructs, tests ---
     fact_items: list[EvidenceLinkedFact] = []
     fact_texts: list[str] = []
+    seen_fact_texts: set[str] = set()
     fact_idx = 1
+
+    # 0. LLM semantic facts (purpose-driven context from raw code)
+    if llm_understanding and len(fact_items) < max_facts:
+        semantic_pool: list[str] = []
+        if llm_understanding.user_value:
+            semantic_pool.append(llm_understanding.user_value)
+        semantic_pool.extend(llm_understanding.key_capabilities[:3])
+        semantic_pool.extend(llm_understanding.implementation_highlights[:2])
+
+        for semantic_fact in semantic_pool:
+            if len(fact_items) >= max_facts:
+                break
+            cleaned = _clean_inline_text(_clean_evidence_artifacts(semantic_fact))
+            if not cleaned or _is_low_signal_fact(cleaned):
+                continue
+            key = cleaned.casefold()
+            if key in seen_fact_texts:
+                continue
+            seen_fact_texts.add(key)
+
+            evidence_keys: list[str] = []
+            if "/" in cleaned:
+                route_key = _find_evidence_key(evidence_catalog, "route:")
+                if route_key:
+                    evidence_keys.append(route_key)
+
+            fact_items.append(
+                EvidenceLinkedFact(
+                    fact_id=f"F{fact_idx}",
+                    text=cleaned,
+                    evidence_keys=evidence_keys,
+                )
+            )
+            fact_texts.append(cleaned)
+            fact_idx += 1
 
     # 1. Top feature/bugfix/refactor commits (deduped)
     ordered_categories = ["feature", "bugfix", "refactor"]
@@ -559,6 +624,10 @@ def compile_project_data_card(
         cleaned = _clean_evidence_artifacts(msg)
         if not cleaned or _is_low_signal_fact(cleaned):
             continue
+        key = cleaned.casefold()
+        if key in seen_fact_texts:
+            continue
+        seen_fact_texts.add(key)
 
         evidence_key = _find_evidence_key(evidence_catalog, f"commit:{category}:")
         evidence_keys = [evidence_key] if evidence_key else []
@@ -579,6 +648,12 @@ def compile_project_data_card(
     if ec and len(fact_items) < max_facts:
         if ec.routes and len(ec.routes) >= 2:
             route_text = f"Defined {len(ec.routes)} API endpoints"
+            key = route_text.casefold()
+            if key in seen_fact_texts:
+                route_text = ""
+            else:
+                seen_fact_texts.add(key)
+        if ec.routes and len(ec.routes) >= 2 and route_text:
             evidence_key = _find_evidence_key(evidence_catalog, "route:")
             fact_items.append(
                 EvidenceLinkedFact(
@@ -599,6 +674,10 @@ def compile_project_data_card(
                 f"Implemented {cls.name} class "
                 f"({cls.method_count} methods, {cls.total_loc} LOC)"
             )
+            key = cls_text.casefold()
+            if key in seen_fact_texts:
+                continue
+            seen_fact_texts.add(key)
             evidence_key = _find_evidence_key(evidence_catalog, f"class:{cls.name}")
             fact_items.append(
                 EvidenceLinkedFact(
@@ -617,6 +696,17 @@ def compile_project_data_card(
             f"Maintained {tr.test_files} test files "
             f"({tr.test_ratio:.0%} test-to-source ratio)"
         )
+        key = test_text.casefold()
+        if key in seen_fact_texts:
+            test_text = ""
+        else:
+            seen_fact_texts.add(key)
+    if (
+        tr.test_files >= 2
+        and tr.test_ratio >= 0.2
+        and len(fact_items) < max_facts
+        and test_text
+    ):
         evidence_key = _find_evidence_key(evidence_catalog, "test_framework:")
         fact_items.append(
             EvidenceLinkedFact(

@@ -1,8 +1,9 @@
 """
-Static data extractors for the v3 resume pipeline.
+Data extractors for the v3 resume pipeline.
 
 Each extractor takes a repo path (+ optional user email) and returns
-structured data. No LLM calls — pure static analysis.
+structured data. Most are static analysis; ``llm_reasoning`` adds an optional
+local-LLM semantic pass over targeted code snippets.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from .cross_module import extract_cross_module_breadth
 from .enriched_constructs import extract_enriched_constructs
 from .imports import extract_import_graph
 from .config_fingerprint import extract_config_fingerprint
+from .llm_reasoning import extract_llm_project_understanding
 
 __all__ = [
     "extract_readme",
@@ -33,4 +35,5 @@ __all__ = [
     "extract_enriched_constructs",
     "extract_import_graph",
     "extract_config_fingerprint",
+    "extract_llm_project_understanding",
 ]

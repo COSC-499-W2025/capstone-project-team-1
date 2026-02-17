@@ -418,7 +418,7 @@ def build_bullets_prompt(
                 'Use "Implemented", "Built", or "Contributed to" as action verbs.\n'
             )
 
-    facts_block = "\n".join(f"- {f}" for f in facts[:5])
+    facts_block = "\n".join(f"- {f}" for f in facts[:15])
 
     if data_card_context:
         return (
@@ -427,12 +427,12 @@ def build_bullets_prompt(
             f"Data card:\n{data_card_context}\n\n"
             f"Facts:\n{facts_block}\n\n"
             f"Using the data card and facts above, write exactly {target} "
-            "professional resume bullets.\n"
-            "Each bullet starts with a strong action verb and "
-            "references a specific feature, endpoint, class, or technology.\n"
-            "Prioritize shipped functionality and technical implementation work.\n"
-            "Use testing and process metrics only when they directly support "
-            "a concrete feature claim.\n"
+            "professional resume bullets that show:\n"
+            "- WHAT the developer built (specific features, endpoints, components)\n"
+            "- WHY it matters (what problem it solves, who benefits, the impact)\n"
+            "- HOW they did it (technologies, approaches, technical decisions)\n"
+            "Each bullet should tell a complete story: action + specific technical work + outcome/impact.\n"
+            "Prioritize shipped functionality and concrete achievements over process metadata.\n"
             "Return bullet lines only (no headings, notes, or commentary).\n"
             f"Write {target} bullets now:\n- "
         )
@@ -441,10 +441,12 @@ def build_bullets_prompt(
         f"Project: {project_name}\n"
         f"{ownership_hint}\n"
         f"Facts:\n{facts_block}\n\n"
-        f"Rephrase the above facts as exactly {target} professional resume bullets.\n"
-        "Each bullet starts with a strong action verb and "
-        "references a specific feature, endpoint, class, or technology.\n"
-        "Prioritize shipped functionality over process metadata.\n"
+        f"Write exactly {target} professional resume bullets that show:\n"
+        "- WHAT the developer built (specific features, components, endpoints)\n"
+        "- WHY it matters (what problem it solves, who benefits)\n"
+        "- HOW they did it (technologies, approaches)\n"
+        "Each bullet should tell a story: action verb + specific technical work + outcome/impact.\n"
+        "Prioritize shipped functionality and concrete achievements over process metadata.\n"
         "Return bullet lines only (no headings, notes, or commentary).\n"
         f"Write {target} bullets now:\n- "
     )
