@@ -146,18 +146,20 @@ def distill_project_context(
     Distill a ProjectDataBundle into a token-budgeted context block.
 
     Section priority (highest resume-signal first, trimmed from back):
-      1. Identity + stack: ~200 tokens
-      2. Quantitative impact: ~400 tokens (incl. churn-complexity hotspots)
-      3. Architecture signal: ~400 tokens (from import_graph)
-      4. Code style profile: ~300 tokens (from style_metrics + file_complexity)
-      5. Enriched constructs: ~600 tokens (replaces basic constructs)
-      6. Cherry-picked commits: ~600 tokens (reduced from 800)
-      7. Skill timeline: ~200 tokens (from skill_appearances)
-      8. README excerpt: ~400 tokens (expanded from 300)
-      9. Config/infra: ~200 tokens (from config_fingerprint)
-     10. File hotspots: ~200 tokens (trim buffer)
+      1. Identity + stack (~200 tokens)
+      2. README excerpt (~300 tokens) — what the project IS
+      3. Cherry-picked commits (~500 tokens) — what the developer DID
+      4. Quantitative impact (~300 tokens) — numbers backing claims
+      5. Enriched constructs (~400 tokens) — code-level evidence
+      6. Architecture signal (~250 tokens)
+      7. Detected skills + evidence (~200 tokens)
+      8. Code style profile (~200 tokens)
+      9. Skill timeline (~150 tokens)
+     10. Config/infra (~100 tokens)
+     11. Insights (~100 tokens)
+     12. File hotspots (~100 tokens)
 
-    Sections 1-5 are protected during back-trimming.
+    Sections 1-7 are protected during back-trimming.
     """
     sections: List[str] = []
 
@@ -172,13 +174,47 @@ def distill_project_context(
         )
         parts.append(f"Stack: {lang_str}")
     if bundle.user_contribution_pct is not None:
-        parts.append(f"Contribution: {bundle.user_contribution_pct:.0f}%")
-    identity_lines.append(" | ".join(parts))
+        pct = bundle.user_contribution_pct
+        parts.append(f"Contribution: {pct:.0f}%")
+        # Add explicit role hint so the LLM uses appropriate ownership language
+        if pct >= 95:
+            identity_lines.append("Role: Solo developer (wrote nearly all the code)")
+        elif pct >= 50:
+            identity_lines.append(f"Role: Lead contributor ({pct:.0f}% of codebase)")
+        else:
+            identity_lines.append(f"Role: Team contributor ({pct:.0f}% of codebase)")
+    identity_lines.insert(1, " | ".join(parts))
     if bundle.frameworks:
         identity_lines.append(f"Frameworks: {', '.join(bundle.frameworks)}")
     sections.append("\n".join(identity_lines))
 
-    # ── 2. Quantitative impact (~400 tokens) ────────────────────────
+    # ── 2. README excerpt (~300 tokens) ─────────────────────────────
+    if bundle.readme_text:
+        excerpt = _truncate_to_tokens(bundle.readme_text, 300)
+        sections.append(f"README SUMMARY:\n{excerpt}")
+
+    # ── 3. Cherry-picked commits (~500 tokens) ──────────────────────
+    ranked_groups = _rank_commit_groups(bundle.commit_groups)
+    commit_lines = ["KEY WORK (from commits):"]
+    commit_token_budget = 500
+    commit_chars = 0
+    max_commit_chars = commit_token_budget * _CHARS_PER_TOKEN
+
+    for group in ranked_groups:
+        if commit_chars >= max_commit_chars:
+            break
+        deduped = _deduplicate_messages(group.messages)
+        for msg in deduped:
+            if commit_chars >= max_commit_chars:
+                break
+            line = f"- [{group.category}] {msg}"
+            commit_lines.append(line)
+            commit_chars += len(line)
+
+    if len(commit_lines) > 1:
+        sections.append("\n".join(commit_lines))
+
+    # ── 4. Quantitative impact (~300 tokens) ────────────────────────
     gs = bundle.git_stats
     tr = bundle.test_ratio
     mb = bundle.module_breadth
@@ -211,10 +247,11 @@ def distill_project_context(
             f"{cq.type_diversity} categories, "
             f"avg {cq.avg_message_length:.0f} chars/message"
         )
-    # Churn-complexity hotspots
-    if bundle.churn_complexity_hotspots:
+    # Churn-complexity hotspots (only if there are actual entries)
+    hotspots_with_data = [hs for hs in bundle.churn_complexity_hotspots if hs.risk_score > 0]
+    if hotspots_with_data:
         impact_lines.append("- Churn-complexity hotspots:")
-        for hs in bundle.churn_complexity_hotspots[:3]:
+        for hs in hotspots_with_data[:3]:
             impact_lines.append(
                 f"  {hs.filepath} (edits={hs.edit_count}, "
                 f"complexity={hs.cyclomatic_complexity}, risk={hs.risk_score:.2f})"
@@ -222,38 +259,7 @@ def distill_project_context(
     if len(impact_lines) > 1:
         sections.append("\n".join(impact_lines))
 
-    # ── 3. Architecture signal (~400 tokens) ────────────────────────
-    ig = bundle.import_graph
-    if ig is not None:
-        arch_lines = ["ARCHITECTURE:"]
-        if ig.layer_detection:
-            arch_lines.append(f"- Layers: {' → '.join(ig.layer_detection)}")
-        if ig.external_deps:
-            arch_lines.append(f"- External deps: {', '.join(ig.external_deps[:12])}")
-        if ig.circular_deps:
-            arch_lines.append(f"- Circular deps: {len(ig.circular_deps)} detected")
-        if ig.imports_map:
-            arch_lines.append(f"- Internal modules: {len(ig.imports_map)}")
-        if len(arch_lines) > 1:
-            sections.append("\n".join(arch_lines))
-
-    # ── 4. Code style profile (~300 tokens) ─────────────────────────
-    sm = bundle.style_metrics
-    if sm is not None:
-        style_lines = ["CODE STYLE:"]
-        style_lines.append(
-            f"- Avg function length: {sm.avg_function_length:.1f} lines "
-            f"({sm.total_functions} functions)"
-        )
-        style_lines.append(f"- Naming: {sm.naming_convention}")
-        style_lines.append(f"- Type annotations: {sm.type_annotation_ratio:.0%}")
-        style_lines.append(f"- Docstring coverage: {sm.docstring_coverage:.0%}")
-        style_lines.append(
-            f"- Comment density: {sm.comment_density:.1f} per 100 lines"
-        )
-        sections.append("\n".join(style_lines))
-
-    # ── 5. Enriched constructs (~600 tokens) ────────────────────────
+    # ── 5. Enriched constructs (~400 tokens) ────────────────────────
     ec = bundle.enriched_constructs
     if ec is not None and (ec.classes or ec.functions or ec.routes):
         construct_lines = ["CODE CONSTRUCTS:"]
@@ -294,28 +300,50 @@ def distill_project_context(
         if len(construct_lines) > 1:
             sections.append("\n".join(construct_lines))
 
-    # ── 6. Cherry-picked commits (~600 tokens) ──────────────────────
-    ranked_groups = _rank_commit_groups(bundle.commit_groups)
-    commit_lines = ["KEY WORK (from commits):"]
-    commit_token_budget = 600
-    commit_chars = 0
-    max_commit_chars = commit_token_budget * _CHARS_PER_TOKEN
+    # ── 6. Architecture signal (~250 tokens) ────────────────────────
+    ig = bundle.import_graph
+    if ig is not None:
+        arch_lines = ["ARCHITECTURE:"]
+        if ig.layer_detection:
+            arch_lines.append(f"- Layers: {' → '.join(ig.layer_detection)}")
+        if ig.external_deps:
+            arch_lines.append(f"- External deps: {', '.join(ig.external_deps[:12])}")
+        if ig.circular_deps:
+            arch_lines.append(f"- Circular deps: {len(ig.circular_deps)} detected")
+        if ig.imports_map:
+            arch_lines.append(f"- Internal modules: {len(ig.imports_map)}")
+        if len(arch_lines) > 1:
+            sections.append("\n".join(arch_lines))
 
-    for group in ranked_groups:
-        if commit_chars >= max_commit_chars:
-            break
-        deduped = _deduplicate_messages(group.messages)
-        for msg in deduped:
-            if commit_chars >= max_commit_chars:
-                break
-            line = f"- [{group.category}] {msg}"
-            commit_lines.append(line)
-            commit_chars += len(line)
+    # ── 7. Detected skills + evidence (~200 tokens) ─────────────────
+    if bundle.detected_skills:
+        skill_lines = ["DETECTED SKILLS:"]
+        for skill in bundle.detected_skills[:12]:
+            evidence = bundle.skill_evidence.get(skill, [])
+            if evidence:
+                ev_str = "; ".join(evidence[:2])
+                skill_lines.append(f"- {skill}: {ev_str}")
+            else:
+                skill_lines.append(f"- {skill}")
+        sections.append("\n".join(skill_lines))
 
-    if len(commit_lines) > 1:
-        sections.append("\n".join(commit_lines))
+    # ── 8. Code style profile (~200 tokens) ─────────────────────────
+    sm = bundle.style_metrics
+    if sm is not None:
+        style_lines = ["CODE STYLE:"]
+        style_lines.append(
+            f"- Avg function length: {sm.avg_function_length:.1f} lines "
+            f"({sm.total_functions} functions)"
+        )
+        style_lines.append(f"- Naming: {sm.naming_convention}")
+        style_lines.append(f"- Type annotations: {sm.type_annotation_ratio:.0%}")
+        style_lines.append(f"- Docstring coverage: {sm.docstring_coverage:.0%}")
+        style_lines.append(
+            f"- Comment density: {sm.comment_density:.1f} per 100 lines"
+        )
+        sections.append("\n".join(style_lines))
 
-    # ── 7. Skill timeline (~200 tokens) ─────────────────────────────
+    # ── 9. Skill timeline (~150 tokens) ─────────────────────────────
     if bundle.skill_appearances:
         timeline_lines = ["SKILL TIMELINE:"]
         for sa in bundle.skill_appearances[:8]:
@@ -323,12 +351,7 @@ def distill_project_context(
             timeline_lines.append(f"- {sa.skill_name}: first seen {date_str}")
         sections.append("\n".join(timeline_lines))
 
-    # ── 8. README excerpt (~400 tokens) ─────────────────────────────
-    if bundle.readme_text:
-        excerpt = _truncate_to_tokens(bundle.readme_text, 400)
-        sections.append(f"README SUMMARY:\n{excerpt}")
-
-    # ── 9. Config/infra (~200 tokens) ───────────────────────────────
+    # ── 10. Config/infra (~100 tokens) ──────────────────────────────
     cfp = bundle.config_fingerprint
     if cfp is not None:
         config_lines = ["TOOLCHAIN:"]
@@ -357,7 +380,17 @@ def distill_project_context(
         if len(config_lines) > 1:
             sections.append("\n".join(config_lines))
 
-    # ── 10. File hotspots (~200 tokens) ─────────────────────────────
+    # ── 11. Insights (~100 tokens) ──────────────────────────────────
+    if bundle.insights:
+        insight_lines = ["INSIGHTS:"]
+        for insight in bundle.insights[:5]:
+            text = insight.get("insight", "") if isinstance(insight, dict) else str(insight)
+            if text:
+                insight_lines.append(f"- {text}")
+        if len(insight_lines) > 1:
+            sections.append("\n".join(insight_lines))
+
+    # ── 12. File hotspots (~100 tokens) ─────────────────────────────
     if gs.file_hotspots:
         hotspot_lines = ["FILE HOTSPOTS:"]
         for fname, count in gs.file_hotspots[:5]:
@@ -365,12 +398,12 @@ def distill_project_context(
         sections.append("\n".join(hotspot_lines))
 
     # ── Assemble and enforce budget ─────────────────────────────────
-    # Protected sections: first 5 (identity, impact, architecture, style, constructs)
-    min_protected = 5
+    # Protected: sections 1-7 (identity, README, commits, impact, constructs, arch, skills)
+    min_protected = 7
     full_text = "\n\n".join(sections)
     estimated = _estimate_tokens(full_text)
 
-    # Back-trim from section 10 → 9 → 8 → 7 → 6, preserving 1-5
+    # Back-trim from section 12 → 11 → ... → 8, preserving 1-7
     if estimated > token_budget and len(sections) > min_protected:
         while (
             _estimate_tokens("\n\n".join(sections)) > token_budget
