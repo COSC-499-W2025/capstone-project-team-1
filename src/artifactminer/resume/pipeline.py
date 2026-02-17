@@ -37,8 +37,8 @@ from .extractors import (
     extract_enriched_constructs,
     extract_import_graph,
     extract_config_fingerprint,
+    extract_llm_project_understanding,
 )
-from .distill import distill_project_context, distill_portfolio_context
 from .queries.runner import (
     compile_project_data_card,
     run_draft_queries_v2,
@@ -286,6 +286,35 @@ def _extract_project(
     except Exception:
         pass
 
+    # --- Phase 4: LLM semantic understanding over raw code snippets ---
+    llm_understanding = None
+    if llm_model:
+        try:
+            if progress:
+                progress("  Inferring project purpose with LLM...")
+
+            route_context = []
+            if enriched_constructs and enriched_constructs.routes:
+                route_context = enriched_constructs.routes
+            elif constructs.routes:
+                route_context = constructs.routes
+
+            llm_understanding = extract_llm_project_understanding(
+                str(repo_path),
+                model=llm_model,
+                project_name=repo_stats.project_name,
+                project_type=project_type,
+                primary_language=primary_lang,
+                frameworks=repo_stats.frameworks or [],
+                readme_text=readme_text,
+                commit_groups=commit_groups,
+                module_groups=module_groups,
+                routes=route_context,
+            )
+        except Exception:
+            # Graceful degradation: keep deterministic path if LLM reasoning fails.
+            llm_understanding = None
+
     # --- Assemble ProjectDataBundle ---
     # Clean up languages (reuse facts.py logic already applied)
     raw_langs = repo_stats.Languages or []
@@ -328,6 +357,7 @@ def _extract_project(
         import_graph=import_graph,
         config_fingerprint=config_fingerprint,
         churn_complexity_hotspots=churn_complexity_hotspots,
+        llm_understanding=llm_understanding,
     )
 
     # User-specific stats
@@ -455,14 +485,8 @@ def extract_and_distill(
         f"{len(portfolio.top_skills)} skills"
     )
 
-    # Distill contexts
-    prog("Distilling project contexts...")
-    for bundle in bundles:
-        bundle.distilled_context = distill_project_context(bundle)
-        prog(
-            f"  Distilled {bundle.project_name}: "
-            f"~{bundle.distilled_context.token_estimate} tokens"
-        )
+    # Skip distillation - give raw context to LLM for better output quality
+    # Removing distillation allows the LLM to see more context
 
     return bundles, portfolio, errors
 
@@ -576,14 +600,8 @@ def generate_resume_v3_multistage(
         f"{len(portfolio.top_skills)} skills"
     )
 
-    # Distill contexts
-    prog("Distilling project contexts...")
-    for bundle in bundles:
-        bundle.distilled_context = distill_project_context(bundle)
-        prog(
-            f"  Distilled {bundle.project_name}: "
-            f"~{bundle.distilled_context.token_estimate} tokens"
-        )
+    # Skip distillation - give raw context to LLM for better output quality
+    # Removing distillation allows the LLM to see more context
 
     # ── STAGE 1: DATA CARD COMPILATION (deterministic) ────────────────
     prog("Stage 1: Compiling data cards (deterministic)...")
