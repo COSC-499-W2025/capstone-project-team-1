@@ -16,6 +16,9 @@ from .git_stats import extract_git_stats
 from .test_ratio import extract_test_ratio
 from .commit_quality import extract_commit_quality
 from .cross_module import extract_cross_module_breadth
+from .enriched_constructs import extract_enriched_constructs
+from .imports import extract_import_graph
+from .config_fingerprint import extract_config_fingerprint
 
 __all__ = [
     "extract_readme",
@@ -27,4 +30,7 @@ __all__ = [
     "extract_test_ratio",
     "extract_commit_quality",
     "extract_cross_module_breadth",
+    "extract_enriched_constructs",
+    "extract_import_graph",
+    "extract_config_fingerprint",
 ]

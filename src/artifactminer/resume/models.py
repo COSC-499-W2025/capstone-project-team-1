@@ -98,6 +98,70 @@ class ModuleBreadth:
 
 
 @dataclass
+class EnrichedClass:
+    """A class with structural metadata beyond just its name."""
+
+    name: str
+    method_count: int = 0
+    total_loc: int = 0
+    parent_class: str = ""
+
+
+@dataclass
+class EnrichedFunction:
+    """A function with structural metadata beyond just its name."""
+
+    name: str
+    param_count: int = 0
+    loc: int = 0
+    has_return_type: bool = False
+
+
+@dataclass
+class EnrichedConstructs:
+    """Code constructs with structural metadata (sizes, params, inheritance)."""
+
+    classes: List[EnrichedClass] = field(default_factory=list)
+    functions: List[EnrichedFunction] = field(default_factory=list)
+    routes: List[str] = field(default_factory=list)
+    test_functions: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ImportGraph:
+    """Import/dependency relationships across the codebase."""
+
+    imports_map: Dict[str, List[str]] = field(default_factory=dict)
+    layer_detection: List[str] = field(default_factory=list)
+    circular_deps: List[tuple] = field(default_factory=list)
+    external_deps: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ConfigFingerprint:
+    """Toolchain and infrastructure configuration signals."""
+
+    linters: List[str] = field(default_factory=list)
+    formatters: List[str] = field(default_factory=list)
+    test_frameworks: List[str] = field(default_factory=list)
+    build_tools: List[str] = field(default_factory=list)
+    deployment_tools: List[str] = field(default_factory=list)
+    package_managers: List[str] = field(default_factory=list)
+    pre_commit_hooks: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ChurnComplexityHotspot:
+    """A file that is both frequently edited and complex — high-risk zone."""
+
+    filepath: str
+    edit_count: int
+    cyclomatic_complexity: int
+    max_nesting_depth: int
+    risk_score: float  # normalized 0-1
+
+
+@dataclass
 class DistilledContext:
     """Token-budgeted, ranked context block ready for the LLM."""
 
@@ -163,6 +227,21 @@ class ProjectDataBundle:
     test_ratio: TestRatio = field(default_factory=TestRatio)
     commit_quality: CommitQuality = field(default_factory=CommitQuality)
     module_breadth: ModuleBreadth = field(default_factory=ModuleBreadth)
+
+    # Analysis modules (from analysis/)
+    style_metrics: Optional[Any] = None
+    file_complexity: List[Any] = field(default_factory=list)
+    skill_appearances: List[Any] = field(default_factory=list)
+
+    # Enriched constructs (Phase 2)
+    enriched_constructs: Optional[EnrichedConstructs] = None
+
+    # Import graph, config fingerprint, churn-complexity (Phase 3)
+    import_graph: Optional[ImportGraph] = None
+    config_fingerprint: Optional[ConfigFingerprint] = None
+    churn_complexity_hotspots: List[ChurnComplexityHotspot] = field(
+        default_factory=list
+    )
 
     # Distilled context (set by distill_project_context, used by to_prompt_context)
     distilled_context: Optional[DistilledContext] = None

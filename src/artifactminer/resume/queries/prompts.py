@@ -237,7 +237,7 @@ Write the profile now (plain text, no preamble):"""
 def build_extraction_evidence_catalog(
     bundle: ProjectDataBundle,
     *,
-    max_items: int = 28,
+    max_items: int = 36,
 ) -> dict[str, str]:
     """Build a compact evidence catalog keyed by deterministic IDs (E1, E2...)."""
     raw_items: list[str] = []
@@ -262,6 +262,32 @@ def build_extraction_evidence_catalog(
         raw_items.append(f"framework:{framework}")
     for module, files in sorted(bundle.module_groups.items())[:8]:
         raw_items.append(f"module:{module} ({len(files)} files)")
+
+    # Architecture layers from import_graph
+    ig = bundle.import_graph
+    if ig is not None:
+        for layer in ig.layer_detection:
+            raw_items.append(f"arch_layer:{layer}")
+        for dep in ig.external_deps[:8]:
+            raw_items.append(f"external_dep:{dep}")
+
+    # Toolchain items from config_fingerprint
+    cfp = bundle.config_fingerprint
+    if cfp is not None:
+        for tool in cfp.linters[:4]:
+            raw_items.append(f"linter:{tool}")
+        for tool in cfp.test_frameworks[:4]:
+            raw_items.append(f"test_framework:{tool}")
+        for tool in cfp.deployment_tools[:4]:
+            raw_items.append(f"deployment:{tool}")
+        for mgr in cfp.package_managers[:2]:
+            raw_items.append(f"package_manager:{mgr}")
+
+    # Churn-complexity hotspots
+    for hs in bundle.churn_complexity_hotspots[:3]:
+        raw_items.append(
+            f"hotspot:{hs.filepath} (edits={hs.edit_count}, risk={hs.risk_score:.2f})"
+        )
 
     seen: set[str] = set()
     deduped: list[str] = []

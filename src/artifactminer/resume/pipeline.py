@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable, List, Optional
 
 from .models import (
+    ChurnComplexityHotspot,
     ProjectDataBundle,
     PortfolioDataBundle,
     RawProjectFacts,
@@ -33,6 +34,9 @@ from .extractors import (
     extract_test_ratio,
     extract_commit_quality,
     extract_cross_module_breadth,
+    extract_enriched_constructs,
+    extract_import_graph,
+    extract_config_fingerprint,
 )
 from .distill import distill_project_context, distill_portfolio_context
 from .queries.runner import (
@@ -54,6 +58,57 @@ from .facts import (
 )
 
 log = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Churn-complexity cross-reference helper
+# ---------------------------------------------------------------------------
+
+
+def _compute_churn_complexity(
+    git_stats: "GitStats",  # noqa: F821
+    file_complexity: list,
+) -> list[ChurnComplexityHotspot]:
+    """Cross-reference file hotspots with complexity metrics.
+
+    Returns the top 5 files ranked by combined edit_frequency × complexity,
+    normalized to a 0-1 risk score.
+    """
+    if not git_stats.file_hotspots or not file_complexity:
+        return []
+
+    # Index complexity by filepath
+    complexity_map: dict[str, tuple[int, int]] = {}
+    for fc in file_complexity:
+        complexity_map[fc.filepath] = (fc.cyclomatic_complexity, fc.max_nesting_depth)
+
+    candidates: list[tuple[str, int, int, int, float]] = []
+    for filepath, edit_count in git_stats.file_hotspots:
+        if filepath in complexity_map:
+            cc, depth = complexity_map[filepath]
+            raw_score = edit_count * cc
+            candidates.append((filepath, edit_count, cc, depth, raw_score))
+
+    if not candidates:
+        return []
+
+    # Normalize scores to 0-1
+    max_score = max(c[4] for c in candidates)
+    if max_score == 0:
+        max_score = 1.0
+
+    candidates.sort(key=lambda c: c[4], reverse=True)
+
+    return [
+        ChurnComplexityHotspot(
+            filepath=filepath,
+            edit_count=edit_count,
+            cyclomatic_complexity=cc,
+            max_nesting_depth=depth,
+            risk_score=round(raw_score / max_score, 3),
+        )
+        for filepath, edit_count, cc, depth, raw_score in candidates[:5]
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +220,75 @@ def _extract_project(
         progress(f"  Measuring module breadth...")
     module_breadth = extract_cross_module_breadth(module_groups, directory_overview)
 
+    # --- Compute primary_lang early (needed by analysis modules) ---
+    primary_lang = repo_stats.primary_language
+    if primary_lang:
+        primary_lang = extension_to_language(primary_lang) or primary_lang.lstrip(".")
+
+    # --- Phase 1: Analysis modules ---
+    style_metrics = None
+    try:
+        from ..resume.analysis.developer_style import compute_style_metrics
+
+        if progress:
+            progress(f"  Computing style metrics...")
+        style_metrics = compute_style_metrics(str(repo_path), user_email, primary_lang)
+    except Exception:
+        pass
+
+    file_complexity: list = []
+    try:
+        from ..resume.analysis.complexity_narrative import compute_complexity_metrics
+
+        if progress:
+            progress(f"  Computing complexity metrics...")
+        file_complexity = compute_complexity_metrics(str(repo_path), user_email)
+    except Exception:
+        pass
+
+    skill_appearances: list = []
+    try:
+        from ..resume.analysis.skill_timeline import compute_skill_first_appearances
+
+        if progress:
+            progress(f"  Computing skill timeline...")
+        skill_appearances = compute_skill_first_appearances(
+            str(repo_path), user_email, facts.detected_skills
+        )
+    except Exception:
+        pass
+
+    # --- Phase 2: Enriched constructs ---
+    enriched_constructs = None
+    try:
+        if progress:
+            progress(f"  Extracting enriched constructs...")
+        enriched_constructs = extract_enriched_constructs(
+            str(repo_path), touched_files or None
+        )
+    except Exception:
+        pass
+
+    # --- Phase 3: Import graph, config fingerprint ---
+    import_graph = None
+    try:
+        if progress:
+            progress(f"  Analyzing import graph...")
+        import_graph = extract_import_graph(str(repo_path), touched_files or None)
+    except Exception:
+        pass
+
+    config_fingerprint = None
+    try:
+        infra_signals = getattr(deep_result, "infra_signals", None)
+        if progress:
+            progress(f"  Extracting config fingerprint...")
+        config_fingerprint = extract_config_fingerprint(
+            str(repo_path), infra_signals=infra_signals
+        )
+    except Exception:
+        pass
+
     # --- Assemble ProjectDataBundle ---
     # Clean up languages (reuse facts.py logic already applied)
     raw_langs = repo_stats.Languages or []
@@ -176,9 +300,8 @@ def _extract_project(
             lang_totals[name] = lang_totals.get(name, 0) + pct
     sorted_langs = sorted(lang_totals.items(), key=lambda x: -x[1])
 
-    primary_lang = repo_stats.primary_language
-    if primary_lang:
-        primary_lang = extension_to_language(primary_lang) or primary_lang.lstrip(".")
+    # --- Churn-complexity cross-reference (Phase 3) ---
+    churn_complexity_hotspots = _compute_churn_complexity(git_stats, file_complexity)
 
     bundle = ProjectDataBundle(
         project_name=repo_stats.project_name,
@@ -201,6 +324,13 @@ def _extract_project(
         test_ratio=test_ratio,
         commit_quality=commit_quality,
         module_breadth=module_breadth,
+        style_metrics=style_metrics,
+        file_complexity=file_complexity,
+        skill_appearances=skill_appearances,
+        enriched_constructs=enriched_constructs,
+        import_graph=import_graph,
+        config_fingerprint=config_fingerprint,
+        churn_complexity_hotspots=churn_complexity_hotspots,
     )
 
     # User-specific stats
