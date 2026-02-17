@@ -93,6 +93,12 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
         "LFM2.5-1.2B-Instruct-BF16.gguf",
         32768,
     ),
+    # Prose-generation model (best for resume bullets, summaries, profiles)
+    "llama-3.2-3b-q4": (
+        "bartowski/Llama-3.2-3B-Instruct-GGUF",
+        "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
+        16384,
+    ),
 }
 
 # Per-model sampling defaults — matched to each model family's characteristics.
@@ -101,6 +107,7 @@ MODEL_SAMPLING_DEFAULTS: dict[str, dict[str, float]] = {
     "lfm2.5": {"temperature": 0.1, "top_p": 0.1, "repetition_penalty": 1.05},
     "qwen2.5-coder": {"temperature": 0.15, "top_p": 0.9},
     "qwen3": {"temperature": 0.2, "top_p": 0.9},
+    "llama": {"temperature": 0.4, "top_p": 0.9, "repetition_penalty": 1.1},
     "default": {"temperature": 0.2, "top_p": 0.9},
 }
 

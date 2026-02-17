@@ -357,6 +357,143 @@ def _resume_output_to_json_payload(output: ResumeOutput) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Per-section micro-prompt system prompts (v2 architecture)
+# ---------------------------------------------------------------------------
+
+BULLET_SYSTEM = (
+    "You are a resume editor for software engineers. "
+    "Rephrase technical facts as concise, achievement-focused resume bullets. "
+    "Each bullet starts with a strong action verb. "
+    "Reference ONLY features, technologies, and specifics from the provided facts. "
+    "Do NOT invent features, metrics, or technologies not present in the facts."
+)
+
+MICRO_POLISH_SYSTEM = (
+    "You are a senior resume editor. "
+    "Improve clarity, tone, and impact of resume content. "
+    "Preserve all factual claims — only improve phrasing. "
+    "Do NOT add new features, technologies, or metrics not in the original."
+)
+
+
+# ---------------------------------------------------------------------------
+# Per-section micro-prompt builders (v2 architecture)
+# ---------------------------------------------------------------------------
+
+
+def build_bullets_prompt(
+    project_name: str,
+    facts: list[str],
+    *,
+    contribution_pct: float | None = None,
+    data_card_context: str = "",
+) -> str:
+    """Build a per-project bullet generation prompt (uses BULLET_GRAMMAR)."""
+    ownership_hint = ""
+    if contribution_pct is not None:
+        if contribution_pct >= 95:
+            ownership_hint = (
+                'Use "Built", "Designed", or "Developed" as action verbs.\n'
+            )
+        elif contribution_pct >= 50:
+            ownership_hint = (
+                'Use "Led development of", "Architected", '
+                'or "Implemented" as action verbs.\n'
+            )
+        else:
+            ownership_hint = (
+                'Use "Contributed to", "Implemented", '
+                'or "Supported" as action verbs.\n'
+            )
+
+    facts_block = "\n".join(f"- {f}" for f in facts[:5])
+
+    if data_card_context:
+        return (
+            f"Project: {project_name}\n"
+            f"{ownership_hint}\n"
+            f"Data card:\n{data_card_context}\n\n"
+            f"Facts:\n{facts_block}\n\n"
+            "Using the data card and facts above, write exactly 3 professional "
+            "resume bullets.\n"
+            "Each bullet starts with a strong action verb and "
+            "references a specific feature or technology.\n"
+            "Prefer quantitative claims when the data card provides numbers.\n"
+            "Write 3 bullets now:\n- "
+        )
+
+    return (
+        f"Project: {project_name}\n"
+        f"{ownership_hint}\n"
+        f"Facts:\n{facts_block}\n\n"
+        "Rephrase the above facts as exactly 3 professional resume bullets.\n"
+        "Each bullet starts with a strong action verb and "
+        "references a specific feature or technology.\n"
+        "Write 3 bullets now:\n- "
+    )
+
+
+def build_micro_summary_prompt(portfolio: "PortfolioDataBundle") -> str:
+    """Build a professional summary prompt (uses SUMMARY_GRAMMAR)."""
+    project_types = ", ".join(
+        f"{count} {ptype}" for ptype, count in portfolio.project_types.items()
+    )
+    langs = ", ".join(portfolio.languages_used[:4])
+
+    return (
+        f"Portfolio: {portfolio.total_projects} projects ({project_types}).\n"
+        f"Technologies: {langs}.\n"
+        f"Total commits: {portfolio.total_commits}.\n\n"
+        "Write a 2-sentence professional summary for a software engineer's resume.\n"
+        "Mention the number of projects, key technologies, and types of systems built.\n"
+        "Write the summary now:\n"
+    )
+
+
+def build_micro_profile_prompt(portfolio: "PortfolioDataBundle") -> str:
+    """Build a developer profile prompt (uses SUMMARY_GRAMMAR)."""
+    project_lines = []
+    for p in portfolio.projects:
+        project_lines.append(
+            f"- {p.project_name}: {p.project_type}, "
+            f"{p.primary_language or 'multi-language'}"
+        )
+    projects_block = "\n".join(project_lines)
+
+    return (
+        f"Projects:\n{projects_block}\n\n"
+        "Write a 2-sentence developer profile describing "
+        "technical strengths and range.\n"
+        "Reference specific project types and technologies from the data.\n"
+        "Write the profile now:\n"
+    )
+
+
+def build_bullet_polish_prompt(bullets: list[str], feedback: str) -> str:
+    """Build a bullet polish prompt (uses BULLET_GRAMMAR)."""
+    bullets_block = "\n".join(f"- {b}" for b in bullets[:3])
+
+    return (
+        f"Current bullets:\n{bullets_block}\n\n"
+        f"Feedback: {feedback}\n\n"
+        "Improve these 3 bullets based on the feedback. "
+        "Keep all factual claims.\n"
+        "Write 3 improved bullets now:\n- "
+    )
+
+
+def build_text_polish_prompt(text: str, feedback: str) -> str:
+    """Build a text polish prompt for summary/profile (uses SUMMARY_GRAMMAR)."""
+    return (
+        f"Current text:\n{text}\n\n"
+        f"Feedback: {feedback}\n\n"
+        "Improve this text based on the feedback. "
+        "Keep all factual claims. Write 2-3 sentences.\n"
+        "Write the improved text now:\n"
+    )
+
+
 EXTRACTION_SYSTEM = (
     "You are a data extraction assistant. "
     "Extract structured facts from project data. "

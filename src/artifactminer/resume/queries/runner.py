@@ -28,6 +28,8 @@ from .prompts import (
     EXTRACTION_SYSTEM,
     DRAFT_SYSTEM,
     POLISH_SYSTEM,
+    BULLET_SYSTEM,
+    MICRO_POLISH_SYSTEM,
     build_project_prompt,
     build_summary_prompt,
     build_skills_prompt,
@@ -36,6 +38,11 @@ from .prompts import (
     build_extraction_evidence_catalog,
     build_draft_prompt,
     build_polish_prompt,
+    build_bullets_prompt,
+    build_micro_summary_prompt,
+    build_micro_profile_prompt,
+    build_bullet_polish_prompt,
+    build_text_polish_prompt,
 )
 from .schemas import Stage1ExtractionResponse, StageDraftResponse
 
@@ -105,6 +112,556 @@ _TOOL_KEYWORDS = {
     "ci/cd",
     "ci cd",
 }
+
+
+# ---------------------------------------------------------------------------
+# Capitalization map for deterministic skill normalization
+# ---------------------------------------------------------------------------
+
+_CAPITALIZATION_MAP: dict[str, str] = {
+    "html": "HTML",
+    "css": "CSS",
+    "javascript": "JavaScript",
+    "typescript": "TypeScript",
+    "python": "Python",
+    "java": "Java",
+    "c++": "C++",
+    "c#": "C#",
+    "sql": "SQL",
+    "nosql": "NoSQL",
+    "mongodb": "MongoDB",
+    "postgresql": "PostgreSQL",
+    "mysql": "MySQL",
+    "graphql": "GraphQL",
+    "rest": "REST",
+    "api": "API",
+    "aws": "AWS",
+    "gcp": "GCP",
+    "azure": "Azure",
+    "docker": "Docker",
+    "kubernetes": "Kubernetes",
+    "react": "React",
+    "vue": "Vue",
+    "angular": "Angular",
+    "fastapi": "FastAPI",
+    "flask": "Flask",
+    "django": "Django",
+    "express": "Express",
+    "nodejs": "Node.js",
+    "node.js": "Node.js",
+    "git": "Git",
+    "ci/cd": "CI/CD",
+    "github actions": "GitHub Actions",
+    "gitlab ci": "GitLab CI",
+    "terraform": "Terraform",
+    "nginx": "Nginx",
+    "redis": "Redis",
+    "kafka": "Kafka",
+    "rabbitmq": "RabbitMQ",
+    "pytest": "pytest",
+    "junit": "JUnit",
+    "jest": "Jest",
+    "webpack": "webpack",
+    "vite": "Vite",
+    "sqlalchemy": "SQLAlchemy",
+    "pandas": "pandas",
+    "numpy": "NumPy",
+    "pytorch": "PyTorch",
+    "tensorflow": "TensorFlow",
+    "linux": "Linux",
+    "bash": "Bash",
+    "go": "Go",
+    "rust": "Rust",
+    "ruby": "Ruby",
+    "swift": "Swift",
+    "kotlin": "Kotlin",
+    "php": "PHP",
+    "r": "R",
+    "dart": "Dart",
+    "scala": "Scala",
+    "tf": "Terraform",
+}
+
+
+# ---------------------------------------------------------------------------
+# Evidence artifact cleanup (Step 2)
+# ---------------------------------------------------------------------------
+
+_EVIDENCE_ARTIFACT_RE = re.compile(
+    r"commit:(?:feature|feat|bugfix|fix|refactor|test|docs|chore):"
+    r"|\(E\d+\)"
+    r"|\[(?:feature|bugfix|fix|refactor|test|docs|chore)\]"
+    r"|\|\s*evidence:\s*[EF]\d+(?:,\s*[EF]\d+)*",
+    re.I,
+)
+
+# Matches conventional commit prefixes at start of line
+_CONVENTIONAL_PREFIX_RE = re.compile(
+    r"^(?:feat|fix|refactor|test|docs|chore|style|perf|ci|build)"
+    r"(?:\([^)]*\))?:\s*",
+    re.I,
+)
+
+# Matches conventional commit prefixes appearing mid-text (e.g. "via feat: add ...")
+_CONVENTIONAL_MIDTEXT_RE = re.compile(
+    r"\b(?:feat|fix|refactor|test|docs|chore|style|perf|ci|build)"
+    r"(?:\([^)]*\))?:\s+",
+    re.I,
+)
+
+# Qwen3 thinking tag leakage
+_THINK_TAG_RE = re.compile(r"</?think>", re.I)
+
+# Emoji garbage runs (3+ consecutive emoji/variation-selector/ZWJ chars)
+_EMOJI_GARBAGE_RE = re.compile(
+    r"[\U0001F300-\U0001FAFF\u2600-\u27BF\u200D\uFE0F\u2705\u274C]{3,}",
+)
+
+
+def _clean_evidence_artifacts(text: str) -> str:
+    """Strip evidence markers and conventional commit prefixes from text."""
+    if not text:
+        return ""
+    cleaned = _EVIDENCE_ARTIFACT_RE.sub("", text)
+    cleaned = _CONVENTIONAL_PREFIX_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _clean_llm_artifacts(text: str) -> str:
+    """Strip LLM generation artifacts: think tags, emoji garbage, mid-text commit prefixes."""
+    if not text:
+        return ""
+    cleaned = _THINK_TAG_RE.sub("", text)
+    cleaned = _EMOJI_GARBAGE_RE.sub("", cleaned)
+    cleaned = _CONVENTIONAL_MIDTEXT_RE.sub("", cleaned)
+    cleaned = _EVIDENCE_ARTIFACT_RE.sub("", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _clean_all_facts(
+    raw_facts: dict[str, RawProjectFacts],
+) -> dict[str, RawProjectFacts]:
+    """Apply artifact cleanup to all Stage 1 facts in-place."""
+    for facts in raw_facts.values():
+        facts.summary = _clean_evidence_artifacts(facts.summary)
+        facts.role = _clean_evidence_artifacts(facts.role)
+        facts.facts = [
+            _clean_evidence_artifacts(f)
+            for f in facts.facts
+            if _clean_evidence_artifacts(f)
+        ]
+        for item in facts.fact_items:
+            item.text = _clean_evidence_artifacts(item.text)
+    return raw_facts
+
+
+# ---------------------------------------------------------------------------
+# Deterministic data card compilation (replaces Stage 1 LLM)
+# ---------------------------------------------------------------------------
+
+
+def _find_evidence_key(
+    catalog: dict[str, str], prefix: str
+) -> str | None:
+    """Find the first evidence catalog entry whose value starts with *prefix*."""
+    for key, value in catalog.items():
+        if value.startswith(prefix):
+            return key
+    return None
+
+
+def _build_data_card_context(bundle: ProjectDataBundle) -> str:
+    """Build a ~400-600 token structured text block from a ProjectDataBundle.
+
+    This context block is injected into the Stage 2 bullet prompt so the LLM
+    has rich quantitative data alongside the cherry-picked facts.
+    """
+    lines: list[str] = []
+
+    # --- Identity ---
+    lines.append(f"Type: {bundle.project_type}")
+    if bundle.primary_language:
+        lines.append(f"Language: {bundle.primary_language}")
+    if bundle.frameworks:
+        lines.append(f"Frameworks: {', '.join(bundle.frameworks[:6])}")
+    if bundle.user_contribution_pct is not None:
+        lines.append(f"Contribution: {bundle.user_contribution_pct:.0f}%")
+
+    # --- Impact metrics ---
+    gs = bundle.git_stats
+    if gs.lines_added:
+        lines.append(
+            f"Impact: {gs.lines_added:,} lines added, "
+            f"{gs.files_touched} files, "
+            f"{gs.active_days} active days"
+        )
+    tr = bundle.test_ratio
+    if tr.test_files > 0:
+        lines.append(
+            f"Testing: {tr.test_files} test files / {tr.source_files} source "
+            f"({tr.test_ratio:.0%} ratio)"
+            + (", CI configured" if tr.has_ci else "")
+        )
+    cq = bundle.commit_quality
+    if cq.type_diversity > 0:
+        lines.append(
+            f"Commit quality: {cq.conventional_pct:.0f}% conventional, "
+            f"{cq.type_diversity} types, "
+            f"longest streak {cq.longest_streak}"
+        )
+    mb = bundle.module_breadth
+    if mb.modules_touched > 0:
+        lines.append(
+            f"Module breadth: {mb.modules_touched}/{mb.total_modules} modules "
+            f"({mb.breadth_pct:.0f}%)"
+        )
+
+    # --- Key constructs ---
+    ec = bundle.enriched_constructs
+    if ec:
+        for cls in ec.classes[:4]:
+            lines.append(
+                f"Class {cls.name}: {cls.method_count} methods, {cls.total_loc} LOC"
+                + (f" (extends {cls.parent_class})" if cls.parent_class else "")
+            )
+        if ec.routes:
+            lines.append(f"Routes: {len(ec.routes)} endpoints")
+        if ec.test_functions:
+            lines.append(f"Tests: {len(ec.test_functions)} test functions")
+
+    # --- Architecture ---
+    ig = bundle.import_graph
+    if ig:
+        if ig.layer_detection:
+            lines.append(f"Layers: {', '.join(ig.layer_detection)}")
+        if ig.external_deps:
+            lines.append(f"Dependencies: {', '.join(ig.external_deps[:6])}")
+
+    # --- Style ---
+    sm = bundle.style_metrics
+    if sm is not None:
+        parts: list[str] = []
+        if hasattr(sm, "naming_convention") and sm.naming_convention:
+            parts.append(sm.naming_convention)
+        if hasattr(sm, "type_annotation_ratio") and sm.type_annotation_ratio:
+            parts.append(f"{sm.type_annotation_ratio:.0%} typed")
+        if hasattr(sm, "docstring_coverage") and sm.docstring_coverage:
+            parts.append(f"{sm.docstring_coverage:.0%} docstring coverage")
+        if parts:
+            lines.append(f"Style: {', '.join(parts)}")
+
+    # --- Churn-complexity hotspots ---
+    for hs in bundle.churn_complexity_hotspots[:2]:
+        lines.append(
+            f"Hotspot: {hs.filepath} "
+            f"(edits={hs.edit_count}, complexity={hs.cyclomatic_complexity})"
+        )
+
+    return "\n".join(lines)
+
+
+def compile_project_data_card(
+    bundle: ProjectDataBundle,
+    *,
+    max_facts: int = 5,
+    progress: Optional[Callable[[str], None]] = None,
+) -> RawProjectFacts:
+    """Deterministic Stage 1 replacement: compile a data card from a bundle.
+
+    Builds summary, role, and cherry-picked facts entirely from static data —
+    no LLM call required.  Returns a ``RawProjectFacts`` with
+    ``source_format="data_card"``.
+    """
+    if progress:
+        progress(f"  [Stage 1] Compiling data card for {bundle.project_name}...")
+
+    evidence_catalog = build_extraction_evidence_catalog(bundle)
+
+    # --- Summary: first sentence of README, fallback to project type ---
+    summary = ""
+    if bundle.readme_text:
+        # Take the first sentence (up to first period followed by space or end)
+        first_sentence = bundle.readme_text.strip().split("\n")[0].strip()
+        # Strip markdown heading markers
+        first_sentence = first_sentence.lstrip("#").strip()
+        if first_sentence:
+            # Truncate at first sentence boundary if long
+            dot_pos = first_sentence.find(". ")
+            if dot_pos > 0 and dot_pos < 200:
+                first_sentence = first_sentence[: dot_pos + 1]
+            elif len(first_sentence) > 200:
+                first_sentence = first_sentence[:200].rsplit(" ", 1)[0] + "..."
+            summary = _clean_inline_text(first_sentence)
+    if not summary:
+        lang_part = f" {bundle.primary_language}" if bundle.primary_language else ""
+        summary = f"A {bundle.project_type.lower()}{lang_part} project."
+
+    # --- Role: deterministic from contribution % + git stats ---
+    role = ""
+    pct = bundle.user_contribution_pct
+    gs = bundle.git_stats
+    lines_added = gs.lines_added
+    files = gs.files_touched
+    active_days = gs.active_days
+
+    if pct is not None and pct >= 95:
+        role = (
+            f"Sole developer, adding {lines_added:,} lines "
+            f"across {files} files over {active_days} active days."
+        )
+    elif pct is not None and pct >= 50:
+        role = (
+            f"Led development ({pct:.0f}% of codebase), "
+            f"adding {lines_added:,} lines across {files} files."
+        )
+    elif pct is not None:
+        role = (
+            f"Contributed {pct:.0f}% of the codebase, "
+            f"adding {lines_added:,} lines across {files} files "
+            f"over {active_days} active days."
+        )
+    elif lines_added > 0:
+        role = (
+            f"Added {lines_added:,} lines across {files} files "
+            f"over {active_days} active days."
+        )
+
+    # --- Facts: cherry-pick from commits, constructs, tests ---
+    fact_items: list[EvidenceLinkedFact] = []
+    fact_texts: list[str] = []
+    fact_idx = 1
+
+    # 1. Top feature/bugfix/refactor commits (deduped)
+    ordered_categories = ["feature", "bugfix", "refactor"]
+    by_category = {g.category: g.messages for g in bundle.commit_groups}
+    commit_pool: list[tuple[str, str]] = []  # (category, message)
+    for category in ordered_categories:
+        for msg in by_category.get(category, [])[:6]:
+            commit_pool.append((category, msg))
+
+    all_commit_msgs = [msg for _, msg in commit_pool]
+    deduped_msgs = ProjectDataBundle._dedup_commit_messages(all_commit_msgs)
+    deduped_set = set(deduped_msgs)
+
+    for category, msg in commit_pool:
+        if len(fact_items) >= max_facts:
+            break
+        if msg not in deduped_set:
+            continue
+        deduped_set.discard(msg)  # consume it so we don't repeat
+
+        cleaned = _clean_evidence_artifacts(msg)
+        if not cleaned:
+            continue
+
+        evidence_key = _find_evidence_key(
+            evidence_catalog, f"commit:{category}:"
+        )
+        evidence_keys = [evidence_key] if evidence_key else []
+
+        fact_id = f"F{fact_idx}"
+        fact_items.append(
+            EvidenceLinkedFact(
+                fact_id=fact_id,
+                text=cleaned,
+                evidence_keys=evidence_keys,
+            )
+        )
+        fact_texts.append(cleaned)
+        fact_idx += 1
+
+    # 2. Construct-derived facts (routes count, key classes)
+    ec = bundle.enriched_constructs
+    if ec and len(fact_items) < max_facts:
+        if ec.routes and len(ec.routes) >= 2:
+            route_text = f"Defined {len(ec.routes)} API endpoints"
+            evidence_key = _find_evidence_key(evidence_catalog, "route:")
+            fact_items.append(
+                EvidenceLinkedFact(
+                    fact_id=f"F{fact_idx}",
+                    text=route_text,
+                    evidence_keys=[evidence_key] if evidence_key else [],
+                )
+            )
+            fact_texts.append(route_text)
+            fact_idx += 1
+
+        for cls in ec.classes[:2]:
+            if len(fact_items) >= max_facts:
+                break
+            cls_text = (
+                f"Implemented {cls.name} class "
+                f"({cls.method_count} methods, {cls.total_loc} LOC)"
+            )
+            evidence_key = _find_evidence_key(evidence_catalog, f"class:{cls.name}")
+            fact_items.append(
+                EvidenceLinkedFact(
+                    fact_id=f"F{fact_idx}",
+                    text=cls_text,
+                    evidence_keys=[evidence_key] if evidence_key else [],
+                )
+            )
+            fact_texts.append(cls_text)
+            fact_idx += 1
+
+    # 3. Test coverage fact
+    tr = bundle.test_ratio
+    if tr.test_files > 0 and len(fact_items) < max_facts:
+        test_text = (
+            f"Maintained {tr.test_files} test files "
+            f"({tr.test_ratio:.0%} test-to-source ratio)"
+        )
+        evidence_key = _find_evidence_key(evidence_catalog, "test_framework:")
+        fact_items.append(
+            EvidenceLinkedFact(
+                fact_id=f"F{fact_idx}",
+                text=test_text,
+                evidence_keys=[evidence_key] if evidence_key else [],
+            )
+        )
+        fact_texts.append(test_text)
+        fact_idx += 1
+
+    return RawProjectFacts(
+        project_name=bundle.project_name,
+        summary=summary,
+        facts=fact_texts,
+        fact_items=fact_items,
+        evidence_catalog=evidence_catalog,
+        role=role,
+        source_format="data_card",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Deterministic skills builder (Step 3)
+# ---------------------------------------------------------------------------
+
+
+def _capitalize_skill(name: str) -> str:
+    """Apply proper capitalization to a skill name."""
+    return _CAPITALIZATION_MAP.get(name.lower().strip(), name)
+
+
+def _build_skills_deterministic(portfolio: PortfolioDataBundle) -> str:
+    """Build skills section deterministically from portfolio data (no LLM)."""
+    categories: dict[str, list[str]] = {
+        "languages": [],
+        "frameworks": [],
+        "tools": [],
+        "practices": [],
+    }
+
+    for lang in portfolio.languages_used[:8]:
+        categories["languages"].append(_capitalize_skill(lang))
+
+    for fw in portfolio.frameworks_used[:10]:
+        capitalized = _capitalize_skill(fw)
+        if _looks_like_tool(fw):
+            categories["tools"].append(capitalized)
+        else:
+            categories["frameworks"].append(capitalized)
+
+    language_tokens = {_normalize_token(n) for n in categories["languages"]}
+    framework_tokens = {_normalize_token(n) for n in categories["frameworks"]}
+    tool_tokens = {_normalize_token(n) for n in categories["tools"]}
+
+    for skill in portfolio.top_skills[:15]:
+        capitalized = _capitalize_skill(skill)
+        token = _normalize_token(capitalized)
+        if token in language_tokens or token in framework_tokens or token in tool_tokens:
+            continue
+        if _normalize_token(skill) in _COMMON_LANGUAGES:
+            categories["languages"].append(capitalized)
+        elif _looks_like_tool(skill):
+            categories["tools"].append(capitalized)
+        else:
+            categories["practices"].append(capitalized)
+
+    seen: set[str] = set()
+    deduped: dict[str, list[str]] = {k: [] for k in categories}
+    for cat in ["languages", "frameworks", "tools", "practices"]:
+        for item in categories[cat]:
+            key = item.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped[cat].append(item)
+
+    lines: list[str] = []
+    if deduped["languages"]:
+        lines.append(f"Languages: {', '.join(deduped['languages'])}")
+    if deduped["frameworks"]:
+        lines.append(f"Frameworks & Libraries: {', '.join(deduped['frameworks'])}")
+    if deduped["tools"]:
+        lines.append(f"Tools & Infrastructure: {', '.join(deduped['tools'])}")
+    if deduped["practices"]:
+        lines.append(f"Practices: {', '.join(deduped['practices'])}")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Deterministic descriptions + narratives (Step 4)
+# ---------------------------------------------------------------------------
+
+
+def _build_descriptions_deterministic(
+    raw_facts: dict[str, RawProjectFacts],
+    portfolio: Optional[PortfolioDataBundle] = None,
+) -> dict[str, tuple[str, str]]:
+    """Build descriptions and narratives from Stage 1 data without LLM.
+
+    Returns ``{project_name: (description, narrative)}``.
+    """
+    bundle_map: dict[str, ProjectDataBundle] = {}
+    if portfolio:
+        for b in portfolio.projects:
+            bundle_map[b.project_name] = b
+
+    result: dict[str, tuple[str, str]] = {}
+    for project_name, facts in raw_facts.items():
+        description = _clean_evidence_artifacts(facts.summary) if facts.summary else ""
+
+        bundle = bundle_map.get(project_name)
+        narrative = ""
+        if bundle:
+            pct = bundle.user_contribution_pct
+            gs = bundle.git_stats
+            lines_added = gs.lines_added
+            files = gs.files_touched
+            active_days = gs.active_days
+
+            if pct is not None and pct >= 95:
+                narrative = (
+                    f"Sole developer, adding {lines_added:,} lines "
+                    f"across {files} files over {active_days} active days."
+                )
+            elif pct is not None and pct >= 50:
+                narrative = (
+                    f"Led development ({pct:.0f}% of codebase), "
+                    f"adding {lines_added:,} lines across {files} files."
+                )
+            elif pct is not None:
+                narrative = (
+                    f"Contributed {pct:.0f}% of the codebase, "
+                    f"adding {lines_added:,} lines across {files} files "
+                    f"over {active_days} active days."
+                )
+            elif lines_added > 0:
+                narrative = (
+                    f"Added {lines_added:,} lines across {files} files "
+                    f"over {active_days} active days."
+                )
+
+        if not narrative:
+            narrative = _clean_evidence_artifacts(facts.role) if facts.role else ""
+
+        result[project_name] = (description, narrative)
+
+    return result
 
 
 def _query(
@@ -501,7 +1058,10 @@ def _extract_bullets(lines: list[str]) -> list[str]:
 
 
 def _clean_summary_or_profile(text: str) -> str:
-    """Strip optional section labels from summary/profile responses."""
+    """Strip optional section labels and LLM artifacts from summary/profile responses."""
+    # Strip think tags and emoji garbage first
+    text = _THINK_TAG_RE.sub("", text) if text else ""
+    text = _EMOJI_GARBAGE_RE.sub("", text)
     cleaned = _clean_text_block(text.splitlines())
     cleaned = re.sub(
         r"^(SUMMARY|PROFILE|DEVELOPER PROFILE)\s*:\s*", "", cleaned, flags=re.I
@@ -1330,5 +1890,422 @@ def run_polish_query(
 
     citation_metrics = _apply_citation_gate(output, raw_facts)
     output.quality_metrics["citations"] = citation_metrics
+
+    return output
+
+
+# ---------------------------------------------------------------------------
+# Per-section micro-prompt queries (Step 6)
+# ---------------------------------------------------------------------------
+
+
+def _parse_bullet_response(text: str) -> list[str]:
+    """Parse ``- bullet`` lines from a GBNF-constrained response."""
+    if not text:
+        return []
+    # Strip think tags and emoji garbage before line-splitting
+    text = _THINK_TAG_RE.sub("", text)
+    text = _EMOJI_GARBAGE_RE.sub("", text)
+    bullets: list[str] = []
+    for line in text.splitlines():
+        match = _BULLET_LINE_RE.match(line.strip())
+        if match:
+            cleaned = _clean_llm_artifacts(match.group(1))
+            cleaned = _clean_inline_text(cleaned)
+            if cleaned:
+                bullets.append(cleaned)
+    return bullets
+
+
+def _run_bullet_query(
+    project_name: str,
+    facts: list[str],
+    model: str,
+    *,
+    contribution_pct: float | None = None,
+    data_card_context: str = "",
+    progress: Optional[Callable[[str], None]] = None,
+) -> tuple[list[str], list[list[str]]]:
+    """Run a single bullet-generation call for one project.
+
+    Returns ``(bullets, bullet_fact_ids)`` — each bullet mapped to fact IDs.
+    """
+    from .grammars import BULLET_GRAMMAR
+
+    if progress:
+        progress(f"  [Stage 2] Generating bullets for {project_name}...")
+
+    if not facts:
+        return [], []
+
+    prompt = build_bullets_prompt(
+        project_name,
+        facts,
+        contribution_pct=contribution_pct,
+        data_card_context=data_card_context,
+    )
+
+    try:
+        response = _query(
+            prompt,
+            model,
+            BULLET_SYSTEM,
+            max_tokens=300,
+            grammar=BULLET_GRAMMAR,
+        )
+        # Prepend "- " since prompt primes with it and grammar expects it
+        if response and not response.startswith("- "):
+            response = "- " + response
+        bullets = _parse_bullet_response(response)
+    except Exception as exc:
+        log.warning("Bullet query failed for %s: %s", project_name, exc)
+        bullets = []
+
+    if not bullets:
+        # Fallback: convert cleaned facts directly
+        bullets = [_fact_to_repair_bullet(f) for f in facts[:3] if f]
+
+    # Map bullets to fact IDs (1:1 with input facts order)
+    bullet_fact_ids: list[list[str]] = []
+    for i, _bullet in enumerate(bullets):
+        if i < len(facts):
+            bullet_fact_ids.append([f"F{i + 1}"])
+        else:
+            bullet_fact_ids.append([])
+
+    return bullets[:3], bullet_fact_ids[:3]
+
+
+def _run_summary_query(
+    portfolio: PortfolioDataBundle,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> str:
+    """Run a single summary-generation call."""
+    from .grammars import SUMMARY_GRAMMAR
+
+    if progress:
+        progress("  [Stage 2] Generating professional summary...")
+
+    prompt = build_micro_summary_prompt(portfolio)
+    try:
+        response = _query(
+            prompt,
+            model,
+            BULLET_SYSTEM,
+            max_tokens=200,
+            grammar=SUMMARY_GRAMMAR,
+        )
+        cleaned = _clean_summary_or_profile(response)
+        if cleaned:
+            return cleaned
+    except Exception as exc:
+        log.warning("Summary query failed: %s", exc)
+
+    # Deterministic fallback
+    return (
+        f"Software developer with experience across "
+        f"{portfolio.total_projects} projects "
+        f"using {', '.join(portfolio.languages_used[:3])}."
+    )
+
+
+def _run_profile_query(
+    portfolio: PortfolioDataBundle,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> str:
+    """Run a single profile-generation call."""
+    from .grammars import SUMMARY_GRAMMAR
+
+    if progress:
+        progress("  [Stage 2] Generating developer profile...")
+
+    prompt = build_micro_profile_prompt(portfolio)
+    try:
+        response = _query(
+            prompt,
+            model,
+            BULLET_SYSTEM,
+            max_tokens=200,
+            grammar=SUMMARY_GRAMMAR,
+        )
+        cleaned = _clean_summary_or_profile(response)
+        if cleaned:
+            return cleaned
+    except Exception as exc:
+        log.warning("Profile query failed: %s", exc)
+
+    # Deterministic fallback
+    return (
+        "Builds practical systems with a strong implementation focus "
+        "across backend, tooling, and delivery workflows."
+    )
+
+
+# ---------------------------------------------------------------------------
+# v2 Stage 2 orchestrator: per-section micro-prompts (Step 7)
+# ---------------------------------------------------------------------------
+
+
+def run_draft_queries_v2(
+    raw_facts: dict[str, RawProjectFacts],
+    portfolio: PortfolioDataBundle,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> ResumeOutput:
+    """Stage 2 v2: Per-section micro-prompt draft with GBNF grammars.
+
+    1. Clean facts (strip evidence artifacts)
+    2. Build skills deterministically
+    3. Build descriptions + narratives deterministically
+    4. Per-project bullet calls with BULLET_GRAMMAR
+    5. Summary + profile calls with SUMMARY_GRAMMAR
+    6. Citation gate
+    """
+    if progress:
+        progress("[Stage 2 v2] Generating draft resume with micro-prompts...")
+
+    # 1. Clean facts
+    _clean_all_facts(raw_facts)
+
+    # 2. Deterministic skills
+    skills_section = _build_skills_deterministic(portfolio)
+
+    # 3. Deterministic descriptions + narratives
+    desc_narr = _build_descriptions_deterministic(raw_facts, portfolio)
+
+    # 4. Per-project bullet generation
+    output = ResumeOutput(stage="draft")
+    bundle_map: dict[str, ProjectDataBundle] = {
+        b.project_name: b for b in portfolio.projects
+    }
+
+    for project_name, facts in raw_facts.items():
+        cleaned_facts = [
+            item.text for item in facts.fact_items if item.text
+        ] or facts.facts
+
+        bundle = bundle_map.get(project_name)
+        pct = bundle.user_contribution_pct if bundle else None
+
+        # Build data card context for richer Stage 2 prompts
+        card_context = _build_data_card_context(bundle) if bundle else ""
+
+        bullets, bullet_fact_ids = _run_bullet_query(
+            project_name,
+            cleaned_facts,
+            model,
+            contribution_pct=pct,
+            data_card_context=card_context,
+            progress=progress,
+        )
+
+        description, narrative = desc_narr.get(project_name, ("", ""))
+        output.project_sections[project_name] = ProjectSection(
+            description=description,
+            bullets=bullets,
+            bullet_fact_ids=bullet_fact_ids,
+            narrative=narrative,
+        )
+
+    # 5. Summary + profile
+    output.professional_summary = _run_summary_query(
+        portfolio, model, progress=progress
+    )
+    output.developer_profile = _run_profile_query(
+        portfolio, model, progress=progress
+    )
+    output.skills_section = skills_section
+
+    # Fallbacks
+    if not output.project_sections:
+        output.project_sections = _synthesize_sections_from_raw_facts(raw_facts)
+    if not output.professional_summary:
+        output.professional_summary = (
+            f"Software developer with experience across "
+            f"{portfolio.total_projects} projects "
+            f"using {', '.join(portfolio.languages_used[:3])}."
+        )
+    if not output.developer_profile:
+        output.developer_profile = (
+            "Builds practical systems with a strong implementation focus "
+            "across backend, tooling, and delivery workflows."
+        )
+    if not output.skills_section:
+        output.skills_section = _build_skills_deterministic(portfolio)
+
+    # 6. Citation gate
+    output.portfolio_data = portfolio
+    output.raw_project_facts = raw_facts
+    citation_metrics = _apply_citation_gate(output, raw_facts)
+    output.quality_metrics["citations"] = citation_metrics
+    output.quality_metrics["schema"] = {
+        "draft_v2_micro": 1,
+    }
+
+    return output
+
+
+# ---------------------------------------------------------------------------
+# v2 Stage 3 orchestrator: per-section polish (Step 8)
+# ---------------------------------------------------------------------------
+
+
+def run_polish_query_v2(
+    draft_output: ResumeOutput,
+    feedback: UserFeedback,
+    model: str,
+    *,
+    progress: Optional[Callable[[str], None]] = None,
+) -> ResumeOutput:
+    """Stage 3 v2: Per-section polish with GBNF grammars.
+
+    - Per-project bullet polish with BULLET_GRAMMAR
+    - Summary + profile polish with SUMMARY_GRAMMAR
+    - Direct section edits applied without LLM
+    - Skills section never polished (deterministic)
+    """
+    from .grammars import BULLET_GRAMMAR, SUMMARY_GRAMMAR
+
+    if progress:
+        progress("[Stage 3 v2] Polishing resume with micro-prompts...")
+
+    raw_facts = draft_output.raw_project_facts or {}
+    has_content_feedback = bool(feedback.general_notes or feedback.tone)
+
+    output = ResumeOutput(stage="polish")
+    output.portfolio_data = draft_output.portfolio_data
+    output.raw_project_facts = raw_facts
+
+    # --- Apply direct section edits first ---
+    if feedback.section_edits:
+        for section_name, corrected in feedback.section_edits.items():
+            key = section_name.casefold()
+            if key in ("summary", "professional_summary"):
+                output.professional_summary = corrected
+            elif key in ("profile", "developer_profile"):
+                output.developer_profile = corrected
+            elif key in ("skills", "skills_section"):
+                output.skills_section = corrected
+
+    # --- Per-project bullet polish ---
+    feedback_text = ""
+    if feedback.general_notes:
+        feedback_text += feedback.general_notes
+    if feedback.tone:
+        if feedback_text:
+            feedback_text += f" Tone: {feedback.tone}."
+        else:
+            feedback_text = f"Tone: {feedback.tone}."
+
+    for project_name, section in draft_output.project_sections.items():
+        if has_content_feedback and section.bullets:
+            if progress:
+                progress(
+                    f"  [Stage 3 v2] Polishing bullets for {project_name}..."
+                )
+            prompt = build_bullet_polish_prompt(section.bullets[:3], feedback_text)
+            try:
+                response = _query(
+                    prompt,
+                    model,
+                    MICRO_POLISH_SYSTEM,
+                    max_tokens=300,
+                    grammar=BULLET_GRAMMAR,
+                )
+                if response and not response.startswith("- "):
+                    response = "- " + response
+                polished_bullets = _parse_bullet_response(response)
+                if polished_bullets:
+                    output.project_sections[project_name] = ProjectSection(
+                        description=section.description,
+                        bullets=polished_bullets[:3],
+                        bullet_fact_ids=section.bullet_fact_ids,
+                        narrative=section.narrative,
+                    )
+                    continue
+            except Exception as exc:
+                log.warning(
+                    "Bullet polish failed for %s: %s", project_name, exc
+                )
+
+        # No polish needed or polish failed — keep draft
+        output.project_sections[project_name] = ProjectSection(
+            description=section.description,
+            bullets=list(section.bullets),
+            bullet_fact_ids=list(section.bullet_fact_ids or []),
+            narrative=section.narrative,
+        )
+
+    # --- Summary polish ---
+    if (
+        has_content_feedback
+        and draft_output.professional_summary
+        and not output.professional_summary
+    ):
+        if progress:
+            progress("  [Stage 3 v2] Polishing summary...")
+        prompt = build_text_polish_prompt(
+            draft_output.professional_summary, feedback_text
+        )
+        try:
+            response = _query(
+                prompt,
+                model,
+                MICRO_POLISH_SYSTEM,
+                max_tokens=200,
+                grammar=SUMMARY_GRAMMAR,
+            )
+            cleaned = _clean_summary_or_profile(response)
+            if cleaned:
+                output.professional_summary = cleaned
+        except Exception as exc:
+            log.warning("Summary polish failed: %s", exc)
+
+    # --- Profile polish ---
+    if (
+        has_content_feedback
+        and draft_output.developer_profile
+        and not output.developer_profile
+    ):
+        if progress:
+            progress("  [Stage 3 v2] Polishing profile...")
+        prompt = build_text_polish_prompt(
+            draft_output.developer_profile, feedback_text
+        )
+        try:
+            response = _query(
+                prompt,
+                model,
+                MICRO_POLISH_SYSTEM,
+                max_tokens=200,
+                grammar=SUMMARY_GRAMMAR,
+            )
+            cleaned = _clean_summary_or_profile(response)
+            if cleaned:
+                output.developer_profile = cleaned
+        except Exception as exc:
+            log.warning("Profile polish failed: %s", exc)
+
+    # --- Preserve unmodified sections from draft ---
+    if not output.professional_summary:
+        output.professional_summary = draft_output.professional_summary
+    if not output.skills_section:
+        output.skills_section = draft_output.skills_section
+    if not output.developer_profile:
+        output.developer_profile = draft_output.developer_profile
+    if not output.project_sections:
+        output.project_sections = dict(draft_output.project_sections)
+
+    # --- Citation gate ---
+    citation_metrics = _apply_citation_gate(output, raw_facts)
+    output.quality_metrics["citations"] = citation_metrics
+    output.quality_metrics["schema"] = {
+        "polish_v2_micro": 1,
+    }
 
     return output

@@ -58,3 +58,21 @@ SUMMARY_GRAMMAR = r"""
 root        ::= sentence " " sentence (" " sentence)?
 sentence    ::= [A-Z] [^.]+ "."
 """.strip()
+
+
+# ---------------------------------------------------------------------------
+# Bullet section: exactly 3 bullet lines (micro-prompt output)
+# ---------------------------------------------------------------------------
+
+# Enforces:
+#   - <bullet line>
+#   - <bullet line>
+#   - <bullet line>
+BULLET_GRAMMAR = r"""
+root       ::= bullet bullet bullet
+bullet     ::= "- " line "\n"
+line       ::= [^\n]+
+""".strip()
+
+# Polish uses the same structure as draft bullets.
+POLISH_BULLET_GRAMMAR = BULLET_GRAMMAR

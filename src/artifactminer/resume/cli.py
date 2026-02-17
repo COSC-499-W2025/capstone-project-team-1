@@ -49,7 +49,7 @@ def _display_extracted_facts(
     console.print(
         Panel(
             overview,
-            title="[bold]STAGE 1 COMPLETE: Extraction + Distillation[/bold]",
+            title="[bold]STAGE 1 COMPLETE: Data Card Compilation[/bold]",
             border_style="green",
         )
     )
@@ -90,7 +90,7 @@ def _display_extracted_facts(
             if facts.role:
                 lines.append(f"[bold]Role:[/bold] {facts.role}")
         else:
-            lines.append("[yellow]No facts extracted (LLM may have failed)[/yellow]")
+            lines.append("[yellow]No facts compiled from project data[/yellow]")
 
         console.print(
             Panel(
@@ -250,9 +250,9 @@ def generate(
         help="Model for fact extraction (default: lfm2-2.6b-q8)",
     ),
     stage2_model: str = typer.Option(
-        "qwen3-1.7b-q8",
+        "llama-3.2-3b-q4",
         "--stage2-model",
-        help="Model for draft + polish (default: qwen3-1.7b-q8)",
+        help="Model for draft + polish (default: llama-3.2-3b-q4)",
     ),
     output_dir: Optional[Path] = typer.Option(
         None,
@@ -272,8 +272,8 @@ def generate(
     Runs a 3-stage pipeline:
 
       1. EXTRACT + DISTILL + fact extraction  (lfm2-2.6b-q8)
-      2. First-draft generation               (qwen3-1.7b-q8)
-      3. Polish with your feedback             (qwen3-1.7b-q8)
+      2. First-draft generation               (llama-3.2-3b-q4)
+      3. Polish with your feedback             (llama-3.2-3b-q4)
 
     After Stage 2, you'll see the draft and can provide feedback
     (tone, additions, removals) before the final polish.
@@ -293,9 +293,9 @@ def generate(
 
     from .pipeline import extract_and_distill
     from .queries.runner import (
-        run_extraction_query,
-        run_draft_queries,
-        run_polish_query,
+        compile_project_data_card,
+        run_draft_queries_v2,
+        run_polish_query_v2,
     )
     from .assembler import assemble_markdown, assemble_json
     from .models import RawProjectFacts, ResumeOutput
@@ -321,7 +321,7 @@ def generate(
         console.print(
             Panel(
                 f"[bold]Resume Pipeline[/bold]\n\n"
-                f"  Stage 1 model: [cyan]{stage1_model}[/cyan] (fact extraction)\n"
+                f"  Stage 1: [cyan]deterministic data card compilation[/cyan]\n"
                 f"  Stage 2 model: [cyan]{stage2_model}[/cyan] (draft generation)\n"
                 f"  Stage 3 model: [cyan]{stage3_model}[/cyan] (polish with feedback)\n\n"
                 f"  ZIP: {zip_path}\n"
@@ -348,21 +348,20 @@ def generate(
         )
         errors.extend(extract_errors)
 
-        # ── STAGE 1: LLM FACT EXTRACTION ─────────────────────────────
+        # ── STAGE 1: DATA CARD COMPILATION (deterministic) ────────────
         console.print()
         console.rule(
-            f"[bold cyan]Stage 1: Fact Extraction ({stage1_model})[/bold cyan]"
+            "[bold cyan]Stage 1: Data Card Compilation (deterministic)[/bold cyan]"
         )
-        models_used.append(stage1_model)
 
         raw_facts: dict[str, RawProjectFacts] = {}
         for bundle in bundles:
             try:
-                facts = run_extraction_query(bundle, stage1_model, progress=prog)
+                facts = compile_project_data_card(bundle, progress=prog)
                 raw_facts[bundle.project_name] = facts
-                prog(f"  Extracted {bundle.project_name}: {len(facts.facts)} facts")
+                prog(f"  Compiled {bundle.project_name}: {len(facts.facts)} facts")
             except Exception as e:
-                prog(f"  Extraction failed for {bundle.project_name}: {e}")
+                prog(f"  Compilation failed for {bundle.project_name}: {e}")
                 errors.append(f"Stage 1 failed for {bundle.project_name}: {e}")
 
         if not raw_facts:
@@ -391,7 +390,7 @@ def generate(
         models_used.append(stage2_model)
 
         try:
-            draft_output = run_draft_queries(
+            draft_output = run_draft_queries_v2(
                 raw_facts,
                 portfolio,
                 stage2_model,
@@ -454,7 +453,7 @@ def generate(
                 console.print(f"[dim]Tone: {user_feedback.tone}[/dim]")
 
             try:
-                final_output = run_polish_query(
+                final_output = run_polish_query_v2(
                     draft_output,
                     user_feedback,
                     stage3_model,

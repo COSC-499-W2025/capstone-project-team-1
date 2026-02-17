@@ -75,6 +75,19 @@ def assemble_markdown(output: ResumeOutput) -> str:
                     lines.append(section.description)
                     lines.append("")
 
+                # Metrics line from git_stats
+                gs = project.git_stats
+                if gs and (gs.lines_added or gs.files_touched or gs.active_days):
+                    parts = []
+                    if gs.lines_added:
+                        parts.append(f"{gs.lines_added:,} lines added")
+                    if gs.files_touched:
+                        parts.append(f"{gs.files_touched} files")
+                    if gs.active_days:
+                        parts.append(f"{gs.active_days} active days")
+                    lines.append(f"*{' | '.join(parts)}*")
+                    lines.append("")
+
                 # Bullets
                 for bullet in section.bullets:
                     lines.append(f"- {bullet}")

@@ -39,9 +39,9 @@ from .extractors import (
 )
 from .distill import distill_project_context, distill_portfolio_context
 from .queries.runner import (
-    run_extraction_query,
-    run_draft_queries,
-    run_polish_query,
+    compile_project_data_card,
+    run_draft_queries_v2,
+    run_polish_query_v2,
 )
 
 # Reuse existing infrastructure
@@ -583,23 +583,19 @@ def generate_resume_v3_multistage(
             f"~{bundle.distilled_context.token_estimate} tokens"
         )
 
-    # ── STAGE 1: EXTRACTION (structured facts) ───────────────────────
-    prog(f"Stage 1: Extracting facts with {stage1_model}...")
-    models_used.append(stage1_model)
+    # ── STAGE 1: DATA CARD COMPILATION (deterministic) ────────────────
+    prog("Stage 1: Compiling data cards (deterministic)...")
     raw_facts: dict[str, RawProjectFacts] = {}
 
     for bundle in bundles:
         quality_metrics["schema"]["stage1_total"] += 1
         try:
-            facts = run_extraction_query(bundle, stage1_model, progress=prog)
+            facts = compile_project_data_card(bundle, progress=prog)
             raw_facts[bundle.project_name] = facts
-            if facts.source_format == "json":
-                quality_metrics["schema"]["stage1_json"] += 1
-            else:
-                quality_metrics["schema"]["stage1_text_fallback"] += 1
-            prog(f"  Extracted {bundle.project_name}: {len(facts.facts)} facts")
+            quality_metrics["schema"]["stage1_json"] += 1
+            prog(f"  Compiled {bundle.project_name}: {len(facts.facts)} facts")
         except Exception as e:
-            prog(f"  Extraction failed for {bundle.project_name}: {e}")
+            prog(f"  Compilation failed for {bundle.project_name}: {e}")
             errors.append(f"Stage 1 failed for {bundle.project_name}: {e}")
 
     if not raw_facts:
@@ -610,7 +606,7 @@ def generate_resume_v3_multistage(
     models_used.append(stage2_model)
 
     try:
-        draft_output = run_draft_queries(
+        draft_output = run_draft_queries_v2(
             raw_facts, portfolio, stage2_model, progress=prog
         )
         merge_quality_metrics(draft_output.quality_metrics)
@@ -639,7 +635,7 @@ def generate_resume_v3_multistage(
         models_used.append(stage3_model)
 
         try:
-            final_output = run_polish_query(
+            final_output = run_polish_query_v2(
                 draft_output, user_feedback, stage3_model, progress=prog
             )
             merge_quality_metrics(final_output.quality_metrics)
