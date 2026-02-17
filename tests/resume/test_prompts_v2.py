@@ -325,7 +325,9 @@ class TestCommitDedup:
         )
         context = bundle.to_prompt_context()
         # "add user authentication" appears in two near-identical messages
-        lines = [l.strip() for l in context.split("\n") if "authentication" in l.lower()]
+        lines = [
+            l.strip() for l in context.split("\n") if "authentication" in l.lower()
+        ]
         assert len(lines) == 1, f"Expected 1 auth line, got {len(lines)}: {lines}"
         assert "payment gateway" in context
 
@@ -381,14 +383,17 @@ class TestCommitDedup:
 class TestPromptBuildersParameterized:
     """Parameterized tests for prompt builder structural properties."""
 
-    @pytest.mark.parametrize("contribution,expected_hint", [
-        (100.0, "SOLO project"),
-        (95.0, "SOLO project"),
-        (94.0, "TEAM project"),
-        (50.0, "TEAM project"),
-        (30.0, "TEAM project"),
-        (None, ""),
-    ])
+    @pytest.mark.parametrize(
+        "contribution,expected_hint",
+        [
+            (100.0, "SOLO project"),
+            (95.0, "SOLO project"),
+            (94.0, "TEAM project"),
+            (50.0, "TEAM project"),
+            (30.0, "TEAM project"),
+            (None, ""),
+        ],
+    )
     def test_ownership_hint(self, contribution, expected_hint) -> None:
         """Ownership hint should match contribution percentage."""
         bundle = _make_bundle(user_contribution_pct=contribution)
@@ -409,24 +414,27 @@ class TestPromptBuildersParameterized:
         prompt = build_project_prompt(_make_bundle(user_contribution_pct=70.0))
         assert 'Do NOT say "Independently built"' in prompt
 
-    @pytest.mark.parametrize("builder,required_markers", [
-        (
-            lambda: build_project_prompt(_make_bundle()),
-            ["DESCRIPTION:", "BULLETS:", "NARRATIVE:"],
-        ),
-        (
-            lambda: build_summary_prompt(_make_portfolio()),
-            ["Rules:", "Portfolio data:"],
-        ),
-        (
-            lambda: build_skills_prompt(_make_portfolio()),
-            ["Format:", "Rules:", "Languages:"],
-        ),
-        (
-            lambda: build_profile_prompt(_make_portfolio()),
-            ["Rules:", "Project data:"],
-        ),
-    ])
+    @pytest.mark.parametrize(
+        "builder,required_markers",
+        [
+            (
+                lambda: build_project_prompt(_make_bundle()),
+                ["DESCRIPTION:", "BULLETS:", "NARRATIVE:"],
+            ),
+            (
+                lambda: build_summary_prompt(_make_portfolio()),
+                ["Rules:", "Portfolio data:"],
+            ),
+            (
+                lambda: build_skills_prompt(_make_portfolio()),
+                ["Format:", "Rules:", "Languages:"],
+            ),
+            (
+                lambda: build_profile_prompt(_make_portfolio()),
+                ["Rules:", "Project data:"],
+            ),
+        ],
+    )
     def test_required_markers_present(self, builder, required_markers) -> None:
         """Each prompt should contain its expected structural markers."""
         prompt = builder()
@@ -546,7 +554,7 @@ class TestBulletsPromptWithDataCard:
 
         assert "Data card:" in prompt
         assert "3,000 lines added" in prompt
-        assert "quantitative" in prompt.lower()
+        assert "Prioritize shipped functionality" in prompt
 
     def test_without_data_card_unchanged(self) -> None:
         """When data_card_context is empty, prompt should be identical to original."""

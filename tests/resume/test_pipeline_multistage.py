@@ -39,6 +39,7 @@ from artifactminer.resume.queries.runner import (
     _build_skills_deterministic,
     _clean_evidence_artifacts,
     _clean_llm_artifacts,
+    _clean_summary_or_profile,
     _parse_bullet_response,
     _parse_draft_response,
     _parse_extraction_response,
@@ -804,7 +805,10 @@ class TestEnrichedExtractDistill:
                 test_functions=["test_list_users", "test_create_user"],
             ),
             import_graph=ImportGraph(
-                imports_map={"src.api.routes": ["fastapi"], "src.api.auth": ["src.models.user"]},
+                imports_map={
+                    "src.api.routes": ["fastapi"],
+                    "src.api.auth": ["src.models.user"],
+                },
                 layer_detection=["presentation", "data"],
                 circular_deps=[],
                 external_deps=["fastapi", "sqlalchemy"],
@@ -970,8 +974,10 @@ class TestCleanLlmArtifacts:
 
     def test_strips_emoji_garbage(self) -> None:
         """Should remove long runs of emoji characters."""
-        result = _clean_llm_artifacts("Built API.\n\u2705\uFE0F\U0001F525\U0001F525\U0001F525\U0001F525")
-        assert "\U0001F525" not in result
+        result = _clean_llm_artifacts(
+            "Built API.\n\u2705\ufe0f\U0001f525\U0001f525\U0001f525\U0001f525"
+        )
+        assert "\U0001f525" not in result
         assert "Built API." in result
 
     def test_strips_midtext_conventional_prefix(self) -> None:
@@ -985,13 +991,37 @@ class TestCleanLlmArtifacts:
         text = "Built user registration with email validation."
         assert _clean_llm_artifacts(text) == text
 
+    def test_strips_note_parenthetical(self) -> None:
+        """Should remove leaked editorial note parentheticals."""
+        result = _clean_llm_artifacts(
+            'Implemented result mapping. (Note: Since "map outputs" is vague, I rephrased it)'
+        )
+        assert "(Note:" not in result
+        assert "Implemented result mapping." in result
+
+
+class TestCleanSummaryOrProfile:
+    """Tests for summary/profile cleanup helpers."""
+
+    def test_strips_meta_preamble(self) -> None:
+        """Should remove lead-in text like 'Here is a ...'."""
+        text = (
+            "Here is a 2-sentence professional summary for a software engineer's resume:\n\n"
+            "Backend engineer with experience in APIs and tooling."
+        )
+        cleaned = _clean_summary_or_profile(text)
+        assert "Here is" not in cleaned
+        assert cleaned.startswith("Backend engineer")
+
 
 class TestParseBulletResponse:
     """Tests for _parse_bullet_response with artifact cleanup."""
 
     def test_strips_think_tags_from_bullets(self) -> None:
         """Should produce clean bullets with no think tags."""
-        text = "- Built user registration.</think>\n- Added JWT auth.\n- Created CRUD.\n"
+        text = (
+            "- Built user registration.</think>\n- Added JWT auth.\n- Created CRUD.\n"
+        )
         bullets = _parse_bullet_response(text)
         assert len(bullets) == 3
         for b in bullets:
@@ -1003,12 +1033,12 @@ class TestParseBulletResponse:
             "- Built API.\n"
             "- Added auth.\n"
             "- Created CRUD.\n"
-            "\u2705\uFE0F\U0001F525\U0001F525\U0001F525\U0001F525\U0001F525"
+            "\u2705\ufe0f\U0001f525\U0001f525\U0001f525\U0001f525\U0001f525"
         )
         bullets = _parse_bullet_response(text)
         assert len(bullets) == 3
         for b in bullets:
-            assert "\U0001F525" not in b
+            assert "\U0001f525" not in b
 
 
 # ---------------------------------------------------------------------------
@@ -1130,7 +1160,9 @@ class TestRunPolishQueryV2:
             "Expert developer specializing in authentication systems.",
         ]
         draft = _make_draft_output()
-        feedback = UserFeedback(tone="more technical", general_notes="Use stronger verbs")
+        feedback = UserFeedback(
+            tone="more technical", general_notes="Use stronger verbs"
+        )
         output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
 
         assert output.stage == "polish"
@@ -1258,11 +1290,20 @@ def _make_bundle_for_data_card(**overrides) -> ProjectDataBundle:
         ),
         enriched_constructs=EnrichedConstructs(
             classes=[
-                EnrichedClass(name="User", method_count=3, total_loc=25, parent_class=""),
-                EnrichedClass(name="TaskItem", method_count=2, total_loc=15, parent_class="BaseModel"),
+                EnrichedClass(
+                    name="User", method_count=3, total_loc=25, parent_class=""
+                ),
+                EnrichedClass(
+                    name="TaskItem",
+                    method_count=2,
+                    total_loc=15,
+                    parent_class="BaseModel",
+                ),
             ],
             functions=[
-                EnrichedFunction(name="authenticate", param_count=1, loc=5, has_return_type=True),
+                EnrichedFunction(
+                    name="authenticate", param_count=1, loc=5, has_return_type=True
+                ),
             ],
             routes=["GET /api/users", "POST /api/users", "GET /api/tasks"],
             test_functions=["test_list_users", "test_create_user"],
@@ -1286,7 +1327,9 @@ class TestCompileProjectDataCard:
         assert len(result.fact_items) >= 1
         # At least one fact should come from a commit
         fact_texts = " ".join(result.facts)
-        assert "registration" in fact_texts or "CRUD" in fact_texts or "JWT" in fact_texts
+        assert (
+            "registration" in fact_texts or "CRUD" in fact_texts or "JWT" in fact_texts
+        )
 
     def test_summary_derived_from_readme(self) -> None:
         """Summary should come from the first sentence of the README."""
@@ -1301,6 +1344,50 @@ class TestCompileProjectDataCard:
         result = compile_project_data_card(bundle)
 
         assert "web api" in result.summary.lower() or "python" in result.summary.lower()
+
+    def test_filters_note_like_commit_facts(self) -> None:
+        """Note/todo style commit messages should not become resume facts."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(
+                    category="feature",
+                    messages=[
+                        "feat: notes: add ridge idea",
+                        "feat: implement login endpoint",
+                    ],
+                )
+            ]
+        )
+        result = compile_project_data_card(bundle)
+        facts_text = " ".join(result.facts).lower()
+        assert "notes" not in facts_text
+        assert "todo" not in facts_text
+
+    def test_skips_trivial_class_fact(self) -> None:
+        """Trivial class metadata should be excluded from fact list."""
+        bundle = _make_bundle_for_data_card(
+            commit_groups=[
+                CommitGroup(category="feature", messages=["feat: add auth endpoint"])
+            ],
+            enriched_constructs=EnrichedConstructs(
+                classes=[
+                    EnrichedClass(
+                        name="SensorReading",
+                        method_count=0,
+                        total_loc=4,
+                        parent_class="BaseModel",
+                    )
+                ],
+                functions=[],
+                routes=["GET /health", "POST /alerts"],
+                test_functions=[],
+            ),
+            test_ratio=TestRatio(
+                test_files=1, source_files=8, test_ratio=0.12, has_ci=False
+            ),
+        )
+        result = compile_project_data_card(bundle)
+        assert all("0 methods" not in fact for fact in result.facts)
 
     def test_role_reflects_contribution_pct(self) -> None:
         """Role should reflect the contribution percentage."""
