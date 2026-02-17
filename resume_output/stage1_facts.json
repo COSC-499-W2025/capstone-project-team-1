@@ -4,8 +4,7 @@
     "facts": [
       "save results to json file",
       "add dry-run flag",
-      "map outputs to result structs",
-      "Maintained 1 test files (33% test-to-source ratio)"
+      "map outputs to result structs"
     ],
     "role": "Contributed 30% of the codebase, adding 120 lines across 7 files over 7 active days."
   },
@@ -13,10 +12,10 @@
     "summary": "Personal Portfolio Site",
     "facts": [
       "add skills section",
-      "content: add infra project",
+      "add infra project",
       "hero CTA and project grid",
       "a11y: enable keyboard navigation",
-      "content: showcase go runner"
+      "showcase go runner"
     ],
     "role": "Sole developer, adding 110 lines across 6 files over 21 active days."
   },
@@ -26,8 +25,7 @@
       "add alerts endpoint",
       "uptime endpoint",
       "average helper",
-      "Defined 10 API endpoints",
-      "Implemented SensorReading class (0 methods, 4 LOC)"
+      "Defined 10 API endpoints"
     ],
     "role": "Contributed 43% of the codebase, adding 96 lines across 7 files over 10 active days."
   },
@@ -37,8 +35,7 @@
       "output cost center",
       "add cost center local",
       "add stage environment",
-      "expose logging bucket output",
-      "Maintained 1 test files (0% test-to-source ratio)"
+      "expose logging bucket output"
     ],
     "role": "Contributed 30% of the codebase, adding 111 lines across 6 files over 7 active days."
   },
@@ -59,8 +56,7 @@
       "search messages endpoint",
       "json messages endpoint",
       "fetch latest messages",
-      "expose message count endpoint",
-      "Maintained 1 test files (33% test-to-source ratio)"
+      "expose message count endpoint"
     ],
     "role": "Contributed 30% of the codebase, adding 130 lines across 5 files over 7 active days."
   },
@@ -78,11 +74,8 @@
   "ml-lab-notebooks": {
     "summary": "ML Lab Notebooks",
     "facts": [
-      "notes: add cross-validation todo",
       "add logistic regression experiment",
-      "simple train/test split",
-      "notes: add ridge idea",
-      "Maintained 1 test files (33% test-to-source ratio)"
+      "simple train/test split"
     ],
     "role": "Contributed 32% of the codebase, adding 71 lines across 8 files over 7 active days."
   }
