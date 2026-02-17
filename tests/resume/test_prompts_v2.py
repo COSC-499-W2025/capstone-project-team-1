@@ -20,7 +20,6 @@ from artifactminer.resume.models import (
 from artifactminer.resume.queries.prompts import (
     PROJECT_SYSTEM,
     SUMMARY_SYSTEM,
-    _PROJECT_FEW_SHOT,
     build_profile_prompt,
     build_project_prompt,
     build_skills_prompt,
@@ -95,100 +94,72 @@ def _make_portfolio() -> PortfolioDataBundle:
 
 
 # ---------------------------------------------------------------------------
-# C1: Few-shot example
+# C1: Zero-shot structural template (replaces few-shot example)
 # ---------------------------------------------------------------------------
 
 
-class TestFewShotExample:
-    """Tests that the few-shot example is present and well-formed."""
+class TestZeroShotTemplate:
+    """Tests that the project prompt uses a structural template without few-shot examples."""
 
-    def test_project_prompt_contains_few_shot(self) -> None:
-        """build_project_prompt should include the few-shot example."""
+    def test_project_prompt_has_no_few_shot(self) -> None:
+        """build_project_prompt should NOT include a concrete example project."""
         prompt = build_project_prompt(_make_bundle())
-        assert "EXAMPLE INPUT:" in prompt
-        assert "EXAMPLE OUTPUT:" in prompt
+        assert "EXAMPLE INPUT:" not in prompt
+        assert "EXAMPLE OUTPUT:" not in prompt
+        assert "TaskTracker" not in prompt
 
-    def test_few_shot_contains_example_project(self) -> None:
-        """Few-shot example should reference a realistic project name."""
-        assert "TaskTracker" in _PROJECT_FEW_SHOT
-
-    def test_few_shot_contains_all_output_sections(self) -> None:
-        """Few-shot output should demonstrate DESCRIPTION/BULLETS/NARRATIVE."""
-        assert "DESCRIPTION:" in _PROJECT_FEW_SHOT
-        assert "BULLETS:" in _PROJECT_FEW_SHOT
-        assert "NARRATIVE:" in _PROJECT_FEW_SHOT
-
-    def test_few_shot_token_budget(self) -> None:
-        """Few-shot example should be approximately 200-350 tokens (~4 chars/token)."""
-        char_count = len(_PROJECT_FEW_SHOT)
-        estimated_tokens = char_count / 4
-        assert 150 <= estimated_tokens <= 400, (
-            f"Few-shot is ~{estimated_tokens:.0f} tokens, expected 150-400"
-        )
-
-
-# ---------------------------------------------------------------------------
-# C2: Positive-only instructions (no negatives)
-# ---------------------------------------------------------------------------
-
-_NEGATIVE_PATTERNS = [
-    r"\bNever\b",
-    r"\bDo not\b",
-    r"\bDo NOT\b",
-    r"\bDon't\b",
-    r"\bdon't\b",
-    r"\bAvoid\b",
-]
-
-
-class TestPositiveInstructions:
-    """All prompt instructions should use positive framing."""
-
-    def test_project_system_no_negatives(self) -> None:
-        """PROJECT_SYSTEM should contain only positive instructions."""
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, PROJECT_SYSTEM), (
-                f"PROJECT_SYSTEM contains negative instruction matching: {pattern}"
-            )
-
-    def test_summary_system_no_negatives(self) -> None:
-        """SUMMARY_SYSTEM should contain only positive instructions."""
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, SUMMARY_SYSTEM), (
-                f"SUMMARY_SYSTEM contains negative instruction matching: {pattern}"
-            )
-
-    def test_project_prompt_no_negatives(self) -> None:
-        """build_project_prompt output should avoid negative instructions."""
+    def test_project_prompt_has_structural_template(self) -> None:
+        """build_project_prompt should include the structural output format."""
         prompt = build_project_prompt(_make_bundle())
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, prompt), (
-                f"Project prompt contains negative instruction matching: {pattern}"
-            )
+        assert "DESCRIPTION:" in prompt
+        assert "BULLETS:" in prompt
+        assert "NARRATIVE:" in prompt
 
-    def test_summary_prompt_no_negatives(self) -> None:
-        """build_summary_prompt output should avoid negative instructions."""
-        prompt = build_summary_prompt(_make_portfolio())
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, prompt), (
-                f"Summary prompt contains negative instruction matching: {pattern}"
-            )
+    def test_project_prompt_has_anti_hallucination_guards(self) -> None:
+        """build_project_prompt should include explicit grounding rules."""
+        prompt = build_project_prompt(_make_bundle())
+        assert "Do NOT invent" in prompt
 
-    def test_skills_prompt_no_negatives(self) -> None:
-        """build_skills_prompt output should avoid negative instructions."""
+    def test_project_prompt_has_contribution_phrasing(self) -> None:
+        """build_project_prompt should include contribution-aware phrasing."""
+        solo = build_project_prompt(_make_bundle(user_contribution_pct=100.0))
+        assert "SOLO" in solo
+        team = build_project_prompt(_make_bundle(user_contribution_pct=40.0))
+        assert "TEAM" in team
+        assert 'Do NOT say "Independently built"' in team
+
+
+# ---------------------------------------------------------------------------
+# C2: Anti-hallucination guards in prompts
+# ---------------------------------------------------------------------------
+
+
+class TestAntiHallucinationGuards:
+    """Prompts should include explicit guards against hallucination."""
+
+    def test_project_system_has_grounding_rules(self) -> None:
+        """PROJECT_SYSTEM should have explicit anti-hallucination language."""
+        assert "Do NOT invent" in PROJECT_SYSTEM
+
+    def test_summary_system_has_grounding_rules(self) -> None:
+        """SUMMARY_SYSTEM should have explicit anti-hallucination language."""
+        assert "Do NOT invent" in SUMMARY_SYSTEM
+
+    def test_project_prompt_has_grounding_rules(self) -> None:
+        """build_project_prompt should include explicit grounding constraints."""
+        prompt = build_project_prompt(_make_bundle())
+        assert "Do NOT invent" in prompt
+        assert "Do NOT copy raw data" in prompt
+
+    def test_skills_prompt_has_inclusion_rule(self) -> None:
+        """build_skills_prompt should restrict to provided items only."""
         prompt = build_skills_prompt(_make_portfolio())
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, prompt), (
-                f"Skills prompt contains negative instruction matching: {pattern}"
-            )
+        assert "Include only items from the lists below" in prompt
 
-    def test_profile_prompt_no_negatives(self) -> None:
-        """build_profile_prompt output should avoid negative instructions."""
+    def test_profile_prompt_has_evidence_rule(self) -> None:
+        """build_profile_prompt should require evidence-backed claims."""
         prompt = build_profile_prompt(_make_portfolio())
-        for pattern in _NEGATIVE_PATTERNS:
-            assert not re.search(pattern, prompt), (
-                f"Profile prompt contains negative instruction matching: {pattern}"
-            )
+        assert "connect to the data" in prompt
 
 
 # ---------------------------------------------------------------------------
@@ -408,6 +379,7 @@ class TestPromptBuildersParameterized:
         (95.0, "SOLO project"),
         (94.0, "TEAM project"),
         (50.0, "TEAM project"),
+        (30.0, "TEAM project"),
         (None, ""),
     ])
     def test_ownership_hint(self, contribution, expected_hint) -> None:
@@ -419,6 +391,16 @@ class TestPromptBuildersParameterized:
         else:
             assert "SOLO project" not in prompt
             assert "TEAM project" not in prompt
+
+    def test_low_contribution_forbids_independently_built(self) -> None:
+        """Low contribution should explicitly forbid 'Independently built'."""
+        prompt = build_project_prompt(_make_bundle(user_contribution_pct=30.0))
+        assert 'Do NOT say "Independently built"' in prompt
+
+    def test_mid_contribution_forbids_independently_built(self) -> None:
+        """Mid contribution should explicitly forbid 'Independently built'."""
+        prompt = build_project_prompt(_make_bundle(user_contribution_pct=70.0))
+        assert 'Do NOT say "Independently built"' in prompt
 
     @pytest.mark.parametrize("builder,required_markers", [
         (

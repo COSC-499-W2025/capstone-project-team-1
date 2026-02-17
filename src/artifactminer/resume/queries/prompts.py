@@ -32,10 +32,11 @@ PROJECT_SYSTEM = (
     "You are a resume editor for software engineers. "
     "Write concise, achievement-focused content in a natural professional tone.\n"
     "Rules:\n"
-    "- Reference only features, endpoints, classes, and tools that appear in the project data.\n"
-    "- Use numbers only when they are explicitly present in the data.\n"
-    "- Describe the developer's specific role within the team.\n"
-    "- If contribution is >=95%, you may use 'Independently built' once.\n"
+    "- Reference ONLY features, endpoints, classes, and tools that appear in the project data below.\n"
+    "- Use numbers ONLY when they are explicitly present in the data.\n"
+    "- Do NOT invent features, metrics, or technologies not in the data.\n"
+    "- Do NOT copy raw data lines into the output — rephrase as professional achievements.\n"
+    "- Match the developer's role to their contribution percentage (see Role line in data).\n"
     "- Prefer concrete technical work from commits and code constructs.\n"
     "- Keep each section's claims distinct from the others.\n"
     "- Output plain text only: use section markers exactly as written."
@@ -43,37 +44,11 @@ PROJECT_SYSTEM = (
 
 SUMMARY_SYSTEM = (
     "You are a resume editor. Write concise, factual content in a natural professional tone. "
-    "Reference only technologies and projects that appear in the data provided. "
+    "Reference ONLY technologies and projects that appear in the data provided. "
+    "Do NOT invent skills, technologies, or achievements not in the data. "
     "Name the exact technologies used. "
     "Output plain text only (use section markers as written, no markdown decoration)."
 )
-
-
-# ---------------------------------------------------------------------------
-# Few-shot example for project prompts (~250 tokens)
-# ---------------------------------------------------------------------------
-
-_PROJECT_FEW_SHOT = """EXAMPLE INPUT:
-PROJECT: TaskTracker
-Type: Web Application | Stack: Python (72%), JavaScript (28%) | Contribution: 85%
-FEATURE commits (6):
-  - feat: add real-time WebSocket notifications
-  - feat: implement role-based access control with JWT
-  - feat: build REST API with 12 CRUD endpoints
-BUGFIX commits (2):
-  - fix: resolve race condition in notification dispatch
-Routes: GET /api/tasks, POST /api/tasks, PUT /api/tasks/:id, DELETE /api/tasks/:id
-Classes: TaskService, NotificationManager, AuthMiddleware
-
-EXAMPLE OUTPUT:
-DESCRIPTION: A full-stack task management application with real-time notifications and role-based access control, built with Python and JavaScript.
-BULLETS:
-- Built REST API with 12 CRUD endpoints for task lifecycle management using FastAPI
-- Implemented WebSocket-based real-time notifications reducing polling overhead
-- Added role-based access control with JWT authentication and AuthMiddleware
-NARRATIVE: Contributed 85% of the codebase over the project's development period, focusing on backend API architecture and the real-time notification system.
-
-"""
 
 
 # ---------------------------------------------------------------------------
@@ -85,43 +60,50 @@ def build_project_prompt(bundle: ProjectDataBundle) -> str:
     """
     Build a prompt for generating one project's resume section.
 
-    Format is front-loaded before data. Includes one few-shot example.
+    Uses 0-shot with structural template (no few-shot example to prevent copying).
     """
     context = bundle.to_prompt_context()
 
     ownership_hint = ""
-    if bundle.user_contribution_pct is not None and bundle.user_contribution_pct >= 95:
-        ownership_hint = (
-            "\nThis is a SOLO project (the developer wrote nearly all the code). "
-            "Ownership language is allowed, but keep claims factual and brief.\n"
-        )
-    elif bundle.user_contribution_pct is not None and bundle.user_contribution_pct < 95:
-        ownership_hint = (
-            "\nThis is a TEAM project (partial contribution). "
-            "Describe the developer's specific role within the team.\n"
-        )
+    if bundle.user_contribution_pct is not None:
+        pct = bundle.user_contribution_pct
+        if pct >= 95:
+            ownership_hint = (
+                "\nThis is a SOLO project (the developer wrote nearly all the code). "
+                'You may say "Built" or "Designed". Keep claims factual.\n'
+            )
+        elif pct >= 50:
+            ownership_hint = (
+                f"\nThis is a TEAM project where the developer contributed {pct:.0f}%. "
+                'Use phrases like "Led development of" or "Architected". '
+                'Do NOT say "Independently built".\n'
+            )
+        else:
+            ownership_hint = (
+                f"\nThis is a TEAM project where the developer contributed {pct:.0f}%. "
+                'Use phrases like "Contributed to" or "Implemented". '
+                'Do NOT say "Independently built" or "Led".\n'
+            )
 
     return f"""{ownership_hint}
-Your task: write a resume section in EXACTLY this format:
+Your task: write a resume section using ONLY information from the project data below.
 
-DESCRIPTION: [1 sentence describing what this project is and does]
+Output format (use these exact markers):
+DESCRIPTION: <1 sentence: what the project does, using the README and project type>
 BULLETS:
-- [achievement bullet 1]
-- [achievement bullet 2]
-- [achievement bullet 3]
-NARRATIVE: [1 sentence about the developer's specific contribution and impact]
+- <achievement: [action verb] [specific feature/component from commits or constructs] [using technology from stack]>
+- <achievement: same pattern, different feature>
+- <achievement: same pattern, different feature>
+NARRATIVE: <1 sentence: developer's specific role and measurable contribution>
 
 Rules:
-- The DESCRIPTION should explain what the project does in 1 sentence.
-- Each BULLET must reference a concrete feature, endpoint, class, or fix from the data.
-- The NARRATIVE should be 1 sentence about the developer's role and impact.
-- Write 2-4 bullets depending on how much data is available.
-- Keep each bullet to one sentence and keep tone natural.
-- Keep each section's claims distinct from the others.
-- Use plain text section markers exactly as written: DESCRIPTION:, BULLETS:, NARRATIVE:.
+- Each bullet MUST reference a specific commit message, route, class, or function from the data.
+- Do NOT invent features, numbers, or technologies not present in the data.
+- Do NOT copy raw data lines — rephrase as professional achievements.
+- Write 2-4 bullets depending on available data. If data is sparse, write fewer bullets.
+- The NARRATIVE must use the actual contribution percentage from the data.
 
-{_PROJECT_FEW_SHOT}
-Now write the resume section for this project:
+Project data:
 
 {context}"""
 
@@ -379,13 +361,17 @@ EXTRACTION_SYSTEM = (
     "You are a data extraction assistant. "
     "Extract structured facts from project data. "
     "Output only valid JSON for the requested schema. "
-    "Reference only information present in the data."
+    "Reference ONLY information explicitly present in the data. "
+    "Do NOT invent features, numbers, or technologies. "
+    "Each fact must be traceable to a specific evidence key."
 )
 
 DRAFT_SYSTEM = (
     "You are a resume writer for software engineers. "
     "Write professional, achievement-focused resume content. "
-    "Reference only technologies and facts provided. "
+    "Reference ONLY technologies and facts provided in the input. "
+    "Do NOT invent features, metrics, or technologies not in the facts. "
+    "Do NOT copy raw fact text verbatim — rephrase as professional achievements. "
     "Output only valid JSON for the requested schema."
 )
 
@@ -503,9 +489,12 @@ Return exactly one JSON object with this shape:
 }}
 
 Rules:
-- Use only provided project facts.
+- Use ONLY provided project facts. Do NOT invent features or numbers.
 - Each project bullet must cite at least one fact_id from that project.
 - Use exact project names from the input.
+- Rephrase facts as professional achievements (do NOT copy fact text verbatim).
+- For the narrative, use the ROLE line from each project's facts.
+- Contribution phrasing: >=95% = "Built", 50-94% = "Led development of", <50% = "Contributed to".
 - Keep tone professional and specific.
 
 Portfolio context:
