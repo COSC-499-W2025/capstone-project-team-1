@@ -116,6 +116,7 @@ def _query(
     max_tokens: int = 1024,
     top_p: float | None = None,
     repetition_penalty: float | None = None,
+    grammar: str | None = None,
 ) -> str:
     """Execute a single LLM query with per-model sampling defaults."""
     from ..llm_client import get_sampling_params, query_llm_text
@@ -140,6 +141,7 @@ def _query(
         max_tokens=max_tokens,
         top_p=effective_top_p,
         repetition_penalty=effective_rep_pen,
+        grammar=grammar,
     )
 
 
@@ -648,21 +650,30 @@ def run_project_query(
     model: str,
     *,
     progress: Optional[Callable[[str], None]] = None,
+    use_grammar: bool = True,
 ) -> ProjectSection:
     """
     Run the LLM query for a single project and return parsed sections.
 
+    When ``use_grammar`` is True (default), uses GBNF grammar-constrained
+    decoding to enforce the DESCRIPTION/BULLETS/NARRATIVE format.
+
     Raises RuntimeError if the LLM returns an empty response.
     """
+    from .grammars import PROJECT_SECTION_GRAMMAR
+
     if progress:
         progress(f"  Querying LLM for {bundle.project_name}...")
 
     prompt = build_project_prompt(bundle)
+    grammar = PROJECT_SECTION_GRAMMAR if use_grammar else None
+
     response = _query(
         prompt,
         model,
         PROJECT_SYSTEM,
         max_tokens=768,
+        grammar=grammar,
     )
 
     if not response.strip():
@@ -678,12 +689,18 @@ def run_portfolio_queries(
     model: str,
     *,
     progress: Optional[Callable[[str], None]] = None,
+    use_grammar: bool = True,
 ) -> tuple[str, str, str]:
     """
     Run the three portfolio-level LLM queries.
 
+    When ``use_grammar`` is True (default), uses GBNF grammar-constrained
+    decoding for skills and summary/profile outputs.
+
     Returns (professional_summary, skills_section, developer_profile).
     """
+    from .grammars import SKILLS_SECTION_GRAMMAR, SUMMARY_GRAMMAR
+
     # 1. Professional summary
     if progress:
         progress("Generating professional summary...")
@@ -694,6 +711,7 @@ def run_portfolio_queries(
             model,
             SUMMARY_SYSTEM,
             max_tokens=256,
+            grammar=SUMMARY_GRAMMAR if use_grammar else None,
         )
     )
 
@@ -706,6 +724,7 @@ def run_portfolio_queries(
         model,
         SUMMARY_SYSTEM,
         max_tokens=320,
+        grammar=SKILLS_SECTION_GRAMMAR if use_grammar else None,
     )
     skills = _normalize_skills_section(raw_skills, portfolio)
 
@@ -719,6 +738,7 @@ def run_portfolio_queries(
             model,
             SUMMARY_SYSTEM,
             max_tokens=320,
+            grammar=SUMMARY_GRAMMAR if use_grammar else None,
         )
     )
 

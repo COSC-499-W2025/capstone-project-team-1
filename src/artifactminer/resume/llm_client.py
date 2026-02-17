@@ -468,12 +468,17 @@ def query_llm_text(
     max_tokens: int = 12288,
     top_p: float | None = None,
     repetition_penalty: float | None = None,
+    grammar: str | None = None,
 ) -> str:
     """
     Query the LLM for plain text output.
 
     With --reasoning-budget 0, thinking is disabled at the server level.
     Accepts optional top_p and repetition_penalty for per-model tuning.
+
+    If ``grammar`` is provided, llama-server uses GBNF grammar-constrained
+    decoding to enforce the output structure.  Cannot be combined with
+    ``response_format`` (JSON schema mode).
     """
     _ensure_server_running(model)
     client = _get_client()
@@ -492,6 +497,8 @@ def query_llm_text(
         extra_body["top_p"] = top_p
     if repetition_penalty is not None:
         extra_body["repetition_penalty"] = repetition_penalty
+    if grammar is not None:
+        extra_body["grammar"] = grammar
 
     kwargs: dict[str, Any] = {
         "model": "local",
@@ -540,6 +547,7 @@ async def query_llm_text_async(
     max_tokens: int = 12288,
     top_p: float | None = None,
     repetition_penalty: float | None = None,
+    grammar: str | None = None,
 ) -> str:
     """Async version of query_llm_text. Runs inference in a thread pool."""
     return await asyncio.to_thread(
@@ -551,4 +559,5 @@ async def query_llm_text_async(
         max_tokens=max_tokens,
         top_p=top_p,
         repetition_penalty=repetition_penalty,
+        grammar=grammar,
     )
