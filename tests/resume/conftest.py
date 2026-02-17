@@ -131,10 +131,54 @@ def sample_repo(tmp_path: Path) -> Path:
     repo.index.add(["src/models/user.py"])
     repo.index.commit("refactor: rename TaskItem to Task for consistency")
 
-    # --- Config file ---
+    # --- Config file (enriched for Phase 3 tests) ---
     pyproject = repo_dir / "pyproject.toml"
-    pyproject.write_text('[project]\nname = "my-web-api"\n')
+    pyproject.write_text(textwrap.dedent("""\
+        [project]
+        name = "my-web-api"
+
+        [tool.ruff]
+        line-length = 88
+
+        [tool.pytest.ini_options]
+        testpaths = ["tests"]
+
+        [tool.mypy]
+        strict = true
+    """))
     repo.index.add(["pyproject.toml"])
     repo.index.commit("chore: add pyproject.toml")
+
+    # --- .pre-commit-config.yaml ---
+    pre_commit = repo_dir / ".pre-commit-config.yaml"
+    pre_commit.write_text(textwrap.dedent("""\
+        repos:
+          - repo: https://github.com/astral-sh/ruff-pre-commit
+            hooks:
+              - id: ruff
+              - id: ruff-format
+          - repo: https://github.com/pre-commit/mirrors-mypy
+            hooks:
+              - id: mypy
+    """))
+    repo.index.add([".pre-commit-config.yaml"])
+    repo.index.commit("chore: add pre-commit config")
+
+    # --- Enrich auth.py with type annotations and imports for enriched constructs ---
+    auth.write_text(textwrap.dedent("""\
+        from src.models.user import User
+
+        def authenticate(token: str) -> bool:
+            \"\"\"Verify an authentication token.\"\"\"
+            return token == "valid"
+
+        def generate_token(user_id: int) -> str:
+            return f"token-{user_id}"
+
+        def revoke_token(token: str, reason: str = "") -> bool:
+            return True
+    """))
+    repo.index.add(["src/api/auth.py"])
+    repo.index.commit("refactor: add type annotations to auth module")
 
     return repo_dir

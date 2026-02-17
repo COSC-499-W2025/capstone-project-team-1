@@ -667,3 +667,188 @@ class TestAssemblerMultistage:
         md = assemble_markdown(output)
         assert "qwen2.5-coder-3b-q4" in md
         assert "multi-stage" not in md
+
+
+# ---------------------------------------------------------------------------
+# Integration: enriched extraction → distillation (Phase 5)
+# ---------------------------------------------------------------------------
+
+
+class TestEnrichedExtractDistill:
+    """Integration tests verifying enriched fields flow through distillation."""
+
+    def test_enriched_bundle_distills_under_budget(self) -> None:
+        """A fully-populated bundle should distill to ≤3500 tokens."""
+        from artifactminer.resume.distill import distill_project_context
+        from artifactminer.resume.models import (
+            EnrichedClass,
+            EnrichedConstructs,
+            EnrichedFunction,
+            GitStats,
+            ImportGraph,
+            ConfigFingerprint,
+            ChurnComplexityHotspot,
+            TestRatio,
+            CommitQuality,
+            ModuleBreadth,
+        )
+        from artifactminer.resume.analysis.developer_style import StyleMetrics
+        from artifactminer.resume.analysis.skill_timeline import SkillAppearance
+
+        bundle = _make_bundle(
+            git_stats=GitStats(
+                lines_added=3000,
+                lines_deleted=500,
+                net_lines=2500,
+                files_touched=40,
+                file_hotspots=[("src/api/routes.py", 15), ("src/models/user.py", 10)],
+                active_days=60,
+                active_span_days=180,
+                avg_commit_size=50.0,
+            ),
+            test_ratio=TestRatio(
+                test_files=5,
+                source_files=12,
+                test_ratio=0.42,
+                has_ci=True,
+            ),
+            commit_quality=CommitQuality(
+                conventional_pct=80.0,
+                avg_message_length=45.0,
+                type_diversity=4,
+                longest_streak=7,
+            ),
+            module_breadth=ModuleBreadth(
+                modules_touched=3,
+                total_modules=4,
+                breadth_pct=75.0,
+                deepest_path="src/api/v2/routes.py",
+            ),
+            style_metrics=StyleMetrics(
+                avg_function_length=15.0,
+                max_function_length=45,
+                total_functions=20,
+                naming_convention="snake_case",
+                type_annotation_ratio=0.7,
+                comment_density=5.0,
+                docstring_coverage=0.4,
+                avg_imports_per_file=4.0,
+                files_analyzed=8,
+            ),
+            file_complexity=[],
+            skill_appearances=[
+                SkillAppearance(
+                    skill_name="Python",
+                    first_date="2024-01-15",
+                    project_name="my-web-api",
+                    evidence="src/api/routes.py",
+                ),
+                SkillAppearance(
+                    skill_name="Testing",
+                    first_date="2024-02-10",
+                    project_name="my-web-api",
+                    evidence="tests/test_routes.py",
+                ),
+            ],
+            enriched_constructs=EnrichedConstructs(
+                classes=[
+                    EnrichedClass(
+                        name="User", method_count=3, total_loc=25, parent_class=""
+                    ),
+                    EnrichedClass(
+                        name="TaskItem",
+                        method_count=2,
+                        total_loc=15,
+                        parent_class="BaseModel",
+                    ),
+                ],
+                functions=[
+                    EnrichedFunction(
+                        name="authenticate",
+                        param_count=1,
+                        loc=5,
+                        has_return_type=True,
+                    ),
+                    EnrichedFunction(
+                        name="generate_token",
+                        param_count=1,
+                        loc=3,
+                        has_return_type=True,
+                    ),
+                ],
+                routes=["GET /api/users", "POST /api/users", "GET /api/tasks"],
+                test_functions=["test_list_users", "test_create_user"],
+            ),
+            import_graph=ImportGraph(
+                imports_map={"src.api.routes": ["fastapi"], "src.api.auth": ["src.models.user"]},
+                layer_detection=["presentation", "data"],
+                circular_deps=[],
+                external_deps=["fastapi", "sqlalchemy"],
+            ),
+            config_fingerprint=ConfigFingerprint(
+                linters=["ruff", "mypy"],
+                formatters=["black"],
+                test_frameworks=["pytest"],
+                build_tools=[],
+                deployment_tools=["GitHub Actions"],
+                package_managers=["uv"],
+                pre_commit_hooks=["ruff", "mypy"],
+            ),
+            churn_complexity_hotspots=[
+                ChurnComplexityHotspot(
+                    filepath="src/api/routes.py",
+                    edit_count=15,
+                    cyclomatic_complexity=12,
+                    max_nesting_depth=3,
+                    risk_score=1.0,
+                ),
+            ],
+        )
+
+        ctx = distill_project_context(bundle)
+        assert ctx.token_estimate <= 3500
+        assert "ARCHITECTURE:" in ctx.text
+        assert "CODE STYLE:" in ctx.text
+        assert "Class User:" in ctx.text
+        assert "SKILL TIMELINE:" in ctx.text
+
+    def test_evidence_catalog_includes_new_fields(self) -> None:
+        """Evidence catalog should include import graph and config items."""
+        from artifactminer.resume.queries.prompts import (
+            build_extraction_evidence_catalog,
+        )
+        from artifactminer.resume.models import (
+            ImportGraph,
+            ConfigFingerprint,
+            ChurnComplexityHotspot,
+        )
+
+        bundle = _make_bundle(
+            import_graph=ImportGraph(
+                layer_detection=["presentation", "data"],
+                external_deps=["fastapi"],
+            ),
+            config_fingerprint=ConfigFingerprint(
+                linters=["ruff"],
+                test_frameworks=["pytest"],
+                deployment_tools=["GitHub Actions"],
+                package_managers=["uv"],
+            ),
+            churn_complexity_hotspots=[
+                ChurnComplexityHotspot(
+                    filepath="src/api/routes.py",
+                    edit_count=10,
+                    cyclomatic_complexity=8,
+                    max_nesting_depth=2,
+                    risk_score=0.9,
+                ),
+            ],
+        )
+
+        catalog = build_extraction_evidence_catalog(bundle, max_items=36)
+        values = list(catalog.values())
+        values_str = " ".join(values)
+        assert "arch_layer:" in values_str
+        assert "external_dep:" in values_str
+        assert "linter:" in values_str
+        assert "hotspot:" in values_str

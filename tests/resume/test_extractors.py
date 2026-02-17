@@ -12,6 +12,13 @@ from artifactminer.resume.extractors.commits import (
 from artifactminer.resume.extractors.structure import extract_structure
 from artifactminer.resume.extractors.constructs import extract_constructs
 from artifactminer.resume.extractors.project_type import infer_project_type
+from artifactminer.resume.extractors.enriched_constructs import (
+    extract_enriched_constructs,
+)
+from artifactminer.resume.extractors.imports import extract_import_graph
+from artifactminer.resume.extractors.config_fingerprint import (
+    extract_config_fingerprint,
+)
 from artifactminer.resume.models import CommitGroup
 
 
@@ -224,3 +231,212 @@ class TestInferProjectType:
             readme_text="This is a command-line CLI tool for data processing",
         )
         assert ptype == "CLI Tool"
+
+
+# ── Analysis module wiring (Phase 1) ─────────────────────────────────
+
+
+class TestAnalysisModuleWiring:
+    """Tests that analysis modules produce data from the sample_repo fixture."""
+
+    def test_style_metrics_returns_data(self, sample_repo: Path) -> None:
+        """compute_style_metrics should return StyleMetrics for the sample repo."""
+        from artifactminer.resume.analysis.developer_style import (
+            compute_style_metrics,
+        )
+
+        metrics = compute_style_metrics(str(sample_repo), TEST_EMAIL, "Python")
+        assert metrics is not None
+        assert metrics.total_functions > 0
+        assert metrics.files_analyzed > 0
+
+    def test_complexity_metrics_returns_data(self, sample_repo: Path) -> None:
+        """compute_complexity_metrics should return FileComplexity list."""
+        from artifactminer.resume.analysis.complexity_narrative import (
+            compute_complexity_metrics,
+        )
+
+        results = compute_complexity_metrics(str(sample_repo), TEST_EMAIL)
+        assert isinstance(results, list)
+        assert len(results) > 0
+        assert results[0].filepath
+
+    def test_skill_appearances_returns_data(self, sample_repo: Path) -> None:
+        """compute_skill_first_appearances should find skills from the fixture."""
+        from artifactminer.resume.analysis.skill_timeline import (
+            compute_skill_first_appearances,
+        )
+
+        appearances = compute_skill_first_appearances(
+            str(sample_repo), TEST_EMAIL, ["Python", "Testing", "REST API Design"]
+        )
+        assert isinstance(appearances, list)
+        assert len(appearances) > 0
+        skill_names = {a.skill_name for a in appearances}
+        assert "Python" in skill_names
+
+
+# ── Enriched constructs extractor (Phase 2) ──────────────────────────
+
+
+class TestEnrichedConstructs:
+    """Tests for the enriched code construct extractor."""
+
+    def test_finds_classes_with_metadata(self, sample_repo: Path) -> None:
+        """Should detect classes with method count and LOC."""
+        ec = extract_enriched_constructs(str(sample_repo))
+        assert len(ec.classes) > 0
+        user_cls = next((c for c in ec.classes if c.name == "User"), None)
+        assert user_cls is not None
+        assert user_cls.total_loc > 0
+
+    def test_finds_functions_with_metadata(self, sample_repo: Path) -> None:
+        """Should detect functions with param count and return type info."""
+        ec = extract_enriched_constructs(str(sample_repo))
+        assert len(ec.functions) > 0
+        auth_fn = next((f for f in ec.functions if f.name == "authenticate"), None)
+        assert auth_fn is not None
+        assert auth_fn.param_count >= 1
+        assert auth_fn.has_return_type is True
+
+    def test_finds_routes(self, sample_repo: Path) -> None:
+        """Should detect FastAPI routes."""
+        ec = extract_enriched_constructs(str(sample_repo))
+        assert len(ec.routes) > 0
+        route_strs = " ".join(ec.routes)
+        assert "/api/users" in route_strs
+
+    def test_finds_test_functions(self, sample_repo: Path) -> None:
+        """Should detect test function names."""
+        ec = extract_enriched_constructs(str(sample_repo))
+        assert len(ec.test_functions) > 0
+        assert "test_list_users" in ec.test_functions
+
+    def test_scoped_to_touched_files(self, sample_repo: Path) -> None:
+        """Should only scan provided files when touched_files is set."""
+        ec = extract_enriched_constructs(
+            str(sample_repo),
+            touched_files={"src/api/auth.py"},
+        )
+        assert any(f.name == "authenticate" for f in ec.functions)
+        assert len(ec.routes) == 0
+
+
+# ── Import graph extractor (Phase 3) ─────────────────────────────────
+
+
+class TestImportGraph:
+    """Tests for the import graph analyzer."""
+
+    def test_detects_imports(self, sample_repo: Path) -> None:
+        """Should detect import statements in Python files."""
+        ig = extract_import_graph(str(sample_repo))
+        assert isinstance(ig.imports_map, dict)
+        # auth.py imports from src.models.user
+        has_import = any(
+            any("models" in dep or "user" in dep for dep in deps)
+            for deps in ig.imports_map.values()
+        )
+        assert has_import
+
+    def test_detects_external_deps(self, sample_repo: Path) -> None:
+        """Should identify external dependencies."""
+        ig = extract_import_graph(str(sample_repo))
+        assert isinstance(ig.external_deps, list)
+        # fastapi is imported in routes.py
+        assert "fastapi" in ig.external_deps
+
+    def test_detects_layers(self, sample_repo: Path) -> None:
+        """Should detect architectural layers from directory structure."""
+        ig = extract_import_graph(str(sample_repo))
+        assert isinstance(ig.layer_detection, list)
+        # src/api → presentation, src/models → data
+        assert "presentation" in ig.layer_detection or "data" in ig.layer_detection
+
+    def test_scoped_to_touched_files(self, sample_repo: Path) -> None:
+        """Should only scan provided files when touched_files is set."""
+        ig = extract_import_graph(
+            str(sample_repo),
+            touched_files={"src/api/auth.py"},
+        )
+        assert len(ig.imports_map) <= 1
+
+
+# ── Config fingerprint extractor (Phase 3) ───────────────────────────
+
+
+class TestConfigFingerprint:
+    """Tests for the config/infra fingerprint extractor."""
+
+    def test_detects_pyproject_tools(self, sample_repo: Path) -> None:
+        """Should detect tools from pyproject.toml [tool.X] sections."""
+        fp = extract_config_fingerprint(str(sample_repo))
+        assert "ruff" in fp.linters
+        assert "pytest" in fp.test_frameworks
+        assert "mypy" in fp.linters
+
+    def test_detects_pre_commit_hooks(self, sample_repo: Path) -> None:
+        """Should extract hook IDs from .pre-commit-config.yaml."""
+        fp = extract_config_fingerprint(str(sample_repo))
+        assert len(fp.pre_commit_hooks) > 0
+        assert "ruff" in fp.pre_commit_hooks
+
+    def test_empty_repo_returns_empty_fingerprint(self, tmp_path: Path) -> None:
+        """Should return an empty fingerprint for a repo with no config."""
+        fp = extract_config_fingerprint(str(tmp_path))
+        assert fp.linters == []
+        assert fp.formatters == []
+        assert fp.test_frameworks == []
+
+
+# ── Churn-complexity cross-reference (Phase 3) ───────────────────────
+
+
+class TestChurnComplexity:
+    """Tests for the churn-complexity hotspot cross-reference."""
+
+    def test_computes_hotspots(self) -> None:
+        """Should intersect file hotspots with complexity metrics."""
+        from artifactminer.resume.pipeline import _compute_churn_complexity
+        from artifactminer.resume.models import GitStats
+        from artifactminer.resume.analysis.complexity_narrative import FileComplexity
+
+        git_stats = GitStats(
+            file_hotspots=[
+                ("src/api/routes.py", 12),
+                ("src/models/user.py", 8),
+                ("src/api/auth.py", 5),
+            ],
+        )
+        file_complexity = [
+            FileComplexity(
+                filepath="src/api/routes.py",
+                cyclomatic_complexity=15,
+                max_nesting_depth=3,
+                loc=100,
+                function_count=5,
+            ),
+            FileComplexity(
+                filepath="src/models/user.py",
+                cyclomatic_complexity=3,
+                max_nesting_depth=1,
+                loc=30,
+                function_count=2,
+            ),
+        ]
+
+        hotspots = _compute_churn_complexity(git_stats, file_complexity)
+        assert len(hotspots) == 2
+        # routes.py should be ranked first (12*15 > 8*3)
+        assert hotspots[0].filepath == "src/api/routes.py"
+        assert hotspots[0].risk_score == 1.0
+        assert 0 < hotspots[1].risk_score < 1.0
+
+    def test_empty_inputs(self) -> None:
+        """Should return empty list when no overlap exists."""
+        from artifactminer.resume.pipeline import _compute_churn_complexity
+        from artifactminer.resume.models import GitStats
+
+        git_stats = GitStats(file_hotspots=[])
+        result = _compute_churn_complexity(git_stats, [])
+        assert result == []
