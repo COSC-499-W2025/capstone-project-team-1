@@ -19,6 +19,9 @@ from artifactminer.resume.extractors.imports import extract_import_graph
 from artifactminer.resume.extractors.config_fingerprint import (
     extract_config_fingerprint,
 )
+from artifactminer.resume.extractors.llm_reasoning import (
+    extract_llm_project_understanding,
+)
 from artifactminer.resume.models import CommitGroup
 
 
@@ -360,6 +363,79 @@ class TestImportGraph:
             touched_files={"src/api/auth.py"},
         )
         assert len(ig.imports_map) <= 1
+
+
+# ── LLM semantic extractor (Phase 4) ─────────────────────────────────
+
+
+class TestLLMProjectUnderstanding:
+    """Tests for optional LLM semantic project understanding."""
+
+    def test_extracts_semantic_understanding(
+        self,
+        sample_repo: Path,
+        monkeypatch,
+    ) -> None:
+        """Should map LLM JSON output into bundle-friendly understanding fields."""
+
+        class _FakePayload:
+            project_purpose = "A REST API for managing tasks and users."
+            user_value = "Lets teams track work and automate task workflows."
+            architecture_summary = (
+                "FastAPI endpoints with auth helpers and model modules."
+            )
+            key_capabilities = [
+                "Implements user and task CRUD endpoints",
+                "Supports token-based authentication flows",
+            ]
+            implementation_highlights = [
+                "Organizes API handlers in src/api modules",
+            ]
+
+        monkeypatch.setattr(
+            "artifactminer.resume.extractors.llm_reasoning.query_llm",
+            lambda *args, **kwargs: _FakePayload(),
+        )
+
+        understanding = extract_llm_project_understanding(
+            str(sample_repo),
+            model="qwen3-1.7b-q8",
+            project_name="my-web-api",
+            project_type="Web API",
+            primary_language="Python",
+            frameworks=["FastAPI"],
+            readme_text="A REST API for managing tasks and users built with FastAPI.",
+            commit_groups=[
+                CommitGroup(category="feature", messages=["feat: add task CRUD"]),
+            ],
+            module_groups={"src": ["src/api/routes.py", "src/api/auth.py"]},
+            routes=["GET /api/users", "POST /api/users"],
+        )
+
+        assert understanding is not None
+        assert "REST API" in understanding.project_purpose
+        assert len(understanding.key_capabilities) >= 1
+
+    def test_returns_none_on_llm_failure(self, sample_repo: Path, monkeypatch) -> None:
+        """Should degrade gracefully when LLM inference fails."""
+
+        def _raise(*_args, **_kwargs):
+            raise RuntimeError("llm unavailable")
+
+        monkeypatch.setattr(
+            "artifactminer.resume.extractors.llm_reasoning.query_llm",
+            _raise,
+        )
+
+        understanding = extract_llm_project_understanding(
+            str(sample_repo),
+            model="qwen3-1.7b-q8",
+            project_name="my-web-api",
+            project_type="Web API",
+            readme_text="A REST API for managing tasks and users built with FastAPI.",
+        )
+
+        assert understanding is None
 
 
 # ── Config fingerprint extractor (Phase 3) ───────────────────────────
