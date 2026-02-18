@@ -37,7 +37,9 @@ export { toErrorMessage } from "./errorMessage";
 export {
 	resumeToLines,
 	resumeToText,
+	resumeToSections,
 	buildLineDiff,
 	keyedLines,
 	type DiffRow,
+	type ResumeSection,
 } from "./resumeText";

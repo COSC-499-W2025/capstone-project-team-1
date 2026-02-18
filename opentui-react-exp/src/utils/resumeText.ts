@@ -1,5 +1,96 @@
 import type { ResumeV3Output } from "../api/types";
 
+export interface ResumeSection {
+	id: string;
+	tocLabel: string;
+	headerText: string;
+	lines: string[];
+}
+
+export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
+	if (!data) {
+		return [
+			{ id: "summary", tocLabel: "Summary", headerText: "PROFESSIONAL SUMMARY", lines: ["No resume data available yet."] },
+			{ id: "skills", tocLabel: "Skills", headerText: "TECHNICAL SKILLS", lines: [] },
+			{ id: "projects", tocLabel: "Projects", headerText: "PROJECTS", lines: [] },
+			{ id: "profile", tocLabel: "Dev Profile", headerText: "DEVELOPER PROFILE", lines: [] },
+			{ id: "metadata", tocLabel: "Metadata", headerText: "METADATA", lines: [] },
+		];
+	}
+
+	const skillsLines = data.skills_section
+		? data.skills_section.split("\n")
+		: ["(empty)"];
+
+	const projectLines: string[] = [];
+	if (!data.projects.length) {
+		projectLines.push("(none)");
+	} else {
+		for (const project of data.projects) {
+			const frameworkText = project.frameworks.length
+				? project.frameworks.join(", ")
+				: "None listed";
+			const contribution =
+				project.contribution_pct === null
+					? "n/a"
+					: `${Math.round(project.contribution_pct)}%`;
+			projectLines.push(`${project.name} (${project.type})`);
+			projectLines.push(`Language: ${project.primary_language || "n/a"}`);
+			projectLines.push(`Frameworks: ${frameworkText}`);
+			projectLines.push(`Contribution: ${contribution}`);
+			if (project.description) projectLines.push(`Description: ${project.description}`);
+			if (project.bullets?.length) {
+				for (const bullet of project.bullets) projectLines.push(`- ${bullet}`);
+			}
+			if (project.narrative) projectLines.push(`Narrative: ${project.narrative}`);
+			projectLines.push("");
+		}
+	}
+
+	const metadataLines: string[] = [
+		`Stage: ${data.metadata.stage || "unknown"}`,
+		`Models: ${data.metadata.models_used.length ? data.metadata.models_used.join(" -> ") : "n/a"}`,
+		`Generation Time: ${Number(data.metadata.generation_time_seconds || 0).toFixed(1)}s`,
+	];
+	if (data.metadata.errors.length) {
+		metadataLines.push("Errors:");
+		for (const error of data.metadata.errors) metadataLines.push(`- ${error}`);
+	}
+
+	return [
+		{
+			id: "summary",
+			tocLabel: "Summary",
+			headerText: "PROFESSIONAL SUMMARY",
+			lines: data.professional_summary ? data.professional_summary.split("\n") : ["(empty)"],
+		},
+		{
+			id: "skills",
+			tocLabel: "Skills",
+			headerText: "TECHNICAL SKILLS",
+			lines: skillsLines,
+		},
+		{
+			id: "projects",
+			tocLabel: "Projects",
+			headerText: "PROJECTS",
+			lines: projectLines,
+		},
+		{
+			id: "profile",
+			tocLabel: "Dev Profile",
+			headerText: "DEVELOPER PROFILE",
+			lines: data.developer_profile ? data.developer_profile.split("\n") : ["(empty)"],
+		},
+		{
+			id: "metadata",
+			tocLabel: "Metadata",
+			headerText: "METADATA",
+			lines: metadataLines,
+		},
+	];
+}
+
 const EMPTY_PREVIEW_TEXT = "No resume data available yet.";
 
 function section(title: string): string {

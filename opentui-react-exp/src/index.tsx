@@ -32,7 +32,7 @@ function screenHint(screen: Screen): string {
 		case "analysis":
 			return "Processing locally — your data never leaves this machine";
 		case "draft-pause":
-			return "Your first draft is ready — give us feedback to refine it";
+			return "Review each section, add feedback notes, then press Enter to start Stage 3";
 		case "feedback":
 			return "Your notes guide the AI in the next pass";
 		case "resume-preview":
@@ -86,7 +86,9 @@ function screenActions(screen: Screen): KeyAction[] {
 			return [{ key: "Esc", label: "Cancel Job" }];
 		case "draft-pause":
 			return [
-				{ key: "Enter", label: "Feedback" },
+				{ key: "↑↓", label: "Navigate" },
+				{ key: "Tab", label: "Next Field" },
+				{ key: "Enter", label: "Submit" },
 				{ key: "Esc", label: "Cancel Job" },
 			];
 		case "feedback":
@@ -239,7 +241,10 @@ function App() {
 			case "draft-pause":
 				return (
 					<DraftPauseScreen
-						onContinue={() => setScreen("feedback")}
+						onSubmitted={() => {
+							setAnalysisMode("phase3");
+							setScreen("analysis");
+						}}
 						onCancelReturn={() => {
 							setAnalysisMode("phase1");
 							setScreen("project-list");
