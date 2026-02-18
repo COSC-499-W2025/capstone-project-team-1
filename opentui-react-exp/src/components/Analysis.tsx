@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/endpoints";
 import { useAppState } from "../context/AppContext";
 import { type AnalysisMode, theme } from "../types";
-import { keyedLines, toErrorMessage } from "../utils";
+import { toErrorMessage } from "../utils";
 import { TopBar } from "./TopBar";
 
 interface AnalysisProps {
@@ -16,11 +16,62 @@ interface AnalysisProps {
 const stageOrder = ["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3"] as const;
 
 const stageLabel: Record<string, string> = {
-	EXTRACT: "Extract",
-	STAGE_1: "Stage 1  —  Analyze",
-	STAGE_2: "Stage 2  —  Draft",
-	STAGE_3: "Stage 3  —  Polish",
+	EXTRACT:  "Extract   —  Read repos",
+	STAGE_1:  "Stage 1   —  Analyze",
+	STAGE_2:  "Stage 2   —  Draft",
+	STAGE_3:  "Stage 3   —  Polish",
 };
+
+// Maps technical log prefixes → human-readable activity descriptions
+const STEP_MAP: Array<[string, string]> = [
+	["Extracting README",                "Reading project documentation"],
+	["Classifying commits",              "Analyzing commit history"],
+	["Extracting structure",             "Mapping project structure"],
+	["Extracting code constructs",       "Scanning code constructs"],
+	["Inferring project type",           "Detecting project type"],
+	["Extracting git stats",             "Gathering git statistics"],
+	["Computing test ratio",             "Measuring test coverage"],
+	["Scoring commit quality",           "Scoring commit quality"],
+	["Measuring module breadth",         "Measuring module breadth"],
+	["Computing style metrics",          "Analyzing code style"],
+	["Computing complexity metrics",     "Measuring code complexity"],
+	["Computing skill timeline",         "Building skill timeline"],
+	["Extracting enriched constructs",   "Deep code analysis"],
+	["Analyzing import graph",           "Mapping dependencies"],
+	["Extracting config fingerprint",    "Reading project configuration"],
+	["Inferring project purpose",        "AI: Inferring project purpose"],
+	["Running project query",            "AI: Writing project bullets"],
+	["Running portfolio query",          "AI: Composing portfolio summary"],
+	["Assembling resume",                "Assembling resume document"],
+];
+
+const NOISE_PREFIXES = [
+	"Pipeline request",
+	"Phase 1 worker",
+	"Phase 1 started",
+	"Phase 3 worker",
+	"Phase 3 started",
+	"Checking model",
+	"Found ",
+	"Analyzing [",
+];
+
+function toFriendlyStep(msg: string): string | null {
+	for (const [prefix, friendly] of STEP_MAP) {
+		if (msg.startsWith(prefix)) return friendly;
+	}
+	for (const noise of NOISE_PREFIXES) {
+		if (msg.startsWith(noise)) return null;
+	}
+	const trimmed = msg.replace(/\.{2,}$/, "").trim();
+	return trimmed.length > 0 ? trimmed : null;
+}
+
+function repoBar(done: number, total: number, width = 14): string {
+	if (total === 0) return "░".repeat(width);
+	const filled = Math.round((done / total) * width);
+	return "█".repeat(filled) + "░".repeat(width - filled);
+}
 
 export function Analysis({
 	mode,
@@ -45,9 +96,7 @@ export function Analysis({
 	const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
-		if (mode !== "phase1" && mode !== "phase3") {
-			return;
-		}
+		if (mode !== "phase1" && mode !== "phase3") return;
 		void state.pipelineJobId;
 		setReadyGate(false);
 		setLocalError(null);
@@ -71,9 +120,7 @@ export function Analysis({
 		const pollStatus = async () => {
 			try {
 				const status = await api.getPipelineStatus(jobId);
-				if (cancelled) {
-					return;
-				}
+				if (cancelled) return;
 
 				setPipelineStatus(status.status);
 				setPipelineStage(status.stage);
@@ -82,26 +129,21 @@ export function Analysis({
 				setResumeV3Draft(status.draft);
 				setResumeV3Output(status.output);
 
-				if (status.error) {
-					setLocalError(status.error);
-				}
+				if (status.error) setLocalError(status.error);
 
 				if (status.status === "draft_ready" && mode === "phase1") {
 					onDraftReady();
 					return;
 				}
-
 				if (status.status === "complete") {
 					setReadyGate(true);
 					return;
 				}
-
 				if (status.status === "cancelled") {
 					setPipelineNotice("Pipeline cancelled.");
 					onCancelReturn();
 					return;
 				}
-
 				if (status.status === "error") {
 					setReadyGate(false);
 					return;
@@ -109,9 +151,7 @@ export function Analysis({
 
 				scheduleNext();
 			} catch (error) {
-				if (cancelled) {
-					return;
-				}
+				if (cancelled) return;
 				setLocalError(toErrorMessage(error));
 				scheduleNext();
 			}
@@ -141,10 +181,7 @@ export function Analysis({
 	]);
 
 	const cancelJob = async () => {
-		if (!state.pipelineJobId || isCancelling) {
-			return;
-		}
-
+		if (!state.pipelineJobId || isCancelling) return;
 		setIsCancelling(true);
 		try {
 			await api.cancelPipeline(state.pipelineJobId);
@@ -160,22 +197,15 @@ export function Analysis({
 
 	useKeyboard((key) => {
 		if (key.name === "escape") {
-			if (!readyGate) {
-				void cancelJob();
-			}
+			if (!readyGate) void cancelJob();
 			return;
 		}
-
 		if ((key.name === "return" || key.name === "enter") && readyGate) {
 			onReady();
 		}
 	});
 
 	const telemetry = state.pipelineTelemetry;
-	const keyedMessages = useMemo(
-		() => keyedLines(state.pipelineMessages, "log"),
-		[state.pipelineMessages],
-	);
 	const activeStage = telemetry?.stage || state.pipelineStage || "EXTRACT";
 	const activeIndex = stageOrder.indexOf(activeStage as (typeof stageOrder)[number]);
 
@@ -194,50 +224,48 @@ export function Analysis({
 				let marker = "○";
 				let color: string = theme.textDim;
 
-				if (completed) {
-					marker = "✓";
-					color = theme.success;
-				} else if (active) {
-					marker = "▶";
-					color = theme.cyan;
-				}
+				if (completed) { marker = "✓"; color = theme.success; }
+				else if (active) { marker = "▶"; color = theme.cyan; }
 
-				if (state.pipelineStatus === "cancelled") {
-					color = theme.warning;
-				}
-
-				if (state.pipelineStatus === "error" && active) {
-					color = theme.error;
-				}
+				if (state.pipelineStatus === "cancelled") color = theme.warning;
+				if (state.pipelineStatus === "error" && active) color = theme.error;
 
 				return { stageName, marker, color };
 			}),
 		[activeIndex, activeStage, state.pipelineStatus],
 	);
 
-	const subtitle =
-		mode === "phase1"
-			? "Extract + Stage 1 + Stage 2"
-			: "Stage 3 polish from saved draft";
+	// Transform raw log messages → friendly activity steps
+	const activitySteps = useMemo(() => {
+		const steps: string[] = [];
+		for (const msg of state.pipelineMessages) {
+			const friendly = toFriendlyStep(msg);
+			if (friendly) steps.push(friendly);
+		}
+		return steps;
+	}, [state.pipelineMessages]);
+
+	const MAX_VISIBLE = 16;
+	const visibleSteps = activitySteps.slice(-MAX_VISIBLE);
+	const hiddenCount = activitySteps.length - visibleSteps.length;
+	const isRunning =
+		state.pipelineStatus === "running" || state.pipelineStatus === "idle";
 
 	const statusColor =
-		state.pipelineStatus === "running"
-			? theme.cyan
-			: state.pipelineStatus === "complete"
-				? theme.success
-				: state.pipelineStatus === "error"
-					? theme.error
-					: state.pipelineStatus === "cancelled"
-						? theme.warning
-						: theme.textDim;
+		state.pipelineStatus === "running" ? theme.cyan
+		: state.pipelineStatus === "complete" ? theme.success
+		: state.pipelineStatus === "error" ? theme.error
+		: state.pipelineStatus === "cancelled" ? theme.warning
+		: theme.textDim;
 
 	const reposDone = telemetry?.repos_done ?? 0;
 	const reposTotal = telemetry?.repos_total ?? 0;
-	const repoProgress =
-		reposTotal > 0
-			? "█".repeat(Math.round((reposDone / reposTotal) * 10)) +
-			  "░".repeat(10 - Math.round((reposDone / reposTotal) * 10))
-			: "░░░░░░░░░░";
+	const elapsed = (telemetry?.elapsed_seconds ?? 0).toFixed(1);
+
+	const subtitle =
+		mode === "phase1"
+			? "Extract + Stage 1 + Stage 2"
+			: "Stage 3  —  Polish from draft";
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -245,9 +273,9 @@ export function Analysis({
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
 
-				{/* ── Left: pipeline status panel ── */}
+				{/* ── Left: mission control panel ── */}
 				<box
-					width={38}
+					width={36}
 					flexDirection="column"
 					border
 					borderStyle="rounded"
@@ -266,7 +294,7 @@ export function Analysis({
 						</text>
 					))}
 
-					{/* Status + model */}
+					{/* Status + timing */}
 					<box
 						flexDirection="column"
 						gap={1}
@@ -282,14 +310,22 @@ export function Analysis({
 							</span>
 						</text>
 						<text>
+							<span fg={theme.textDim}>Elapsed  </span>
+							<span fg={theme.textSecondary}>{elapsed}s</span>
+						</text>
+						<text>
 							<span fg={theme.textDim}>Model    </span>
 							<span fg={theme.textSecondary}>
-								{telemetry?.active_model || "—"}
+								{telemetry?.active_model
+									? telemetry.active_model.length > 18
+										? telemetry.active_model.slice(0, 18) + "…"
+										: telemetry.active_model
+									: "—"}
 							</span>
 						</text>
 					</box>
 
-					{/* Telemetry stats */}
+					{/* Repo progress */}
 					<box
 						flexDirection="column"
 						gap={1}
@@ -300,104 +336,120 @@ export function Analysis({
 					>
 						<text>
 							<span fg={theme.textDim}>Repos    </span>
-							<span fg={reposDone > 0 ? theme.textSecondary : theme.textDim}>
-								{reposDone} / {reposTotal}
+							<span fg={reposDone > 0 ? theme.textPrimary : theme.textDim}>
+								{reposDone}
 							</span>
+							<span fg={theme.textDim}> / {reposTotal}</span>
 						</text>
 						{reposTotal > 0 ? (
 							<text>
-								<span fg={reposDone > 0 ? theme.cyan : theme.textDim}>
-									{repoProgress}
+								<span fg={reposDone > 0 ? theme.gold : theme.textDim}>
+									{repoBar(reposDone, reposTotal)}
+								</span>
+								<span fg={theme.textDim}>
+									{"  "}{reposTotal > 0
+										? Math.round((reposDone / reposTotal) * 100)
+										: 0}%
 								</span>
 							</text>
 						) : null}
-						<text>
-							<span fg={theme.textDim}>Facts    </span>
-							<span fg={theme.textSecondary}>
-								{telemetry?.facts_total ?? 0}
-							</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>Elapsed  </span>
-							<span fg={theme.textSecondary}>
-								{(telemetry?.elapsed_seconds ?? 0).toFixed(1)}s
-							</span>
-						</text>
-						{(telemetry?.draft_projects ?? 0) > 0 ? (
+						{(telemetry?.facts_total ?? 0) > 0 ? (
 							<text>
-								<span fg={theme.textDim}>Drafted  </span>
-								<span fg={theme.gold}>
-									{telemetry?.draft_projects}
-								</span>
-							</text>
-						) : null}
-						{(telemetry?.polished_projects ?? 0) > 0 ? (
-							<text>
-								<span fg={theme.textDim}>Polished </span>
-								<span fg={theme.success}>
-									{telemetry?.polished_projects}
-								</span>
+								<span fg={theme.textDim}>Facts    </span>
+								<span fg={theme.textSecondary}>{telemetry?.facts_total}</span>
 							</text>
 						) : null}
 					</box>
 				</box>
 
-				{/* ── Right: live log panel ── */}
+				{/* ── Right: activity feed ── */}
 				<box
 					flexGrow={1}
 					flexDirection="column"
 					border
 					borderStyle="rounded"
 					borderColor={theme.cyanDim}
-					title="  Live Logs  "
-					titleAlignment="left"
-					padding={1}
+					title="  Activity  "
+					titleAlignment="center"
+					padding={2}
+					gap={1}
 				>
+					{/* Current repo header */}
 					{telemetry?.current_repo ? (
 						<box
+							flexDirection="column"
+							gap={1}
 							borderBottom
 							borderColor={theme.bgLight}
 							paddingBottom={1}
-							marginBottom={1}
 						>
 							<text>
-								<span fg={theme.textDim}>▶  </span>
-								<span fg={theme.cyan}>{telemetry.current_repo}</span>
+								<span fg={theme.textDim}>Now analyzing</span>
+							</text>
+							<text>
+								<span fg={theme.gold}>
+									<strong>{telemetry.current_repo}</strong>
+								</span>
+								{reposTotal > 0 ? (
+									<span fg={theme.textDim}>
+										{"  —  repo "}
+										{reposDone + 1} of {reposTotal}
+									</span>
+								) : null}
 							</text>
 						</box>
 					) : null}
 
-					<scrollbox
-						focused
-						style={{
-							rootOptions: { flexGrow: 1, backgroundColor: theme.bgDark },
-							wrapperOptions: { flexGrow: 1 },
-							viewportOptions: { paddingLeft: 1, paddingRight: 1 },
-						}}
-					>
-						{keyedMessages.length ? (
-							keyedMessages.map((line) => (
-								<text key={line.key}>
-									<span fg={theme.textSecondary}>{line.text}</span>
+					{/* Activity checklist */}
+					{visibleSteps.length > 0 ? (
+						<box flexDirection="column" gap={0}>
+							{hiddenCount > 0 ? (
+								<text>
+									<span fg={theme.textDim}>
+										  · · ·  {hiddenCount} earlier {hiddenCount === 1 ? "step" : "steps"}
+									</span>
 								</text>
-							))
-						) : (
+							) : null}
+							{visibleSteps.map((step, i) => {
+								const isCurrentStep =
+									isRunning && i === visibleSteps.length - 1;
+								return (
+									<text key={`${step}-${i}`}>
+										<span fg={isCurrentStep ? theme.cyan : theme.success}>
+											{isCurrentStep ? "▶" : "✓"}
+										</span>
+										<span
+											fg={
+												isCurrentStep
+													? theme.textPrimary
+													: theme.textSecondary
+											}
+										>
+											{"  "}{step}
+										</span>
+									</text>
+								);
+							})}
+						</box>
+					) : (
+						<box flexDirection="column" gap={1}>
 							<text>
-								<span fg={theme.textDim}>Waiting for pipeline logs...</span>
+								<span fg={theme.textDim}>
+									Preparing pipeline — starting shortly...
+								</span>
 							</text>
-						)}
-					</scrollbox>
+						</box>
+					)}
 				</box>
 			</box>
 
-			{/* Status messages */}
+			{/* Status line */}
 			{(readyGate || localError || isCancelling) ? (
 				<box
 					paddingLeft={2}
 					paddingRight={2}
 					paddingBottom={1}
 					flexDirection="column"
-					gap={1}
 				>
 					{readyGate ? (
 						<text>
