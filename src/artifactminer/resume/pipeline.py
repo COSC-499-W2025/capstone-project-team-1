@@ -3,9 +3,9 @@ Resume Pipeline Orchestrator.
 
 Multi-stage pipeline:
   Phase 1: EXTRACT + DISTILL — static data gathering + token-budgeted compression
-  Stage 1: Fact extraction (LFM2-2.6B) — structured facts per project
-  Stage 2: Draft generation (Qwen3-1.7B) — first-draft resume
-  Stage 3: Polish (Qwen3-1.7B) — refine with user feedback
+  Stage 1: Fact extraction (Qwen2.5-Coder-3B) — structured facts per project
+  Stage 2: Draft generation (LFM2.5-1.2B) — first-draft resume
+  Stage 3: Polish (LFM2.5-1.2B) — refine with user feedback
 """
 
 from __future__ import annotations
@@ -437,7 +437,7 @@ def extract_and_distill(
     zip_path: str,
     user_email: str,
     *,
-    llm_model: str = "lfm2-2.6b-q8",
+    llm_model: str = "qwen2.5-coder-3b-q4",
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> tuple[List[ProjectDataBundle], PortfolioDataBundle, list[str]]:
     """
@@ -500,27 +500,27 @@ def generate_resume_v3_multistage(
     zip_path: str,
     user_email: str,
     *,
-    stage1_model: str = "lfm2-2.6b-q8",
-    stage2_model: str = "qwen3-1.7b-q8",
-    stage3_model: str = "qwen3-1.7b-q8",
+    stage1_model: str = "qwen2.5-coder-3b-q4",
+    stage2_model: str = "lfm2.5-1.2b-bf16",
+    stage3_model: str = "lfm2.5-1.2b-bf16",
     user_feedback: Optional[UserFeedback] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> ResumeOutput:
     """
     Multi-stage pipeline entry point.
 
-    Stage 1: LFM2-2.6B extracts structured facts per project (with distilled context)
-    Stage 2: Qwen3-1.7B generates a first-draft resume
-    Stage 3: Qwen3-1.7B (or custom) polishes with user feedback (skipped if no feedback)
+    Stage 1: Qwen2.5-Coder-3B extracts structured facts per project (with distilled context)
+    Stage 2: LFM2.5-1.2B generates a first-draft resume
+    Stage 3: LFM2.5-1.2B (or custom) polishes with user feedback (skipped if no feedback)
 
     Model switching uses _restart_server() (~4-6s per switch on M2).
 
     Args:
         zip_path: Path to ZIP file containing git repositories
         user_email: User's git email for attribution
-        stage1_model: Model for fact extraction (default: lfm2-2.6b-q8)
-        stage2_model: Model for draft generation (default: qwen3-1.7b-q8)
-        stage3_model: Model for polish/refinement (default: qwen3-1.7b-q8)
+        stage1_model: Model for fact extraction (default: qwen2.5-coder-3b-q4)
+        stage2_model: Model for draft generation (default: lfm2.5-1.2b-bf16)
+        stage3_model: Model for polish/refinement (default: lfm2.5-1.2b-bf16)
         user_feedback: Optional feedback to apply in Stage 3
         progress_callback: Optional callback for progress messages
 

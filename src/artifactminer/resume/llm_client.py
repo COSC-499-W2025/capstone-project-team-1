@@ -99,6 +99,18 @@ MODEL_REGISTRY: dict[str, tuple[str, str, int]] = {
         "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
         16384,
     ),
+    # Strong instruction-following + coding model (3.8B, beats 7B on HumanEval)
+    "phi-4-mini-q4": (
+        "bartowski/Phi-4-mini-instruct-GGUF",
+        "Phi-4-mini-instruct-Q4_K_M.gguf",
+        16384,  # 16K: safe on 8GB (~3.3GB total), sufficient for resume prompts
+    ),
+    # Cascade-distilled from 24B Mistral — strong prose + instruction following
+    "ministral-3b-q4": (
+        "bartowski/Ministral-3-3B-Instruct-2512-GGUF",
+        "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+        16384,  # 16K: safe on 8GB (~3.2GB total), model supports 256K natively
+    ),
 }
 
 # Per-model sampling defaults — matched to each model family's characteristics.
@@ -107,6 +119,8 @@ MODEL_SAMPLING_DEFAULTS: dict[str, dict[str, float]] = {
     "lfm2.5": {"temperature": 0.1, "top_p": 0.1, "repetition_penalty": 1.05},
     "qwen2.5-coder": {"temperature": 0.15, "top_p": 0.9},
     "qwen3": {"temperature": 0.2, "top_p": 0.9},
+    "phi-4": {"temperature": 0.2, "top_p": 0.9},
+    "ministral": {"temperature": 0.3, "top_p": 0.9, "repetition_penalty": 1.05},
     "llama": {"temperature": 0.4, "top_p": 0.9, "repetition_penalty": 1.1},
     "default": {"temperature": 0.2, "top_p": 0.9},
 }
