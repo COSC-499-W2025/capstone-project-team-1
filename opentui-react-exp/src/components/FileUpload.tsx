@@ -190,17 +190,17 @@ export function FileUpload({
 		entry: SearchableEntry,
 	): { icon: string; name: string; description: string } => {
 		if ("isParent" in entry && entry.isParent) {
-			return { icon: "◀", name: "..", description: "Parent directory" };
+			return { icon: "", name: "..", description: "Parent directory" };
 		}
 
 		if ("type" in entry && entry.type === "zip") {
 			const sizeStr = entry.size !== undefined ? formatSize(entry.size) : "";
-			return { icon: "◆", name: entry.name, description: sizeStr };
+			return { icon: "", name: entry.name, description: sizeStr };
 		}
 
 		const dirEntry = entry as DirEntry;
 		const zipLabel = dirEntry.zipCount === 1 ? "1 ZIP" : `${dirEntry.zipCount} ZIPs`;
-		return { icon: "▸", name: dirEntry.name, description: zipLabel };
+		return { icon: "", name: dirEntry.name, description: zipLabel };
 	};
 
 	const getScanStatusText = (): string => {
@@ -325,6 +325,7 @@ export function FileUpload({
 								focused={!isSearchFocused && !isSubmitting}
 								height={16}
 								showScrollIndicator
+								rowGap={1}
 							/>
 						)}
 					</box>
