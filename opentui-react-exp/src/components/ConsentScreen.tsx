@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
@@ -6,13 +6,23 @@ import { TopBar } from "./TopBar";
 interface ConsentPolicyScreenProps {
 	onContinue: () => void;
 	onBack: () => void;
+	onHintChange: (hint: string) => void;
 }
 
 export function ConsentScreen({
 	onContinue,
 	onBack,
+	onHintChange,
 }: ConsentPolicyScreenProps) {
 	const [checked, setChecked] = useState(false);
+
+	useEffect(() => {
+		onHintChange(
+			checked
+				? "You're all set — press Enter to continue"
+				: "Check the box to confirm you're happy to proceed",
+		);
+	}, [checked, onHintChange]);
 
 	useKeyboard((key) => {
 		if (key.name === "space") {
