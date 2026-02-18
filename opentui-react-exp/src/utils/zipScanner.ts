@@ -62,7 +62,7 @@ export async function scanForZips(options: ScanOptions): Promise<ScanResult> {
 		const crawler = new fdir()
 			.withFullPaths()
 			.filter((path) => path.toLowerCase().endsWith(".zip"))
-			.exclude((dirName) => excludeDirs.includes(dirName))
+			.exclude((dirName) => excludeDirs.includes(dirName) || dirName.startsWith("."))
 			.crawl(rootPath);
 
 		const files = await crawler.withPromise();
@@ -160,6 +160,7 @@ export function getChildDirsWithZips(
 	}
 
 	return Array.from(childDirs.entries())
+		.filter(([fullPath]) => !basename(fullPath).startsWith("."))
 		.map(([fullPath, zipCount]) => ({
 			name: basename(fullPath),
 			fullPath,
