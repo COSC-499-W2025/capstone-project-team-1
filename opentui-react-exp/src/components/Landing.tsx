@@ -88,7 +88,7 @@ export function Landing() {
     useEffect(() => {
         const glowInterval = setInterval(() => {
             setGlowIndex((i) => (i + 1) % glowColors.length);
-        }, 400);
+        }, 650);
         return () => clearInterval(glowInterval);
     }, []);
 
@@ -106,7 +106,7 @@ export function Landing() {
 
         const rippleInterval = setInterval(() => {
             setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
-        }, 60);
+        }, 90);
 
         return () => {
             clearInterval(rippleInterval);
@@ -186,7 +186,7 @@ export function Landing() {
                         border
                         borderStyle="rounded"
                         borderColor={glowColors[glowIndex]}
-                        backgroundColor="#1a1a00"
+                        backgroundColor="#000000"
                         paddingLeft={4}
                         paddingRight={4}
                         paddingTop={1}
