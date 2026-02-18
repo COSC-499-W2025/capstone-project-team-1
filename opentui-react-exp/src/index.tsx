@@ -24,6 +24,7 @@ function screenActions(screen: Screen): KeyAction[] {
 			];
 		case "consent-policy":
 			return [
+				{ key: "Space", label: "Toggle" },
 				{ key: "Enter", label: "Accept" },
 				{ key: "Esc", label: "Back" },
 			];
