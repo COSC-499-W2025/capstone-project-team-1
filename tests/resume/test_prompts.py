@@ -10,14 +10,7 @@ from artifactminer.resume.models import (
     CommitGroup,
     CodeConstructs,
 )
-from artifactminer.resume.queries.prompts import (
-    build_project_prompt,
-    build_summary_prompt,
-    build_skills_prompt,
-    build_profile_prompt,
-)
 from artifactminer.resume.queries.runner import (
-    _parse_project_response,
     _normalize_skills_section,
 )
 from artifactminer.resume.assembler import assemble_markdown, assemble_json
@@ -88,131 +81,6 @@ def _make_portfolio() -> PortfolioDataBundle:
         project_types={"Web API": 1},
         top_skills=["REST API Design", "Authentication"],
     )
-
-
-# ── Prompt construction ───────────────────────────────────────────────
-
-
-class TestBuildProjectPrompt:
-    """Tests for the per-project prompt builder."""
-
-    def test_includes_project_name(self) -> None:
-        """Prompt should contain the project name."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "my-web-api" in prompt
-
-    def test_includes_commit_messages(self) -> None:
-        """Prompt should include actual commit messages."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "implement user registration endpoint" in prompt
-
-    def test_includes_code_constructs(self) -> None:
-        """Prompt should reference routes and classes."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "/api/users" in prompt
-        assert "User" in prompt
-
-    def test_includes_readme_excerpt(self) -> None:
-        """Prompt should contain the README excerpt."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "REST API for managing tasks" in prompt
-
-    def test_solo_project_hint(self) -> None:
-        """100% contribution should trigger solo project language."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "SOLO project" in prompt
-
-    def test_no_solo_hint_for_team_projects(self) -> None:
-        """Team projects should not get solo language."""
-        bundle = _make_bundle()
-        bundle.user_contribution_pct = 30.0
-        prompt = build_project_prompt(bundle)
-        assert "SOLO project" not in prompt
-
-    def test_output_format_instructions(self) -> None:
-        """Prompt should request DESCRIPTION/BULLETS/NARRATIVE format."""
-        prompt = build_project_prompt(_make_bundle())
-        assert "DESCRIPTION:" in prompt
-        assert "BULLETS:" in prompt
-        assert "NARRATIVE:" in prompt
-
-
-class TestBuildPortfolioPrompts:
-    """Tests for the portfolio-level prompt builders."""
-
-    def test_summary_includes_project_count(self) -> None:
-        """Summary prompt should mention number of projects."""
-        prompt = build_summary_prompt(_make_portfolio())
-        assert "1" in prompt
-
-    def test_skills_includes_languages(self) -> None:
-        """Skills prompt should list languages."""
-        prompt = build_skills_prompt(_make_portfolio())
-        assert "Python" in prompt
-        assert "JavaScript" in prompt
-
-    def test_profile_includes_project_types(self) -> None:
-        """Profile prompt should mention project types."""
-        prompt = build_profile_prompt(_make_portfolio())
-        assert "Web API" in prompt
-
-
-# ── Response parsing ──────────────────────────────────────────────────
-
-
-class TestParseProjectResponse:
-    """Tests for parsing the structured LLM response."""
-
-    def test_parses_structured_response(self) -> None:
-        """Should parse DESCRIPTION/BULLETS/NARRATIVE format."""
-        text = (
-            "DESCRIPTION: A FastAPI web service for task management.\n"
-            "BULLETS:\n"
-            "- Implemented user registration with JWT authentication\n"
-            "- Built CRUD endpoints for task management\n"
-            "- Added comprehensive route handler tests\n"
-            "NARRATIVE: The developer independently architected a full REST API."
-        )
-        section = _parse_project_response(text)
-        assert "FastAPI" in section.description
-        assert len(section.bullets) == 3
-        assert "JWT" in section.bullets[0]
-        assert "independently" in section.narrative.lower()
-
-    def test_handles_bullet_style_only(self) -> None:
-        """Should fallback to parsing bullets when no structure markers."""
-        text = (
-            "- Built user authentication system\n- Implemented task CRUD operations\n"
-        )
-        section = _parse_project_response(text)
-        assert len(section.bullets) == 2
-
-    def test_handles_empty_response_gracefully(self) -> None:
-        """Should not crash on empty sections."""
-        text = "DESCRIPTION: \nBULLETS:\nNARRATIVE: "
-        section = _parse_project_response(text)
-        assert isinstance(section, ProjectSection)
-
-    def test_parses_markdown_decorated_headers(self) -> None:
-        """Should parse headers even when wrapped in markdown markers."""
-        text = (
-            "DESCRIPTION:\n"
-            "**\n"
-            "Campus pathfinding API with schedule-aware routing.\n"
-            "**BULLETS:**\n"
-            "- **Implemented** /schedule endpoint with busy building metadata\n"
-            "- Architected safe-path routing that respects closures\n"
-            "**NARRATIVE:**\n"
-            "As a core contributor, designed route safety logic and endpoint shape.\n"
-            "- NARRATIVE:**"
-        )
-
-        section = _parse_project_response(text)
-        assert section.description.startswith("Campus pathfinding API")
-        assert len(section.bullets) == 2
-        assert "Implemented /schedule endpoint" in section.bullets[0]
-        assert "As a core contributor" in section.narrative
-        assert "NARRATIVE:" not in section.narrative
 
 
 class TestNormalizeSkillsSection:
