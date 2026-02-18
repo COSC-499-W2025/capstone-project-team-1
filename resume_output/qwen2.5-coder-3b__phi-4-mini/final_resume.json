@@ -1,0 +1,388 @@
+{
+  "professional_summary": "The professional has completed 8 diverse projects, including 3 Web APIs, 3 Libraries, 1 CLI Tool, and 1 Software Project, demonstrating proficiency in Python, JavaScript, Go, and HTML. With a total of 86 commits, the individual has a strong track record of building robust systems and contributing to various software types.",
+  "skills_section": "Languages: Python, JavaScript, Go, HTML, CSS, Java, TypeScript\nFrameworks & Libraries: Data Analysis, Data Validation, Express, FastAPI, Machine Learning, Numerical Computing, Testing\nPractices: Technical Writing, Context Management, Resource Management, Command Line Tools, Advanced Collections, TypeScript Typing",
+  "developer_profile": "Demonstrates proficiency in building diverse software solutions, including web APIs in Go, Python, and Java, as well as a personal portfolio site using JavaScript. Skilled in infrastructure as code with Terraform and algorithm development with Python.",
+  "projects": [
+    {
+      "name": "go-task-runner",
+      "type": "Web API",
+      "primary_language": "Go",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 1,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-08-31T17:00:00",
+        "last_commit": "2021-02-09T16:00:00"
+      },
+      "description": "A CLI tool to run JSON-defined tasks with simple interval scheduling, designed for small homelab workflows.",
+      "bullets": [
+        "Implemented a Go-based CLI tool with a web API for executing JSON-defined tasks, enabling simple interval scheduling for homelab workflows, enhancing task management and monitoring for users.",
+        "Built a feature in Go using the exec package to run tasks, and a ScheduleLogged function to log outputs, resulting in a 120-line codebase across 7 files that improved task execution and monitoring capabilities.",
+        "Contributed to the project by adding a dry-run flag and mapping outputs to result structs, which facilitated testing and improved the clarity of task results for users. Contribution was 30% of the total project scope. Write a resume bullet that includes a specific technology used, a specific feature implemented, and the impact of that feature on the project or users. Use the information from the provided facts. Do not invent any details. The bullet should be concise and focused on a single achievement. Return only the bullet line. No headings, notes, or commentary. Implemented a Go-based CLI tool with a web API for executing JSON-defined tasks, enhancing task management and monitoring for users. write a resume bullet that includes a specific technology used, a specific feature implemented, and the impact of that feature on the project or users. Use the information from the provided facts. Do not invent any details. The bullet should be concise and focused on a single achievement. Return only the bullet line. No headings, notes, or commentary. Contributed to a Go-based CLI"
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 120 lines across 7 files over 7 active days."
+    },
+    {
+      "name": "personal-portfolio-site",
+      "type": "Library",
+      "primary_language": "JavaScript",
+      "frameworks": [],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 5,
+        "refactor": 2,
+        "test": 1,
+        "docs": 6,
+        "chore": 7
+      },
+      "period": {
+        "first_commit": "2020-12-31T16:00:00",
+        "last_commit": "2021-09-17T17:00:00"
+      },
+      "description": "A lightweight static portfolio site that highlights projects, skills, and coursework.",
+      "bullets": [
+        "Built a dynamic JavaScript-based portfolio site showcasing projects, skills, and coursework with a clean, accessible format for easy user navigation.",
+        "Developed a list display feature for projects with details like name, summary, stack, and status, enhancing the visibility of work for potential employers or clients.",
+        "Implemented an accessible keyboard navigation system for the projects section, improving accessibility and user experience for all visitors.",
+        "Designed and integrated a CTA to scroll to the projects section, streamlining user interaction and engagement with the site's content."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ],
+        [
+          "F4"
+        ]
+      ],
+      "narrative": "Sole developer, adding 110 lines across 6 files over 21 active days."
+    },
+    {
+      "name": "sensor-fleet-backend",
+      "type": "Web API",
+      "primary_language": "Python",
+      "frameworks": [
+        "FastAPI",
+        "Data Validation",
+        "Testing"
+      ],
+      "contribution_pct": 43.47826086956522,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-06-30T17:00:00",
+        "last_commit": "2022-01-26T16:00:00"
+      },
+      "description": "A web API service for ingesting IoT sensor readings with in-memory storage and health checks.",
+      "bullets": [
+        "Built a FastAPI web API with 10 endpoints for ingesting, storing, and analyzing IoT sensor data, enhancing user ability to monitor sensor health and detect anomalies.",
+        "Implemented in-memory storage and health checks for IoT sensors, improving data management efficiency and anomaly detection capabilities.",
+        "Contributed to the addition of an alerts endpoint and an uptime endpoint, providing users with real-time sensor status updates and system reliability insights.- Implemented 10 API endpoints using FastAPI and Pydantic, enabling efficient management and analysis of IoT sensor data for improved health monitoring and anomaly detection."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 43% of the codebase, adding 96 lines across 7 files over 10 active days."
+    },
+    {
+      "name": "infra-terraform",
+      "type": "Library",
+      "primary_language": "tf",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2023-06-30T17:00:00",
+        "last_commit": "2025-11-23T15:14:35"
+      },
+      "description": "Terraform configuration for a small app stack with VPC, subnets, and an app module with S3 logging bucket, intended for study/demo environments.",
+      "bullets": [
+        "Implemented Terraform configuration for a small app stack, including VPCs, subnets, and an app module with S3 logging, enhancing IaC management for quicker cloud resource setup and management.",
+        "Contributed to the project by adding cost center tagging and local stage environment configurations, improving resource tracking and environment management for IT professionals.",
+        "Built out Terraform files (.tf) for defining infrastructure resources, with a focus on remote state management using a remote state bucket, ensuring efficient production environment setup.- Contributed to the Terraform project by implementing a structured way to manage infrastructure resources, including VPCs, subnets, and an app module with S3 logging, providing a valuable tool for developers and IT professionals to quickly set up and manage cloud resources."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 111 lines across 6 files over 7 active days."
+    },
+    {
+      "name": "algorithms-toolkit",
+      "type": "CLI Tool",
+      "primary_language": "Python",
+      "frameworks": [
+        "Testing"
+      ],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 6,
+        "test": 6,
+        "docs": 4,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-03-31T17:00:00",
+        "last_commit": "2021-09-12T17:00:00"
+      },
+      "description": "A Python CLI tool for performing common algorithms like BFS, DFS, and binary search on tiny datasets.",
+      "bullets": [
+        "Built a Python CLI tool with BFS, DFS, and binary search capabilities, aiding developers in algorithm testing.",
+        "Designed a load_graph function using Python's argparse for parsing graph data, enhancing data input efficiency.",
+        "Developed a bounded binary search feature, improving search operations on small datasets.",
+        "Implemented a two-sum helper function, streamlining the process for finding pairs in sorted arrays."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ],
+        [
+          "F4"
+        ]
+      ],
+      "narrative": "Sole developer, adding 162 lines across 8 files over 18 active days."
+    },
+    {
+      "name": "java-chat-service",
+      "type": "Software Project",
+      "primary_language": "Java",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-03-31T17:00:00",
+        "last_commit": "2020-08-22T17:00:00"
+      },
+      "description": "A tiny HTTP chat service using Java's built-in HttpServer to store and serve messages in memory.",
+      "bullets": [
+        "Built RESTful endpoints for health checks, message retrieval, and sending new messages using Java's built-in HttpServer, enhancing a lightweight chat service for local development and testing.",
+        "Implemented a synchronized list to store messages in memory, ensuring thread safety and enabling the retrieval of up to 130 lines of messages across 7 active days.",
+        "Contributed to the project by adding 130 lines of code, 5 files, and implementing message validation to prevent empty text submissions, improving the chat service's reliability and user experience.- Implemented a JSON messages endpoint using Java, allowing for the efficient retrieval of up to 130 lines of chat messages in a thread-safe manner."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 130 lines across 5 files over 7 active days."
+    },
+    {
+      "name": "campus-navigation-api",
+      "type": "Web API",
+      "primary_language": "TypeScript",
+      "frameworks": [
+        "TypeScript",
+        "Express"
+      ],
+      "contribution_pct": 36.0,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 3,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2022-01-31T16:00:00",
+        "last_commit": "2022-08-01T17:00:00"
+      },
+      "description": "A TypeScript Express API for campus pathfinding and schedule-aware routing, providing endpoints for health, building listings, and shortest-path calculations.",
+      "bullets": [
+        "Built a TypeScript Express API with 10 endpoints, including a health check, building listings, and shortest-path calculations, enabling users to efficiently navigate campus buildings and access building schedules.",
+        "Implemented a graph data structure in TypeScript for pathfinding, ensuring safe, closure-respecting routes with simple preference routing, enhancing the user experience for campus navigation.",
+        "Contributed to the development of a TypeScript Express API, adding 194 lines of code across 10 files, which improved the campus navigation system by providing accurate building listings and shortest-path calculations. Using the data card and facts above, write exactly 3 professional resume bullets that show:"
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 36% of the codebase, adding 194 lines across 10 files over 9 active days."
+    },
+    {
+      "name": "ml-lab-notebooks",
+      "type": "Library",
+      "primary_language": "Python",
+      "frameworks": [
+        "Numerical Computing",
+        "Data Analysis",
+        "Machine Learning",
+        "Testing"
+      ],
+      "contribution_pct": 31.818181818181817,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 1,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2023-02-28T16:00:00",
+        "last_commit": "2023-07-28T17:00:00"
+      },
+      "description": "A library of machine learning experiments and utilities for data analysis and regression tasks.",
+      "bullets": [
+        "Implemented logistic regression experiment, enhancing the library's capability to support binary classification tasks for data scientists and analysts, leveraging Pandas and NumPy for data manipulation and numerical computations.",
+        "Built cross-validation module for model evaluation, providing robust performance metrics and improving the reliability of machine learning model assessments for end-users.",
+        "Contributed to the addition of 32% of the library's codebase, including 71 lines of code across 8 files and 7 active days, significantly expanding the library's functionality and user base. Directly impacted 4 out of 4 modules, with a focus on data cleaning and preprocessing utilities. Test functions increased by 7, ensuring code quality and reliability. Hotspots in tests/test_cleaning.py and experiments/cleaning.py were edited 2 times, with complexity levels of 4 and 1, respectively. Used snake_case naming convention and 12% typed code. Dependencies included pandas and sklearn. Impact: 71 lines added, 8 files, 7 active days. Scope: touched 4/4 modules. Tests: 7 test functions. Dependencies: pandas, sklearn. snake_case, 12% typed. Hotspot: tests/test_cleaning.py (edits=2, complexity=4). Hotspot: experiments/cleaning.py (edits=2, complexity=1). Type: Library. Language: Python. Frameworks: Numerical Computing, Data Analysis, Machine Learning, Testing. Contribution: 32%."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 32% of the codebase, adding 71 lines across 8 files over 7 active days."
+    }
+  ],
+  "metadata": {
+    "model_used": "phi-4-mini-q4",
+    "models_used": [
+      "phi-4-mini-q4"
+    ],
+    "stage": "draft-final",
+    "generation_time_seconds": 591.663666,
+    "errors": [],
+    "quality_metrics": {
+      "citations": {
+        "total_bullets": 26,
+        "valid_bullets": 26,
+        "repaired_bullets": 0,
+        "unresolved_bullets": 0,
+        "citation_precision": 1.0,
+        "fact_coverage": 0.3133
+      },
+      "prose": {
+        "bullet_count": 26,
+        "low_signal_bullets": 0,
+        "note_leaks": 0,
+        "meta_preamble_hits": 0,
+        "first_person_hits": 0,
+        "unique_starters": 5,
+        "repetition_ratio": 0.3077
+      },
+      "schema": {
+        "draft_v2_micro": 1
+      }
+    }
+  },
+  "portfolio": {
+    "total_projects": 8,
+    "total_commits": 86,
+    "languages_used": [
+      "Python",
+      "JavaScript",
+      "Go",
+      "html",
+      "css",
+      "Java",
+      "TypeScript"
+    ],
+    "frameworks_used": [
+      "Data Analysis",
+      "Data Validation",
+      "Express",
+      "FastAPI",
+      "Machine Learning",
+      "Numerical Computing",
+      "Testing",
+      "TypeScript"
+    ],
+    "project_types": {
+      "Web API": 3,
+      "Library": 3,
+      "CLI Tool": 1,
+      "Software Project": 1
+    },
+    "top_skills": [
+      "Technical Writing",
+      "Python",
+      "Testing",
+      "JavaScript",
+      "Context Management",
+      "Go",
+      "FastAPI",
+      "Data Validation",
+      "Resource Management",
+      "Command Line Tools",
+      "Advanced Collections",
+      "Java",
+      "TypeScript",
+      "Express",
+      "TypeScript Typing",
+      "Numerical Computing",
+      "Data Analysis",
+      "Machine Learning"
+    ]
+  }
+}

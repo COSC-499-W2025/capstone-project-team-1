@@ -1,0 +1,388 @@
+{
+  "professional_summary": "A seasoned software engineer with a diverse portfolio of 8 projects, including 3 web APIs, 3 libraries, 1 CLI tool, and 1 software project, has honed expertise in languages such as Python, JavaScript, and Go, with a focus on building scalable systems in HTML. With a proven track record of contributing to 86 projects, this engineer demonstrates a strong ability to design, develop, and deploy software solutions across various system types.",
+  "skills_section": "Languages: Python, JavaScript, Go, HTML, CSS, Java, TypeScript\nFrameworks & Libraries: Data Analysis, Data Validation, Express, FastAPI, Machine Learning, Numerical Computing, Testing\nPractices: Technical Writing, Context Management, Resource Management, Command Line Tools, Advanced Collections, TypeScript Typing",
+  "developer_profile": "A skilled software engineer with expertise in building scalable web APIs using Go and Python, with experience in developing CLI tools and libraries for a range of applications, from personal portfolio sites to complex fleet management systems. Proficient in a variety of programming languages, including JavaScript, Java, and Python, and familiar with infrastructure automation tools like Terraform, with experience in deploying and managing large-scale systems.",
+  "projects": [
+    {
+      "name": "go-task-runner",
+      "type": "Web API",
+      "primary_language": "Go",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 1,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-08-31T17:00:00",
+        "last_commit": "2021-02-09T16:00:00"
+      },
+      "description": "A CLI tool to run JSON-defined tasks with simple interval scheduling, designed for small homelab workflows.",
+      "bullets": [
+        "Implemented a CLI tool with a simple command-line interface in Go, utilizing the flag package for command-line arguments, to automate repetitive tasks and simplify workflow management.",
+        "Contributed to a JSON-defined task configuration system, allowing users to define tasks with simple interval scheduling, and saved results to a JSON file, making it easier to manage and maintain workflows.",
+        "Built a Go backend to handle task execution and scheduling, mapping outputs to result structs and adding a dry-run flag for testing, resulting in 120 lines of code, 7 files, and 7 active days of development."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 120 lines across 7 files over 7 active days."
+    },
+    {
+      "name": "personal-portfolio-site",
+      "type": "Library",
+      "primary_language": "JavaScript",
+      "frameworks": [],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 5,
+        "refactor": 2,
+        "test": 1,
+        "docs": 6,
+        "chore": 7
+      },
+      "period": {
+        "first_commit": "2020-12-31T16:00:00",
+        "last_commit": "2021-09-17T17:00:00"
+      },
+      "description": "A lightweight static portfolio site that highlights projects, skills, and coursework.",
+      "bullets": [
+        "Built a lightweight static portfolio site using JavaScript, featuring a JSON file-based data storage, renderProjects function, and a11y-enabled keyboard navigation, benefiting users with an easy-to-navigate and accessible project showcase.",
+        "Designed and implemented a hero CTA and project grid, showcasing go runner capabilities, and providing a seamless user experience, resulting in improved user engagement and project discovery.",
+        "Developed a skills section with a list of skills, utilizing camelCase coding style, and enabling users to quickly identify relevant skills, enhancing the overall user experience and developer visibility.",
+        "Implemented a CTA to scroll to the projects section, utilizing a simple JavaScript-based architecture, and providing users with a clear call-to-action, resulting in a 21-day active project showcase and 110 lines of code added.assistant"
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ],
+        [
+          "F4"
+        ]
+      ],
+      "narrative": "Sole developer, adding 110 lines across 6 files over 21 active days."
+    },
+    {
+      "name": "sensor-fleet-backend",
+      "type": "Web API",
+      "primary_language": "Python",
+      "frameworks": [
+        "FastAPI",
+        "Data Validation",
+        "Testing"
+      ],
+      "contribution_pct": 43.47826086956522,
+      "commit_breakdown": {
+        "feature": 3,
+        "test": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-06-30T17:00:00",
+        "last_commit": "2022-01-26T16:00:00"
+      },
+      "description": "A web API service for ingesting IoT sensor readings with in-memory storage and health checks.",
+      "bullets": [
+        "Implemented a web API service using FastAPI framework, providing a simple and efficient way to manage and analyze sensor data, enabling users to track sensor health and detect anomalies, with 96 lines of code added and 7 files modified.",
+        "Built a RESTful API with 10 endpoints, including GET /health, POST /ingest, and GET /sensors/{sensor_id}, utilizing Pydantic for input validation, and providing a scalable solution for IoT sensor readings with in-memory storage.",
+        "Contributed to the development of the project, implementing health checks, anomaly detection through alerts, and an uptime endpoint, leveraging FastAPI and Data Validation for efficient data ingestion and validation, with 10 active days and 43% code ownership."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 43% of the codebase, adding 96 lines across 7 files over 10 active days."
+    },
+    {
+      "name": "infra-terraform",
+      "type": "Library",
+      "primary_language": "tf",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "docs": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2023-06-30T17:00:00",
+        "last_commit": "2025-11-23T15:14:35"
+      },
+      "description": "Terraform configuration for a small app stack, including VPC, subnets, and an app module with S3 logging bucket, designed for study/demo environments.",
+      "bullets": [
+        "Implemented VPC and subnet management using Terraform, enabling efficient cloud resource setup and management for developers and IT professionals.",
+        "Built reusable Terraform modules for environment-specific configurations, utilizing tfvars to streamline cost center tagging and logging bucket exposure.",
+        "Contributed to the infrastructure stack by adding 111 lines of code, creating a structured Terraform configuration for study/demo environments, with 6 files and 7 active days of maintenance."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 111 lines across 6 files over 7 active days."
+    },
+    {
+      "name": "algorithms-toolkit",
+      "type": "CLI Tool",
+      "primary_language": "Python",
+      "frameworks": [
+        "Testing"
+      ],
+      "contribution_pct": 100.0,
+      "commit_breakdown": {
+        "feature": 6,
+        "test": 6,
+        "docs": 4,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2021-03-31T17:00:00",
+        "last_commit": "2021-09-12T17:00:00"
+      },
+      "description": "A Python CLI tool for performing classic algorithms like BFS, DFS, and binary search on tiny datasets.",
+      "bullets": [
+        "Built a Python CLI tool, algorithms-toolkit, providing quick access to common algorithms like BFS, DFS, and binary search, helping software developers and interviewers prepare for coding interviews.",
+        "Designed and developed a modular architecture using Python's built-in libraries and argparse, separating algorithms into distinct modules (search.py and sorting.py) for clarity and reusability.",
+        "Developed a bounded binary search feature, improving the efficiency of binary search, and implemented a utility to check sorted arrays, enhancing the overall algorithmic functionality.",
+        "Implemented Dijkstra's Shortest Path Algorithm, adding a critical component to the tool, and optimized the algokit/search.py module with edits and complexity improvements."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ],
+        [
+          "F4"
+        ]
+      ],
+      "narrative": "Sole developer, adding 162 lines across 8 files over 18 active days."
+    },
+    {
+      "name": "java-chat-service",
+      "type": "Software Project",
+      "primary_language": "Java",
+      "frameworks": [],
+      "contribution_pct": 30.434782608695656,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "chore": 2
+      },
+      "period": {
+        "first_commit": "2020-03-31T17:00:00",
+        "last_commit": "2020-08-22T17:00:00"
+      },
+      "description": "A tiny HTTP chat service using Java's built-in HttpServer to store and expose messages in memory.",
+      "bullets": [
+        "Implemented a lightweight chat service using Java's built-in HttpServer, exposing RESTful endpoints for health checks, message retrieval, and sending new messages, improving user communication with a simple and efficient solution.",
+        "Contributed to the development of a synchronized list-based message storage system, ensuring thread safety and scalability, and validated incoming messages for empty text, resulting in a secure and reliable chat experience.",
+        "Built a search, JSON messages, fetch latest messages, and message count endpoint, providing users with a comprehensive API for managing messages, with a 30% contribution and 130 lines of code added, impacting the project's functionality and user experience."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 30% of the codebase, adding 130 lines across 5 files over 7 active days."
+    },
+    {
+      "name": "campus-navigation-api",
+      "type": "Web API",
+      "primary_language": "TypeScript",
+      "frameworks": [
+        "Express",
+        "TypeScript"
+      ],
+      "contribution_pct": 36.0,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 3,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2022-01-31T16:00:00",
+        "last_commit": "2022-08-01T17:00:00"
+      },
+      "description": "A TypeScript Express API for campus pathfinding and schedule-aware routing, providing endpoints for health, building listings, and shortest-path calculations.",
+      "bullets": [
+        "Implemented a graph-based pathfinding system using TypeScript and Express, enabling users to find the shortest path between buildings and improving campus connectivity.",
+        "Contributed to the development of 10 API endpoints, including GET /health, GET /buildings, and POST /route, providing users with a comprehensive platform for campus navigation and schedule-aware routing.",
+        "Built a schedule-aware routing system that respects closures and fetches single building data, enhancing the user experience with safe and efficient pathfinding solutions."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 36% of the codebase, adding 194 lines across 10 files over 9 active days."
+    },
+    {
+      "name": "ml-lab-notebooks",
+      "type": "Library",
+      "primary_language": "Python",
+      "frameworks": [
+        "Numerical Computing",
+        "Data Analysis",
+        "Machine Learning",
+        "Testing"
+      ],
+      "contribution_pct": 31.818181818181817,
+      "commit_breakdown": {
+        "feature": 4,
+        "test": 1,
+        "docs": 1,
+        "chore": 1
+      },
+      "period": {
+        "first_commit": "2023-02-28T16:00:00",
+        "last_commit": "2023-07-28T17:00:00"
+      },
+      "description": "A library of machine learning experiments and utilities for data analysis and regression tasks.",
+      "bullets": [
+        "Implemented data cleaning utilities for normalization and feature extraction, improving data quality and enabling accurate model training, with a 71-line codebase impact and 7 active days of maintenance.",
+        "Built a comprehensive library of machine learning experiments, including linear regression and logistic regression, providing practical tools for data preprocessing, model training, and evaluation, benefiting data scientists and machine learning practitioners.",
+        "Contributed to the development of cross-validation for model evaluation, enhancing the library's ability to accurately assess model performance, with 7 test functions and 8 files showcasing the improved functionality."
+      ],
+      "bullet_fact_ids": [
+        [
+          "F1"
+        ],
+        [
+          "F2"
+        ],
+        [
+          "F3"
+        ]
+      ],
+      "narrative": "Contributed 32% of the codebase, adding 71 lines across 8 files over 7 active days."
+    }
+  ],
+  "metadata": {
+    "model_used": "llama-3.2-3b-q4",
+    "models_used": [
+      "llama-3.2-3b-q4"
+    ],
+    "stage": "draft-final",
+    "generation_time_seconds": 340.603404,
+    "errors": [],
+    "quality_metrics": {
+      "citations": {
+        "total_bullets": 26,
+        "valid_bullets": 26,
+        "repaired_bullets": 0,
+        "unresolved_bullets": 0,
+        "citation_precision": 1.0,
+        "fact_coverage": 0.3133
+      },
+      "prose": {
+        "bullet_count": 26,
+        "low_signal_bullets": 0,
+        "note_leaks": 0,
+        "meta_preamble_hits": 0,
+        "first_person_hits": 0,
+        "unique_starters": 5,
+        "repetition_ratio": 0.3077
+      },
+      "schema": {
+        "draft_v2_micro": 1
+      }
+    }
+  },
+  "portfolio": {
+    "total_projects": 8,
+    "total_commits": 86,
+    "languages_used": [
+      "Python",
+      "JavaScript",
+      "Go",
+      "html",
+      "css",
+      "Java",
+      "TypeScript"
+    ],
+    "frameworks_used": [
+      "Data Analysis",
+      "Data Validation",
+      "Express",
+      "FastAPI",
+      "Machine Learning",
+      "Numerical Computing",
+      "Testing",
+      "TypeScript"
+    ],
+    "project_types": {
+      "Web API": 3,
+      "Library": 3,
+      "CLI Tool": 1,
+      "Software Project": 1
+    },
+    "top_skills": [
+      "Technical Writing",
+      "Python",
+      "Testing",
+      "JavaScript",
+      "Context Management",
+      "Go",
+      "FastAPI",
+      "Data Validation",
+      "Resource Management",
+      "Command Line Tools",
+      "Advanced Collections",
+      "Java",
+      "TypeScript",
+      "Express",
+      "TypeScript Typing",
+      "Numerical Computing",
+      "Data Analysis",
+      "Machine Learning"
+    ]
+  }
+}

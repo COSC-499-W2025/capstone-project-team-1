@@ -1,0 +1,132 @@
+{
+  "go-task-runner": {
+    "summary": "Go Task Runner is a lightweight web API and CLI tool designed to execute JSON-defined tasks with interval scheduling, tailored for small homelab environments.",
+    "facts": [
+      "It enables users to automate repetitive tasks with simple configuration and supports dry-run mode for safe testing without execution.",
+      "Load and validate JSON task configurations with structured task definitions",
+      "Schedule and execute tasks at configurable intervals using bash commands",
+      "Export execution results in JSON format with task metadata",
+      "Tasks are defined via a JSON structure with name, command, and interval_seconds fields",
+      "Execution is handled through exec.Command with combined output captured and formatted",
+      "save results to json file",
+      "add dry-run flag",
+      "map outputs to result structs"
+    ],
+    "role": "Contributed 30% of the codebase, adding 120 lines across 7 files over 7 active days."
+  },
+  "personal-portfolio-site": {
+    "summary": "A lightweight static portfolio site that showcases projects, skills, and coursework without requiring a build step, enabling immediate access via a simple local server.",
+    "facts": [
+      "Users can quickly view and navigate a developer's portfolio directly in the browser, supporting accessibility and ease of deployment for personal branding.",
+      "Dynamic project rendering from JSON data",
+      "Smooth scrolling navigation to project sections",
+      "Keyboard-accessible CTA and interactive elements",
+      "Projects and skills data loaded from projects.json and rendered client-side",
+      "Smooth scrolling implemented via scrollIntoView on CTA click",
+      "add skills section",
+      "add infra project",
+      "hero CTA and project grid",
+      "a11y: enable keyboard navigation",
+      "showcase go runner",
+      "prep footer slot"
+    ],
+    "role": "Sole developer, adding 110 lines across 6 files over 21 active days."
+  },
+  "sensor-fleet-backend": {
+    "summary": "The sensor-fleet-backend is a FastAPI-based web service designed to ingest, store, and analyze IoT sensor readings with real-time metrics and health monitoring capabilities.",
+    "facts": [
+      "Users benefit from reliable ingestion of sensor data, real-time alerts for abnormal readings, and efficient data management through in-memory storage and export options.",
+      "Ingest sensor readings with automatic timestamping and validation",
+      "Provide real-time health checks via the /health endpoint",
+      "Calculate sensor averages and detect stale sensors based on time windows",
+      "Utilizes FastAPI for high-performance, asynchronous request handling",
+      "Employs Pydantic models for robust data validation and type safety",
+      "add alerts endpoint",
+      "uptime endpoint",
+      "average helper",
+      "Defined 10 API endpoints"
+    ],
+    "role": "Contributed 43% of the codebase, adding 96 lines across 7 files over 10 active days."
+  },
+  "infra-terraform": {
+    "summary": "Infra Terraform provides a reusable Terraform configuration for deploying a small application stack consisting of a VPC, subnets, and an app module with an S3 logging bucket, designed for study and demo environments.",
+    "facts": [
+      "This project enables developers and DevOps engineers to quickly set up and manage a consistent, reproducible infrastructure stack for testing and demonstration purposes, reducing configuration drift and setup time.",
+      "Automated provisioning of a small app stack including VPC, subnets, and S3 logging",
+      "Support for environment separation via local staging and remote state management",
+      "Cost center tagging integration for financial tracking",
+      "Implementation of cost center tagging in the local development environment for cost tracking",
+      "Addition of a staging environment with separate Terraform layout for environment isolation",
+      "output cost center",
+      "add cost center local",
+      "add stage environment",
+      "expose logging bucket output"
+    ],
+    "role": "Contributed 30% of the codebase, adding 111 lines across 6 files over 7 active days."
+  },
+  "algorithms-toolkit": {
+    "summary": "Algorithms Toolkit is a Python command-line utility providing pre-built implementations of classic algorithms such as BFS, DFS, binary search, and Dijkstra's shortest path, along with a helper for reversing lists, designed to aid in algorithm practice and",
+    "facts": [
+      "It enables developers and interview candidates to quickly test and verify algorithm correctness using realistic datasets and CLI interfaces, saving time and improving learning efficiency.",
+      "Execute BFS and DFS on graph data loaded from text files with node and neighbor definitions.",
+      "Perform binary search on sorted integer lists and return the index of a target value.",
+      "Compute shortest paths using Dijkstra's algorithm on weighted graphs represented as adjacency lists.",
+      "Uses argparse for robust CLI argument handling and input validation.",
+      "Implements BFS and DFS with iterative approaches to avoid recursion depth issues.",
+      "add rotate helper",
+      "add dijkstra shortest path",
+      "bounded binary search",
+      "convenience reverse helper",
+      "utility to check sorted arrays",
+      "add two-sum helper"
+    ],
+    "role": "Sole developer, adding 162 lines across 8 files over 18 active days."
+  },
+  "java-chat-service": {
+    "summary": "Java Chat Service is a lightweight HTTP-based chat application that stores messages in memory and provides RESTful endpoints for sending, retrieving, and counting messages.",
+    "facts": [
+      "This service enables real-time messaging with simple API access, making it easy for developers to build chat features without complex infrastructure.",
+      "Exposes /health endpoint to confirm service availability",
+      "Supports /messages to retrieve all stored messages as a JSON array",
+      "Allows /send to post new messages with author and text",
+      "Uses HttpServer from com.sun.net.httpserver for lightweight HTTP handling",
+      "Employs MessageStore with synchronized list to safely manage concurrent message writes",
+      "search messages endpoint",
+      "json messages endpoint",
+      "fetch latest messages",
+      "expose message count endpoint"
+    ],
+    "role": "Contributed 30% of the codebase, adding 130 lines across 5 files over 7 active days."
+  },
+  "campus-navigation-api": {
+    "summary": "Campus navigation API provides a TypeScript-based web service for finding paths across campus, respecting building schedules and closures, with health checks and building management endpoints.",
+    "facts": [
+      "Students and staff can efficiently navigate campus by finding optimal routes between buildings, avoiding busy or closed facilities, and accessing real-time building availability information.",
+      "Calculates shortest paths between campus buildings using a graph traversal algorithm",
+      "Respects building schedules by filtering out routes through closed or busy facilities",
+      "Provides health and status endpoints for service monitoring",
+      "Uses TypeScript with proper type definitions to ensure strong typing across request/response objects",
+      "Implements a custom shortest-path algorithm with support for dynamic closure filtering",
+      "simple preference routing",
+      "safe path respecting closures",
+      "fetch single building",
+      "endpoint to create buildings",
+      "Defined 10 API endpoints"
+    ],
+    "role": "Contributed 36% of the codebase, adding 194 lines across 10 files over 9 active days."
+  },
+  "ml-lab-notebooks": {
+    "summary": "The ml-lab-notebooks project provides a collection of Python-based machine learning experiments and utilities for data analysis, including linear regression, logistic regression, and data preprocessing tools.",
+    "facts": [
+      "Users benefit by gaining hands-on experience with core machine learning techniques and practical data cleaning methods through reproducible code and documented experiments.",
+      "Implements linear regression for continuous target prediction with model coefficient logging",
+      "Supports logistic regression experiments using scikit-learn for binary classification",
+      "Provides data preprocessing utilities including z-score normalization and room-to-area ratio calculation",
+      "Uses pandas for data manipulation and scikit-learn for machine learning models",
+      "Logs regression coefficients for model interpretability",
+      "add logistic regression experiment",
+      "simple train/test split"
+    ],
+    "role": "Contributed 32% of the codebase, adding 71 lines across 8 files over 7 active days."
+  }
+}

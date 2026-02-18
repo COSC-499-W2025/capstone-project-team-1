@@ -1,0 +1,131 @@
+{
+  "go-task-runner": {
+    "summary": "A CLI tool to run JSON-defined tasks with simple interval scheduling, designed for small homelab workflows.",
+    "facts": [
+      "It simplifies the execution of repetitive tasks and provides a simple way to schedule them.",
+      "Runs JSON-defined tasks with interval scheduling",
+      "Supports dry-run mode to preview tasks without execution",
+      "Exports results to JSON files",
+      "Uses Go's exec package to execute tasks",
+      "Schedules tasks using a simple tick function",
+      "save results to json file",
+      "add dry-run flag",
+      "map outputs to result structs"
+    ],
+    "role": "Contributed 30% of the codebase, adding 120 lines across 7 files over 7 active days."
+  },
+  "personal-portfolio-site": {
+    "summary": "A lightweight static portfolio site that highlights projects, skills, and coursework.",
+    "facts": [
+      "It provides a simple and accessible way for users to showcase their work and skills.",
+      "Dynamic project rendering",
+      "Dynamic project rendering using JavaScript",
+      "Accessibility features implemented using ARIA roles and attributes",
+      "add skills section",
+      "add infra project",
+      "hero CTA and project grid",
+      "a11y: enable keyboard navigation",
+      "copy: tighten title and tagline",
+      "prep footer slot",
+      "showcase go runner"
+    ],
+    "role": "Sole developer, adding 110 lines across 6 files over 21 active days."
+  },
+  "sensor-fleet-backend": {
+    "summary": "A web API service for ingesting IoT sensor readings with in-memory storage and health checks.",
+    "facts": [
+      "It provides a simple and efficient way to manage and analyze sensor data, enabling users to track sensor health and performance.",
+      "Ingesting sensor readings",
+      "Storing sensor data in memory",
+      "Providing health checks",
+      "FastAPI framework for building the API",
+      "Pydantic for input validation",
+      "add alerts endpoint",
+      "uptime endpoint",
+      "average helper",
+      "Defined 10 API endpoints"
+    ],
+    "role": "Contributed 43% of the codebase, adding 96 lines across 7 files over 10 active days."
+  },
+  "infra-terraform": {
+    "summary": "Terraform configuration for a small app stack, including VPC, subnets, and an app module with S3 logging bucket, designed for study/demo environments.",
+    "facts": [
+      "This project provides a structured way to manage infrastructure using Terraform, which is beneficial for developers and IT professionals who need to quickly set up and manage cloud resources.",
+      "VPC and subnet management",
+      "S3 logging bucket creation",
+      "Cost center tagging",
+      "Terraform modules for VPC, subnets, and app module",
+      "Use of tfvars for environment-specific configurations",
+      "output cost center",
+      "add cost center local",
+      "add stage environment",
+      "expose logging bucket output"
+    ],
+    "role": "Contributed 30% of the codebase, adding 111 lines across 6 files over 7 active days."
+  },
+  "algorithms-toolkit": {
+    "summary": "A Python CLI tool for performing classic algorithms such as BFS, DFS, and binary search, with utilities for sorting and reverse operations.",
+    "facts": [
+      "It helps software developers and interviewers quickly test and implement algorithms in Python, making it easier to prepare for technical interviews.",
+      "Breadth-First Search (BFS) and Depth-First Search (DFS) for graph traversal",
+      "Binary Search for sorted lists",
+      "Quicksort and Mergesort for sorting",
+      "The use of Python's built-in argparse module for command-line interface (CLI) handling",
+      "Separation of concerns between different algorithms and utilities",
+      "add rotate helper",
+      "add dijkstra shortest path",
+      "bounded binary search",
+      "convenience reverse helper",
+      "utility to check sorted arrays",
+      "add two-sum helper"
+    ],
+    "role": "Sole developer, adding 162 lines across 8 files over 18 active days."
+  },
+  "java-chat-service": {
+    "summary": "A tiny HTTP chat service using Java's built-in HttpServer to store and expose messages in memory.",
+    "facts": [
+      "Provides a simple, lightweight chat service for local development and testing.",
+      "Stores messages in memory",
+      "Exposes RESTful endpoints for health checks, message retrieval, and sending new messages",
+      "Validates incoming messages for empty text",
+      "Uses Java's built-in HttpServer for handling HTTP requests",
+      "Stores messages in a synchronized list to ensure thread safety",
+      "search messages endpoint",
+      "json messages endpoint",
+      "fetch latest messages",
+      "expose message count endpoint"
+    ],
+    "role": "Contributed 30% of the codebase, adding 130 lines across 5 files over 7 active days."
+  },
+  "campus-navigation-api": {
+    "summary": "A TypeScript Express API for campus pathfinding and schedule-aware routing, providing health, building listings, and shortest-path endpoints.",
+    "facts": [
+      "Campus navigation helps students and staff efficiently find their way around the campus, enhancing their academic and administrative experience.",
+      "Pathfinding and schedule-aware routing",
+      "Building listings and details",
+      "Health check endpoint",
+      "TypeScript for type safety and code readability",
+      "Express for routing and middleware",
+      "simple preference routing",
+      "safe path respecting closures",
+      "fetch single building",
+      "endpoint to create buildings",
+      "Defined 10 API endpoints"
+    ],
+    "role": "Contributed 36% of the codebase, adding 194 lines across 10 files over 9 active days."
+  },
+  "ml-lab-notebooks": {
+    "summary": "A library of Python notebooks for machine learning experiments, focusing on linear regression, classification, and data preprocessing utilities.",
+    "facts": [
+      "Provides a collection of tools for data analysis and machine learning, making it easier for users to experiment with different models and techniques.",
+      "Linear regression and classification experiments",
+      "Data preprocessing utilities such as normalization, z-score, and room per area heuristic",
+      "Cross-validation for model evaluation",
+      "Uses Pandas for data manipulation and NumPy for numerical operations",
+      "Utilizes scikit-learn for machine learning models",
+      "add logistic regression experiment",
+      "simple train/test split"
+    ],
+    "role": "Contributed 32% of the codebase, adding 71 lines across 8 files over 7 active days."
+  }
+}
