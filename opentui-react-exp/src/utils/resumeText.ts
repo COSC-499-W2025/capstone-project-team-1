@@ -203,6 +203,65 @@ export function keyedLines(lines: string[], prefix: string): KeyedLine[] {
 	return keyed;
 }
 
+export interface StatLine {
+	label: string;
+	value: string;
+}
+
+export function resumeStats(data: ResumeV3Output | null): StatLine[] {
+	if (!data) return [];
+
+	const stats: StatLine[] = [];
+
+	stats.push({ label: "Projects", value: String(data.projects.length) });
+
+	const languages = data.portfolio?.languages_used;
+	if (languages?.length) {
+		stats.push({ label: "Languages", value: languages.join(", ") });
+	}
+
+	const totalCommits = data.portfolio?.total_commits;
+	if (totalCommits != null) {
+		stats.push({ label: "Commits", value: String(totalCommits) });
+	}
+
+	const genTime = data.metadata.generation_time_seconds;
+	if (genTime) {
+		stats.push({ label: "Gen time", value: `${Number(genTime).toFixed(1)}s` });
+	}
+
+	if (data.metadata.stage) {
+		stats.push({ label: "Stage", value: data.metadata.stage });
+	}
+
+	return stats;
+}
+
+export function createUnifiedDiff(oldText: string, newText: string): string {
+	const oldLines = oldText.split("\n");
+	const newLines = newText.split("\n");
+	const result: string[] = [];
+
+	result.push("--- draft");
+	result.push("+++ final");
+	result.push(`@@ -1,${oldLines.length} +1,${newLines.length} @@`);
+
+	const maxLen = Math.max(oldLines.length, newLines.length);
+	for (let i = 0; i < maxLen; i++) {
+		const oldLine = i < oldLines.length ? oldLines[i] : undefined;
+		const newLine = i < newLines.length ? newLines[i] : undefined;
+
+		if (oldLine === newLine) {
+			result.push(` ${oldLine}`);
+		} else {
+			if (oldLine !== undefined) result.push(`-${oldLine}`);
+			if (newLine !== undefined) result.push(`+${newLine}`);
+		}
+	}
+
+	return result.join("\n");
+}
+
 export function buildLineDiff(
 	draft: ResumeV3Output | null,
 	finalOutput: ResumeV3Output | null,

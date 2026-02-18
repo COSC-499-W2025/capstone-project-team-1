@@ -36,7 +36,7 @@ function screenHint(screen: Screen): string {
 		case "feedback":
 			return "Your notes guide the AI in the next pass";
 		case "resume-preview":
-			return "Your resume is ready";
+			return "Your resume is ready — navigate sections, compare changes, or save";
 		default:
 			return "";
 	}
@@ -99,8 +99,11 @@ function screenActions(screen: Screen): KeyAction[] {
 			];
 		case "resume-preview":
 			return [
-				{ key: "Tab", label: "Draft/Final/Diff" },
-				{ key: "P", label: "Polish Again" },
+				{ key: "↑↓", label: "Section" },
+				{ key: "1-5", label: "Jump" },
+				{ key: "S", label: "Save" },
+				{ key: "Tab", label: "Mode" },
+				{ key: "P", label: "Polish" },
 				{ key: "R", label: "Restart" },
 				{ key: "Esc", label: "Exit" },
 			];

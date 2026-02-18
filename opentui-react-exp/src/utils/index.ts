@@ -38,8 +38,11 @@ export {
 	resumeToLines,
 	resumeToText,
 	resumeToSections,
+	resumeStats,
+	createUnifiedDiff,
 	buildLineDiff,
 	keyedLines,
 	type DiffRow,
 	type ResumeSection,
+	type StatLine,
 } from "./resumeText";
