@@ -22,6 +22,47 @@ const stageLabel: Record<string, string> = {
 	STAGE_3:  "Stage 3   —  Polish",
 };
 
+// Context shown in the Activity panel while each stage is active
+const stageContext: Record<string, { heading: string; lines: string[] }> = {
+	EXTRACT: {
+		heading: "Gathering raw data from your repositories",
+		lines: [
+			"We're reading README files, commit messages, folder",
+			"structure, dependency graphs, and code metrics for",
+			"every repo you selected. No AI runs at this stage —",
+			"just thorough, local extraction. Nothing leaves your",
+			"machine.",
+		],
+	},
+	STAGE_1: {
+		heading: "Understanding what you built and how",
+		lines: [
+			"A small local AI model is now analysing each project.",
+			"It scores commit quality, maps your skill timeline,",
+			"measures complexity, and infers what each repo is",
+			"actually for — so your resume reflects real depth,",
+			"not just a list of technologies.",
+		],
+	},
+	STAGE_2: {
+		heading: "Writing your resume",
+		lines: [
+			"The AI is now composing project bullets, technical",
+			"summaries, and a portfolio overview — all grounded",
+			"in the evidence extracted from your code. Output is",
+			"structured as clean Markdown ready to export.",
+		],
+	},
+	STAGE_3: {
+		heading: "Polishing based on your feedback",
+		lines: [
+			"The AI is refining tone, language, and emphasis",
+			"using the notes you provided. This pass targets",
+			"the specific gaps you flagged in the draft.",
+		],
+	},
+};
+
 // Maps technical log prefixes → human-readable activity descriptions
 const STEP_MAP: Array<[string, string]> = [
 	["Extracting README",                "Reading project documentation"],
@@ -374,6 +415,28 @@ export function Analysis({
 					padding={2}
 					gap={1}
 				>
+					{/* Stage context: heading + description */}
+					{stageContext[activeStage] ? (
+						<box
+							flexDirection="column"
+							gap={1}
+							borderBottom
+							borderColor={theme.bgLight}
+							paddingBottom={1}
+						>
+							<text>
+								<span fg={theme.gold}>
+									<strong>{stageContext[activeStage].heading}</strong>
+								</span>
+							</text>
+							{stageContext[activeStage].lines.map((line, i) => (
+								<text key={i}>
+									<span fg={theme.textDim}>{line}</span>
+								</text>
+							))}
+						</box>
+					) : null}
+
 					{/* Current repo header */}
 					{telemetry?.current_repo ? (
 						<box
