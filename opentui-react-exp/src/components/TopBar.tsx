@@ -13,47 +13,19 @@ export function TopBar({ step, title, description }: TopBarProps) {
 			flexDirection="column"
 			justifyContent="center"
 			alignItems="center"
-			gap={0}
-			padding={1}
+			paddingTop={1}
+			paddingBottom={1}
 			backgroundColor={theme.bgDark}
 		>
-			<box width="100%" flexDirection="row" alignItems="center">
-				{/* Left side: Step (aligned right) */}
-				<box
-					flexGrow={1}
-					width={0}
-					flexDirection="row"
-					justifyContent="flex-end"
-					paddingRight={1}
-				>
-					<text>
-						<span fg={theme.gold}>
-							<strong>{step}</strong>
-						</span>
-					</text>
-				</box>
-
-				{/* Center: Separator */}
-				<text>
-					<span fg={theme.textDim}>|</span>
-				</text>
-
-				{/* Right side: Title (aligned left) */}
-				<box
-					flexGrow={1}
-					width={0}
-					flexDirection="row"
-					justifyContent="flex-start"
-					paddingLeft={0.5}
-				>
-					<text>
-						<span fg={theme.textPrimary}>
-							<strong>{title}</strong>
-						</span>
-					</text>
-				</box>
-			</box>
-
+			<text>
+				<span fg={theme.gold}>
+					<strong>{step}</strong>
+				</span>
+				<span fg={theme.textDim}>{" | "}</span>
+				<span fg={theme.textPrimary}>
+					<strong>{title}</strong>
+				</span>
+			</text>
 			{description && (
 				<text>
 					<span fg={theme.textDim}>{description}</span>
