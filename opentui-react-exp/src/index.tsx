@@ -1,6 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { ConsentScreen } from "./components/ConsentScreen";
@@ -14,6 +14,33 @@ import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { AppProvider, useAppState } from "./context/AppContext";
 import { type AnalysisMode, type KeyAction, type Screen, theme } from "./types";
+
+function screenHint(screen: Screen): string {
+	switch (screen) {
+		case "landing":
+			return "Transform your repos into a polished, recruiter-ready resume";
+		case "consent-policy":
+			return "Check the box to confirm you're happy to proceed";
+		case "file-upload":
+			return "Select the ZIP file from your GitHub export";
+		case "project-list":
+			return "Pick the repos to include in your resume";
+		case "identity":
+			return "We use your email to filter which commits count as yours";
+		case "pipeline-launch":
+			return "Ready? The local AI will generate your resume on-device";
+		case "analysis":
+			return "Processing locally — your data never leaves this machine";
+		case "draft-pause":
+			return "Your first draft is ready — give us feedback to refine it";
+		case "feedback":
+			return "Your notes guide the AI in the next pass";
+		case "resume-preview":
+			return "Your resume is ready";
+		default:
+			return "";
+	}
+}
 
 function screenActions(screen: Screen): KeyAction[] {
 	switch (screen) {
@@ -97,6 +124,13 @@ function App() {
 
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("phase1");
+	const [hint, setHint] = useState(() => screenHint("landing"));
+	const [landingReady, setLandingReady] = useState(false);
+
+	useEffect(() => {
+		setHint(screenHint(screen));
+		if (screen === "landing") setLandingReady(false);
+	}, [screen]);
 
 	useKeyboard((key) => {
 		if (key.ctrl && key.name === "c") {
@@ -115,6 +149,7 @@ function App() {
 	});
 
 	const actions = useMemo(() => screenActions(screen), [screen]);
+	const bottomBarReady = screen !== "landing" || landingReady;
 
 	const startNewRun = () => {
 		reset();
@@ -125,13 +160,14 @@ function App() {
 	const renderScreen = () => {
 			switch (screen) {
 				case "landing":
-					return <Landing />;
+					return <Landing onReady={() => setLandingReady(true)} />;
 
 			case "consent-policy":
 				return (
 					<ConsentScreen
 						onContinue={() => setScreen("file-upload")}
 						onBack={() => setScreen("landing")}
+						onHintChange={setHint}
 					/>
 				);
 
@@ -239,7 +275,7 @@ function App() {
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<box flexGrow={1}>{renderScreen()}</box>
-			<BottomBar actions={actions} />
+			<BottomBar hint={bottomBarReady ? hint : ""} actions={bottomBarReady ? actions : []} />
 		</box>
 	);
 }
