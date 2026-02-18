@@ -29,3 +29,15 @@ export {
 	getParentPath,
 	isAtOrAboveRoot,
 } from "./pathHelpers";
+
+// API / parsing helpers
+export { toErrorMessage } from "./errorMessage";
+
+// Resume preview rendering
+export {
+	resumeToLines,
+	resumeToText,
+	buildLineDiff,
+	keyedLines,
+	type DiffRow,
+} from "./resumeText";
