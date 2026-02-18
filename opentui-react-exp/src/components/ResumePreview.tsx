@@ -1,229 +1,199 @@
-import { type ResumeData, theme } from "../types";
+import { useKeyboard } from "@opentui/react";
+import { useMemo, useState } from "react";
+import { useAppState } from "../context/AppContext";
+import { theme } from "../types";
+import { buildLineDiff, keyedLines, resumeToLines } from "../utils";
 import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {
-	data: ResumeData;
-	onBack: () => void;
+	onPolishAgain: () => void;
 	onRestart: () => void;
+	onExit: () => void;
 }
 
-export function ResumePreview({ data, onBack, onRestart }: ResumePreviewProps) {
-	const expertSkills = data.skills.filter((s) => s.level === "expert");
-	const advancedSkills = data.skills.filter((s) => s.level === "advanced");
-	const intermediateSkills = data.skills.filter(
-		(s) => s.level === "intermediate",
+type PreviewMode = "draft" | "final" | "diff";
+
+const modeOrder: PreviewMode[] = ["draft", "final", "diff"];
+
+export function ResumePreview({
+	onPolishAgain,
+	onRestart,
+	onExit,
+}: ResumePreviewProps) {
+	const { state } = useAppState();
+	const [mode, setMode] = useState<PreviewMode>(
+		state.resumeV3Output ? "final" : "draft",
 	);
+
+	const draftLines = useMemo(() => resumeToLines(state.resumeV3Draft), [state.resumeV3Draft]);
+	const finalLines = useMemo(() => resumeToLines(state.resumeV3Output), [state.resumeV3Output]);
+	const keyedDraft = useMemo(() => keyedLines(draftLines, "preview-draft"), [draftLines]);
+	const keyedFinal = useMemo(() => keyedLines(finalLines, "preview-final"), [finalLines]);
+	const diffRows = useMemo(
+		() => buildLineDiff(state.resumeV3Draft, state.resumeV3Output),
+		[state.resumeV3Draft, state.resumeV3Output],
+	);
+
+	const cycleMode = () => {
+		setMode((prev) => {
+			const index = modeOrder.indexOf(prev);
+			return modeOrder[(index + 1) % modeOrder.length] || "draft";
+		});
+	};
+
+	useKeyboard((key) => {
+		if (key.name === "tab") {
+			cycleMode();
+			return;
+		}
+
+		if (key.name === "p") {
+			onPolishAgain();
+			return;
+		}
+
+		if (key.name === "r") {
+			onRestart();
+			return;
+		}
+
+		if (key.name === "escape") {
+			onExit();
+		}
+	});
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			{/* <TopBar 
-        step="Done" 
-        title="Resume Generated" 
-        description="Analysis complete."
-      /> */}
+			<TopBar
+				step="Preview"
+				title="Draft / Final / Diff"
+				description={`Current mode: ${mode.toUpperCase()}`}
+			/>
 
-			{/* Resume content */}
+			<box flexGrow={1} padding={1}>
+				<box
+					flexGrow={1}
+					border
+					borderStyle="rounded"
+					borderColor={theme.goldDim}
+					padding={1}
+				>
+					{mode === "draft" ? (
+						<SinglePane title="Draft" lines={keyedDraft} color={theme.cyan} />
+					) : null}
+
+					{mode === "final" ? (
+						<SinglePane title="Final" lines={keyedFinal} color={theme.success} />
+					) : null}
+
+					{mode === "diff" ? <DiffPane rows={diffRows} /> : null}
+				</box>
+			</box>
+
+			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={1}>
+				<text>
+					<span fg={theme.textDim}>
+						Tab switches mode. P polish again. R restart flow. Esc exit.
+					</span>
+				</text>
+			</box>
+		</box>
+	);
+}
+
+interface SinglePaneProps {
+	title: string;
+	lines: { key: string; text: string }[];
+	color: string;
+}
+
+function SinglePane({ title, lines, color }: SinglePaneProps) {
+	return (
+		<box flexGrow={1} flexDirection="column">
+			<text>
+				<span fg={color}>
+					<strong>{title}</strong>
+				</span>
+			</text>
 			<scrollbox
 				focused
 				style={{
-					rootOptions: { backgroundColor: theme.bgDark },
-					wrapperOptions: { flexGrow: 1 },
-					viewportOptions: { padding: 2 },
+					rootOptions: { flexGrow: 1, backgroundColor: theme.bgDark },
+					wrapperOptions: { flexGrow: 1, marginTop: 1 },
+					viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 				}}
 			>
-				<box flexDirection="column" gap={2}>
-					{/* Summary section */}
-					<box
-						flexDirection="column"
-						border
-						borderStyle="rounded"
-						borderColor={theme.gold}
-						padding={2}
-					>
-						<text>
-							<span fg={theme.gold}>
-								<strong>Professional Summary</strong>
-							</span>
-						</text>
-						<text>
-							<span fg={theme.textSecondary}>{data.summary}</span>
-						</text>
-					</box>
-
-					{/* Skills section */}
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.cyan}>
-								<strong>Technical Skills</strong>
-							</span>
-						</text>
-
-						{expertSkills.length > 0 && (
-							<box flexDirection="row" gap={1}>
-								<text>
-									<span fg={theme.textDim}>Expert:</span>
-								</text>
-								<box flexDirection="row" gap={1} flexWrap="wrap">
-									{expertSkills.map((skill, i) => (
-										<box
-											key={i}
-											backgroundColor={theme.goldDim}
-											paddingLeft={1}
-											paddingRight={1}
-										>
-											<text>
-												<span fg={theme.textPrimary}>{skill.name}</span>
-											</text>
-										</box>
-									))}
-								</box>
-							</box>
-						)}
-
-						{advancedSkills.length > 0 && (
-							<box flexDirection="row" gap={1}>
-								<text>
-									<span fg={theme.textDim}>Advanced:</span>
-								</text>
-								<box flexDirection="row" gap={1} flexWrap="wrap">
-									{advancedSkills.map((skill, i) => (
-										<box
-											key={i}
-											backgroundColor={theme.cyanDim}
-											paddingLeft={1}
-											paddingRight={1}
-										>
-											<text>
-												<span fg={theme.textPrimary}>{skill.name}</span>
-											</text>
-										</box>
-									))}
-								</box>
-							</box>
-						)}
-
-						{intermediateSkills.length > 0 && (
-							<box flexDirection="row" gap={1}>
-								<text>
-									<span fg={theme.textDim}>Intermediate:</span>
-								</text>
-								<box flexDirection="row" gap={1} flexWrap="wrap">
-									{intermediateSkills.map((skill, i) => (
-										<box
-											key={i}
-											backgroundColor={theme.bgLight}
-											paddingLeft={1}
-											paddingRight={1}
-										>
-											<text>
-												<span fg={theme.textPrimary}>{skill.name}</span>
-											</text>
-										</box>
-									))}
-								</box>
-							</box>
-						)}
-					</box>
-
-					{/* Projects section */}
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.cyan}>
-								<strong>Notable Projects</strong>
-							</span>
-						</text>
-
-						{data.projects.slice(0, 5).map((project) => (
-							<box
-								key={project.id}
-								flexDirection="column"
-								border
-								borderStyle="single"
-								borderColor={theme.textDim}
-								padding={1}
-								marginBottom={1}
-							>
-								<box flexDirection="row" justifyContent="space-between">
-									<text>
-										<span fg={theme.gold}>
-											<strong>{project.name}</strong>
-										</span>
-									</text>
-									<text>
-										<span fg={theme.cyan}>{project.language}</span>
-									</text>
-								</box>
-								<text>
-									<span fg={theme.textSecondary}>{project.description}</span>
-								</text>
-								<box flexDirection="row" gap={1} marginTop={1}>
-									{project.technologies.slice(0, 5).map((tech, i) => (
-										<text key={i}>
-											<span fg={theme.textDim}>• {tech}</span>
-										</text>
-									))}
-								</box>
-							</box>
-						))}
-					</box>
-
-					{/* Stats */}
-					<box
-						flexDirection="row"
-						gap={4}
-						border
-						borderStyle="rounded"
-						borderColor={theme.cyanDim}
-						padding={2}
-						justifyContent="center"
-					>
-						<box flexDirection="column" alignItems="center">
-							<text>
-								<span fg={theme.gold}>
-									<strong>{data.projects.length}</strong>
-								</span>
-							</text>
-							<text>
-								<span fg={theme.textDim}>Projects</span>
-							</text>
-						</box>
-						<box flexDirection="column" alignItems="center">
-							<text>
-								<span fg={theme.gold}>
-									<strong>{data.skills.length}</strong>
-								</span>
-							</text>
-							<text>
-								<span fg={theme.textDim}>Skills</span>
-							</text>
-						</box>
-						<box flexDirection="column" alignItems="center">
-							<text>
-								<span fg={theme.gold}>
-									<strong>
-										{data.projects.reduce((sum, p) => sum + p.commits, 0)}
-									</strong>
-								</span>
-							</text>
-							<text>
-								<span fg={theme.textDim}>Total Commits</span>
-							</text>
-						</box>
-						<box flexDirection="column" alignItems="center">
-							<text>
-								<span fg={theme.gold}>
-									<strong>
-										{new Set(data.projects.map((p) => p.language)).size}
-									</strong>
-								</span>
-							</text>
-							<text>
-								<span fg={theme.textDim}>Languages</span>
-							</text>
-						</box>
-					</box>
-				</box>
+				{lines.map((line) => (
+					<text key={line.key}>
+						<span fg={theme.textSecondary}>{line.text || " "}</span>
+					</text>
+				))}
 			</scrollbox>
 		</box>
 	);
+}
+
+interface DiffPaneProps {
+	rows: ReturnType<typeof buildLineDiff>;
+}
+
+function DiffPane({ rows }: DiffPaneProps) {
+	return (
+		<box flexGrow={1} flexDirection="column" gap={1}>
+			<box flexDirection="row" justifyContent="space-between">
+				<text>
+					<span fg={theme.cyan}>
+						<strong>Draft</strong>
+					</span>
+				</text>
+				<text>
+					<span fg={theme.success}>
+						<strong>Final</strong>
+					</span>
+				</text>
+			</box>
+
+			<scrollbox
+				focused
+				style={{
+					rootOptions: { flexGrow: 1, backgroundColor: theme.bgDark },
+					wrapperOptions: { flexGrow: 1 },
+					viewportOptions: { paddingLeft: 1, paddingRight: 1 },
+				}}
+			>
+				{rows.map((row) => (
+					<box key={row.lineNumber} flexDirection="row" gap={1}>
+						<box width={4}>
+							<text>
+								<span fg={theme.textDim}>{String(row.lineNumber).padStart(3, " ")}</span>
+							</text>
+						</box>
+
+						<box width={50}>
+							<text>
+								<span fg={row.changed ? theme.warning : theme.textSecondary}>
+									{clipLine(row.left)}
+								</span>
+							</text>
+						</box>
+
+						<box width={50}>
+							<text>
+								<span fg={row.changed ? theme.success : theme.textSecondary}>
+									{clipLine(row.right)}
+								</span>
+							</text>
+						</box>
+					</box>
+				))}
+			</scrollbox>
+		</box>
+	);
+}
+
+function clipLine(line: string): string {
+	if (line.length <= 48) {
+		return line || " ";
+	}
+	return `${line.slice(0, 45)}...`;
 }

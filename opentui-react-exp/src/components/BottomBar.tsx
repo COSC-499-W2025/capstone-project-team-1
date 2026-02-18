@@ -15,8 +15,8 @@ export function BottomBar({ actions }: BottomBarProps) {
 			padding={1}
 			backgroundColor={theme.bgDark}
 		>
-			{actions.map((action, index) => (
-				<box key={index} flexDirection="row" gap={1}>
+			{actions.map((action) => (
+				<box key={`${action.key}-${action.label}`} flexDirection="row" gap={1}>
 					<text>
 						<span fg={theme.goldDark}>{action.key}</span>
 					</text>

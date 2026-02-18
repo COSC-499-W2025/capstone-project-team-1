@@ -1,186 +1,78 @@
 import { useKeyboard } from "@opentui/react";
-import { useState } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
-interface ConsentScreenProps {
-	onContinue: (useLLM: boolean) => void;
+interface ConsentPolicyScreenProps {
+	onContinue: () => void;
 	onBack: () => void;
 }
 
-type Selection = "cloud" | "offline";
-
-export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-	const [selected, setSelected] = useState<Selection>("offline");
-
+export function ConsentScreen({
+	onContinue,
+	onBack,
+}: ConsentPolicyScreenProps) {
 	useKeyboard((key) => {
-		if (key.name === "left" || key.name === "right") {
-			setSelected((prev) => (prev === "cloud" ? "offline" : "cloud"));
-		}
-		if (key.name === "return") {
-			onContinue(selected === "cloud");
+		if (key.name === "return" || key.name === "enter") {
+			onContinue();
 		}
 		if (key.name === "escape") {
 			onBack();
 		}
 	});
 
-	const isCloudSelected = selected === "cloud";
-	const isOfflineSelected = selected === "offline";
-
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
-				step="Privacy"
-				title="Settings"
-				description="Choose how your project metadata is analyzed."
+				step="Policy"
+				title="Local Processing Consent"
+				description="This prototype runs only on your machine."
 			/>
 
-			{/* Main split-screen container */}
-			<box
-				flexGrow={1}
-				flexDirection="row"
-				gap={1}
-				paddingLeft={2}
-				paddingRight={2}
-				paddingBottom={2}
-			>
-				{/* Cloud Analysis Panel */}
+			<box flexGrow={1} justifyContent="center" alignItems="center" padding={2}>
 				<box
-					flexGrow={1}
+					width={88}
 					flexDirection="column"
-					padding={2}
 					border
-					borderStyle={isCloudSelected ? "rounded" : "rounded"}
-					borderColor={isCloudSelected ? theme.gold : theme.textDim}
-					backgroundColor={isCloudSelected ? theme.bgMedium : theme.bgDark}
+					borderStyle="rounded"
+					borderColor={theme.goldDim}
+					padding={2}
 					gap={1}
 				>
 					<text>
-						<span fg={isCloudSelected ? theme.gold : theme.textSecondary}>
-							<strong>Cloud Analysis</strong>
+						<span fg={theme.gold}>
+							<strong>Local-Only Processing</strong>
 						</span>
 					</text>
 
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Pros:</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Enhanced skill detection</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Smarter summaries</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Better project insights</span>
-						</text>
-					</box>
+					<text>
+						<span fg={theme.textSecondary}>
+							Your ZIP, repositories, logs, and generated resume stay on this machine
+							during this run.
+						</span>
+					</text>
 
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Cons:</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Requires network</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Metadata sent to OpenAI</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Less privacy</span>
-						</text>
-					</box>
+					<text>
+						<span fg={theme.success}>+ No cloud routing in this flow</span>
+					</text>
+					<text>
+						<span fg={theme.success}>
+							+ One intake ZIP and one ephemeral job state per run
+						</span>
+					</text>
+					<text>
+						<span fg={theme.success}>
+							+ Escape can hard-cancel backend processing
+						</span>
+					</text>
 
-					<box marginTop={1} paddingTop={1}>
-						<text>
-							<span fg={theme.textDim}>─────────────────────────</span>
-						</text>
+					<box marginTop={1}>
 						<text>
 							<span fg={theme.textDim}>
-								Sends: file names, commit messages, technology names
+								By continuing, you confirm local processing for this prototype run.
 							</span>
 						</text>
 					</box>
 				</box>
-
-				{/* Offline Analysis Panel */}
-				<box
-					flexGrow={1}
-					flexDirection="column"
-					padding={2}
-					border
-					borderStyle={isOfflineSelected ? "rounded" : "rounded"}
-					borderColor={isOfflineSelected ? theme.gold : theme.textDim}
-					backgroundColor={isOfflineSelected ? theme.bgMedium : theme.bgDark}
-					gap={1}
-				>
-					<text>
-						<span fg={isOfflineSelected ? theme.gold : theme.textSecondary}>
-							<strong>Offline</strong>
-						</span>
-					</text>
-
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Pros:</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + All processing local</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Complete privacy</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + No data transmitted</span>
-						</text>
-					</box>
-
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Cons:</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Pattern-based analysis</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Less detailed insights</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Basic skill detection</span>
-						</text>
-					</box>
-
-					<box marginTop={1} paddingTop={1}>
-						<text>
-							<span fg={theme.textDim}>─────────────────────────</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>
-								All analysis happens on your machine. Zero external calls.
-							</span>
-						</text>
-					</box>
-				</box>
-			</box>
-
-			{/* Demo Mode Banner */}
-			<box
-				height={3}
-				border
-				borderStyle="single"
-				borderColor={theme.error}
-				paddingLeft={2}
-				paddingRight={2}
-				paddingTop={1}
-				paddingBottom={1}
-			>
-				<text>
-					<span fg={theme.goldDark}>Demo Mode:</span>
-					<span fg={theme.textDim}> Press </span>
-					<span fg={theme.cyan}>Enter</span>
-					<span fg={theme.textDim}> to continue</span>
-				</text>
 			</box>
 		</box>
 	);
