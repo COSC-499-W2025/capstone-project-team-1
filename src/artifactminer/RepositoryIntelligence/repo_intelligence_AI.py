@@ -47,7 +47,7 @@ def user_allows_llm() -> bool:
         consent = db.get(Consent, 1)
         if consent is None: #no consent row means no consent given
             consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
-        return bool(consent and (consent.consent_level or "").lower() == "full")#return True if consent level is "full"
+        return bool(consent and (consent.consent_level or "").lower() in ("local-llm", "cloud"))
     finally:
         db.close()
 # Set user consent level for LLM usage
