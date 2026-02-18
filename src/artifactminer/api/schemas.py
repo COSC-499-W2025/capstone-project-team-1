@@ -75,15 +75,15 @@ class ConsentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    consent_level: Literal["full", "no_llm", "none"]
+    consent_level: Literal["none", "local", "local-llm", "cloud"]
     accepted_at: datetime | None = None
 
 
 class ConsentUpdateRequest(BaseModel):
     """Request payload to update consent state."""
 
-    consent_level: Literal["full", "no_llm", "none"] = Field(
-        description="Consent level: 'full' (with LLM), 'no_llm' (without LLM), or 'none'."
+    consent_level: Literal["none", "local", "local-llm", "cloud"] = Field(
+        description="Consent level: 'local' (static only), 'local-llm' (local LLM), 'cloud' (cloud LLM), or 'none'."
     )
 
 
