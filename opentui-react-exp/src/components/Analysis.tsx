@@ -15,6 +15,13 @@ interface AnalysisProps {
 
 const stageOrder = ["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3"] as const;
 
+const stageLabel: Record<string, string> = {
+	EXTRACT: "Extract",
+	STAGE_1: "Stage 1  —  Analyze",
+	STAGE_2: "Stage 2  —  Draft",
+	STAGE_3: "Stage 3  —  Polish",
+};
+
 export function Analysis({
 	mode,
 	onDraftReady,
@@ -213,97 +220,158 @@ export function Analysis({
 			? "Extract + Stage 1 + Stage 2"
 			: "Stage 3 polish from saved draft";
 
+	const statusColor =
+		state.pipelineStatus === "running"
+			? theme.cyan
+			: state.pipelineStatus === "complete"
+				? theme.success
+				: state.pipelineStatus === "error"
+					? theme.error
+					: state.pipelineStatus === "cancelled"
+						? theme.warning
+						: theme.textDim;
+
+	const reposDone = telemetry?.repos_done ?? 0;
+	const reposTotal = telemetry?.repos_total ?? 0;
+	const repoProgress =
+		reposTotal > 0
+			? "█".repeat(Math.round((reposDone / reposTotal) * 10)) +
+			  "░".repeat(10 - Math.round((reposDone / reposTotal) * 10))
+			: "░░░░░░░░░░";
+
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Pipeline"
-				title="Live Progress"
-				description={subtitle}
-			/>
+			<TopBar step="Pipeline" title="Live Progress" description={subtitle} />
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
+
+				{/* ── Left: pipeline status panel ── */}
 				<box
-					width={44}
+					width={38}
+					flexDirection="column"
 					border
 					borderStyle="rounded"
 					borderColor={theme.goldDim}
+					title="  Pipeline  "
+					titleAlignment="center"
 					padding={2}
 					gap={1}
 				>
-					<text>
-						<span fg={theme.gold}>
-							<strong>Stage Board</strong>
-						</span>
-					</text>
+					{/* Stage timeline */}
 					{stageRows.map((row) => (
 						<text key={row.stageName}>
 							<span fg={row.color}>
-								{row.marker} {row.stageName.replace("_", " ")}
+								{row.marker}  {stageLabel[row.stageName] ?? row.stageName}
 							</span>
 						</text>
 					))}
 
-					<box marginTop={1} flexDirection="column" gap={1}>
+					{/* Status + model */}
+					<box
+						flexDirection="column"
+						gap={1}
+						borderTop
+						borderColor={theme.bgLight}
+						paddingTop={1}
+						marginTop={1}
+					>
 						<text>
-							<span fg={theme.cyan}>
-								Status: {state.pipelineStatus.toUpperCase()}
+							<span fg={theme.textDim}>Status   </span>
+							<span fg={statusColor}>
+								<strong>{state.pipelineStatus.toUpperCase()}</strong>
 							</span>
 						</text>
 						<text>
+							<span fg={theme.textDim}>Model    </span>
 							<span fg={theme.textSecondary}>
-								Model: {telemetry?.active_model || "n/a"}
+								{telemetry?.active_model || "—"}
 							</span>
 						</text>
 					</box>
 
-					<box marginTop={1} flexDirection="column" gap={1}>
+					{/* Telemetry stats */}
+					<box
+						flexDirection="column"
+						gap={1}
+						borderTop
+						borderColor={theme.bgLight}
+						paddingTop={1}
+						marginTop={1}
+					>
 						<text>
-							<span fg={theme.textDim}>
-								Repos: {telemetry?.repos_done || 0}/{telemetry?.repos_total || 0}
+							<span fg={theme.textDim}>Repos    </span>
+							<span fg={reposDone > 0 ? theme.textSecondary : theme.textDim}>
+								{reposDone} / {reposTotal}
+							</span>
+						</text>
+						{reposTotal > 0 ? (
+							<text>
+								<span fg={reposDone > 0 ? theme.cyan : theme.textDim}>
+									{repoProgress}
+								</span>
+							</text>
+						) : null}
+						<text>
+							<span fg={theme.textDim}>Facts    </span>
+							<span fg={theme.textSecondary}>
+								{telemetry?.facts_total ?? 0}
 							</span>
 						</text>
 						<text>
-							<span fg={theme.textDim}>
-								Facts: {telemetry?.facts_total || 0}
+							<span fg={theme.textDim}>Elapsed  </span>
+							<span fg={theme.textSecondary}>
+								{(telemetry?.elapsed_seconds ?? 0).toFixed(1)}s
 							</span>
 						</text>
-						<text>
-							<span fg={theme.textDim}>
-								Draft Projects: {telemetry?.draft_projects || 0}
-							</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>
-								Polished Projects: {telemetry?.polished_projects || 0}
-							</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>
-								Elapsed: {(telemetry?.elapsed_seconds || 0).toFixed(1)}s
-							</span>
-						</text>
+						{(telemetry?.draft_projects ?? 0) > 0 ? (
+							<text>
+								<span fg={theme.textDim}>Drafted  </span>
+								<span fg={theme.gold}>
+									{telemetry?.draft_projects}
+								</span>
+							</text>
+						) : null}
+						{(telemetry?.polished_projects ?? 0) > 0 ? (
+							<text>
+								<span fg={theme.textDim}>Polished </span>
+								<span fg={theme.success}>
+									{telemetry?.polished_projects}
+								</span>
+							</text>
+						) : null}
 					</box>
 				</box>
 
+				{/* ── Right: live log panel ── */}
 				<box
 					flexGrow={1}
+					flexDirection="column"
 					border
 					borderStyle="rounded"
 					borderColor={theme.cyanDim}
+					title="  Live Logs  "
+					titleAlignment="left"
 					padding={1}
-					flexDirection="column"
 				>
-					<text>
-						<span fg={theme.gold}>
-							<strong>Live Logs</strong>
-						</span>
-					</text>
+					{telemetry?.current_repo ? (
+						<box
+							borderBottom
+							borderColor={theme.bgLight}
+							paddingBottom={1}
+							marginBottom={1}
+						>
+							<text>
+								<span fg={theme.textDim}>▶  </span>
+								<span fg={theme.cyan}>{telemetry.current_repo}</span>
+							</text>
+						</box>
+					) : null}
 
 					<scrollbox
 						focused
 						style={{
 							rootOptions: { flexGrow: 1, backgroundColor: theme.bgDark },
-							wrapperOptions: { flexGrow: 1, marginTop: 1 },
+							wrapperOptions: { flexGrow: 1 },
 							viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 						}}
 					>
@@ -322,33 +390,34 @@ export function Analysis({
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={1}>
-				{telemetry?.current_repo ? (
-					<text>
-						<span fg={theme.cyan}>Current repo: {telemetry.current_repo}</span>
-					</text>
-				) : null}
-
-				{readyGate ? (
-					<text>
-						<span fg={theme.success}>
-							READY. Press Enter to continue to resume preview.
-						</span>
-					</text>
-				) : null}
-
-				{localError ? (
-					<text>
-						<span fg={theme.error}>{localError}</span>
-					</text>
-				) : null}
-
-				{isCancelling ? (
-					<text>
-						<span fg={theme.warning}>Cancelling pipeline...</span>
-					</text>
-				) : null}
-			</box>
+			{/* Status messages */}
+			{(readyGate || localError || isCancelling) ? (
+				<box
+					paddingLeft={2}
+					paddingRight={2}
+					paddingBottom={1}
+					flexDirection="column"
+					gap={1}
+				>
+					{readyGate ? (
+						<text>
+							<span fg={theme.success}>
+								✓  Done — press Enter to view your resume.
+							</span>
+						</text>
+					) : null}
+					{localError ? (
+						<text>
+							<span fg={theme.error}>{localError}</span>
+						</text>
+					) : null}
+					{isCancelling ? (
+						<text>
+							<span fg={theme.warning}>Cancelling pipeline...</span>
+						</text>
+					) : null}
+				</box>
+			) : null}
 		</box>
 	);
 }
