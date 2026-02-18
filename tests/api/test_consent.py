@@ -8,13 +8,13 @@ def test_get_consent_seeds_default_if_missing(client):
 
 
 def test_get_consent_returns_existing_state(client):
-    
-    client.put("/consent", json={"consent_level": "full"})
-    
+
+    client.put("/consent", json={"consent_level": "local-llm"})
+
     response = client.get("/consent")
     assert response.status_code == 200
     payload = response.json()
-    assert payload["consent_level"] == "full"
+    assert payload["consent_level"] == "local-llm"
     assert payload["accepted_at"] is not None
 
 
@@ -26,31 +26,31 @@ def test_get_consent_response_structure(client):
     assert "consent_level" in payload
     assert "accepted_at" in payload
     assert isinstance(payload["consent_level"], str)
-    assert payload["consent_level"] in ("full", "no_llm", "none")
+    assert payload["consent_level"] in ("none", "local", "local-llm", "cloud")
 
 
-def test_accept_full_consent(client):
-    response = client.put("/consent", json={"consent_level": "full"})
+def test_accept_local_llm_consent(client):
+    response = client.put("/consent", json={"consent_level": "local-llm"})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["consent_level"] == "full"
+    assert payload["consent_level"] == "local-llm"
     assert payload["accepted_at"] is not None
 
 
-def test_accept_no_llm_consent(client):
-    response = client.put("/consent", json={"consent_level": "no_llm"})
+def test_accept_local_consent(client):
+    response = client.put("/consent", json={"consent_level": "local"})
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["consent_level"] == "no_llm"
+    assert payload["consent_level"] == "local"
     assert payload["accepted_at"] is not None
 
 
 def test_set_consent_to_none(client):
-    
-    client.put("/consent", json={"consent_level": "full"})
-    
+
+    client.put("/consent", json={"consent_level": "local-llm"})
+
     response = client.put("/consent", json={"consent_level": "none"})
     assert response.status_code == 200
     payload = response.json()
@@ -59,18 +59,18 @@ def test_set_consent_to_none(client):
 
 
 def test_change_consent_level(client):
-    
-    client.put("/consent", json={"consent_level": "full"})
-    
-    response = client.put("/consent", json={"consent_level": "no_llm"})
+
+    client.put("/consent", json={"consent_level": "local-llm"})
+
+    response = client.put("/consent", json={"consent_level": "local"})
     assert response.status_code == 200
     payload = response.json()
-    assert payload["consent_level"] == "no_llm"
+    assert payload["consent_level"] == "local"
     assert payload["accepted_at"] is not None
 
 
 def test_accepted_at_timestamp_format(client):
-    response = client.put("/consent", json={"consent_level": "full"})
+    response = client.put("/consent", json={"consent_level": "local-llm"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -81,29 +81,29 @@ def test_accepted_at_timestamp_format(client):
 
 
 def test_multiple_updates_timestamp(client):
-    
-    response1 = client.put("/consent", json={"consent_level": "full"})
+
+    response1 = client.put("/consent", json={"consent_level": "local-llm"})
     timestamp1 = response1.json()["accepted_at"]
-    
+
     client.put("/consent", json={"consent_level": "none"})
-    
-    response2 = client.put("/consent", json={"consent_level": "no_llm"})
+
+    response2 = client.put("/consent", json={"consent_level": "local"})
     timestamp2 = response2.json()["accepted_at"]
-    
+
     assert timestamp1 != timestamp2
 
 
 def test_consent_persists_across_requests(client):
-    
-    client.put("/consent", json={"consent_level": "full"})
-    
+
+    client.put("/consent", json={"consent_level": "local-llm"})
+
     response = client.get("/consent")
     assert response.status_code == 200
-    assert response.json()["consent_level"] == "full"
-    
+    assert response.json()["consent_level"] == "local-llm"
+
     response = client.get("/consent")
     assert response.status_code == 200
-    assert response.json()["consent_level"] == "full"
+    assert response.json()["consent_level"] == "local-llm"
 
 
 def test_update_consent_with_missing_fields(client):
