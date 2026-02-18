@@ -17,6 +17,22 @@ from .models import UserFeedback
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
+def _make_run_tag(stage1: str, stage2: str, stage3: str) -> str:
+    """Generate a short tag from model names for organising output directories."""
+    import re
+
+    def shorten(name: str) -> str:
+        # Strip trailing quant suffixes: -q4, -q8, -q4_k_m, -bf16, etc.
+        return re.sub(r"[-_](?:q\d+(?:_k_[a-z]+)?|bf16)$", "", name, flags=re.IGNORECASE)
+
+    s1 = shorten(stage1)
+    s2 = shorten(stage2)
+    s3 = shorten(stage3)
+    if s2 == s3:
+        return f"{s1}__{s2}"
+    return f"{s1}__{s2}__{s3}"
+
+
 # ---------------------------------------------------------------------------
 # Display helpers
 # ---------------------------------------------------------------------------
@@ -245,14 +261,14 @@ def generate(
         help="User's email for git attribution",
     ),
     stage1_model: str = typer.Option(
-        "lfm2-2.6b-q8",
+        "qwen2.5-coder-3b-q4",
         "--stage1-model",
-        help="Model for fact extraction (default: lfm2-2.6b-q8)",
+        help="Model for fact extraction (default: qwen2.5-coder-3b-q4)",
     ),
     stage2_model: str = typer.Option(
-        "llama-3.2-3b-q4",
+        "lfm2.5-1.2b-bf16",
         "--stage2-model",
-        help="Model for draft generation (default: llama-3.2-3b-q4)",
+        help="Model for draft generation (default: lfm2.5-1.2b-bf16)",
     ),
     stage3_model: Optional[str] = typer.Option(
         None,
@@ -263,7 +279,14 @@ def generate(
         None,
         "--output-dir",
         "-o",
-        help="Directory to save outputs. Defaults to ./resume_output/",
+        help="Directory to save outputs. Defaults to ./resume_output/<tag>/",
+    ),
+    tag: Optional[str] = typer.Option(
+        None,
+        "--tag",
+        "-t",
+        help="Label for this run (default: auto-generated from model names). "
+             "Outputs go to ./resume_output/<tag>/",
     ),
     no_feedback: bool = typer.Option(
         False,
@@ -276,7 +299,7 @@ def generate(
 
     Runs a 3-stage pipeline:
 
-      1. EXTRACT + DISTILL + fact extraction  (lfm2-2.6b-q8)
+      1. EXTRACT + DISTILL + fact extraction  (qwen2.5-coder-3b-q4)
       2. First-draft generation               (--stage2-model)
       3. Polish with your feedback             (--stage3-model or --stage2-model)
 
@@ -314,8 +337,9 @@ def generate(
     # Stage 3 defaults to Stage 2 model unless overridden
     stage3_model = stage3_model or stage2_model
 
-    # Setup output directory
-    out_dir = output_dir or Path("resume_output")
+    # Determine run tag and output directory
+    run_tag = tag or _make_run_tag(stage1_model, stage2_model, stage3_model)
+    out_dir = output_dir or (Path("resume_output") / run_tag)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     def prog(msg: str) -> None:
@@ -331,6 +355,8 @@ def generate(
                 f"  Stage 3 model: [cyan]{stage3_model}[/cyan] (polish with feedback)\n\n"
                 f"  ZIP: {zip_path}\n"
                 f"  Email: {email}\n"
+                f"  Tag: [bold yellow]{run_tag}[/bold yellow]\n"
+                f"  Output: {out_dir}\n"
                 f"  Interactive: {'no' if no_feedback else 'yes'}",
                 border_style="blue",
             )
@@ -496,6 +522,7 @@ def generate(
         console.print(
             Panel(
                 f"[bold green]Generation complete![/bold green]\n\n"
+                f"  Tag: [bold yellow]{run_tag}[/bold yellow]\n"
                 f"  Time: {elapsed:.1f}s\n"
                 f"  Models: {' -> '.join(models_used)}\n"
                 f"  Stage: {final_output.stage}\n"
@@ -522,102 +549,6 @@ def generate(
         import traceback
 
         traceback.print_exc()
-        raise typer.Exit(1) from exc
-
-
-# ---------------------------------------------------------------------------
-# v2 pipeline (kept for rollback)
-# ---------------------------------------------------------------------------
-
-
-@app.command("generate-v2")
-def generate_v2(
-    zip_path: Path = typer.Option(
-        ...,
-        "--zip",
-        "-z",
-        exists=True,
-        file_okay=True,
-        dir_okay=False,
-        readable=True,
-        help="Path to ZIP file containing git repositories",
-    ),
-    email: str = typer.Option(
-        ...,
-        "--email",
-        "-e",
-        help="User's email for git attribution",
-    ),
-    model: str = typer.Option(
-        "qwen3-1.7b-q8",
-        "--model",
-        "-m",
-        help="Local GGUF model to use",
-    ),
-    output_json: Optional[Path] = typer.Option(
-        None,
-        "--output-json",
-        help="Output JSON file path",
-    ),
-    output_markdown: Optional[Path] = typer.Option(
-        None,
-        "--output-markdown",
-        "--output-md",
-        help="Output Markdown file path",
-    ),
-    verbose: bool = typer.Option(
-        False,
-        "--verbose",
-        "-v",
-        help="Show detailed progress",
-    ),
-) -> None:
-    """
-    Generate resume content using the v2 pipeline (legacy).
-
-    Kept for comparison and rollback purposes.
-    """
-    from .generate import generate_resume
-
-    def progress(msg: str) -> None:
-        if verbose:
-            typer.echo(msg)
-
-    try:
-        result = generate_resume(
-            zip_path=str(zip_path.resolve()),
-            user_email=email.lower().strip(),
-            llm_model=model,
-            progress_callback=progress if verbose else None,
-        )
-
-        markdown = result.to_markdown()
-        typer.echo("\n" + "=" * 60)
-        typer.echo(markdown)
-
-        if output_json:
-            output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(result.to_json())
-            typer.echo(f"\nJSON output written to: {output_json}")
-
-        if output_markdown:
-            output_markdown.parent.mkdir(parents=True, exist_ok=True)
-            output_markdown.write_text(markdown)
-            typer.echo(f"Markdown output written to: {output_markdown}")
-
-        typer.echo("\n" + "=" * 60)
-        typer.echo("GENERATION SUMMARY (v2)")
-        typer.echo("=" * 60)
-        typer.echo(f"Projects analyzed: {result.portfolio_facts.total_projects}")
-        typer.echo(f"Total commits: {result.portfolio_facts.total_commits}")
-        typer.echo(f"Generation time: {result.generation_time_seconds:.1f}s")
-
-    except Exception as exc:
-        typer.secho(f"Error: {exc}", fg=typer.colors.RED, err=True)
-        if verbose:
-            import traceback
-
-            traceback.print_exc()
         raise typer.Exit(1) from exc
 
 
