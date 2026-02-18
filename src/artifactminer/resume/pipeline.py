@@ -57,6 +57,9 @@ from .facts import (
 log = logging.getLogger(__name__)
 
 
+RepoProgressCallback = Callable[[int, int, str], None]
+
+
 # ---------------------------------------------------------------------------
 # Churn-complexity cross-reference helper
 # ---------------------------------------------------------------------------
@@ -433,18 +436,15 @@ def _build_portfolio(
 # ---------------------------------------------------------------------------
 
 
-def extract_and_distill(
-    zip_path: str,
+def _extract_and_distill_from_repo_paths(
+    repo_paths: List[Path],
     user_email: str,
     *,
     llm_model: str = "qwen2.5-coder-3b-q4",
     progress_callback: Optional[Callable[[str], None]] = None,
+    repo_progress_callback: Optional[RepoProgressCallback] = None,
 ) -> tuple[List[ProjectDataBundle], PortfolioDataBundle, list[str]]:
-    """
-    Run EXTRACT + DISTILL phases (deterministic, no LLM inference needed).
-
-    Returns (bundles, portfolio, errors).
-    """
+    """Run EXTRACT + DISTILL using an explicit set of repository paths."""
     errors: list[str] = []
 
     def prog(msg: str) -> None:
@@ -452,17 +452,18 @@ def extract_and_distill(
             progress_callback(msg)
         log.info(msg)
 
-    prog(f"Extracting {zip_path}...")
-    extract_dir = extract_zip(zip_path)
+    if not repo_paths:
+        raise RuntimeError("No repositories selected for analysis")
 
-    repos = discover_git_repos(extract_dir)
-    if not repos:
-        raise RuntimeError("No git repositories found in ZIP")
-    prog(f"Found {len(repos)} repositories")
+    prog(f"Found {len(repo_paths)} repositories")
 
     bundles: List[ProjectDataBundle] = []
-    for i, repo_path in enumerate(repos):
-        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
+    total_repos = len(repo_paths)
+    for i, repo_path in enumerate(repo_paths):
+        if repo_progress_callback:
+            repo_progress_callback(i, total_repos, repo_path.name)
+
+        prog(f"Analyzing [{i + 1}/{total_repos}]: {repo_path.name}")
         try:
             bundle = _extract_project(
                 repo_path,
@@ -475,6 +476,9 @@ def extract_and_distill(
             error_msg = f"Error analyzing {repo_path.name}: {e}"
             prog(f"  ERROR: {error_msg}")
             errors.append(error_msg)
+        finally:
+            if repo_progress_callback:
+                repo_progress_callback(i + 1, total_repos, repo_path.name)
 
     if not bundles:
         raise RuntimeError("No repositories could be analyzed")
@@ -491,6 +495,57 @@ def extract_and_distill(
     return bundles, portfolio, errors
 
 
+def extract_and_distill_for_repos(
+    repo_paths: List[str | Path],
+    user_email: str,
+    *,
+    llm_model: str = "qwen2.5-coder-3b-q4",
+    progress_callback: Optional[Callable[[str], None]] = None,
+    repo_progress_callback: Optional[RepoProgressCallback] = None,
+) -> tuple[List[ProjectDataBundle], PortfolioDataBundle, list[str]]:
+    """Public helper to run EXTRACT + DISTILL for selected repositories only."""
+    normalized_paths = [Path(p).resolve() for p in repo_paths]
+    return _extract_and_distill_from_repo_paths(
+        normalized_paths,
+        user_email,
+        llm_model=llm_model,
+        progress_callback=progress_callback,
+        repo_progress_callback=repo_progress_callback,
+    )
+
+
+def extract_and_distill(
+    zip_path: str,
+    user_email: str,
+    *,
+    llm_model: str = "qwen2.5-coder-3b-q4",
+    progress_callback: Optional[Callable[[str], None]] = None,
+) -> tuple[List[ProjectDataBundle], PortfolioDataBundle, list[str]]:
+    """
+    Run EXTRACT + DISTILL phases (deterministic, no LLM inference needed).
+
+    Returns (bundles, portfolio, errors).
+    """
+
+    def prog(msg: str) -> None:
+        if progress_callback:
+            progress_callback(msg)
+        log.info(msg)
+
+    prog(f"Extracting {zip_path}...")
+    extract_dir = extract_zip(zip_path)
+
+    repos = discover_git_repos(extract_dir)
+    if not repos:
+        raise RuntimeError("No git repositories found in ZIP")
+    return _extract_and_distill_from_repo_paths(
+        repos,
+        user_email,
+        llm_model=llm_model,
+        progress_callback=progress_callback,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Multi-stage pipeline — programmatic entry point
 # ---------------------------------------------------------------------------
@@ -503,6 +558,7 @@ def generate_resume_v3_multistage(
     stage1_model: str = "qwen2.5-coder-3b-q4",
     stage2_model: str = "lfm2.5-1.2b-bf16",
     stage3_model: str = "lfm2.5-1.2b-bf16",
+    selected_repo_paths: Optional[List[str | Path]] = None,
     user_feedback: Optional[UserFeedback] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> ResumeOutput:
@@ -566,42 +622,22 @@ def generate_resume_v3_multistage(
         ensure_model_available(model_name)
 
     # ── PHASE 1: EXTRACT + DISTILL ───────────────────────────────────
-    prog(f"Extracting {zip_path}...")
-    extract_dir = extract_zip(zip_path)
-    prog(f"Extracted to {extract_dir}")
-
-    repos = discover_git_repos(extract_dir)
-    if not repos:
-        raise RuntimeError("No git repositories found in ZIP")
-    prog(f"Found {len(repos)} repositories")
-
-    bundles: List[ProjectDataBundle] = []
-    for i, repo_path in enumerate(repos):
-        prog(f"Analyzing [{i + 1}/{len(repos)}]: {repo_path.name}")
-        try:
-            bundle = _extract_project(
-                repo_path,
-                user_email,
-                llm_model=stage1_model,
-                progress=prog,
-            )
-            bundles.append(bundle)
-        except Exception as e:
-            error_msg = f"Error analyzing {repo_path.name}: {e}"
-            prog(f"  ERROR: {error_msg}")
-            errors.append(error_msg)
-
-    if not bundles:
-        raise RuntimeError("No repositories could be analyzed")
-
-    portfolio = _build_portfolio(user_email, bundles)
-    prog(
-        f"Portfolio: {portfolio.total_projects} projects, "
-        f"{len(portfolio.top_skills)} skills"
-    )
-
-    # Skip distillation - give raw context to LLM for better output quality
-    # Removing distillation allows the LLM to see more context
+    if selected_repo_paths:
+        prog(f"Using selected repository subset ({len(selected_repo_paths)})")
+        bundles, portfolio, extract_errors = extract_and_distill_for_repos(
+            selected_repo_paths,
+            user_email,
+            llm_model=stage1_model,
+            progress_callback=progress_callback,
+        )
+    else:
+        bundles, portfolio, extract_errors = extract_and_distill(
+            zip_path,
+            user_email,
+            llm_model=stage1_model,
+            progress_callback=progress_callback,
+        )
+    errors.extend(extract_errors)
 
     # ── STAGE 1: DATA CARD COMPILATION (deterministic) ────────────────
     prog("Stage 1: Compiling data cards (deterministic)...")
