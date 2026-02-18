@@ -104,9 +104,9 @@ def evaluate_multistage_pipeline(
     user_email: str,
     *,
     runs: int = 1,
-    stage1_model: str = "lfm2-2.6b-q8",
-    stage2_model: str = "qwen3-1.7b-q8",
-    stage3_model: str = "qwen3-1.7b-q8",
+    stage1_model: str = "qwen2.5-coder-3b-q4",
+    stage2_model: str = "lfm2.5-1.2b-bf16",
+    stage3_model: str = "lfm2.5-1.2b-bf16",
     output_dir: str = "resume_output/eval",
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> dict[str, Any]:

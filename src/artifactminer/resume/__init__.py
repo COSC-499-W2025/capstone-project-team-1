@@ -16,13 +16,7 @@ from .pipeline import generate_resume_v3_multistage, extract_and_distill
 from .models import ProjectDataBundle, PortfolioDataBundle, ResumeOutput
 from .assembler import assemble_markdown, assemble_json
 
-# v2 pipeline (kept for rollback)
-from .generate import generate_resume, GenerationResult
-from .facts import ProjectFacts, PortfolioFacts
-from .enhance import ResumeContent
-
 __all__ = [
-    # v3 multi-stage pipeline
     "generate_resume_v3_multistage",
     "extract_and_distill",
     "ProjectDataBundle",
@@ -30,10 +24,4 @@ __all__ = [
     "ResumeOutput",
     "assemble_markdown",
     "assemble_json",
-    # v2 (legacy)
-    "generate_resume",
-    "GenerationResult",
-    "ProjectFacts",
-    "PortfolioFacts",
-    "ResumeContent",
 ]
