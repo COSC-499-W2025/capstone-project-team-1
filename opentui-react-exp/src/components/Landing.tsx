@@ -29,7 +29,11 @@ const glowColors = [
     "#FFDF33",
 ];
 
-export function Landing() {
+interface LandingProps {
+    onReady?: () => void;
+}
+
+export function Landing({ onReady }: LandingProps) {
     // Typewriter title state
     const [titleText, setTitleText] = useState("");
     const [titlePhase, setTitlePhase] = useState<
@@ -83,6 +87,10 @@ export function Landing() {
             }
         };
     }, [titleIndex, titlePhase, titleText]);
+
+    useEffect(() => {
+        if (enableCtaRipple) onReady?.();
+    }, [enableCtaRipple, onReady]);
 
     // Pulsing glow effect on button border
     useEffect(() => {
@@ -187,10 +195,10 @@ export function Landing() {
                         borderStyle="rounded"
                         borderColor={glowColors[glowIndex]}
                         backgroundColor="#000000"
-                        paddingLeft={4}
-                        paddingRight={4}
-                        paddingTop={1}
-                        paddingBottom={1}
+                        paddingLeft={2}
+                        paddingRight={2}
+                        paddingTop={0}
+                        paddingBottom={0}
                         style={{ opacity: ctaOpacity }}
                     >
                         <text>
