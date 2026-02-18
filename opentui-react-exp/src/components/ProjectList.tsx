@@ -129,7 +129,6 @@ export function ProjectList({
 						<select
 							options={repos.map((repo) => ({
 								name: `${selectedSet.has(repo.id) ? "[x]" : "[ ]"} ${repo.name}`,
-								description: repo.rel_path,
 								value: repo.id,
 							}))}
 							onChange={(index) => setSelectedIndex(index)}
@@ -137,6 +136,8 @@ export function ProjectList({
 							focused
 							height={18}
 							showScrollIndicator
+							itemSpacing={0}
+							showDescription={false}
 						/>
 					) : (
 						<box padding={1}>
@@ -211,11 +212,6 @@ export function ProjectList({
 						<span fg={theme.error}>{message}</span>
 					</text>
 				) : null}
-				<text>
-					<span fg={theme.textDim}>
-						Space toggles, A selects all, N clears, Enter continues.
-					</span>
-				</text>
 			</box>
 		</box>
 	);
