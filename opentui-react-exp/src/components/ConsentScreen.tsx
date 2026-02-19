@@ -17,11 +17,13 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
+		let ignore = false;
 		api.getConsent().then((resp) => {
-			if (resp.consent_level !== "none") {
+			if (!ignore && resp.consent_level !== "none") {
 				setSelected(resp.consent_level);
 			}
-		}).catch(() => {});
+		}).catch((err) => { console.error("Failed to load consent:", err); });
+		return () => { ignore = true; };
 	}, []);
 
 	useKeyboard((key) => {
