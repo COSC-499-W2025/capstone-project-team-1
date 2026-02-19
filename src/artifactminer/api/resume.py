@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Body, Depends, HTTPException, Path as ApiPath
 from sqlalchemy.orm import Session
 
-from ..db import get_db, ProjectEvidence, RepoStat, ResumeItem
+from ..db import get_db, ProjectEvidence, RepoStat, ResumeItem, UserRepoStat
 from .schemas import (
     ResumeItemResponse,
     ResumeGenerationRequest,
@@ -311,11 +311,25 @@ async def edit_resume_item(
             detail=f"Failed to update resume item: {type(e).__name__}: {str(e)}",
         )
 
+    role: str | None = None
+    if repo_stat:
+        latest_user_stat = (
+            db.query(UserRepoStat)
+            .filter(
+                UserRepoStat.project_name == repo_stat.project_name,
+                UserRepoStat.project_path == repo_stat.project_path,
+            )
+            .order_by(UserRepoStat.id.desc())
+            .first()
+        )
+        role = latest_user_stat.user_role if latest_user_stat else None
+
     return ResumeItemResponse(
         id=resume_item.id,
         title=resume_item.title,
         content=resume_item.content,
         category=resume_item.category,
         project_name=repo_stat.project_name if repo_stat else None,
+        role=role,
         created_at=resume_item.created_at,
     )
