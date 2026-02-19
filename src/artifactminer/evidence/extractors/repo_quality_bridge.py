@@ -63,8 +63,8 @@ def repo_quality_to_evidence(
     if not quality.has_tests:
         items.append(EvidenceItem(
             type="test_coverage",
-            content="Test coverage below 80%: 0.0%",
-            source="test_coverage_signals",
+            content="No test files detected in repository",
+            source="repo_quality_signals",
             date=evidence_date,
         ))
 
