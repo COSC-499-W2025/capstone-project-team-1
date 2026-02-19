@@ -313,7 +313,7 @@ class ResumeItemEditRequest(BaseModel):
         default=None, min_length=1, description="New content for the resume item."
     )
     category: str | None = Field(
-        default=None, description="New category for the resume item."
+        default=None, min_length=1, description="New category for the resume item."
     )
 
     @model_validator(mode="after")
