@@ -301,8 +301,15 @@ async def edit_resume_item(
     if request.category is not None:
         resume_item.category = request.category
 
-    db.commit()
-    db.refresh(resume_item)
+    try:
+        db.commit()
+        db.refresh(resume_item)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update resume item: {type(e).__name__}: {str(e)}",
+        )
 
     return ResumeItemResponse(
         id=resume_item.id,
