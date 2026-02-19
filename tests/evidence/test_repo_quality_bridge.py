@@ -92,8 +92,8 @@ def test_repo_quality_to_evidence_negative_coverage():
 
     cov_item = next((i for i in result if i.type == "test_coverage"), None)
     assert cov_item is not None
-    assert "0.0%" in cov_item.content
-    assert cov_item.source == "test_coverage_signals"
+    assert cov_item.content == "No test files detected in repository"
+    assert cov_item.source == "repo_quality_signals"
 
 
 def test_repo_quality_to_evidence_negative_docs():
