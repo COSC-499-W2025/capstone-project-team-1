@@ -8,7 +8,6 @@ from typing import Any, Dict, Set
 import git
 
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo
-from artifactminer.RepositoryIntelligence.repo_intelligence_user import getUserRepoStats
 
 
 def get_git_stats(
@@ -36,6 +35,10 @@ def get_git_stats(
 
     if user_stats is None:
         try:
+            from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
+                getUserRepoStats,
+            )
+
             user_stats = getUserRepoStats(repo_path, user_email)
         except Exception:
             return {}

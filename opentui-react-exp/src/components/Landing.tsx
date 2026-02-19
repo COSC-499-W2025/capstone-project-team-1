@@ -2,10 +2,6 @@ import { useEffect, useState } from "react";
 // import { TopBar } from "./TopBar";
 import { theme } from "../types";
 
-interface LandingProps {
-    onGetStarted: () => void;
-}
-
 const SUBTITLE_OPTIONS = [
     // "Projects become portfolio",
     "We build your narrative",
@@ -33,7 +29,11 @@ const glowColors = [
     "#FFDF33",
 ];
 
-export function Landing({ onGetStarted }: LandingProps) {
+interface LandingProps {
+    onReady?: () => void;
+}
+
+export function Landing({ onReady }: LandingProps) {
     // Typewriter title state
     const [titleText, setTitleText] = useState("");
     const [titlePhase, setTitlePhase] = useState<
@@ -88,11 +88,15 @@ export function Landing({ onGetStarted }: LandingProps) {
         };
     }, [titleIndex, titlePhase, titleText]);
 
+    useEffect(() => {
+        if (enableCtaRipple) onReady?.();
+    }, [enableCtaRipple, onReady]);
+
     // Pulsing glow effect on button border
     useEffect(() => {
         const glowInterval = setInterval(() => {
             setGlowIndex((i) => (i + 1) % glowColors.length);
-        }, 400);
+        }, 650);
         return () => clearInterval(glowInterval);
     }, []);
 
@@ -110,7 +114,7 @@ export function Landing({ onGetStarted }: LandingProps) {
 
         const rippleInterval = setInterval(() => {
             setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
-        }, 60);
+        }, 90);
 
         return () => {
             clearInterval(rippleInterval);
@@ -118,9 +122,11 @@ export function Landing({ onGetStarted }: LandingProps) {
         };
     }, [enableCtaRipple]);
 
-    const renderCtaText = () =>
-        CTA_TEXT.split("").map((char, i) => {
-            const distance = Math.abs(i - rippleIndex);
+    const renderCtaText = () => {
+        const spans = [];
+        let position = 0;
+        for (const char of CTA_TEXT) {
+            const distance = Math.abs(position - rippleIndex);
 
             let color: string;
             if (distance === 0) {
@@ -133,12 +139,15 @@ export function Landing({ onGetStarted }: LandingProps) {
                 color = theme.goldDark;
             }
 
-            return (
-                <span key={i} fg={color}>
+            spans.push(
+                <span key={`cta-${char}-${distance}-${position}`} fg={color}>
                     {char}
-                </span>
+                </span>,
             );
-        });
+            position += 1;
+        }
+        return spans;
+    };
 
     const renderTitle = () => {
         if (titleIndex === 0) {
@@ -185,12 +194,11 @@ export function Landing({ onGetStarted }: LandingProps) {
                         border
                         borderStyle="rounded"
                         borderColor={glowColors[glowIndex]}
-                        backgroundColor="#1a1a00"
-                        paddingLeft={4}
-                        paddingRight={4}
-                        paddingTop={1}
-                        paddingBottom={1}
-                        onMouseDown={onGetStarted}
+                        backgroundColor="#000000"
+                        paddingLeft={2}
+                        paddingRight={2}
+                        paddingTop={0}
+                        paddingBottom={0}
                         style={{ opacity: ctaOpacity }}
                     >
                         <text>

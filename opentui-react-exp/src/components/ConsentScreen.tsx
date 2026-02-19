@@ -1,186 +1,166 @@
+import { useEffect, useState } from "react";
 import { useKeyboard } from "@opentui/react";
-import { useState } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
-interface ConsentScreenProps {
-	onContinue: (useLLM: boolean) => void;
+interface ConsentPolicyScreenProps {
+	onContinue: () => void;
 	onBack: () => void;
+	onHintChange: (hint: string) => void;
 }
 
-type Selection = "cloud" | "offline";
+export function ConsentScreen({
+	onContinue,
+	onBack,
+	onHintChange,
+}: ConsentPolicyScreenProps) {
+	const [checked, setChecked] = useState(false);
 
-export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-	const [selected, setSelected] = useState<Selection>("offline");
+	useEffect(() => {
+		onHintChange(
+			checked
+				? "You're all set — press Enter to continue"
+				: "Check the box to confirm you're happy to proceed",
+		);
+	}, [checked, onHintChange]);
 
 	useKeyboard((key) => {
-		if (key.name === "left" || key.name === "right") {
-			setSelected((prev) => (prev === "cloud" ? "offline" : "cloud"));
+		if (key.name === "space") {
+			setChecked((prev) => !prev);
 		}
-		if (key.name === "return") {
-			onContinue(selected === "cloud");
+		if ((key.name === "return" || key.name === "enter") && checked) {
+			onContinue();
 		}
 		if (key.name === "escape") {
 			onBack();
 		}
 	});
 
-	const isCloudSelected = selected === "cloud";
-	const isOfflineSelected = selected === "offline";
-
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
-				step="Privacy"
-				title="Settings"
-				description="Choose how your project metadata is analyzed."
+				step="Policy"
+				title="Local Processing Consent"
+				description="Everything stays on your machine — here's exactly what happens."
 			/>
 
-			{/* Main split-screen container */}
-			<box
-				flexGrow={1}
-				flexDirection="row"
-				gap={1}
-				paddingLeft={2}
-				paddingRight={2}
-				paddingBottom={2}
-			>
-				{/* Cloud Analysis Panel */}
+			<box flexGrow={1} justifyContent="center" alignItems="center" padding={2}>
 				<box
-					flexGrow={1}
+					width={88}
 					flexDirection="column"
-					padding={2}
 					border
-					borderStyle={isCloudSelected ? "rounded" : "rounded"}
-					borderColor={isCloudSelected ? theme.gold : theme.textDim}
-					backgroundColor={isCloudSelected ? theme.bgMedium : theme.bgDark}
+					borderStyle="rounded"
+					borderColor={theme.goldDim}
+					padding={2}
 					gap={1}
 				>
+					{/* Intro */}
 					<text>
-						<span fg={isCloudSelected ? theme.gold : theme.textSecondary}>
-							<strong>Cloud Analysis</strong>
+						<span fg={theme.textSecondary}>
+							We read your repos locally, run a small AI model on your machine,
+							and hand you a resume. Nothing leaves your device.
 						</span>
 					</text>
 
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Pros:</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Enhanced skill detection</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Smarter summaries</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Better project insights</span>
-						</text>
+					{/* Two mini-cards */}
+					<box flexDirection="row" gap={2} marginTop={1}>
+						{/* Left card: What we read */}
+						<box
+							flexGrow={1}
+							flexDirection="column"
+							border
+							borderStyle="rounded"
+							borderColor={theme.cyanDim}
+							padding={1}
+							gap={1}
+						>
+							<text>
+								<span fg={theme.cyan}>
+									<strong>What we read</strong>
+								</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>· README files (up to 2,000 chars)</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>· Your commit messages</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>· Folder structure & file names</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>· Code metrics & skill timeline</span>
+							</text>
+						</box>
+
+						{/* Right card: What AI sees + Where it runs */}
+						<box
+							flexGrow={1}
+							flexDirection="column"
+							border
+							borderStyle="rounded"
+							borderColor={theme.goldDim}
+							padding={1}
+							gap={1}
+						>
+							<text>
+								<span fg={theme.gold}>
+									<strong>What the AI sees</strong>
+								</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>
+									Summaries & metrics only — never
+								</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>your raw source code.</span>
+							</text>
+							<text>
+								<span fg={theme.textDim}>
+									Commit messages only reach the AI
+								</span>
+							</text>
+							<text>
+								<span fg={theme.textDim}>if our classifier can't label them.</span>
+							</text>
+
+							<box marginTop={1} flexDirection="column" gap={1}>
+								<text>
+									<span fg={theme.gold}>
+										<strong>Where it runs</strong>
+									</span>
+								</text>
+								<text>
+									<span fg={theme.textSecondary}>
+										A local model on your machine.
+									</span>
+								</text>
+								<text>
+									<span fg={theme.textSecondary}>No cloud. Nothing leaves here.</span>
+								</text>
+								<text>
+									<span fg={theme.textDim}>~/.artifactminer/models/</span>
+								</text>
+							</box>
+						</box>
 					</box>
 
-					<box flexDirection="column" gap={1}>
+					{/* Checkbox */}
+					<box marginTop={1} flexDirection="row" gap={1}>
 						<text>
-							<span fg={theme.textDim}>Cons:</span>
+							<span fg={checked ? theme.success : theme.textDim}>
+								{checked ? "[✓]" : "[ ]"}
+							</span>
 						</text>
 						<text>
-							<span fg={theme.warning}> - Requires network</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Metadata sent to OpenAI</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Less privacy</span>
-						</text>
-					</box>
-
-					<box marginTop={1} paddingTop={1}>
-						<text>
-							<span fg={theme.textDim}>─────────────────────────</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>
-								Sends: file names, commit messages, technology names
+							<span fg={theme.textSecondary}>
+								{"  "}I'm happy for this run to process my repos locally.
 							</span>
 						</text>
 					</box>
+
 				</box>
-
-				{/* Offline Analysis Panel */}
-				<box
-					flexGrow={1}
-					flexDirection="column"
-					padding={2}
-					border
-					borderStyle={isOfflineSelected ? "rounded" : "rounded"}
-					borderColor={isOfflineSelected ? theme.gold : theme.textDim}
-					backgroundColor={isOfflineSelected ? theme.bgMedium : theme.bgDark}
-					gap={1}
-				>
-					<text>
-						<span fg={isOfflineSelected ? theme.gold : theme.textSecondary}>
-							<strong>Offline</strong>
-						</span>
-					</text>
-
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Pros:</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + All processing local</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + Complete privacy</span>
-						</text>
-						<text>
-							<span fg={theme.success}> + No data transmitted</span>
-						</text>
-					</box>
-
-					<box flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.textDim}>Cons:</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Pattern-based analysis</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Less detailed insights</span>
-						</text>
-						<text>
-							<span fg={theme.warning}> - Basic skill detection</span>
-						</text>
-					</box>
-
-					<box marginTop={1} paddingTop={1}>
-						<text>
-							<span fg={theme.textDim}>─────────────────────────</span>
-						</text>
-						<text>
-							<span fg={theme.textDim}>
-								All analysis happens on your machine. Zero external calls.
-							</span>
-						</text>
-					</box>
-				</box>
-			</box>
-
-			{/* Demo Mode Banner */}
-			<box
-				height={3}
-				border
-				borderStyle="single"
-				borderColor={theme.error}
-				paddingLeft={2}
-				paddingRight={2}
-				paddingTop={1}
-				paddingBottom={1}
-			>
-				<text>
-					<span fg={theme.goldDark}>Demo Mode:</span>
-					<span fg={theme.textDim}> Press </span>
-					<span fg={theme.cyan}>Enter</span>
-					<span fg={theme.textDim}> to continue</span>
-				</text>
 			</box>
 		</box>
 	);

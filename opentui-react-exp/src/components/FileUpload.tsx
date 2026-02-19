@@ -2,8 +2,9 @@ import { useKeyboard } from "@opentui/react";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { api } from "../api/endpoints";
+import type { PipelineIntakeResponse } from "../api/types";
 import { theme } from "../types";
-import { TopBar } from "./TopBar";
 import {
 	scanForZips,
 	buildEntries,
@@ -11,51 +12,60 @@ import {
 	getMatchCount,
 	pathToBreadcrumbs,
 	formatSize,
+	toErrorMessage,
 	type ZipFile,
 	type DirEntry,
 	type SearchableEntry,
 } from "../utils";
+import { TopBar } from "./TopBar";
 
 interface FileUploadProps {
-	onSubmit: (path: string) => void;
+	onIntakeCreated: (zipPath: string, intake: PipelineIntakeResponse) => void;
 	onBack: () => void;
-	/** Root path to scan for ZIPs. Defaults to homedir() */
 	scanRoot?: string;
 }
 
 type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
-export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
+export function FileUpload({
+	onIntakeCreated,
+	onBack,
+	scanRoot,
+}: FileUploadProps) {
 	const rootPath = scanRoot || homedir();
 	const [currentPath, setCurrentPath] = useState(rootPath);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchFocused, setIsSearchFocused] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-	// Global ZIP scan state
 	const [allZips, setAllZips] = useState<ZipFile[]>([]);
 	const [scanStatus, setScanStatus] = useState<ScanStatus>("idle");
 	const scanAbortRef = useRef<boolean>(false);
 
-	// Scan filesystem for all ZIP files
 	const doScan = useCallback(async () => {
 		setScanStatus("scanning");
-		setAllZips([]); // Clear old data before new scan
+		setAllZips([]);
 		scanAbortRef.current = false;
+		setErrorMessage(null);
 
 		const result = await scanForZips({ rootPath });
 
-		if (scanAbortRef.current) return;
+		if (scanAbortRef.current) {
+			return;
+		}
 
 		if (result.error) {
 			setScanStatus("error");
-		} else {
-			setAllZips(result.zips);
-			setScanStatus("complete");
+			setErrorMessage(result.error);
+			return;
 		}
+
+		setAllZips(result.zips);
+		setScanStatus("complete");
 	}, [rootPath]);
 
-	// Start scan on mount
 	useEffect(() => {
 		doScan();
 		return () => {
@@ -63,31 +73,55 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 		};
 	}, [doScan]);
 
-	// Build entries for current directory view
 	const entries = useMemo(() => {
 		return buildEntries(allZips, currentPath, rootPath);
 	}, [allZips, currentPath, rootPath]);
 
-	// Filter entries based on search
 	const filteredEntries = useMemo(() => {
 		return filterEntries(entries, searchQuery);
 	}, [entries, searchQuery]);
 
-	// Reset selection when entries change
 	useEffect(() => {
+		if (filteredEntries.length < 0 || !currentPath) {
+			return;
+		}
 		setSelectedIndex(0);
 	}, [filteredEntries.length, currentPath]);
 
-	// Reset search when changing directories
 	useEffect(() => {
+		if (!currentPath) {
+			return;
+		}
 		setSearchQuery("");
 		setIsSearchFocused(false);
 	}, [currentPath]);
 
 	const selectedEntry = filteredEntries[selectedIndex];
 
-	const handleSelect = () => {
-		if (!selectedEntry) return;
+	const submitZip = useCallback(
+		async (zipPath: string) => {
+			if (isSubmitting) {
+				return;
+			}
+
+			setIsSubmitting(true);
+			setErrorMessage(null);
+			try {
+				const intake = await api.createPipelineIntake(zipPath);
+				onIntakeCreated(zipPath, intake);
+			} catch (error) {
+				setErrorMessage(toErrorMessage(error));
+			} finally {
+				setIsSubmitting(false);
+			}
+		},
+		[isSubmitting, onIntakeCreated],
+	);
+
+	const handleSelect = useCallback(() => {
+		if (!selectedEntry || isSubmitting) {
+			return;
+		}
 
 		if ("isParent" in selectedEntry && selectedEntry.isParent) {
 			setCurrentPath(dirname(currentPath));
@@ -95,42 +129,65 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 		}
 
 		if ("type" in selectedEntry && selectedEntry.type === "zip") {
-			onSubmit(selectedEntry.fullPath);
+			void submitZip(selectedEntry.fullPath);
 			return;
 		}
 
 		if ("zipCount" in selectedEntry) {
 			setCurrentPath(selectedEntry.fullPath);
 		}
-	};
+	}, [currentPath, isSubmitting, selectedEntry, submitZip]);
 
 	useKeyboard((key) => {
 		if (key.name === "backspace" && currentPath !== rootPath && !isSearchFocused) {
 			setCurrentPath(dirname(currentPath));
 		}
+
 		if (key.sequence === "/" && !isSearchFocused) {
 			setIsSearchFocused(true);
 		}
+
 		if (key.name === "escape" && isSearchFocused) {
 			if (searchQuery) {
 				setSearchQuery("");
 			} else {
 				setIsSearchFocused(false);
 			}
+			return;
 		}
-		if (key.name === "return" && isSearchFocused) {
+
+		if (key.name === "escape" && !isSearchFocused && !isSubmitting) {
+			onBack();
+			return;
+		}
+
+		if ((key.name === "return" || key.name === "enter") && isSearchFocused) {
 			setIsSearchFocused(false);
 		}
+
 		if (key.name === "r" && key.ctrl) {
-			doScan();
+			void doScan();
 		}
 	});
 
 	const breadcrumbs = pathToBreadcrumbs(currentPath);
+	const breadcrumbItems = useMemo(() => {
+		const counts = new Map<string, number>();
+		let position = 0;
+		return breadcrumbs.map((crumb) => {
+			position += 1;
+			const nextCount = (counts.get(crumb) || 0) + 1;
+			counts.set(crumb, nextCount);
+			return {
+				crumb,
+				isLast: position === breadcrumbs.length,
+				key: `${crumb}-${nextCount}`,
+			};
+		});
+	}, [breadcrumbs]);
 
-	// Get display info for each entry
 	const getEntryDisplay = (
-		entry: SearchableEntry
+		entry: SearchableEntry,
 	): { icon: string; name: string; description: string } => {
 		if ("isParent" in entry && entry.isParent) {
 			return { icon: "", name: "..", description: "Parent directory" };
@@ -138,15 +195,18 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 
 		if ("type" in entry && entry.type === "zip") {
 			const sizeStr = entry.size !== undefined ? formatSize(entry.size) : "";
-			return { icon: "📦", name: entry.name, description: sizeStr };
+			return { icon: "", name: entry.name, description: sizeStr };
 		}
 
 		const dirEntry = entry as DirEntry;
 		const zipLabel = dirEntry.zipCount === 1 ? "1 ZIP" : `${dirEntry.zipCount} ZIPs`;
-		return { icon: "📁", name: dirEntry.name, description: zipLabel };
+		return { icon: "", name: dirEntry.name, description: zipLabel };
 	};
 
 	const getScanStatusText = (): string => {
+		if (isSubmitting) {
+			return "Preparing intake...";
+		}
 		switch (scanStatus) {
 			case "scanning":
 				return "Scanning...";
@@ -163,8 +223,8 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				step="Step 1"
-				title="Select Projects"
-				description="Browse for your project zip file"
+				title="Choose Intake ZIP"
+				description="Select exactly one ZIP to start a local pipeline run"
 			/>
 
 			<box flexGrow={1} flexDirection="column" padding={1}>
@@ -175,7 +235,6 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 					borderColor={theme.gold}
 					flexDirection="column"
 				>
-					{/* Search Bar */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
@@ -184,9 +243,12 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 						flexDirection="column"
 						gap={1}
 					>
-						<box flexDirection="row" justifyContent="flex-end">
+						<box flexDirection="row" justifyContent="space-between">
 							<text>
-								<span fg={scanStatus === "scanning" ? theme.gold : theme.success}>
+								<span fg={theme.textDim}>Root: {rootPath}</span>
+							</text>
+							<text>
+								<span fg={isSubmitting ? theme.warning : theme.success}>
 									{getScanStatusText()}
 								</span>
 							</text>
@@ -203,26 +265,31 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 							gap={1}
 						>
 							<text>
-								<span fg={isSearchFocused ? theme.cyan : theme.textDim}>🔍</span>
+								<span fg={isSearchFocused ? theme.cyan : theme.textDim}>◉</span>
 							</text>
 							<input
 								value={searchQuery}
 								onChange={setSearchQuery}
-								placeholder="Search for ZIP files..."
+								placeholder="Search ZIP files"
 								focused={isSearchFocused}
-								width={60}
+								width={58}
 							/>
-							{searchQuery && (
+							{searchQuery ? (
 								<text>
 									<span fg={theme.cyan}>
 										{getMatchCount(filteredEntries)} matches
 									</span>
 								</text>
-							)}
+							) : null}
 						</box>
+
+						{errorMessage ? (
+							<text>
+								<span fg={theme.error}>{errorMessage}</span>
+							</text>
+						) : null}
 					</box>
 
-					{/* File List */}
 					<box flexGrow={1} paddingLeft={1} paddingRight={1}>
 						{scanStatus === "scanning" ? (
 							<box padding={1}>
@@ -234,7 +301,9 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 							<box padding={1}>
 								<text>
 									<span fg={theme.textDim}>
-										{searchQuery ? "No matches found" : "No ZIP files in this location"}
+										{searchQuery
+											? "No matches found"
+											: "No ZIP files in this location"}
 									</span>
 								</text>
 							</box>
@@ -243,7 +312,9 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 								options={filteredEntries.map((entry) => {
 									const display = getEntryDisplay(entry);
 									return {
-										name: display.icon ? `${display.icon} ${display.name}` : display.name,
+										name: display.icon
+											? `${display.icon} ${display.name}`
+											: display.name,
 										description: display.description,
 										value: entry.fullPath || entry.name,
 									};
@@ -251,14 +322,14 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 								onChange={(index) => setSelectedIndex(index)}
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
-								focused={!isSearchFocused}
+								focused={!isSearchFocused && !isSubmitting}
 								height={16}
 								showScrollIndicator
+								rowGap={1}
 							/>
 						)}
 					</box>
 
-					{/* Breadcrumb Bar */}
 					<box
 						paddingLeft={2}
 						paddingRight={2}
@@ -269,32 +340,51 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 						alignItems="center"
 					>
 						<text>
-							{breadcrumbs.map((crumb, i) => (
-								<>
-									<span
-										key={i}
-										fg={i === breadcrumbs.length - 1 ? theme.cyan : theme.textSecondary}
-									>
-										{crumb === "/" ? "~" : crumb}
-									</span>
-									{i < breadcrumbs.length - 1 && (
+							{breadcrumbItems.map((crumb) => (
+								<span
+									key={crumb.key}
+									fg={
+										crumb.isLast
+											? theme.cyan
+											: theme.textSecondary
+									}
+								>
+									{crumb.crumb === "/" ? "~" : crumb.crumb}
+									{!crumb.isLast ? (
 										<span fg={theme.textDim}> / </span>
-									)}
-								</>
+									) : null}
+								</span>
 							))}
 						</text>
-						{selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? (
-							<text>
-								<span fg={theme.success}>⏎ Select this ZIP</span>
-							</text>
-						) : selectedEntry && "zipCount" in selectedEntry && !("isParent" in selectedEntry && selectedEntry.isParent) ? (
-							<text>
-								<span fg={theme.textDim}>⏎ Open folder</span>
-							</text>
-						) : null}
+
+						{textHint(selectedEntry)}
 					</box>
 				</box>
 			</box>
 		</box>
 	);
+}
+
+function textHint(selectedEntry: SearchableEntry | undefined) {
+	if (!selectedEntry) {
+		return null;
+	}
+
+	if ("type" in selectedEntry && selectedEntry.type === "zip") {
+		return (
+			<text>
+				<span fg={theme.success}>Enter Select ZIP</span>
+			</text>
+		);
+	}
+
+	if ("zipCount" in selectedEntry && !("isParent" in selectedEntry && selectedEntry.isParent)) {
+		return (
+			<text>
+				<span fg={theme.textDim}>Enter Open folder</span>
+			</text>
+		);
+	}
+
+	return null;
 }

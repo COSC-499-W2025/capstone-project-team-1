@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime as _dt
 from datetime import datetime, UTC
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -393,6 +393,132 @@ class ResumeGenerationResponse(BaseModel):
         default_factory=list,
         description="List of non-critical warnings encountered during generation.",
     )
+
+
+PipelineJobStatus = Literal[
+    "queued",
+    "running",
+    "draft_ready",
+    "polishing",
+    "complete",
+    "error",
+    "cancelled",
+]
+
+PipelineStage = Literal["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3", "DONE"]
+
+
+class PipelineRepoCandidate(BaseModel):
+    """A repository discovered from an intake ZIP."""
+
+    id: str
+    name: str
+    rel_path: str
+
+
+class PipelineIntakeCreateRequest(BaseModel):
+    """Request payload to create an ephemeral intake from a ZIP path."""
+
+    zip_path: str = Field(min_length=1)
+
+
+class PipelineIntakeCreateResponse(BaseModel):
+    """Response payload for intake creation and repository discovery."""
+
+    intake_id: str
+    zip_path: str
+    repos: list[PipelineRepoCandidate]
+
+
+class PipelineContributorsRequest(BaseModel):
+    """Request payload for contributor discovery over selected repos."""
+
+    repo_ids: list[str] = Field(min_length=1)
+
+
+class PipelineContributorIdentity(BaseModel):
+    """Identity candidate derived from git history."""
+
+    email: str
+    name: str | None = None
+    repo_count: int
+    commit_count: int
+    candidate_username: str
+
+
+class PipelineContributorsResponse(BaseModel):
+    """Contributor identities available for selected repositories."""
+
+    contributors: list[PipelineContributorIdentity]
+
+
+class PipelineStartRequest(BaseModel):
+    """Request payload to launch phase 1 of the local resume pipeline."""
+
+    intake_id: str = Field(min_length=1)
+    repo_ids: list[str] = Field(min_length=1)
+    user_email: str = Field(min_length=3)
+    stage1_model: str = Field(default="qwen2.5-coder-3b-q4", min_length=1)
+    stage2_model: str = Field(default="lfm2.5-1.2b-bf16", min_length=1)
+    stage3_model: str = Field(default="lfm2.5-1.2b-bf16", min_length=1)
+
+
+class PipelineStartResponse(BaseModel):
+    """Response payload for pipeline launch."""
+
+    job_id: str
+    status: PipelineJobStatus
+
+
+class PipelineTelemetry(BaseModel):
+    """Structured telemetry emitted by running pipeline stages."""
+
+    stage: PipelineStage = "EXTRACT"
+    active_model: str | None = None
+    repos_total: int = 0
+    repos_done: int = 0
+    current_repo: str | None = None
+    facts_total: int = 0
+    draft_projects: int = 0
+    polished_projects: int = 0
+    elapsed_seconds: float = 0.0
+    model_check_seconds: float = 0.0
+    selected_repos: list[str] = Field(default_factory=list)
+
+
+class PipelineStatusResponse(BaseModel):
+    """Response payload for polling pipeline state."""
+
+    status: PipelineJobStatus
+    stage: PipelineStage
+    messages: list[str] = Field(default_factory=list)
+    telemetry: PipelineTelemetry
+    draft: dict[str, Any] | None = None
+    output: dict[str, Any] | None = None
+    error: str | None = None
+
+
+class PipelinePolishRequest(BaseModel):
+    """Request payload for re-running Stage 3 polish from a saved draft."""
+
+    general_notes: str = ""
+    tone: str = ""
+    additions: list[str] = Field(default_factory=list)
+    removals: list[str] = Field(default_factory=list)
+
+
+class PipelinePolishResponse(BaseModel):
+    """Response payload for Stage 3 polish trigger."""
+
+    ok: bool
+    status: PipelineJobStatus
+
+
+class PipelineCancelResponse(BaseModel):
+    """Response payload for immediate cancellation requests."""
+
+    ok: bool
+    status: PipelineJobStatus
 
 
 class ProjectRankingItem(BaseModel):
