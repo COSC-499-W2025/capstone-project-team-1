@@ -547,3 +547,27 @@ class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
     summary_text: str
+
+
+class ChronologyOverride(BaseModel):
+    """Manual override for project chronology metadata."""
+
+    project_id: str = Field(description="Project identifier (repo_stat ID as string).")
+    first_commit: str | None = Field(
+        default=None,
+        description="Optional override for first commit timestamp (ISO format string).",
+    )
+    last_commit: str | None = Field(
+        default=None,
+        description="Optional override for last commit timestamp (ISO format string).",
+    )
+
+
+class CustomRanking(BaseModel):
+    """Manual override for project ranking position."""
+
+    project_id: str = Field(description="Project identifier (repo_stat ID as string).")
+    rank: int = Field(
+        description="Custom ranking position (lower value = higher rank).",
+        ge=1,
+    )
