@@ -1,5 +1,6 @@
 import os
 from fastapi import APIRouter, Depends, HTTPException
+from git import List
 from sqlalchemy.orm import Session
 
 from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_file_contents
@@ -11,7 +12,7 @@ from ..db import get_db
 router = APIRouter(tags=["intelligence"])
 
 @router.get("/fileintelligence", tags=["intelligence"])
-async def get_file_intelligence_contents(zip_id: int, db: Session = Depends(get_db)) -> str:
+async def get_file_intelligence_contents(zip_id: int, db: Session = Depends(get_db)) -> List[str]:
     
     #1) get data from user consent (in config)
     try: 
