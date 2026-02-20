@@ -9,7 +9,7 @@ from pypdf import PdfReader
 
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
 #CRAWLER INTEGRATION
-async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) -> str:
+async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) -> List[str]:
     
 
     if file_values is None:
@@ -17,14 +17,17 @@ async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) ->
     if len(file_values) == 0: 
         return "no response, file value is empty."
     
-    str_response = "No pdf file found." #update this message based on file type...
+    str_response_list = [] #update this message based on file type...
+    str_response = "No pdf file found."
+    
     for file_data in file_values:
         if file_data[2] == ".pdf":
             str_response = await analyze_pdf(file_path=file_data[1]) #get relative path
         if file_data[2] == ".md":
             str_response = await analyze_markdown(file_path=file_data[1])
+    str_response_list.append(str_response)
 
-    return str_response
+    return str_response_list
 
 
 async def analyze_pdf(file_path):
