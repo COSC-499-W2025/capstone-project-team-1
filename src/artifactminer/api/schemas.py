@@ -341,59 +341,6 @@ class DeleteResponse(BaseModel):
     deleted_id: int = Field(description="ID of the deleted resource.")
 
 
-class ResumeGenerationRequest(BaseModel):
-    """Request payload for resume generation."""
-
-    project_ids: list[int] = Field(
-        description="List of project IDs (repo_stat IDs) to generate resume items for.",
-        min_length=1,
-    )
-    regenerate: bool = Field(
-        default=False,
-        description=(
-            "If True, delete existing generated ProjectEvidence rows (and any legacy ResumeItem rows) "
-            "for these projects before regenerating."
-        ),
-    )
-
-
-class ResumeGenerationResponse(BaseModel):
-    """Response from resume generation endpoint.
-
-    ## Success Semantics
-
-    The `success` field indicates whether generation completed without critical errors.
-    Insights are persisted as `ProjectEvidence` rows, not `ResumeItem` rows.
-
-    - `success=True`: All projects were processed without errors
-    - `success=False`: One or more projects encountered errors during processing
-    - `warnings`: Non-critical issues (for example git metadata collection failures)
-    - `items_generated`: Count of evidence items created (not resume items)
-    - `resume_items`: Always empty list (insights stored as ProjectEvidence)
-    """
-
-    success: bool = Field(
-        description="True if generation completed without critical errors."
-    )
-    items_generated: int = Field(
-        description="Total number of evidence items created (not resume items)."
-    )
-    resume_items: list[ResumeItemResponse] = Field(
-        default_factory=list,
-        description="Always empty. Insights are stored as ProjectEvidence, not ResumeItem rows.",
-    )
-    consent_level: str = Field(
-        description="Consent level used for generation ('full', 'no_llm', or 'none')."
-    )
-    errors: list[str] = Field(
-        default_factory=list,
-        description="List of errors encountered during generation (if any).",
-    )
-    warnings: list[str] = Field(
-        default_factory=list,
-        description="List of non-critical warnings encountered during generation.",
-    )
-
 
 class ProjectRankingItem(BaseModel):
     """Ranked project based on user contribution."""
