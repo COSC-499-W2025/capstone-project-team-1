@@ -6,13 +6,13 @@ This document explains how the local LLM stack evolved and why the current appro
 
 Evolution map:
 
-Generation 1 (Ollama daemon)
+Generation 1 (legacy external daemon runtime)
 -> Generation 2 (embedded llama-cpp-python)
 -> Generation 3 (llama-server subprocess + OpenAI SDK)
 
 Primary lesson: operational reliability and setup simplicity matter as much as model quality.
 
-## Generation 1: Ollama daemon
+## Generation 1: legacy external daemon runtime
 
 How it behaved:
 

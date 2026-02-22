@@ -5,8 +5,8 @@ This module provides OPTIONAL LLM enhancement. The key principles:
 
 1. LLM receives ONLY pre-digested facts, never raw code
 2. ONE call per portfolio (not per file, not per project)
-3. Works with ANY Ollama model the user has installed
-4. Graceful degradation if Ollama is unavailable
+3. Works with any local model alias available in llm_client
+4. Graceful degradation if local model runtime is unavailable
 
 The LLM's job is simple: take structured facts and write compelling prose.
 It is NOT doing code analysis - that's already done by static analysis.
@@ -315,7 +315,7 @@ def enhance_with_llm(
         ResumeContent with generated bullets and summaries
 
     Raises:
-        RuntimeError: If Ollama is not available or model is not found
+        RuntimeError: If local model runtime is unavailable or model is not found
     """
     result = ResumeContent(
         project_bullets={},
@@ -399,7 +399,7 @@ def generate_without_llm(portfolio: PortfolioFacts) -> ResumeContent:
     """
     Generate resume content using only templates (no LLM).
 
-    This is the fallback that works on any machine without Ollama.
+    This is the fallback that works on any machine without local model runtime.
     """
     result = ResumeContent(
         project_bullets={},
