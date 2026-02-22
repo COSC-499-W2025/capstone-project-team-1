@@ -6,14 +6,17 @@ import datetime as _dt
 from datetime import datetime, UTC
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
 # Evidence types
 # ---------------------------------------------------------------------------
 
-EvidenceType = Literal["metric", "feedback", "evaluation", "award", "custom"]
+EvidenceType = Literal[
+    "metric", "feedback", "evaluation", "award", "custom",
+    "testing", "documentation", "code_quality", "test_coverage",
+]
 
 
 class EvidenceCreateRequest(BaseModel):
@@ -75,15 +78,15 @@ class ConsentResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    consent_level: Literal["full", "no_llm", "none"]
+    consent_level: Literal["none", "local", "local-llm", "cloud"]
     accepted_at: datetime | None = None
 
 
 class ConsentUpdateRequest(BaseModel):
     """Request payload to update consent state."""
 
-    consent_level: Literal["full", "no_llm", "none"] = Field(
-        description="Consent level: 'full' (with LLM), 'no_llm' (without LLM), or 'none'."
+    consent_level: Literal["none", "local", "local-llm", "cloud"] = Field(
+        description="Consent level: 'local' (static only), 'local-llm' (local LLM), 'cloud' (cloud LLM), or 'none'."
     )
 
 
@@ -301,6 +304,28 @@ class SkillResponse(BaseModel):
     project_count: int | None = Field(
         default=None, description="Number of projects using this skill."
     )
+
+
+class ResumeItemEditRequest(BaseModel):
+    """Request payload for editing a resume item."""
+
+    title: str | None = Field(
+        default=None, min_length=1, description="New title for the resume item."
+    )
+    content: str | None = Field(
+        default=None, min_length=1, description="New content for the resume item."
+    )
+    category: str | None = Field(
+        default=None, min_length=1, description="New category for the resume item."
+    )
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "ResumeItemEditRequest":
+        if self.title is None and self.content is None and self.category is None:
+            raise ValueError(
+                "At least one of title, content, or category must be provided"
+            )
+        return self
 
 
 class ResumeItemResponse(BaseModel):
@@ -638,4 +663,3 @@ class CustomRanking(BaseModel):
         description="Custom ranking position (lower value = higher rank).",
         ge=1,
     )
-

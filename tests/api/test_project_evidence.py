@@ -117,6 +117,33 @@ class TestListEvidence:
         assert len(data) == 1
         assert data[0]["type"] == "metric"
 
+    def test_returns_new_evidence_types_in_evidence_response(self, client):
+        """GET returns persisted new evidence types with full response fields."""
+        pid = _get_project_id(client)
+        new_types = ["testing", "documentation", "code_quality", "test_coverage"]
+
+        for evidence_type in new_types:
+            resp = _post_evidence(
+                client,
+                pid,
+                type=evidence_type,
+                content=f"{evidence_type} evidence",
+                source="integration-test",
+                date="2026-01-15",
+            )
+            assert resp.status_code == 201
+
+        resp = client.get(f"/projects/{pid}/evidence")
+        assert resp.status_code == 200
+        rows = [item for item in resp.json() if item["type"] in new_types]
+        assert {item["type"] for item in rows} == set(new_types)
+
+        for row in rows:
+            assert row["project_id"] == pid
+            assert row["source"] == "integration-test"
+            assert row["date"] == "2026-01-15"
+            assert row["content"].endswith("evidence")
+
 
 # =========================================================================
 # DELETE /projects/{id}/evidence/{evidence_id}
