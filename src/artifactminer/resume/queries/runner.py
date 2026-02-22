@@ -1659,7 +1659,12 @@ def run_polish_query(
         progress("[Stage 3] Polishing resume with micro-prompts...")
 
     raw_facts = draft_output.raw_project_facts or {}
-    has_content_feedback = bool(feedback.general_notes or feedback.tone)
+    has_content_feedback = bool(
+        feedback.general_notes
+        or feedback.tone
+        or feedback.additions
+        or feedback.removals
+    )
 
     output = ResumeOutput(stage="polish")
     output.portfolio_data = draft_output.portfolio_data
@@ -1677,14 +1682,18 @@ def run_polish_query(
                 output.skills_section = corrected
 
     # --- Per-project bullet polish ---
-    feedback_text = ""
+    feedback_parts: list[str] = []
     if feedback.general_notes:
-        feedback_text += feedback.general_notes
+        feedback_parts.append(feedback.general_notes)
     if feedback.tone:
-        if feedback_text:
-            feedback_text += f" Tone: {feedback.tone}."
-        else:
-            feedback_text = f"Tone: {feedback.tone}."
+        feedback_parts.append(f"Tone: {feedback.tone}.")
+    if feedback.additions:
+        feedback_parts.append(
+            "Additional information to include: " + "; ".join(feedback.additions)
+        )
+    if feedback.removals:
+        feedback_parts.append("Claims to remove: " + "; ".join(feedback.removals))
+    feedback_text = " ".join(feedback_parts)
 
     for project_name, section in draft_output.project_sections.items():
         if has_content_feedback and section.bullets:

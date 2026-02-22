@@ -201,6 +201,7 @@ def _extract_project(
         str(repo_path),
         frameworks=facts.frameworks,
         readme_text=readme_text,
+        llm_model=llm_model,
     )
 
     # --- New Strategy A extractors ---
