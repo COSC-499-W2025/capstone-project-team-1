@@ -15,7 +15,7 @@ from ..db import RepresentationPrefs, get_db
 router = APIRouter(prefix="/views", tags=["views"])
 
 
-def get_prefs(db: Session, portfolio_id: int) -> RepresentationPreferences:
+def get_prefs(db: Session, portfolio_id: str) -> RepresentationPreferences:
     """Retrieve preferences for a portfolio; return defaults if not found."""
     row = db.get(RepresentationPrefs, portfolio_id)
     if row is None:
@@ -28,11 +28,11 @@ def get_prefs(db: Session, portfolio_id: int) -> RepresentationPreferences:
 
 
 def save_prefs(
-    db: Session, portfolio_id: int, prefs: RepresentationPreferences
+    db: Session, portfolio_id: str, prefs: RepresentationPreferences
 ) -> RepresentationPreferences:
     """Upsert preferences for a portfolio."""
     row = db.get(RepresentationPrefs, portfolio_id)
-    prefs_json = json.dumps(prefs.model_dump())
+    prefs_json = json.dumps(prefs.model_dump(mode='json'))
 
     if row is None:
         row = RepresentationPrefs(
@@ -52,7 +52,7 @@ def save_prefs(
 
 @router.get("/{portfolio_id}/prefs", response_model=RepresentationPreferences)
 async def get_representation_prefs(
-    portfolio_id: int, db: Session = Depends(get_db)
+    portfolio_id: str, db: Session = Depends(get_db)
 ) -> RepresentationPreferences:
     """Fetch representation preferences for a portfolio; returns defaults if not set."""
     return get_prefs(db, portfolio_id)
@@ -60,7 +60,7 @@ async def get_representation_prefs(
 
 @router.put("/{portfolio_id}/prefs", response_model=RepresentationPreferences)
 async def update_representation_prefs(
-    portfolio_id: int,
+    portfolio_id: str,
     payload: RepresentationPreferences,
     db: Session = Depends(get_db),
 ) -> RepresentationPreferences:
