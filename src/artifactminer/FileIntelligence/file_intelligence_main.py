@@ -13,19 +13,19 @@ async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) ->
     
 
     if file_values is None:
-        return "no response, file value is null."
+        return ["no response, file value is null."]
     if len(file_values) == 0: 
-        return "no response, file value is empty."
+        return ["no response, file value is empty."]
     
     str_response_list = [] #update this message based on file type...
-    str_response = "No pdf file found."
     
     for file_data in file_values:
+        str_response = "No file intelligence available for this file type."
         if file_data[2] == ".pdf":
             str_response = await analyze_pdf(file_path=file_data[1]) #get relative path
-        if file_data[2] == ".md":
+        elif file_data[2] == ".md":
             str_response = await analyze_markdown(file_path=file_data[1])
-    str_response_list.append(str_response)
+        str_response_list.append(str_response)
 
     return str_response_list
 
@@ -136,9 +136,8 @@ async def analyze_markdown(file_path):
     if user_allows_llm():
         if is_resume:
             prompt = (
-                "Analyze the following resume written in Markdown and extract key information. "
+                "Summarize the following resume written in Markdown and extract key information. "
                 "Focus on: work experience, education, technical skills, projects, and achievements. "
-                "Preserve section hierarchy when possible. "
                 "Format the output in a structured way suitable for portfolio analysis:\n\n"
             )
         else:
