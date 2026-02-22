@@ -619,7 +619,7 @@ def test_get_portfolio_respects_preferences(client_with_complete_portfolio):
     
     # Verify preferences are included in response
     assert payload["preferences"] is not None
-    assert payload["preferences"]["showcase_project_ids"] == ["100", "101"]
+    assert payload["preferences"]["showcase_project_ids"] == [100, 101]
 
 
 def test_get_portfolio_without_role_and_evidence():
