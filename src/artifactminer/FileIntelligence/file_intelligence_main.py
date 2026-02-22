@@ -20,13 +20,17 @@ async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) ->
     str_response_list = [] #update this message based on file type...
     
     for file_data in file_values:
-        str_response = "No file intelligence available for this file type."
         if file_data[2] == ".pdf":
             str_response = await analyze_pdf(file_path=file_data[1]) #get relative path
         elif file_data[2] == ".md":
             str_response = await analyze_markdown(file_path=file_data[1])
+        else:
+            continue #skip other file types for now, can add more analysis functions later for different file types.
         str_response_list.append(str_response)
-
+       
+    if(len(str_response_list) == 0):
+        return ["no analyzable files found in directory."]
+    
     return str_response_list
 
 
