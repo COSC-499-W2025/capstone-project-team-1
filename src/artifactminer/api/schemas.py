@@ -6,7 +6,7 @@ import datetime as _dt
 from datetime import datetime, UTC
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -306,6 +306,28 @@ class SkillResponse(BaseModel):
     )
 
 
+class ResumeItemEditRequest(BaseModel):
+    """Request payload for editing a resume item."""
+
+    title: str | None = Field(
+        default=None, min_length=1, description="New title for the resume item."
+    )
+    content: str | None = Field(
+        default=None, min_length=1, description="New content for the resume item."
+    )
+    category: str | None = Field(
+        default=None, min_length=1, description="New category for the resume item."
+    )
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "ResumeItemEditRequest":
+        if self.title is None and self.content is None and self.category is None:
+            raise ValueError(
+                "At least one of title, content, or category must be provided"
+            )
+        return self
+
+
 class ResumeItemResponse(BaseModel):
     """Response shape for resume/portfolio items."""
 
@@ -544,8 +566,6 @@ class PortfolioGenerationResponse(BaseModel):
     summaries: list[SummaryResponse]
     skills_chronology: list[SkillChronologyItem]
     errors: list[str] = Field(default_factory=list)
-
-
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
