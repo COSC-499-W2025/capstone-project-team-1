@@ -42,9 +42,10 @@ async def get_file_intelligence_contents(zip_id: int, db: Session = Depends(get_
     extraction_path = extract_zip_to_persistent_location(uploaded_zip.path, zip_id) #extract the zip file.
     
     directory_walk.CURRENTPATH = extraction_path #set path to crawler
-    filedict = directory_walk.crawl_directory() #crawl and get dictionary of file names
     
-    file_values = filedict[0].values() #getting file name, path, and extension
+    filedict, _ = directory_walk.crawl_directory() #crawl and get dictionary of file names
+    
+    file_values = filedict.values() #getting file name, path, and extension
 
     str_response = await get_crawler_file_contents(file_values=file_values)
 
