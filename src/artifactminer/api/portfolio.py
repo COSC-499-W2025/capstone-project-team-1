@@ -32,8 +32,8 @@ from ..db import (
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
-def _normalize_tokens(values: list[str]) -> list[str]:
-    return [value.strip() for value in values if str(value).strip()]
+def _normalize_tokens(values: list[str | int]) -> list[str]:
+    return [str(value).strip() for value in values if str(value).strip()]
 
 
 def _project_tokens(project: RepoStat) -> set[str]:
@@ -56,7 +56,7 @@ def _build_path_boundary_filter(column, paths: list[str]):
 
 
 def _build_portfolio_project_items(
-    projects: list[RepoStat], db: Session, user_email: str
+    projects: list[RepoStat], db: Session
 ) -> list[PortfolioProjectItem]:
     """Build complete PortfolioProjectItem objects with role, thumbnail, and evidence."""
     project_paths = [project.project_path for project in projects]
@@ -67,7 +67,6 @@ def _build_portfolio_project_items(
     if project_paths:
         user_roles = (
             db.query(UserRepoStat)
-            .filter(UserRepoStat.user_email == user_email)
             .filter(UserRepoStat.project_path.in_(project_paths))
             .all()
         )
@@ -270,7 +269,7 @@ async def generate_portfolio(
     if selected_paths:
         skills_chronology = fetch_skill_chronology(db, project_path_prefixes=selected_paths)
 
-    project_items = _build_portfolio_project_items(selected_projects, db, user_email)
+    project_items = _build_portfolio_project_items(selected_projects, db)
 
     return PortfolioGenerationResponse(
         success=bool(selected_projects),
@@ -412,7 +411,7 @@ async def get_portfolio(
         skills_chronology = fetch_skill_chronology(db, project_path_prefixes=selected_paths)
 
     # Build complete project items with role, thumbnail, and evidence
-    project_items = _build_portfolio_project_items(selected_projects, db, user_email)
+    project_items = _build_portfolio_project_items(selected_projects, db)
 
     return PortfolioDisplayResponse(
         success=bool(selected_projects),
