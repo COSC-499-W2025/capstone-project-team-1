@@ -49,8 +49,8 @@ from ..resume.models import ResumeOutput, UserFeedback
 from ..resume.pipeline import extract_and_distill_for_repos
 from ..resume.queries.runner import (
     compile_project_data_card,
-    run_draft_queries_v2,
-    run_polish_query_v2,
+    run_draft_queries,
+    run_polish_query,
 )
 from ..resume.generate import discover_git_repos, extract_zip
 from ..skills.deep_analysis import DeepRepoAnalyzer
@@ -498,7 +498,7 @@ def _phase1_worker(
         emit(f"Stage 2: Generating draft with {stage2_model}...")
 
         try:
-            draft_output = run_draft_queries_v2(
+            draft_output = run_draft_queries(
                 raw_facts,
                 portfolio,
                 stage2_model,
@@ -599,7 +599,7 @@ def _phase3_worker(
         emit("Stage 3 started: polishing draft from saved Stage 2 output")
         push_telemetry()
 
-        final_output = run_polish_query_v2(
+        final_output = run_polish_query(
             draft_output,
             feedback,
             stage3_model,

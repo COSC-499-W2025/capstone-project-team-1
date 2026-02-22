@@ -358,7 +358,7 @@ def _resume_output_to_json_payload(output: ResumeOutput) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Per-section micro-prompt system prompts (v2 architecture)
+# Per-section micro-prompt system prompts
 # ---------------------------------------------------------------------------
 
 BULLET_SYSTEM = (
@@ -387,7 +387,7 @@ MICRO_POLISH_SYSTEM = (
 
 
 # ---------------------------------------------------------------------------
-# Per-section micro-prompt builders (v2 architecture)
+# Per-section micro-prompt builders
 # ---------------------------------------------------------------------------
 
 

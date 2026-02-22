@@ -322,8 +322,8 @@ def generate(
     from .pipeline import extract_and_distill
     from .queries.runner import (
         compile_project_data_card,
-        run_draft_queries_v2,
-        run_polish_query_v2,
+        run_draft_queries,
+        run_polish_query,
     )
     from .assembler import assemble_markdown, assemble_json
     from .models import RawProjectFacts, ResumeOutput
@@ -421,7 +421,7 @@ def generate(
         models_used.append(stage2_model)
 
         try:
-            draft_output = run_draft_queries_v2(
+            draft_output = run_draft_queries(
                 raw_facts,
                 portfolio,
                 stage2_model,
@@ -484,7 +484,7 @@ def generate(
                 console.print(f"[dim]Tone: {user_feedback.tone}[/dim]")
 
             try:
-                final_output = run_polish_query_v2(
+                final_output = run_polish_query(
                     draft_output,
                     user_feedback,
                     stage3_model,

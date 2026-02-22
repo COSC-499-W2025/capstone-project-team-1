@@ -36,8 +36,8 @@ from artifactminer.resume.queries.runner import (
     _clean_summary_or_profile,
     _parse_bullet_response,
     compile_project_data_card,
-    run_draft_queries_v2,
-    run_polish_query_v2,
+    run_draft_queries,
+    run_polish_query,
 )
 
 
@@ -681,12 +681,12 @@ class TestBuildSkillsDeterministic:
 
 
 # ---------------------------------------------------------------------------
-# Step 7: run_draft_queries_v2
+# Step 7: run_draft_queries
 # ---------------------------------------------------------------------------
 
 
-class TestRunDraftQueriesV2:
-    """Tests for run_draft_queries_v2 with mocked LLM."""
+class TestRunDraftQueries:
+    """Tests for run_draft_queries with mocked LLM."""
 
     @patch("artifactminer.resume.queries.runner._query")
     def test_returns_draft_with_micro_prompts(self, mock_query: MagicMock) -> None:
@@ -701,7 +701,7 @@ class TestRunDraftQueriesV2:
         ]
         raw_facts = _make_raw_facts_with_evidence()
         portfolio = _make_portfolio()
-        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+        output = run_draft_queries(raw_facts, portfolio, "qwen3-1.7b-q8")
 
         assert output.stage == "draft"
         assert "my-web-api" in output.project_sections
@@ -721,7 +721,7 @@ class TestRunDraftQueriesV2:
         ]
         raw_facts = _make_raw_facts_with_evidence()
         portfolio = _make_portfolio()
-        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+        output = run_draft_queries(raw_facts, portfolio, "qwen3-1.7b-q8")
 
         # 3 calls: 1 bullet + 1 summary + 1 profile (no skills LLM call)
         assert mock_query.call_count == 3
@@ -737,7 +737,7 @@ class TestRunDraftQueriesV2:
         ]
         raw_facts = _make_raw_facts_with_evidence()
         portfolio = _make_portfolio()
-        output = run_draft_queries_v2(raw_facts, portfolio, "qwen3-1.7b-q8")
+        output = run_draft_queries(raw_facts, portfolio, "qwen3-1.7b-q8")
 
         section = output.project_sections["my-web-api"]
         assert "commit:" not in section.description
@@ -745,12 +745,12 @@ class TestRunDraftQueriesV2:
 
 
 # ---------------------------------------------------------------------------
-# Step 8: run_polish_query_v2
+# Step 8: run_polish_query
 # ---------------------------------------------------------------------------
 
 
-class TestRunPolishQueryV2:
-    """Tests for run_polish_query_v2 with mocked LLM."""
+class TestRunPolishQuery:
+    """Tests for run_polish_query with mocked LLM."""
 
     @patch("artifactminer.resume.queries.runner._query")
     def test_polishes_bullets_with_feedback(self, mock_query: MagicMock) -> None:
@@ -766,7 +766,7 @@ class TestRunPolishQueryV2:
         feedback = UserFeedback(
             tone="more technical", general_notes="Use stronger verbs"
         )
-        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+        output = run_polish_query(draft, feedback, "qwen3-1.7b-q8")
 
         assert output.stage == "polish"
         assert "my-web-api" in output.project_sections
@@ -778,7 +778,7 @@ class TestRunPolishQueryV2:
         """Should preserve draft content when no feedback is provided."""
         draft = _make_draft_output()
         feedback = UserFeedback()
-        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+        output = run_polish_query(draft, feedback, "qwen3-1.7b-q8")
 
         assert output.stage == "polish"
         # No LLM calls should be made
@@ -793,7 +793,7 @@ class TestRunPolishQueryV2:
         feedback = UserFeedback(
             section_edits={"summary": "Custom summary text."},
         )
-        output = run_polish_query_v2(draft, feedback, "qwen3-1.7b-q8")
+        output = run_polish_query(draft, feedback, "qwen3-1.7b-q8")
 
         assert output.professional_summary == "Custom summary text."
         mock_query.assert_not_called()

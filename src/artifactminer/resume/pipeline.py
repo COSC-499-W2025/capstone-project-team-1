@@ -41,8 +41,8 @@ from .extractors import (
 )
 from .queries.runner import (
     compile_project_data_card,
-    run_draft_queries_v2,
-    run_polish_query_v2,
+    run_draft_queries,
+    run_polish_query,
 )
 
 # Reuse existing infrastructure
@@ -662,7 +662,7 @@ def generate_resume_v3_multistage(
     models_used.append(stage2_model)
 
     try:
-        draft_output = run_draft_queries_v2(
+        draft_output = run_draft_queries(
             raw_facts, portfolio, stage2_model, progress=prog
         )
         merge_quality_metrics(draft_output.quality_metrics)
@@ -691,7 +691,7 @@ def generate_resume_v3_multistage(
         models_used.append(stage3_model)
 
         try:
-            final_output = run_polish_query_v2(
+            final_output = run_polish_query(
                 draft_output, user_feedback, stage3_model, progress=prog
             )
             merge_quality_metrics(final_output.quality_metrics)

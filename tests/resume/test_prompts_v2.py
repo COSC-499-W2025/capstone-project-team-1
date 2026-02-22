@@ -443,7 +443,7 @@ class TestPromptBuildersParameterized:
 
 
 # ---------------------------------------------------------------------------
-# Micro-prompt structure tests (v2 architecture)
+# Micro-prompt structure tests
 # ---------------------------------------------------------------------------
 
 

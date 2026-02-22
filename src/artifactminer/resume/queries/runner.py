@@ -1536,18 +1536,18 @@ def _run_profile_query(
 
 
 # ---------------------------------------------------------------------------
-# v2 Stage 2 orchestrator: per-section micro-prompts (Step 7)
+# Stage 2 orchestrator: per-section micro-prompts
 # ---------------------------------------------------------------------------
 
 
-def run_draft_queries_v2(
+def run_draft_queries(
     raw_facts: dict[str, RawProjectFacts],
     portfolio: PortfolioDataBundle,
     model: str,
     *,
     progress: Optional[Callable[[str], None]] = None,
 ) -> ResumeOutput:
-    """Stage 2 v2: Per-section micro-prompt draft with GBNF grammars.
+    """Stage 2: Per-section micro-prompt draft with GBNF grammars.
 
     1. Clean facts (strip evidence artifacts)
     2. Build skills deterministically
@@ -1557,7 +1557,7 @@ def run_draft_queries_v2(
     6. Citation gate
     """
     if progress:
-        progress("[Stage 2 v2] Generating draft resume with micro-prompts...")
+        progress("[Stage 2] Generating draft resume with micro-prompts...")
 
     # 1. Clean facts
     _clean_all_facts(raw_facts)
@@ -1629,26 +1629,24 @@ def run_draft_queries_v2(
     citation_metrics = _apply_citation_gate(output, raw_facts)
     output.quality_metrics["citations"] = citation_metrics
     output.quality_metrics["prose"] = _compute_prose_metrics(output)
-    output.quality_metrics["schema"] = {
-        "draft_v2_micro": 1,
-    }
+    output.quality_metrics["schema"] = {"draft_micro": 1}
 
     return output
 
 
 # ---------------------------------------------------------------------------
-# v2 Stage 3 orchestrator: per-section polish (Step 8)
+# Stage 3 orchestrator: per-section polish
 # ---------------------------------------------------------------------------
 
 
-def run_polish_query_v2(
+def run_polish_query(
     draft_output: ResumeOutput,
     feedback: UserFeedback,
     model: str,
     *,
     progress: Optional[Callable[[str], None]] = None,
 ) -> ResumeOutput:
-    """Stage 3 v2: Per-section polish with GBNF grammars.
+    """Stage 3: Per-section polish with GBNF grammars.
 
     - Per-project bullet polish with BULLET_GRAMMAR
     - Summary + profile polish with SUMMARY_GRAMMAR
@@ -1658,7 +1656,7 @@ def run_polish_query_v2(
     from .grammars import BULLET_GRAMMAR, SUMMARY_GRAMMAR
 
     if progress:
-        progress("[Stage 3 v2] Polishing resume with micro-prompts...")
+        progress("[Stage 3] Polishing resume with micro-prompts...")
 
     raw_facts = draft_output.raw_project_facts or {}
     has_content_feedback = bool(feedback.general_notes or feedback.tone)
@@ -1691,7 +1689,7 @@ def run_polish_query_v2(
     for project_name, section in draft_output.project_sections.items():
         if has_content_feedback and section.bullets:
             if progress:
-                progress(f"  [Stage 3 v2] Polishing bullets for {project_name}...")
+                progress(f"  [Stage 3] Polishing bullets for {project_name}...")
             target_bullets = max(2, min(4, len(section.bullets[:4]) or 2))
             prompt = build_bullet_polish_prompt(
                 section.bullets[:4],
@@ -1741,7 +1739,7 @@ def run_polish_query_v2(
         and not output.professional_summary
     ):
         if progress:
-            progress("  [Stage 3 v2] Polishing summary...")
+            progress("  [Stage 3] Polishing summary...")
         prompt = build_text_polish_prompt(
             draft_output.professional_summary, feedback_text
         )
@@ -1766,7 +1764,7 @@ def run_polish_query_v2(
         and not output.developer_profile
     ):
         if progress:
-            progress("  [Stage 3 v2] Polishing profile...")
+            progress("  [Stage 3] Polishing profile...")
         prompt = build_text_polish_prompt(draft_output.developer_profile, feedback_text)
         try:
             response = _query(
@@ -1810,8 +1808,6 @@ def run_polish_query_v2(
     citation_metrics = _apply_citation_gate(output, raw_facts)
     output.quality_metrics["citations"] = citation_metrics
     output.quality_metrics["prose"] = _compute_prose_metrics(output)
-    output.quality_metrics["schema"] = {
-        "polish_v2_micro": 1,
-    }
+    output.quality_metrics["schema"] = {"polish_micro": 1}
 
     return output
