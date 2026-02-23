@@ -46,6 +46,9 @@ export function getParentPath(path: string): string {
 /**
  * Checks if a path is at or above a root path
  */
-export function isAtOrAboveRoot(currentPath: string, rootPath: string): boolean {
+export function isAtOrAboveRoot(
+	currentPath: string,
+	rootPath: string,
+): boolean {
 	return currentPath === rootPath || !currentPath.startsWith(rootPath);
 }

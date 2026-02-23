@@ -62,7 +62,9 @@ export async function scanForZips(options: ScanOptions): Promise<ScanResult> {
 		const crawler = new fdir()
 			.withFullPaths()
 			.filter((path) => path.toLowerCase().endsWith(".zip"))
-			.exclude((dirName) => excludeDirs.includes(dirName) || dirName.startsWith("."))
+			.exclude(
+				(dirName) => excludeDirs.includes(dirName) || dirName.startsWith("."),
+			)
 			.crawl(rootPath);
 
 		const files = await crawler.withPromise();
@@ -83,7 +85,7 @@ export async function scanForZips(options: ScanOptions): Promise<ScanResult> {
 					parentDir: dirname(filePath),
 					size,
 				};
-			})
+			}),
 		);
 
 		return { zips };
@@ -102,7 +104,10 @@ export async function scanForZips(options: ScanOptions): Promise<ScanResult> {
 /**
  * Builds a set of all directories that contain ZIPs (at any depth)
  */
-export function buildDirsWithZips(zips: ZipFile[], rootPath: string): Set<string> {
+export function buildDirsWithZips(
+	zips: ZipFile[],
+	rootPath: string,
+): Set<string> {
 	const dirs = new Set<string>();
 	// Ensure path ends with separator but don't double it (handles root "/" correctly)
 	const rootWithSep = rootPath.endsWith(sep) ? rootPath : rootPath + sep;
@@ -110,7 +115,10 @@ export function buildDirsWithZips(zips: ZipFile[], rootPath: string): Set<string
 	for (const zip of zips) {
 		let dir = zip.parentDir;
 		// Check if dir is under rootPath (exact match or starts with rootPath + separator)
-		while ((dir === rootPath || dir.startsWith(rootWithSep)) && dir !== rootPath) {
+		while (
+			(dir === rootPath || dir.startsWith(rootWithSep)) &&
+			dir !== rootPath
+		) {
 			dirs.add(dir);
 			dir = dirname(dir);
 		}
@@ -134,13 +142,15 @@ export function getZipsInDir(zips: ZipFile[], dirPath: string): ZipFile[] {
  */
 export function getChildDirsWithZips(
 	zips: ZipFile[],
-	currentPath: string
+	currentPath: string,
 ): DirEntry[] {
 	const childDirs = new Map<string, number>();
 
 	for (const zip of zips) {
 		// Ensure path ends with separator but don't double it (handles root "/" correctly)
-		const pathWithSep = currentPath.endsWith(sep) ? currentPath : currentPath + sep;
+		const pathWithSep = currentPath.endsWith(sep)
+			? currentPath
+			: currentPath + sep;
 
 		// Skip if not under current path (must be actual child, not just string prefix)
 		if (!zip.parentDir.startsWith(pathWithSep)) continue;
@@ -175,7 +185,7 @@ export function getChildDirsWithZips(
 export function buildEntries(
 	zips: ZipFile[],
 	currentPath: string,
-	rootPath: string
+	rootPath: string,
 ): Array<DirEntry | (ZipFile & { type: "zip" })> {
 	const result: Array<DirEntry | (ZipFile & { type: "zip" })> = [];
 

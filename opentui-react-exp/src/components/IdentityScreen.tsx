@@ -14,12 +14,8 @@ interface IdentityScreenProps {
 type FocusMode = "list" | "manual";
 
 export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
-	const {
-		state,
-		setContributors,
-		setSelectedEmail,
-		setPipelineNotice,
-	} = useAppState();
+	const { state, setContributors, setSelectedEmail, setPipelineNotice } =
+		useAppState();
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [focusMode, setFocusMode] = useState<FocusMode>("list");
 	const [manualEmail, setManualEmail] = useState(state.selectedEmail || "");
@@ -37,7 +33,9 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 		setError(null);
 
 		void api
-			.getPipelineContributors(state.intakeId, { repo_ids: state.selectedRepoIds })
+			.getPipelineContributors(state.intakeId, {
+				repo_ids: state.selectedRepoIds,
+			})
 			.then((response) => {
 				if (cancelled) {
 					return;
@@ -159,7 +157,9 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 					{isLoading ? (
 						<box padding={1}>
 							<text>
-								<span fg={theme.cyan}>Collecting contributor identities...</span>
+								<span fg={theme.cyan}>
+									Collecting contributor identities...
+								</span>
 							</text>
 						</box>
 					) : options.length ? (
@@ -197,7 +197,8 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 					</text>
 					<text>
 						<span fg={theme.textDim}>
-							Press Tab to switch focus between contributor list and manual input.
+							Press Tab to switch focus between contributor list and manual
+							input.
 						</span>
 					</text>
 
@@ -216,7 +217,8 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 							</text>
 							<text>
 								<span fg={theme.textSecondary}>
-									{selectedContributor.name || selectedContributor.candidate_username}
+									{selectedContributor.name ||
+										selectedContributor.candidate_username}
 								</span>
 							</text>
 							<text>
@@ -227,7 +229,13 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={1}>
+			<box
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+				flexDirection="column"
+				gap={1}
+			>
 				{state.pipelineNotice ? (
 					<text>
 						<span fg={theme.warning}>{state.pipelineNotice}</span>

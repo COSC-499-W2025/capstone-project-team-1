@@ -106,7 +106,8 @@ export function DraftPauseScreen({
 		}
 	});
 
-	const current = sections[selectedSection] ?? sections[0]!;
+	const current = sections[selectedSection] ??
+		sections[0] ?? { id: "empty", headerText: "", tocLabel: "", lines: [] };
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -131,8 +132,11 @@ export function DraftPauseScreen({
 				>
 					{sections.map((section, i) => (
 						<text key={section.id}>
-							<span fg={i === selectedSection ? theme.gold : theme.textSecondary}>
-								{i === selectedSection ? "▶ " : "  "}{section.tocLabel}
+							<span
+								fg={i === selectedSection ? theme.gold : theme.textSecondary}
+							>
+								{i === selectedSection ? "▶ " : "  "}
+								{section.tocLabel}
 							</span>
 						</text>
 					))}
@@ -215,10 +219,18 @@ export function DraftPauseScreen({
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={0}>
+			<box
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+				flexDirection="column"
+				gap={0}
+			>
 				{isSubmitting ? (
 					<text>
-						<span fg={theme.cyan}>Submitting feedback and starting Stage 3...</span>
+						<span fg={theme.cyan}>
+							Submitting feedback and starting Stage 3...
+						</span>
 					</text>
 				) : null}
 				{isCancelling ? (

@@ -55,7 +55,10 @@ export const api = {
 	},
 	listDirectories: (zipId: number): Promise<DirectoriesResponse> =>
 		client.get(`/zip/${zipId}/directories`),
-	runAnalysis: (zipId: number, directories?: string[]): Promise<AnalysisResponse> =>
+	runAnalysis: (
+		zipId: number,
+		directories?: string[],
+	): Promise<AnalysisResponse> =>
 		client.post(`/analyze/${zipId}`, directories ? { directories } : undefined),
 	getResume: (projectId?: number): Promise<ResumeItem[]> =>
 		client.get(withQuery("/resume", { project_id: projectId })),
@@ -84,7 +87,9 @@ export const api = {
 		request: PipelineContributorsRequest,
 	): Promise<PipelineContributorsResponse> =>
 		client.post(`/resume/pipelines/intakes/${intakeId}/contributors`, request),
-	startPipeline: (request: PipelineStartRequest): Promise<PipelineStartResponse> =>
+	startPipeline: (
+		request: PipelineStartRequest,
+	): Promise<PipelineStartResponse> =>
 		client.post("/resume/pipelines", request),
 	getPipelineStatus: (jobId: string): Promise<PipelineStatusResponse> =>
 		client.get(`/resume/pipelines/${jobId}`),

@@ -30,7 +30,10 @@ export function ProjectList({
 		}
 	}, [repos.length, selectedIndex]);
 
-	const selectedSet = useMemo(() => new Set(selectedRepoIds), [selectedRepoIds]);
+	const selectedSet = useMemo(
+		() => new Set(selectedRepoIds),
+		[selectedRepoIds],
+	);
 
 	const selectedRepos = useMemo(
 		() => repos.filter((repo) => selectedSet.has(repo.id)),
@@ -129,6 +132,7 @@ export function ProjectList({
 						<select
 							options={repos.map((repo) => ({
 								name: `${selectedSet.has(repo.id) ? "[x]" : "[ ]"} ${repo.name}`,
+								description: repo.rel_path,
 								value: repo.id,
 							}))}
 							onChange={(index) => setSelectedIndex(index)}
@@ -142,7 +146,9 @@ export function ProjectList({
 					) : (
 						<box padding={1}>
 							<text>
-								<span fg={theme.warning}>No repositories detected in this intake.</span>
+								<span fg={theme.warning}>
+									No repositories detected in this intake.
+								</span>
 							</text>
 						</box>
 					)}
@@ -201,7 +207,12 @@ export function ProjectList({
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column">
+			<box
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+				flexDirection="column"
+			>
 				{notice ? (
 					<text>
 						<span fg={theme.warning}>{notice}</span>

@@ -16,10 +16,10 @@ interface AnalysisProps {
 const stageOrder = ["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3"] as const;
 
 const stageLabel: Record<string, string> = {
-	EXTRACT:  "Extract   —  Read repos",
-	STAGE_1:  "Stage 1   —  Analyze",
-	STAGE_2:  "Stage 2   —  Draft",
-	STAGE_3:  "Stage 3   —  Polish",
+	EXTRACT: "Extract   —  Read repos",
+	STAGE_1: "Stage 1   —  Analyze",
+	STAGE_2: "Stage 2   —  Draft",
+	STAGE_3: "Stage 3   —  Polish",
 };
 
 // Context shown in the Activity panel while each stage is active
@@ -65,25 +65,25 @@ const stageContext: Record<string, { heading: string; lines: string[] }> = {
 
 // Maps technical log prefixes → human-readable activity descriptions
 const STEP_MAP: Array<[string, string]> = [
-	["Extracting README",                "Reading project documentation"],
-	["Classifying commits",              "Analyzing commit history"],
-	["Extracting structure",             "Mapping project structure"],
-	["Extracting code constructs",       "Scanning code constructs"],
-	["Inferring project type",           "Detecting project type"],
-	["Extracting git stats",             "Gathering git statistics"],
-	["Computing test ratio",             "Measuring test coverage"],
-	["Scoring commit quality",           "Scoring commit quality"],
-	["Measuring module breadth",         "Measuring module breadth"],
-	["Computing style metrics",          "Analyzing code style"],
-	["Computing complexity metrics",     "Measuring code complexity"],
-	["Computing skill timeline",         "Building skill timeline"],
-	["Extracting enriched constructs",   "Deep code analysis"],
-	["Analyzing import graph",           "Mapping dependencies"],
-	["Extracting config fingerprint",    "Reading project configuration"],
-	["Inferring project purpose",        "AI: Inferring project purpose"],
-	["Running project query",            "AI: Writing project bullets"],
-	["Running portfolio query",          "AI: Composing portfolio summary"],
-	["Assembling resume",                "Assembling resume document"],
+	["Extracting README", "Reading project documentation"],
+	["Classifying commits", "Analyzing commit history"],
+	["Extracting structure", "Mapping project structure"],
+	["Extracting code constructs", "Scanning code constructs"],
+	["Inferring project type", "Detecting project type"],
+	["Extracting git stats", "Gathering git statistics"],
+	["Computing test ratio", "Measuring test coverage"],
+	["Scoring commit quality", "Scoring commit quality"],
+	["Measuring module breadth", "Measuring module breadth"],
+	["Computing style metrics", "Analyzing code style"],
+	["Computing complexity metrics", "Measuring code complexity"],
+	["Computing skill timeline", "Building skill timeline"],
+	["Extracting enriched constructs", "Deep code analysis"],
+	["Analyzing import graph", "Mapping dependencies"],
+	["Extracting config fingerprint", "Reading project configuration"],
+	["Inferring project purpose", "AI: Inferring project purpose"],
+	["Running project query", "AI: Writing project bullets"],
+	["Running portfolio query", "AI: Composing portfolio summary"],
+	["Assembling resume", "Assembling resume document"],
 ];
 
 const NOISE_PREFIXES = [
@@ -248,7 +248,9 @@ export function Analysis({
 
 	const telemetry = state.pipelineTelemetry;
 	const activeStage = telemetry?.stage || state.pipelineStage || "EXTRACT";
-	const activeIndex = stageOrder.indexOf(activeStage as (typeof stageOrder)[number]);
+	const activeIndex = stageOrder.indexOf(
+		activeStage as (typeof stageOrder)[number],
+	);
 
 	const stageRows = useMemo(
 		() =>
@@ -265,8 +267,13 @@ export function Analysis({
 				let marker = "○";
 				let color: string = theme.textDim;
 
-				if (completed) { marker = "✓"; color = theme.success; }
-				else if (active) { marker = "▶"; color = theme.cyan; }
+				if (completed) {
+					marker = "✓";
+					color = theme.success;
+				} else if (active) {
+					marker = "▶";
+					color = theme.cyan;
+				}
 
 				if (state.pipelineStatus === "cancelled") color = theme.warning;
 				if (state.pipelineStatus === "error" && active) color = theme.error;
@@ -293,11 +300,15 @@ export function Analysis({
 		state.pipelineStatus === "running" || state.pipelineStatus === "idle";
 
 	const statusColor =
-		state.pipelineStatus === "running" ? theme.cyan
-		: state.pipelineStatus === "complete" ? theme.success
-		: state.pipelineStatus === "error" ? theme.error
-		: state.pipelineStatus === "cancelled" ? theme.warning
-		: theme.textDim;
+		state.pipelineStatus === "running"
+			? theme.cyan
+			: state.pipelineStatus === "complete"
+				? theme.success
+				: state.pipelineStatus === "error"
+					? theme.error
+					: state.pipelineStatus === "cancelled"
+						? theme.warning
+						: theme.textDim;
 
 	const reposDone = telemetry?.repos_done ?? 0;
 	const reposTotal = telemetry?.repos_total ?? 0;
@@ -313,7 +324,6 @@ export function Analysis({
 			<TopBar step="Pipeline" title="Live Progress" description={subtitle} />
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
-
 				{/* ── Left: mission control panel ── */}
 				<box
 					width={36}
@@ -330,7 +340,7 @@ export function Analysis({
 					{stageRows.map((row) => (
 						<text key={row.stageName}>
 							<span fg={row.color}>
-								{row.marker}  {stageLabel[row.stageName] ?? row.stageName}
+								{row.marker} {stageLabel[row.stageName] ?? row.stageName}
 							</span>
 						</text>
 					))}
@@ -339,27 +349,27 @@ export function Analysis({
 					<box
 						flexDirection="column"
 						gap={1}
-						borderTop
+						border={["top"]}
 						borderColor={theme.bgLight}
 						paddingTop={1}
 						marginTop={1}
 					>
 						<text>
-							<span fg={theme.textDim}>Status   </span>
+							<span fg={theme.textDim}>Status </span>
 							<span fg={statusColor}>
 								<strong>{state.pipelineStatus.toUpperCase()}</strong>
 							</span>
 						</text>
 						<text>
-							<span fg={theme.textDim}>Elapsed  </span>
+							<span fg={theme.textDim}>Elapsed </span>
 							<span fg={theme.textSecondary}>{elapsed}s</span>
 						</text>
 						<text>
-							<span fg={theme.textDim}>Model    </span>
+							<span fg={theme.textDim}>Model </span>
 							<span fg={theme.textSecondary}>
 								{telemetry?.active_model
 									? telemetry.active_model.length > 18
-										? telemetry.active_model.slice(0, 18) + "…"
+										? `${telemetry.active_model.slice(0, 18)}…`
 										: telemetry.active_model
 									: "—"}
 							</span>
@@ -370,13 +380,13 @@ export function Analysis({
 					<box
 						flexDirection="column"
 						gap={1}
-						borderTop
+						border={["top"]}
 						borderColor={theme.bgLight}
 						paddingTop={1}
 						marginTop={1}
 					>
 						<text>
-							<span fg={theme.textDim}>Repos    </span>
+							<span fg={theme.textDim}>Repos </span>
 							<span fg={reposDone > 0 ? theme.textPrimary : theme.textDim}>
 								{reposDone}
 							</span>
@@ -388,15 +398,17 @@ export function Analysis({
 									{repoBar(reposDone, reposTotal)}
 								</span>
 								<span fg={theme.textDim}>
-									{"  "}{reposTotal > 0
+									{"  "}
+									{reposTotal > 0
 										? Math.round((reposDone / reposTotal) * 100)
-										: 0}%
+										: 0}
+									%
 								</span>
 							</text>
 						) : null}
 						{(telemetry?.facts_total ?? 0) > 0 ? (
 							<text>
-								<span fg={theme.textDim}>Facts    </span>
+								<span fg={theme.textDim}>Facts </span>
 								<span fg={theme.textSecondary}>{telemetry?.facts_total}</span>
 							</text>
 						) : null}
@@ -420,7 +432,7 @@ export function Analysis({
 						<box
 							flexDirection="column"
 							gap={1}
-							borderBottom
+							border={["bottom"]}
 							borderColor={theme.bgLight}
 							paddingBottom={1}
 						>
@@ -430,7 +442,7 @@ export function Analysis({
 								</span>
 							</text>
 							{stageContext[activeStage].lines.map((line, i) => (
-								<text key={i}>
+								<text key={`${activeStage}-line-${i}`}>
 									<span fg={theme.textDim}>{line}</span>
 								</text>
 							))}
@@ -442,7 +454,7 @@ export function Analysis({
 						<box
 							flexDirection="column"
 							gap={1}
-							borderBottom
+							border={["bottom"]}
 							borderColor={theme.bgLight}
 							paddingBottom={1}
 						>
@@ -469,7 +481,8 @@ export function Analysis({
 							{hiddenCount > 0 ? (
 								<text>
 									<span fg={theme.textDim}>
-										  · · ·  {hiddenCount} earlier {hiddenCount === 1 ? "step" : "steps"}
+										· · · {hiddenCount} earlier{" "}
+										{hiddenCount === 1 ? "step" : "steps"}
 									</span>
 								</text>
 							) : null}
@@ -477,18 +490,17 @@ export function Analysis({
 								const isCurrentStep =
 									isRunning && i === visibleSteps.length - 1;
 								return (
-									<text key={`${step}-${i}`}>
+									<text key={step}>
 										<span fg={isCurrentStep ? theme.cyan : theme.success}>
 											{isCurrentStep ? "▶" : "✓"}
 										</span>
 										<span
 											fg={
-												isCurrentStep
-													? theme.textPrimary
-													: theme.textSecondary
+												isCurrentStep ? theme.textPrimary : theme.textSecondary
 											}
 										>
-											{"  "}{step}
+											{"  "}
+											{step}
 										</span>
 									</text>
 								);
@@ -507,7 +519,7 @@ export function Analysis({
 			</box>
 
 			{/* Status line */}
-			{(readyGate || localError || isCancelling) ? (
+			{readyGate || localError || isCancelling ? (
 				<box
 					paddingLeft={2}
 					paddingRight={2}
@@ -517,7 +529,7 @@ export function Analysis({
 					{readyGate ? (
 						<text>
 							<span fg={theme.success}>
-								✓  Done — press Enter to view your resume.
+								✓ Done — press Enter to view your resume.
 							</span>
 						</text>
 					) : null}

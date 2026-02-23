@@ -86,9 +86,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const setSelectedRepoIds = useCallback((value: string[]) => {
 		setState((prev) => ({ ...prev, selectedRepoIds: value }));
 	}, []);
-	const setContributors = useCallback((value: PipelineContributorIdentity[]) => {
-		setState((prev) => ({ ...prev, contributors: value }));
-	}, []);
+	const setContributors = useCallback(
+		(value: PipelineContributorIdentity[]) => {
+			setState((prev) => ({ ...prev, contributors: value }));
+		},
+		[],
+	);
 	const setSelectedEmail = useCallback((value: string | null) => {
 		setState((prev) => ({ ...prev, selectedEmail: value }));
 	}, []);
@@ -101,9 +104,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 	const setPipelineStage = useCallback((value: PipelineStage | null) => {
 		setState((prev) => ({ ...prev, pipelineStage: value }));
 	}, []);
-	const setPipelineTelemetry = useCallback((value: PipelineTelemetry | null) => {
-		setState((prev) => ({ ...prev, pipelineTelemetry: value }));
-	}, []);
+	const setPipelineTelemetry = useCallback(
+		(value: PipelineTelemetry | null) => {
+			setState((prev) => ({ ...prev, pipelineTelemetry: value }));
+		},
+		[],
+	);
 	const setPipelineMessages = useCallback((value: string[]) => {
 		setState((prev) => ({ ...prev, pipelineMessages: value }));
 	}, []);
@@ -119,16 +125,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 	const resetRunState = useCallback(
 		() =>
-		setState((prev) => ({
-			...prev,
-			pipelineJobId: null,
-			pipelineStatus: "idle",
-			pipelineStage: null,
-			pipelineTelemetry: null,
-			pipelineMessages: [],
-			resumeV3Draft: null,
-			resumeV3Output: null,
-		})),
+			setState((prev) => ({
+				...prev,
+				pipelineJobId: null,
+				pipelineStatus: "idle",
+				pipelineStage: null,
+				pipelineTelemetry: null,
+				pipelineMessages: [],
+				resumeV3Draft: null,
+				resumeV3Output: null,
+			})),
 		[],
 	);
 
@@ -175,11 +181,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 		],
 	);
 
-	return (
-		<AppContext.Provider value={value}>
-			{children}
-		</AppContext.Provider>
-	);
+	return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useAppState() {

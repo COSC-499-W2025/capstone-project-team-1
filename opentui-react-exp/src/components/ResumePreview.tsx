@@ -2,8 +2,13 @@ import { useKeyboard } from "@opentui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppState } from "../context/AppContext";
 import { theme } from "../types";
-import { createUnifiedDiff, resumeStats, resumeToSections, resumeToText } from "../utils";
 import type { ResumeSection, StatLine } from "../utils";
+import {
+	createUnifiedDiff,
+	resumeStats,
+	resumeToSections,
+	resumeToText,
+} from "../utils";
 import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {
@@ -28,12 +33,19 @@ export function ResumePreview({
 	const [selectedSection, setSelectedSection] = useState(0);
 	const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
-	const activeData = mode === "draft" ? state.resumeV3Draft : state.resumeV3Output;
+	const activeData =
+		mode === "draft" ? state.resumeV3Draft : state.resumeV3Output;
 	const sections = useMemo(() => resumeToSections(activeData), [activeData]);
 	const stats = useMemo(() => resumeStats(activeData), [activeData]);
 
-	const draftText = useMemo(() => resumeToText(state.resumeV3Draft), [state.resumeV3Draft]);
-	const finalText = useMemo(() => resumeToText(state.resumeV3Output), [state.resumeV3Output]);
+	const draftText = useMemo(
+		() => resumeToText(state.resumeV3Draft),
+		[state.resumeV3Draft],
+	);
+	const finalText = useMemo(
+		() => resumeToText(state.resumeV3Output),
+		[state.resumeV3Output],
+	);
 
 	const cycleMode = useCallback(() => {
 		setMode((prev) => {
@@ -102,7 +114,8 @@ export function ResumePreview({
 		}
 	});
 
-	const current = sections[selectedSection] ?? sections[0]!;
+	const current = sections[selectedSection] ??
+		sections[0] ?? { id: "empty", headerText: "", tocLabel: "", lines: [] };
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -193,7 +206,9 @@ function SectionNav({ sections, selectedIndex, stats }: SectionNavProps) {
 			{sections.map((section, i) => (
 				<text key={section.id}>
 					<span fg={i === selectedIndex ? theme.gold : theme.textSecondary}>
-						{i === selectedIndex ? `▶ ${section.tocLabel}` : `  ${section.tocLabel}`}
+						{i === selectedIndex
+							? `▶ ${section.tocLabel}`
+							: `  ${section.tocLabel}`}
 					</span>
 				</text>
 			))}
@@ -255,7 +270,7 @@ function FormatLine({ line }: { line: string }) {
 	if (!line || line.trim() === "") {
 		return (
 			<text>
-				<span>{" "}</span>
+				<span> </span>
 			</text>
 		);
 	}
@@ -343,11 +358,7 @@ function DiffView({ draftText, finalText }: DiffViewProps) {
 					viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 				}}
 			>
-				<diff
-					diff={diffString}
-					view="split"
-					showLineNumbers
-				/>
+				<diff diff={diffString} view="split" showLineNumbers />
 			</scrollbox>
 		</box>
 	);

@@ -1,21 +1,21 @@
-import { useKeyboard } from "@opentui/react";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useKeyboard } from "@opentui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api/endpoints";
 import type { PipelineIntakeResponse } from "../api/types";
 import { theme } from "../types";
 import {
-	scanForZips,
 	buildEntries,
+	type DirEntry,
 	filterEntries,
+	formatSize,
 	getMatchCount,
 	pathToBreadcrumbs,
-	formatSize,
+	type SearchableEntry,
+	scanForZips,
 	toErrorMessage,
 	type ZipFile,
-	type DirEntry,
-	type SearchableEntry,
 } from "../utils";
 import { TopBar } from "./TopBar";
 
@@ -139,7 +139,11 @@ export function FileUpload({
 	}, [currentPath, isSubmitting, selectedEntry, submitZip]);
 
 	useKeyboard((key) => {
-		if (key.name === "backspace" && currentPath !== rootPath && !isSearchFocused) {
+		if (
+			key.name === "backspace" &&
+			currentPath !== rootPath &&
+			!isSearchFocused
+		) {
 			setCurrentPath(dirname(currentPath));
 		}
 
@@ -199,7 +203,8 @@ export function FileUpload({
 		}
 
 		const dirEntry = entry as DirEntry;
-		const zipLabel = dirEntry.zipCount === 1 ? "1 ZIP" : `${dirEntry.zipCount} ZIPs`;
+		const zipLabel =
+			dirEntry.zipCount === 1 ? "1 ZIP" : `${dirEntry.zipCount} ZIPs`;
 		return { icon: "", name: dirEntry.name, description: zipLabel };
 	};
 
@@ -325,7 +330,7 @@ export function FileUpload({
 								focused={!isSearchFocused && !isSubmitting}
 								height={16}
 								showScrollIndicator
-								rowGap={1}
+								itemSpacing={1}
 							/>
 						)}
 					</box>
@@ -343,16 +348,10 @@ export function FileUpload({
 							{breadcrumbItems.map((crumb) => (
 								<span
 									key={crumb.key}
-									fg={
-										crumb.isLast
-											? theme.cyan
-											: theme.textSecondary
-									}
+									fg={crumb.isLast ? theme.cyan : theme.textSecondary}
 								>
 									{crumb.crumb === "/" ? "~" : crumb.crumb}
-									{!crumb.isLast ? (
-										<span fg={theme.textDim}> / </span>
-									) : null}
+									{!crumb.isLast ? <span fg={theme.textDim}> / </span> : null}
 								</span>
 							))}
 						</text>
@@ -378,7 +377,10 @@ function textHint(selectedEntry: SearchableEntry | undefined) {
 		);
 	}
 
-	if ("zipCount" in selectedEntry && !("isParent" in selectedEntry && selectedEntry.isParent)) {
+	if (
+		"zipCount" in selectedEntry &&
+		!("isParent" in selectedEntry && selectedEntry.isParent)
+	) {
 		return (
 			<text>
 				<span fg={theme.textDim}>Enter Open folder</span>

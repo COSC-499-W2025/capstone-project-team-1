@@ -163,9 +163,9 @@ function App() {
 	};
 
 	const renderScreen = () => {
-			switch (screen) {
-				case "landing":
-					return <Landing onReady={() => setLandingReady(true)} />;
+		switch (screen) {
+			case "landing":
+				return <Landing onReady={() => setLandingReady(true)} />;
 
 			case "consent-policy":
 				return (
@@ -283,7 +283,10 @@ function App() {
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<box flexGrow={1}>{renderScreen()}</box>
-			<BottomBar hint={bottomBarReady ? hint : ""} actions={bottomBarReady ? actions : []} />
+			<BottomBar
+				hint={bottomBarReady ? hint : ""}
+				actions={bottomBarReady ? actions : []}
+			/>
 		</box>
 	);
 }

@@ -35,7 +35,10 @@ export function PipelineLaunchScreen({
 	const [error, setError] = useState<string | null>(null);
 
 	const selectedRepos = useMemo(
-		() => state.detectedRepos.filter((repo) => state.selectedRepoIds.includes(repo.id)),
+		() =>
+			state.detectedRepos.filter((repo) =>
+				state.selectedRepoIds.includes(repo.id),
+			),
 		[state.detectedRepos, state.selectedRepoIds],
 	);
 
@@ -117,10 +120,14 @@ export function PipelineLaunchScreen({
 					</text>
 
 					<text>
-						<span fg={theme.textSecondary}>Email: {state.selectedEmail || "(none)"}</span>
+						<span fg={theme.textSecondary}>
+							Email: {state.selectedEmail || "(none)"}
+						</span>
 					</text>
 					<text>
-						<span fg={theme.textSecondary}>Selected repos: {selectedRepos.length}</span>
+						<span fg={theme.textSecondary}>
+							Selected repos: {selectedRepos.length}
+						</span>
 					</text>
 
 					{selectedRepos.slice(0, 8).map((repo) => (
@@ -151,7 +158,13 @@ export function PipelineLaunchScreen({
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={1}>
+			<box
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+				flexDirection="column"
+				gap={1}
+			>
 				{isStarting ? (
 					<text>
 						<span fg={theme.cyan}>Starting pipeline...</span>

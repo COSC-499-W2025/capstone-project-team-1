@@ -10,11 +10,36 @@ export interface ResumeSection {
 export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 	if (!data) {
 		return [
-			{ id: "summary", tocLabel: "Summary", headerText: "PROFESSIONAL SUMMARY", lines: ["No resume data available yet."] },
-			{ id: "skills", tocLabel: "Skills", headerText: "TECHNICAL SKILLS", lines: [] },
-			{ id: "projects", tocLabel: "Projects", headerText: "PROJECTS", lines: [] },
-			{ id: "profile", tocLabel: "Dev Profile", headerText: "DEVELOPER PROFILE", lines: [] },
-			{ id: "metadata", tocLabel: "Metadata", headerText: "METADATA", lines: [] },
+			{
+				id: "summary",
+				tocLabel: "Summary",
+				headerText: "PROFESSIONAL SUMMARY",
+				lines: ["No resume data available yet."],
+			},
+			{
+				id: "skills",
+				tocLabel: "Skills",
+				headerText: "TECHNICAL SKILLS",
+				lines: [],
+			},
+			{
+				id: "projects",
+				tocLabel: "Projects",
+				headerText: "PROJECTS",
+				lines: [],
+			},
+			{
+				id: "profile",
+				tocLabel: "Dev Profile",
+				headerText: "DEVELOPER PROFILE",
+				lines: [],
+			},
+			{
+				id: "metadata",
+				tocLabel: "Metadata",
+				headerText: "METADATA",
+				lines: [],
+			},
 		];
 	}
 
@@ -38,11 +63,13 @@ export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 			projectLines.push(`Language: ${project.primary_language || "n/a"}`);
 			projectLines.push(`Frameworks: ${frameworkText}`);
 			projectLines.push(`Contribution: ${contribution}`);
-			if (project.description) projectLines.push(`Description: ${project.description}`);
+			if (project.description)
+				projectLines.push(`Description: ${project.description}`);
 			if (project.bullets?.length) {
 				for (const bullet of project.bullets) projectLines.push(`- ${bullet}`);
 			}
-			if (project.narrative) projectLines.push(`Narrative: ${project.narrative}`);
+			if (project.narrative)
+				projectLines.push(`Narrative: ${project.narrative}`);
 			projectLines.push("");
 		}
 	}
@@ -62,7 +89,9 @@ export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 			id: "summary",
 			tocLabel: "Summary",
 			headerText: "PROFESSIONAL SUMMARY",
-			lines: data.professional_summary ? data.professional_summary.split("\n") : ["(empty)"],
+			lines: data.professional_summary
+				? data.professional_summary.split("\n")
+				: ["(empty)"],
 		},
 		{
 			id: "skills",
@@ -80,7 +109,9 @@ export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 			id: "profile",
 			tocLabel: "Dev Profile",
 			headerText: "DEVELOPER PROFILE",
-			lines: data.developer_profile ? data.developer_profile.split("\n") : ["(empty)"],
+			lines: data.developer_profile
+				? data.developer_profile.split("\n")
+				: ["(empty)"],
 		},
 		{
 			id: "metadata",

@@ -80,16 +80,22 @@ export function ConsentScreen({
 								</span>
 							</text>
 							<text>
-								<span fg={theme.textSecondary}>· README files (up to 2,000 chars)</span>
+								<span fg={theme.textSecondary}>
+									· README files (up to 2,000 chars)
+								</span>
 							</text>
 							<text>
 								<span fg={theme.textSecondary}>· Your commit messages</span>
 							</text>
 							<text>
-								<span fg={theme.textSecondary}>· Folder structure & file names</span>
+								<span fg={theme.textSecondary}>
+									· Folder structure & file names
+								</span>
 							</text>
 							<text>
-								<span fg={theme.textSecondary}>· Code metrics & skill timeline</span>
+								<span fg={theme.textSecondary}>
+									· Code metrics & skill timeline
+								</span>
 							</text>
 						</box>
 
@@ -122,7 +128,9 @@ export function ConsentScreen({
 								</span>
 							</text>
 							<text>
-								<span fg={theme.textDim}>if our classifier can't label them.</span>
+								<span fg={theme.textDim}>
+									if our classifier can't label them.
+								</span>
 							</text>
 
 							<box marginTop={1} flexDirection="column" gap={1}>
@@ -137,7 +145,9 @@ export function ConsentScreen({
 									</span>
 								</text>
 								<text>
-									<span fg={theme.textSecondary}>No cloud. Nothing leaves here.</span>
+									<span fg={theme.textSecondary}>
+										No cloud. Nothing leaves here.
+									</span>
 								</text>
 								<text>
 									<span fg={theme.textDim}>~/.artifactminer/models/</span>
@@ -159,7 +169,6 @@ export function ConsentScreen({
 							</span>
 						</text>
 					</box>
-
 				</box>
 			</box>
 		</box>

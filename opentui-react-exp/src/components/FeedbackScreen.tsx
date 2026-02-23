@@ -32,8 +32,14 @@ export function FeedbackScreen({
 	const [isCancelling, setIsCancelling] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	const draftLines = useMemo(() => resumeToLines(state.resumeV3Draft), [state.resumeV3Draft]);
-	const keyedDraftLines = useMemo(() => keyedLines(draftLines, "feedback-draft"), [draftLines]);
+	const draftLines = useMemo(
+		() => resumeToLines(state.resumeV3Draft),
+		[state.resumeV3Draft],
+	);
+	const keyedDraftLines = useMemo(
+		() => keyedLines(draftLines, "feedback-draft"),
+		[draftLines],
+	);
 
 	const submitFeedback = async () => {
 		if (!state.pipelineJobId || isSubmitting) {
@@ -186,10 +192,18 @@ export function FeedbackScreen({
 				</box>
 			</box>
 
-			<box paddingLeft={2} paddingRight={2} paddingBottom={1} flexDirection="column" gap={1}>
+			<box
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+				flexDirection="column"
+				gap={1}
+			>
 				{isSubmitting ? (
 					<text>
-						<span fg={theme.cyan}>Submitting feedback and starting Stage 3...</span>
+						<span fg={theme.cyan}>
+							Submitting feedback and starting Stage 3...
+						</span>
 					</text>
 				) : null}
 				{isCancelling ? (
