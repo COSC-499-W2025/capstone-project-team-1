@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import { ApiClient, ApiError } from "./client";
 
 const withMockFetch = async (
+	// biome-ignore lint/suspicious/noExplicitAny: test mock
 	mock: any,
 	fn: () => Promise<void>,
 ): Promise<void> => {
@@ -16,6 +17,7 @@ const withMockFetch = async (
 
 test("ApiClient.get returns JSON", async () => {
 	await withMockFetch(
+		// biome-ignore lint/suspicious/noExplicitAny: test mock
 		async (url: any) => {
 			expect(String(url)).toBe("http://example.test/health");
 			return new Response(JSON.stringify({ ok: true }), {
@@ -53,6 +55,7 @@ test("ApiClient throws ApiError with detail", async () => {
 test("ApiClient.uploadFile sends FormData", async () => {
 	let captured: RequestInit | undefined;
 	await withMockFetch(
+		// biome-ignore lint/suspicious/noExplicitAny: test mock
 		async (_url: any, options: any) => {
 			captured = options;
 			return new Response(JSON.stringify({ ok: true }), {
