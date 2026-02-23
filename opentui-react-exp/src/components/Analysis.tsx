@@ -441,8 +441,8 @@ export function Analysis({
 									<strong>{stageContext[activeStage].heading}</strong>
 								</span>
 							</text>
-							{stageContext[activeStage].lines.map((line, i) => (
-								<text key={`${activeStage}-line-${i}`}>
+							{stageContext[activeStage].lines.map((line) => (
+								<text key={line}>
 									<span fg={theme.textDim}>{line}</span>
 								</text>
 							))}
