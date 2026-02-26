@@ -99,7 +99,7 @@ class JobState:
     process: multiprocessing.Process | None = None
     event_queue: multiprocessing.Queue | None = None
     messages: list[str] = field(default_factory=list)
-    stage: PipelineStage = "EXTRACT"
+    stage: PipelineStage = "ANALYZE"
     telemetry: dict[str, Any] = field(default_factory=dict)
     draft_output: ResumeOutput | None = None
     draft_json: dict[str, Any] | None = None
@@ -232,8 +232,8 @@ def _drain_events_once(job: JobState) -> None:
 
             job.status = "draft_ready"
             job.phase = "none"
-            job.stage = "STAGE_2"
-            _append_message(job, "Stage 2 complete. Draft is ready for feedback.")
+            job.stage = "DRAFT"
+            _append_message(job, "Draft complete. Ready for feedback.")
 
         elif event_type == "complete":
             output_json = event.get("output_json")
@@ -246,8 +246,8 @@ def _drain_events_once(job: JobState) -> None:
 
             job.status = "complete"
             job.phase = "none"
-            job.stage = "DONE"
-            _append_message(job, "Stage 3 complete. Final resume is ready.")
+            job.stage = "POLISH"
+            _append_message(job, "Polish complete. Final resume is ready.")
 
         elif event_type == "error":
             error_message = str(event.get("error", "Pipeline failed"))
@@ -420,7 +420,7 @@ def _phase1_worker(
     started = time.monotonic()
     telemetry = _new_telemetry(
         selected_repo_names,
-        stage="EXTRACT",
+        stage="ANALYZE",
         active_model=stage1_model,
     )
 
@@ -451,8 +451,8 @@ def _phase1_worker(
             telemetry["current_repo"] = current_repo
             push_telemetry()
 
-        emit("Phase 1 started: EXTRACT + Stage 1 + Stage 2")
-        telemetry["stage"] = "EXTRACT"
+        emit("Pipeline started: ANALYZE → FACTS → DRAFT")
+        telemetry["stage"] = "ANALYZE"
         telemetry["active_model"] = stage1_model
         push_telemetry()
 
@@ -465,9 +465,9 @@ def _phase1_worker(
         )
 
         for extraction_error in extract_errors:
-            emit(f"EXTRACT warning: {extraction_error}")
+            emit(f"ANALYZE warning: {extraction_error}")
 
-        telemetry["stage"] = "STAGE_1"
+        telemetry["stage"] = "FACTS"
         telemetry["active_model"] = stage1_model
         telemetry["facts_total"] = 0
         push_telemetry()
@@ -484,18 +484,18 @@ def _phase1_worker(
                 emit(f"Compiled {bundle.project_name}: {len(facts.facts)} facts")
                 push_telemetry()
             except Exception as exc:
-                error_msg = f"Stage 1 failed for {bundle.project_name}: {exc}"
+                error_msg = f"FACTS failed for {bundle.project_name}: {exc}"
                 stage_errors.append(error_msg)
                 emit(error_msg)
 
         if not raw_facts:
-            raise RuntimeError("Stage 1 extraction produced no results")
+            raise RuntimeError("FACTS stage produced no results")
 
-        telemetry["stage"] = "STAGE_2"
+        telemetry["stage"] = "DRAFT"
         telemetry["active_model"] = stage2_model
         telemetry["current_repo"] = None
         push_telemetry()
-        emit(f"Stage 2: Generating draft with {stage2_model}...")
+        emit(f"DRAFT: generating with {stage2_model}...")
 
         try:
             draft_output = run_draft_queries(
@@ -505,8 +505,8 @@ def _phase1_worker(
                 progress=emit,
             )
         except Exception as exc:
-            stage_errors.append(f"Stage 2 draft failed: {exc}")
-            emit(f"Stage 2 draft failed: {exc}")
+            stage_errors.append(f"DRAFT failed: {exc}")
+            emit(f"DRAFT failed: {exc}")
             draft_output = ResumeOutput(
                 stage="draft",
                 portfolio_data=portfolio,
@@ -557,7 +557,7 @@ def _phase3_worker(
     started = time.monotonic()
     telemetry = _new_telemetry(
         selected_repo_names,
-        stage="STAGE_3",
+        stage="POLISH",
         active_model=stage3_model,
     )
     telemetry["repos_done"] = telemetry["repos_total"]
@@ -596,7 +596,7 @@ def _phase3_worker(
             ],
         )
 
-        emit("Stage 3 started: polishing draft from saved Stage 2 output")
+        emit("POLISH started: refining draft from saved output")
         push_telemetry()
 
         final_output = run_polish_query(
@@ -614,7 +614,7 @@ def _phase3_worker(
         final_output.generation_time_seconds = round(time.monotonic() - started, 2)
 
         telemetry["polished_projects"] = len(final_output.project_sections)
-        telemetry["stage"] = "DONE"
+        telemetry["stage"] = "POLISH"
         push_telemetry()
 
         output_json = _serialize_resume_output(final_output)
@@ -755,10 +755,10 @@ async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartR
             phase="phase1",
             event_queue=event_queue,
             messages=["Pipeline request accepted. Waiting for worker updates."],
-            stage="EXTRACT",
+            stage="ANALYZE",
             telemetry=_new_telemetry(
                 selected_repo_names,
-                stage="EXTRACT",
+                stage="ANALYZE",
                 active_model=request.stage1_model,
             ),
             selected_repo_ids=[repo.id for repo in selected_repos],
@@ -863,17 +863,17 @@ async def polish_resume_pipeline(
 
         job.status = "polishing"
         job.phase = "phase3"
-        job.stage = "STAGE_3"
+        job.stage = "POLISH"
         job.last_error = None
         job.final_json = None
         job.telemetry.update(
             {
-                "stage": "STAGE_3",
+                "stage": "POLISH",
                 "active_model": job.stage3_model,
                 "polished_projects": 0,
             }
         )
-        _append_message(job, "Stage 3 polish requested.")
+        _append_message(job, "Polish requested.")
 
         feedback_payload = request.model_dump()
         process = multiprocessing.Process(

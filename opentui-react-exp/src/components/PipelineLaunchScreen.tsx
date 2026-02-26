@@ -70,7 +70,7 @@ export function PipelineLaunchScreen({
 
 			setPipelineJobId(response.job_id);
 			setPipelineStatus(response.status);
-			setPipelineStage("EXTRACT");
+			setPipelineStage("ANALYZE");
 			setPipelineTelemetry(null);
 			setPipelineMessages(["Pipeline start requested."]);
 			setResumeV3Draft(null);

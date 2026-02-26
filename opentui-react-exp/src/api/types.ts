@@ -126,11 +126,10 @@ export type PipelineJobStatus =
 	| "cancelled";
 
 export type PipelineStage =
-	| "EXTRACT"
-	| "STAGE_1"
-	| "STAGE_2"
-	| "STAGE_3"
-	| "DONE";
+	| "ANALYZE"
+	| "FACTS"
+	| "DRAFT"
+	| "POLISH";
 
 export interface PipelineRepoCandidate {
 	id: string;

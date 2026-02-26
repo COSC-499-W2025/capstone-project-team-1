@@ -13,38 +13,37 @@ interface AnalysisProps {
 	onCancelReturn: () => void;
 }
 
-const stageOrder = ["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3"] as const;
+const stageOrder = ["ANALYZE", "FACTS", "DRAFT", "POLISH"] as const;
 
 const stageLabel: Record<string, string> = {
-	EXTRACT: "Extract   —  Read repos",
-	STAGE_1: "Stage 1   —  Analyze",
-	STAGE_2: "Stage 2   —  Draft",
-	STAGE_3: "Stage 3   —  Polish",
+	ANALYZE: "Analyze   —  Read repos",
+	FACTS: "Facts     —  Compile evidence",
+	DRAFT: "Draft     —  Write resume",
+	POLISH: "Polish    —  Apply feedback",
 };
 
 // Context shown in the Activity panel while each stage is active
 const stageContext: Record<string, { heading: string; lines: string[] }> = {
-	EXTRACT: {
-		heading: "Gathering raw data from your repositories",
+		ANALYZE: {
+			heading: "Reading and analyzing your repositories locally",
+			lines: [
+				"We're reading README files, commit messages, folder",
+				"structure, dependency graphs, and code metrics for",
+				"every repo you selected. Nothing leaves your machine,",
+				"and this step is focused on collecting real signals,",
+				"not writing resume text yet.",
+			],
+		},
+	FACTS: {
+		heading: "Compiling grounded facts and evidence",
 		lines: [
-			"We're reading README files, commit messages, folder",
-			"structure, dependency graphs, and code metrics for",
-			"every repo you selected. No AI runs at this stage —",
-			"just thorough, local extraction. Nothing leaves your",
-			"machine.",
+			"We're assembling a concise fact set per project from",
+			"commits, constructs, tests, and metrics. These facts",
+			"act as the grounding layer for drafting so the output",
+			"stays tied to what your repos actually contain.",
 		],
 	},
-	STAGE_1: {
-		heading: "Understanding what you built and how",
-		lines: [
-			"A small local AI model is now analysing each project.",
-			"It scores commit quality, maps your skill timeline,",
-			"measures complexity, and infers what each repo is",
-			"actually for — so your resume reflects real depth,",
-			"not just a list of technologies.",
-		],
-	},
-	STAGE_2: {
+	DRAFT: {
 		heading: "Writing your resume",
 		lines: [
 			"The AI is now composing project bullets, technical",
@@ -53,7 +52,7 @@ const stageContext: Record<string, { heading: string; lines: string[] }> = {
 			"structured as clean Markdown ready to export.",
 		],
 	},
-	STAGE_3: {
+	POLISH: {
 		heading: "Polishing based on your feedback",
 		lines: [
 			"The AI is refining tone, language, and emphasis",
@@ -89,7 +88,7 @@ const STEP_MAP: Array<[string, string]> = [
 const NOISE_PREFIXES = [
 	"Pipeline request",
 	"Phase 1 worker",
-	"Phase 1 started",
+	"Pipeline started",
 	"Phase 3 worker",
 	"Phase 3 started",
 	"Checking model",
@@ -247,7 +246,7 @@ export function Analysis({
 	});
 
 	const telemetry = state.pipelineTelemetry;
-	const activeStage = telemetry?.stage || state.pipelineStage || "EXTRACT";
+	const activeStage = telemetry?.stage || state.pipelineStage || "ANALYZE";
 	const activeIndex = stageOrder.indexOf(
 		activeStage as (typeof stageOrder)[number],
 	);

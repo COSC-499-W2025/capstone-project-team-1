@@ -207,7 +207,7 @@ def test_pipeline_start_poll_polish_flow_with_inline_process(
                     },
                 },
                 "telemetry": {
-                    "stage": "STAGE_2",
+                    "stage": "DRAFT",
                     "repos_total": 1,
                     "repos_done": 1,
                     "facts_total": 3,
@@ -238,7 +238,7 @@ def test_pipeline_start_poll_polish_flow_with_inline_process(
                     },
                 },
                 "telemetry": {
-                    "stage": "DONE",
+                    "stage": "POLISH",
                     "repos_total": 1,
                     "repos_done": 1,
                     "polished_projects": 1,

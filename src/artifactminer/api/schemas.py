@@ -395,7 +395,10 @@ PipelineJobStatus = Literal[
     "cancelled",
 ]
 
-PipelineStage = Literal["EXTRACT", "STAGE_1", "STAGE_2", "STAGE_3", "DONE"]
+# Pipeline stage is a lightweight progress indicator for UI/telemetry.
+# Completion is represented by PipelineJobStatus ("complete"), so we do not
+# model a separate "DONE" stage.
+PipelineStage = Literal["ANALYZE", "FACTS", "DRAFT", "POLISH"]
 
 
 class PipelineRepoCandidate(BaseModel):
@@ -463,7 +466,7 @@ class PipelineStartResponse(BaseModel):
 class PipelineTelemetry(BaseModel):
     """Structured telemetry emitted by running pipeline stages."""
 
-    stage: PipelineStage = "EXTRACT"
+    stage: PipelineStage = "ANALYZE"
     active_model: str | None = None
     repos_total: int = 0
     repos_done: int = 0
