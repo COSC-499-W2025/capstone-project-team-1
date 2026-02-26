@@ -84,8 +84,9 @@ uploads/
 # Extracted ZIP contents
 .extracted/
 
-# Demo fixtures (never commit embedded git metadata)
-demo/mock_data/**/.git/
+# Demo fixtures (never commit embedded git metadata or archives)
+demo/mock_data/**/
+mock.zip
 
 # Test fixtures (already packaged in tests/data/mock_projects.zip)
 projects/
