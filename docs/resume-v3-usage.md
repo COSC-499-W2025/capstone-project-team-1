@@ -8,7 +8,7 @@ Resume v3 generates resume content from a ZIP of Git repositories by combining s
 
 Flow map:
 
-ZIP file -> Repository discovery -> EXTRACT signals -> QUERY with LLM -> ASSEMBLE outputs -> `resume.md` and `resume.json`
+ZIP file -> Repository discovery -> ANALYZE -> FACTS -> DRAFT -> (optional) POLISH -> `resume.md` and `resume.json`
 
 ## Before you run it
 
@@ -28,14 +28,16 @@ When you run `artifactminer resume generate`, the system usually does this seque
 1. Validates the ZIP and user email.
 2. Confirms the model file exists locally.
 3. Starts `llama-server` if needed.
-4. Extracts metadata from each repository.
-5. Runs project and portfolio LLM queries.
-6. Assembles Markdown and JSON outputs.
-7. Stops server resources when done.
+4. ANALYZE: extracts metadata from each repository (local analysis).
+5. FACTS: compiles grounded per-project facts.
+6. DRAFT: writes the first resume draft (local LLM).
+7. POLISH (optional): refines the draft based on user feedback (local LLM).
+8. Assembles Markdown and JSON outputs.
+9. Stops server resources when done.
 
 Execution map:
 
-Input validation -> Model check -> Server health -> Extractors -> LLM queries -> Output assembly -> Complete
+Input validation -> Model check -> Server health -> ANALYZE -> FACTS -> DRAFT -> (optional) POLISH -> Output assembly -> Complete
 
 ## Outputs you should expect
 

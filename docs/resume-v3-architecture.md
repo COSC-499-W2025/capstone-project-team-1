@@ -14,16 +14,20 @@ System diagram:
 
 ZIP input
 -> Repo discovery
--> EXTRACT phase (no LLM)
+-> ANALYZE stage (mostly deterministic; may use a small local model for classification/inference)
 -> `ProjectDataBundle`
--> QUERY phase (LLM calls)
--> `PortfolioDataBundle`
+-> FACTS stage (compile grounded per-project facts)
+-> `RawProjectFacts`
+-> DRAFT stage (LLM calls)
+-> draft `ResumeOutput`
+-> POLISH stage (LLM calls with user feedback)
+-> final `ResumeOutput`
 -> ASSEMBLE phase
 -> Markdown + JSON outputs
 
-## Phase 1: EXTRACT
+## Stage: ANALYZE
 
-Purpose: gather deterministic, low-cost repository signals before any LLM call.
+Purpose: gather repository signals before drafting the resume text.
 
 Extractor map:
 
@@ -38,7 +42,15 @@ What each extractor contributes:
 - Constructs: function, class, and import-level structural hints.
 - Project type: broad category such as app, library, or tool.
 
-## Phase 2: QUERY
+## Stage: FACTS
+
+Purpose: compile a grounded fact set per project that downstream drafting must cite.
+
+Fact compilation map:
+
+`ProjectDataBundle` -> deterministic data-card compilation -> `RawProjectFacts`
+
+## Stage: DRAFT
 
 Purpose: use the LLM as an analyst over structured metadata, not as a raw parser.
 
@@ -55,7 +67,11 @@ Expected outcomes:
 - Skills and growth themes across repositories.
 - More coherent portfolio narrative than single-shot prompting.
 
-## Phase 3: ASSEMBLE
+## Stage: POLISH
+
+Purpose: refine the draft using explicit user feedback while preserving factual grounding.
+
+## Phase: ASSEMBLE
 
 Purpose: convert extracted facts and LLM analysis into stable output formats.
 
