@@ -63,11 +63,14 @@ def _build_portfolio_project_items(
     project_ids = [project.id for project in projects]
     
     # Fetch user roles for all projects in one query
+    # Note: Multiple UserRepoStat entries can exist per project_path (e.g., multiple files).
+    # We use a dict to keep only one role per project (last one seen, which SQLAlchemy returns deterministically).
     user_roles_map = {}
     if project_paths:
         user_roles = (
             db.query(UserRepoStat)
             .filter(UserRepoStat.project_path.in_(project_paths))
+            .order_by(UserRepoStat.project_path, UserRepoStat.id)
             .all()
         )
         user_roles_map = {ur.project_path: ur.user_role for ur in user_roles}
@@ -78,7 +81,7 @@ def _build_portfolio_project_items(
         evidence_items = (
             db.query(ProjectEvidence)
             .filter(ProjectEvidence.repo_stat_id.in_(project_ids))
-            .order_by(ProjectEvidence.date.desc().nullslast(), ProjectEvidence.id.desc())
+            .order_by(ProjectEvidence.repo_stat_id, ProjectEvidence.date.desc().nullslast(), ProjectEvidence.id.desc())
             .all()
         )
         for ev in evidence_items:
@@ -212,6 +215,12 @@ async def generate_portfolio(
 
     errors: list[str] = []
     selected_projects = _apply_preferences(projects, prefs, errors)
+    if not selected_projects:
+        raise HTTPException(
+            status_code=400,
+            detail="No projects available after applying preferences. No portfolio to generate.",
+        )
+    
     selected_project_ids = [project.id for project in selected_projects]
     selected_paths = sorted({project.project_path.rstrip("/") for project in selected_projects})
 
@@ -350,6 +359,12 @@ async def get_portfolio(
     # Apply preferences (ordering and filtering)
     errors: list[str] = []
     selected_projects = _apply_preferences(projects, prefs, errors)
+    if not selected_projects:
+        raise HTTPException(
+            status_code=400,
+            detail="No projects available after applying preferences. No portfolio to generate.",
+        )
+    
     selected_project_ids = [project.id for project in selected_projects]
     selected_paths = sorted({project.project_path.rstrip("/") for project in selected_projects})
 
