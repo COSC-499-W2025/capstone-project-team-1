@@ -2,22 +2,58 @@
 
 from __future__ import annotations
 
-from dataclasses import fields
+from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List
 
-from artifactminer.skills.models import (
-    DeepAnalysisResult,
-    ExtractedSkill,
-    GitStatsResult,
-    InfraSignalsResult,
-    Insight,
-    RepoQualityResult,
-)
+from artifactminer.skills.models import ExtractedSkill
 from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
 from artifactminer.skills.signals.infra_signals import get_infra_signals
-from artifactminer.skills.signals.repo_quality_signals import get_repo_quality_signals
+
+
+@dataclass
+class Insight:
+    """Aggregated insight with rationale."""
+
+    title: str
+    evidence: List[str] = field(default_factory=list)
+    why_it_matters: str = ""
+
+
+@dataclass
+class GitStatsResult:
+    """Git contribution metrics for a user in a repo."""
+
+    commit_count_window: int = 0
+    commit_frequency: float = 0.0
+    contribution_percent: float = 0.0
+    first_commit_date: Any = None
+    last_commit_date: Any = None
+    has_branches: bool = False
+    branch_count: int = 0
+    has_tags: bool = False
+    merge_commits: int = 0
+
+
+@dataclass
+class InfraSignalsResult:
+    """Infrastructure and DevOps configuration signals."""
+
+    ci_cd_tools: List[str] = field(default_factory=list)
+    docker_tools: List[str] = field(default_factory=list)
+    env_build_tools: List[str] = field(default_factory=list)
+    all_tools: List[str] = field(default_factory=list)
+
+
+@dataclass
+class DeepAnalysisResult:
+    """Baseline skills plus higher-order insights."""
+
+    skills: List[ExtractedSkill]
+    insights: List[Insight]
+    git_stats: GitStatsResult | None = None
+    infra_signals: InfraSignalsResult | None = None
 
 
 class DeepRepoAnalyzer:
@@ -83,14 +119,12 @@ class DeepRepoAnalyzer:
             repo_path, user_email, user_contributions, user_stats
         )
         infra_signals = self._extract_infra_signals(repo_path, user_contributions)
-        repo_quality = self._extract_repo_quality(repo_path, user_contributions)
 
         return DeepAnalysisResult(
             skills=skills,
             insights=insights,
             git_stats=git_stats,
             infra_signals=infra_signals,
-            repo_quality=repo_quality,
         )
 
     def _extract_git_stats(
@@ -133,17 +167,6 @@ class DeepRepoAnalyzer:
         summary = signals.get("summary", {})
         valid = {f.name for f in fields(InfraSignalsResult)}
         return InfraSignalsResult(**{k: summary.get(k) for k in valid if k in summary})
-
-    def _extract_repo_quality(
-        self,
-        repo_path: str,
-        user_contributions: Dict | None,
-    ) -> RepoQualityResult | None:
-        """Extract repository quality signals."""
-        touched_paths = (
-            user_contributions.get("touched_paths") if user_contributions else None
-        )
-        return get_repo_quality_signals(repo_path, touched_paths=touched_paths) or None
 
     def _validate_insight_rules(self) -> None:
         """Fail fast if insight rules reference skills that do not exist."""
