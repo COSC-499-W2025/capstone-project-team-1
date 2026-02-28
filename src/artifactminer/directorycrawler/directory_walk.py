@@ -524,7 +524,9 @@ userIncludeFileExtension = [] #user file extension that will be included
 userIncludeAllFiles = False 
 
 store_file_dictionary = StoreFileDict()
+
 #storing files from mock folder to dictionary
+#NOTE: return dictionary of file name, path, and extension. and list of all directories.
 def crawl_directory(refresh_dict = True) -> tuple[dict, list[str]]: 
     listforalldirs = []
     if not os.path.exists(CURRENTPATH):
@@ -568,10 +570,12 @@ def crawl_directory(refresh_dict = True) -> tuple[dict, list[str]]:
                     store_file_dictionary.add_to_dict(fileId, (file, full_path, extension)) #key = filename, path = filepath
     
     
+
     values = copy.deepcopy(store_file_dictionary.get_dict()) #perform deep copy to avoid duplicates
     
     if refresh_dict: #do we want to remove all items for dictionary when we call this function or manually? 
         store_file_dictionary.remove_all_dict()
+
 
     return values, listforalldirs
 

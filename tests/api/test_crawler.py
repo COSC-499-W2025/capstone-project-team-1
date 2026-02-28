@@ -1,7 +1,7 @@
 
 from pathlib import Path
 from artifactminer.directorycrawler.directory_walk import user_keep_extension
-from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_pdf_contents
+from artifactminer.FileIntelligence.file_intelligence_main import get_crawler_file_contents
 import shutil
 
 MOCK_CONFIG_PATH =  Path(__file__).parent/ "../directorycrawler" / "mocks" / "config_mock"
@@ -52,6 +52,10 @@ def test_ignore_files(client):
     Crawler: performs checks cleans data
     User configuration requests that ".keepme" file can stay; output reacts accordingly.
     """
+    # Clean the config directory before this test
+    if MOCK_CONFIG_PATH.exists():
+        shutil.rmtree(MOCK_CONFIG_PATH)
+    
     append_file_to_path('my_ignored_file.ignoreextension', "data")
     append_file_to_path('keep_this_file.keepme', "data")  #adds this file to directory based on user request.
     append_file_to_path('allowed.c', "int x = 0;") 
@@ -79,8 +83,6 @@ def test_ignore_files(client):
     {'file_path': '.extracted/1/allowed1.c', 'file_name': 'allowed1.c', 'file_ext': '.c'},
     {'file_path': '.extracted/1/allowed2.c', 'file_name': 'allowed2.c', 'file_ext': '.c'},
     
-
-
     ]
     assert payload["crawl_path_and_file_name_and_ext"] == expected_files
 
@@ -135,10 +137,132 @@ async def test_get_crawler_content_pdf_analysis(client):
     tuple_file_values = [(fv["file_name"],fv["file_path"], fv["file_ext"])
     for fv in file_values]
 
-    response = await get_crawler_pdf_contents(file_values=tuple_file_values)
-
-    assert isinstance(response, str)
+    response = await get_crawler_file_contents(file_values=tuple_file_values)
+    
+    assert isinstance(response, list)
+    assert len(response) > 0
+    assert all(isinstance(item, str) for item in response)
+    assert all(len(item) > 0 for item in response)
     
 
+async def test_get_crawler_content_markdown_analysis(client, tmp_path, monkeypatch):
 
+    pdf_path = Path(__file__).parent/ "../directorycrawler" / "mocks" / "markdowndirectory.zip"
+    response = upload_zip_for_test(client=client, path=pdf_path)
+    payload = response.json()
+
+    assert payload["zip_id"] == 1
+    assert payload["filename"] == "markdowndirectory.zip"
+    assert response.status_code == 200
+
+    zip_id = payload["zip_id"]
+
+    response = client.get("/crawler", params={"zip_id" : zip_id})
     
+    payload = response.json()
+
+    file_values = payload["crawl_path_and_file_name_and_ext"]
+
+    #convert object to tuple 
+    tuple_file_values = [(fv["file_name"],fv["file_path"], fv["file_ext"])
+    for fv in file_values]
+
+    response = await get_crawler_file_contents(file_values=tuple_file_values)
+    
+    assert isinstance(response, list)
+    assert len(response) > 0
+    assert all(isinstance(item, str) for item in response)
+    assert all(len(item) > 0 for item in response)
+
+
+def test_fileintelligence_api_no_pdf_md(client):
+    """
+    Test /fileintelligence API with files that have no .pdf or .md extensions.
+    Should return "No pdf file found." since no supported file types exist.
+    """
+    # Clean the config directory before this test
+    if MOCK_CONFIG_PATH.exists():
+        shutil.rmtree(MOCK_CONFIG_PATH)
+    
+    append_file_to_path('script.js', "console.log('test');")
+    append_file_to_path('code.c', "int main() { return 0; }")
+    append_file_to_path('notes.txt', "This is a text file")
+    
+    directory_to_zip(MOCK_CONFIG_PATH, CONFIG_ZIP_PATH)
+    response = upload_zip_for_test(client=client, path=CONFIG_ZIP_PATH)
+    payload = response.json()
+    
+    assert response.status_code == 200
+    zip_id = payload["zip_id"]
+    
+    # Call the /fileintelligence API endpoint
+    response = client.get("/fileintelligence", params={"zip_id": zip_id})
+    
+    assert response.status_code == 200
+    result = response.json()
+    assert isinstance(result, list)
+    assert len(result) > 0
+
+
+def test_fileintelligence_api_only_markdown(client):
+    """
+    Test /fileintelligence API with only .md files.
+    Should analyze markdown files and return structured content.
+    """
+    # Clean the config directory before this test
+    if MOCK_CONFIG_PATH.exists():
+        shutil.rmtree(MOCK_CONFIG_PATH)
+    
+    append_file_to_path('resume.md', "# Resume\n## Experience\nWorked at Company X\n## Education\nBS Computer Science")
+    append_file_to_path('portfolio.md', "# Portfolio\n## Projects\nProject 1: Web App\nProject 2: Mobile App")
+    
+    directory_to_zip(MOCK_CONFIG_PATH, CONFIG_ZIP_PATH)
+    response = upload_zip_for_test(client=client, path=CONFIG_ZIP_PATH)
+    payload = response.json()
+    
+    assert response.status_code == 200
+    zip_id = payload["zip_id"]
+    
+    # Call the /fileintelligence API endpoint
+    response = client.get("/fileintelligence", params={"zip_id": zip_id})
+    
+    assert response.status_code == 200
+    result = response.json()
+    assert isinstance(result, list)
+    assert len(result) == 2
+
+
+def test_fileintelligence_api_multiple_markdown(client):
+    """
+    Test /fileintelligence API with multiple .md files.
+    Should process all markdown files and return analysis for each.
+    """
+    # Clean the config directory before this test
+    if MOCK_CONFIG_PATH.exists():
+        shutil.rmtree(MOCK_CONFIG_PATH)
+    
+    append_file_to_path('skills.md', "# Skills\nPython, JavaScript, Java, Go")
+    append_file_to_path('education.md', "# Education\nBS Computer Science from University")
+    append_file_to_path('experience.md', "# Work Experience\nSoftware Engineer at Tech Corp for 3 years")
+    
+    directory_to_zip(MOCK_CONFIG_PATH, CONFIG_ZIP_PATH)
+    response = upload_zip_for_test(client=client, path=CONFIG_ZIP_PATH)
+    payload = response.json()
+    
+    assert response.status_code == 200
+    zip_id = payload["zip_id"]
+    
+    # Call the /fileintelligence API endpoint
+    response = client.get("/fileintelligence", params={"zip_id": zip_id})
+    
+    assert response.status_code == 200
+    result = response.json()
+
+    for item in result:
+        #print files
+        print(item)
+
+    assert isinstance(result, list)
+    assert len(result) == 3
+   
+

@@ -59,7 +59,11 @@ from ..evidence.orchestrator import (
     persist_generated_evidence,
     persist_insights_as_project_evidence,
 )
-from ..evidence.extractors import git_stats_to_evidence, infra_signals_to_evidence
+from ..evidence.extractors import (
+    git_stats_to_evidence,
+    infra_signals_to_evidence,
+    repo_quality_to_evidence,
+)
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
@@ -265,6 +269,23 @@ def _get_progress_callback() -> Callable[[int, int, str], None] | None:
     return None
 
 
+def _persist_optional_evidence(
+    db: Session,
+    *,
+    repo_stat_id: int,
+    evidence_items: list,
+) -> None:
+    """Persist generated evidence rows when there are items to store."""
+    if not evidence_items:
+        return
+    persist_generated_evidence(
+        db=db,
+        repo_stat_id=repo_stat_id,
+        evidence_items=evidence_items,
+        commit=False,
+    )
+
+
 @router.post("/{zip_id}", response_model=AnalyzeResponse)
 async def analyze_zip(
     zip_id: int,
@@ -371,8 +392,11 @@ async def analyze_zip(
         try:
             repo_stats = getRepoStats(repo_path)
             repo_stat = saveRepoStats(repo_stats, db=db)
+            if repo_stat is None:
+                raise ValueError(f"Failed to persist repo stats for {repo_path.name}")
 
             # repo_stat is now the SQLAlchemy model instance with .id
+            repo_last_commit = repo_stat.last_commit if repo_stat and repo_stat.last_commit else None
 
             user_stats = None
             user_contribution_pct = None
@@ -431,32 +455,18 @@ async def analyze_zip(
                 db=db,
                 repo_stat_id=repo_stat.id,
                 insights=deep_result.insights,
-                repo_last_commit=repo_stat.last_commit,
+                repo_last_commit=repo_last_commit,
                 commit=False,
             )
+            evidence_date = repo_last_commit.date() if repo_last_commit else None
 
-            if deep_result.git_stats:
-                git_evidence = git_stats_to_evidence(deep_result.git_stats)
-                persist_generated_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=git_evidence,
-                    commit=False,
-                )
-
-            if deep_result.infra_signals:
-                infra_evidence = infra_signals_to_evidence(
-                    deep_result.infra_signals,
-                    evidence_date=repo_stat.last_commit.date()
-                    if repo_stat.last_commit
-                    else None,
-                )
-                persist_generated_evidence(
-                    db=db,
-                    repo_stat_id=repo_stat.id,
-                    evidence_items=infra_evidence,
-                    commit=False,
-                )
+            for signal, converter in [
+                (deep_result.git_stats, lambda s: git_stats_to_evidence(s)),
+                (deep_result.infra_signals, lambda s: infra_signals_to_evidence(s, evidence_date=evidence_date)),
+                (deep_result.repo_quality, lambda s: repo_quality_to_evidence(s, evidence_date=evidence_date)),
+            ]:
+                if signal:
+                    _persist_optional_evidence(db=db, repo_stat_id=repo_stat.id, evidence_items=converter(signal))
 
             print(
                 f"[analyze] Completed {repo_path.name}: {skills_count} skills, {insights_count} insights"

@@ -44,7 +44,7 @@ class Consent(Base):
     __tablename__ = "consents"
 
     id = Column(Integer, primary_key=True, index=True)
-    consent_level = Column(String, default="none", nullable=False) # e.g., "none", "full"
+    consent_level = Column(String, default="none", nullable=False) # e.g., "none", "local", "local-llm", "cloud"
     LLM_model = Column(String, default="chatGPT", nullable=False) # e.g., "ollama", "chatGPT"
     accepted_at = Column(DateTime, nullable=True)
 

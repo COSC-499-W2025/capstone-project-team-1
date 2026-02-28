@@ -1,13 +1,14 @@
 """Skill extraction package."""
 
-from .models import ExtractedSkill  # noqa: F401
-
-from .skill_extractor import SkillExtractor  # noqa: F401
-
-from .deep_analysis import (
+from .models import (
     DeepAnalysisResult,
-    DeepRepoAnalyzer,
+    ExtractedSkill,
     GitStatsResult,
     InfraSignalsResult,
     Insight,
+    RepoQualityResult,
 )  # noqa: F401
+
+from .skill_extractor import SkillExtractor  # noqa: F401
+
+from .deep_analysis import DeepRepoAnalyzer  # noqa: F401

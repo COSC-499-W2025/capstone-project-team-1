@@ -1,5 +1,6 @@
 from pathlib import Path
 from copy import deepcopy
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -126,3 +127,44 @@ def test_validation_catches_invalid_insight_rules(monkeypatch):
     finally:
         # Restore original rules
         DeepRepoAnalyzer._INSIGHT_RULES = original_rules
+
+
+def test_extract_git_stats_includes_commit_window_with_preloaded_user_stats(monkeypatch):
+    """Verify _extract_git_stats passes preloaded user_stats through to get_git_stats."""
+    analyzer = DeepRepoAnalyzer(enable_llm=False)
+
+    preloaded_stats = MagicMock()
+    preloaded_stats.total_commits = 4
+    preloaded_stats.commitFrequency = 2.0
+    preloaded_stats.userStatspercentages = 40.0
+    preloaded_stats.first_commit = None
+    preloaded_stats.last_commit = None
+
+    def fake_get_git_stats(repo_path, user_email, **kwargs):
+        assert kwargs["user_stats"] is preloaded_stats
+        return {
+            "commit_count_window": 3,
+            "commit_frequency": 2.0,
+            "contribution_percent": 40.0,
+            "first_commit_date": None,
+            "last_commit_date": None,
+        }
+
+    monkeypatch.setattr(
+        "artifactminer.skills.deep_analysis.get_git_stats",
+        fake_get_git_stats,
+    )
+    monkeypatch.setattr(
+        "artifactminer.skills.deep_analysis.detect_git_patterns",
+        lambda *args, **kwargs: {},
+    )
+
+    git_stats = analyzer._extract_git_stats(
+        "/tmp/repo",
+        "user@example.com",
+        user_contributions=None,
+        user_stats=preloaded_stats,
+    )
+
+    assert git_stats is not None
+    assert git_stats.commit_count_window == 3

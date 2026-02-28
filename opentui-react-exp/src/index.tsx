@@ -47,7 +47,6 @@ function App() {
 	const renderer = useRenderer();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
-	const [useLLM, setUseLLM] = useState(false);
 
 	// Global keyboard handler
 	useKeyboard((key) => {
@@ -106,8 +105,7 @@ function App() {
 			case "consent":
 				return (
 					<ConsentScreen
-						onContinue={(llmChoice) => {
-							setUseLLM(llmChoice);
+						onContinue={() => {
 							setScreen("file-upload");
 						}}
 						onBack={() => setScreen("landing")}

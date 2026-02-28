@@ -118,11 +118,11 @@ async def test_consent_continue_saves_and_navigates(monkeypatch: pytest.MonkeyPa
 
     screen, status, app, token = make_screen()
     try:
-        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="consent-full-btn")))
+        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="consent-local-llm-btn")))
         await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="continue-btn")))
 
-        assert calls == [{"consent_level": "full"}]
-        assert app.consent_state == {"consent_level": "full", "accepted_at": "now"}
+        assert calls == [{"consent_level": "local-llm"}]
+        assert app.consent_state == {"consent_level": "local-llm", "accepted_at": "now"}
         assert app.switched == ["userconfig"]
         assert status.text == screen.SUCCESS_STATUS
         assert "error" not in status.classes
