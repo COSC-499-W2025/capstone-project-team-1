@@ -81,23 +81,23 @@ export const api = {
 	deleteProject: (projectId: number): Promise<DeleteResponse> =>
 		client.delete(`/projects/${projectId}`),
 	createPipelineIntake: (zipPath: string): Promise<PipelineIntakeResponse> =>
-		client.post("/resume/pipelines/intakes", { zip_path: zipPath }),
+		client.post("/local-llm/intakes", { zip_path: zipPath }),
 	getPipelineContributors: (
 		intakeId: string,
 		request: PipelineContributorsRequest,
 	): Promise<PipelineContributorsResponse> =>
-		client.post(`/resume/pipelines/intakes/${intakeId}/contributors`, request),
+		client.post(`/local-llm/intakes/${intakeId}/contributors`, request),
 	startPipeline: (
 		request: PipelineStartRequest,
 	): Promise<PipelineStartResponse> =>
-		client.post("/resume/pipelines", request),
+		client.post("/local-llm/jobs", request),
 	getPipelineStatus: (jobId: string): Promise<PipelineStatusResponse> =>
-		client.get(`/resume/pipelines/${jobId}`),
+		client.get(`/local-llm/jobs/${jobId}`),
 	polishPipeline: (
 		jobId: string,
 		request: PipelinePolishRequest,
 	): Promise<PipelinePolishResponse> =>
-		client.post(`/resume/pipelines/${jobId}/polish`, request),
+		client.post(`/local-llm/jobs/${jobId}/polish`, request),
 	cancelPipeline: (jobId: string): Promise<PipelineCancelResponse> =>
-		client.post(`/resume/pipelines/${jobId}/cancel`),
+		client.post(`/local-llm/jobs/${jobId}/cancel`),
 };

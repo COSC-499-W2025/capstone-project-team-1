@@ -61,6 +61,11 @@ router = APIRouter(
     tags=["resume"],
 )
 
+local_llm_router = APIRouter(
+    prefix="/local-llm",
+    tags=["local-llm"],
+)
+
 
 JobPhase = Literal["phase1", "phase3", "none"]
 _TERMINATE_TIMEOUT_SECONDS = 1.0
@@ -637,7 +642,7 @@ def _phase3_worker(
         )
 
 
-@router.post("/pipelines/intakes", response_model=PipelineIntakeCreateResponse)
+@local_llm_router.post("/intakes", response_model=PipelineIntakeCreateResponse)
 async def create_pipeline_intake(
     request: PipelineIntakeCreateRequest,
 ) -> PipelineIntakeCreateResponse:
@@ -704,8 +709,8 @@ async def create_pipeline_intake(
     )
 
 
-@router.post(
-    "/pipelines/intakes/{intake_id}/contributors",
+@local_llm_router.post(
+    "/intakes/{intake_id}/contributors",
     response_model=PipelineContributorsResponse,
 )
 async def list_pipeline_contributors(
@@ -730,7 +735,7 @@ async def list_pipeline_contributors(
     return PipelineContributorsResponse(contributors=contributors)
 
 
-@router.post("/pipelines", response_model=PipelineStartResponse)
+@local_llm_router.post("/jobs", response_model=PipelineStartResponse)
 async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartResponse:
     """Start phase 1 pipeline for selected repos and identity."""
     user_email = _normalize_email_or_422(request.user_email)
@@ -805,7 +810,7 @@ async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartR
     return PipelineStartResponse(job_id=job_id, status="running")
 
 
-@router.get("/pipelines/{job_id}", response_model=PipelineStatusResponse)
+@local_llm_router.get("/jobs/{job_id}", response_model=PipelineStatusResponse)
 async def get_resume_pipeline_status(job_id: str) -> PipelineStatusResponse:
     """Poll current status for a pipeline job."""
     with _lock:
@@ -827,7 +832,7 @@ async def get_resume_pipeline_status(job_id: str) -> PipelineStatusResponse:
         )
 
 
-@router.post("/pipelines/{job_id}/polish", response_model=PipelinePolishResponse)
+@local_llm_router.post("/jobs/{job_id}/polish", response_model=PipelinePolishResponse)
 async def polish_resume_pipeline(
     job_id: str,
     request: PipelinePolishRequest,
@@ -914,7 +919,7 @@ async def polish_resume_pipeline(
     return PipelinePolishResponse(ok=True, status="polishing")
 
 
-@router.post("/pipelines/{job_id}/cancel", response_model=PipelineCancelResponse)
+@local_llm_router.post("/jobs/{job_id}/cancel", response_model=PipelineCancelResponse)
 async def cancel_resume_pipeline(job_id: str) -> PipelineCancelResponse:
     """Cancel a running or paused pipeline immediately."""
     process: multiprocessing.Process | None = None
