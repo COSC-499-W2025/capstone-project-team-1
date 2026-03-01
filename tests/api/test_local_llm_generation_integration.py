@@ -1,4 +1,21 @@
-"""Integration test for local-LLM generation start + status flow."""
+"""Integration tests for local-LLM resume generation API endpoints.
+
+This module tests the full workflow of generating resumes using local LLM models:
+1. Uploading a ZIP file containing git repositories
+2. Extracting repository context and contributors
+3. Starting an asynchronous generation job
+4. Polling for job status until completion
+5. Verifying proper cleanup of background processes
+6. Testing the polish endpoint for final refinement
+
+Prerequisites:
+    - llama-server binary installed (e.g., via `brew install llama.cpp`)
+    - Required models downloaded to ~/.artifactminer/models/
+    - mock.zip test fixture present in repository root
+
+The tests verify both successful generation workflows and proper resource cleanup
+to prevent zombie processes.
+"""
 
 from __future__ import annotations
 
