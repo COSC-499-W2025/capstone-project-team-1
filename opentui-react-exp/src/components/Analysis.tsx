@@ -159,7 +159,7 @@ export function Analysis({
 
 		const pollStatus = async () => {
 			try {
-				const status = await api.getPipelineStatus(jobId);
+				const status = await api.getPipelineStatus();
 				if (cancelled) return;
 
 				setPipelineStatus(status.status);
@@ -224,7 +224,7 @@ export function Analysis({
 		if (!state.pipelineJobId || isCancelling) return;
 		setIsCancelling(true);
 		try {
-			await api.cancelPipeline(state.pipelineJobId);
+			await api.cancelPipeline();
 			setPipelineStatus("cancelled");
 			setPipelineNotice("Pipeline cancelled by user.");
 			onCancelReturn();

@@ -33,7 +33,7 @@ export function IdentityScreen({ onContinue, onBack }: IdentityScreenProps) {
 		setError(null);
 
 		void api
-			.getPipelineContributors(state.intakeId, {
+			.getPipelineContributors({
 				repo_ids: state.selectedRepoIds,
 			})
 			.then((response) => {
