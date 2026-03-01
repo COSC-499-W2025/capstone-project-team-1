@@ -520,11 +520,48 @@ class CrawlerFiles(BaseModel):
 class RepresentationPreferences(BaseModel):
     """User preferences for portfolio representation."""
 
-    showcase_project_ids: list[str] = Field(
-        default_factory=list, description="Project IDs to showcase."
+    showcase_project_ids: list[int] = Field(
+        default_factory=list,
+        description="RepoStat IDs to showcase (use integer repo_stat IDs).",
     )
-    project_order: list[str] = Field(
-        default_factory=list, description="Manual project ordering override."
+    project_order: list[int] = Field(
+        default_factory=list,
+        description="Manual project ordering override as a list of RepoStat IDs.",
+    )
+    skills_to_highlight: list[int] = Field(
+        default_factory=list,
+        description="Skill IDs to highlight in portfolio output.",
+    )
+    hidden_skills: list[int] = Field(
+        default_factory=list,
+        description="Skill IDs to hide from portfolio output.",
+    )
+    chronology_overrides: list["ChronologyOverride"] = Field(
+        default_factory=list,
+        description=(
+            "Manual overrides for project chronology. Use date-only values (YYYY-MM-DD). "
+            "Partial overrides allowed (provide only first_commit or last_commit)."
+        ),
+    )
+    comparison_attributes: list[Literal[
+        "languages",
+        "frameworks",
+        "skills",
+        "total_commits",
+        "ranking_score",
+        "health_score",
+        "primary_language",
+        "role",
+    ]] = Field(
+        default_factory=list,
+        description=(
+            "Allowed attributes for project comparison. Valid values: languages, frameworks, "
+            "skills, total_commits, ranking_score, health_score, primary_language, role."
+        ),
+    )
+    custom_rankings: list["CustomRanking"] = Field(
+        default_factory=list,
+        description="Manual custom rankings for projects (list of {project_id, rank}).",
     )
 
 
@@ -535,6 +572,18 @@ class PortfolioGenerationRequest(BaseModel):
         min_length=1,
         description="Portfolio UUID returned by ZIP uploads.",
     )
+
+
+class PortfolioEvidenceItem(BaseModel):
+    """Evidence item for portfolio display."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    type: EvidenceType
+    content: str
+    source: str | None = None
+    date: _dt.date | None = None
 
 
 class PortfolioProjectItem(BaseModel):
@@ -549,6 +598,9 @@ class PortfolioProjectItem(BaseModel):
     last_commit: datetime | None = None
     ranking_score: float | None = None
     health_score: float | None = None
+    thumbnail_url: str | None = None
+    user_role: str | None = None
+    evidence: list[PortfolioEvidenceItem] = Field(default_factory=list)
 
 
 class PortfolioGenerationResponse(BaseModel):
@@ -566,7 +618,48 @@ class PortfolioGenerationResponse(BaseModel):
     summaries: list[SummaryResponse]
     skills_chronology: list[SkillChronologyItem]
     errors: list[str] = Field(default_factory=list)
+
+
+class PortfolioDisplayResponse(BaseModel):
+    """Portfolio display data for GET /portfolio/{id} endpoint."""
+
+    success: bool = Field(description="True when at least one project is included.")
+    portfolio_id: str
+    consent_level: str
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    preferences: RepresentationPreferences
+    projects: list[PortfolioProjectItem]
+    resume_items: list[ResumeItemResponse]
+    summaries: list[SummaryResponse]
+    skills_chronology: list[SkillChronologyItem]
+    errors: list[str] = Field(default_factory=list)
+
+
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
     summary_text: str
+
+
+class ChronologyOverride(BaseModel):
+    """Manual override for project chronology metadata."""
+    project_id: int = Field(description="Project identifier (repo_stat ID as integer).")
+    first_commit: _dt.date | None = Field(
+        default=None,
+        description="Optional override for first commit date (YYYY-MM-DD).",
+    )
+    last_commit: _dt.date | None = Field(
+        default=None,
+        description="Optional override for last commit date (YYYY-MM-DD).",
+    )
+
+class CustomRanking(BaseModel):
+    """Manual override for project ranking position."""
+
+    project_id: int = Field(description="Project identifier (repo_stat ID as integer).")
+    rank: int = Field(
+        description="Custom ranking position (lower value = higher rank).",
+        ge=1,
+    )

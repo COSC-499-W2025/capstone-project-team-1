@@ -14,8 +14,8 @@ def test_get_prefs_returns_defaults_for_missing_portfolio(client):
 def test_put_get_roundtrip_returns_same_payload(client):
     """PUT then GET roundtrip returns the same payload."""
     prefs = {
-        "showcase_project_ids": ["proj-1", "proj-2"],
-        "project_order": ["proj-2", "proj-1", "proj-3"],
+        "showcase_project_ids": [101, 102],
+        "project_order": [102, 101, 103],
     }
 
     # PUT the preferences
