@@ -43,7 +43,7 @@ export function DraftPauseScreen({
 		setError(null);
 		setIsSubmitting(true);
 		try {
-			await api.polishPipeline(state.pipelineJobId, {
+			await api.polishPipeline({
 				general_notes: generalNotes.trim(),
 				tone: tone.trim(),
 				additions: parseList(additionsText),
@@ -62,7 +62,7 @@ export function DraftPauseScreen({
 		setIsCancelling(true);
 		setError(null);
 		try {
-			await api.cancelPipeline(state.pipelineJobId);
+			await api.cancelPipeline();
 			setPipelineStatus("cancelled");
 			setPipelineNotice("Pipeline cancelled at draft pause.");
 			onCancelReturn();
