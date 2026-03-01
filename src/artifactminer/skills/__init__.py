@@ -10,6 +10,7 @@ from .deep_analysis import (
     GitStatsResult,
     InfraSignalsResult,
     Insight,
+    RepoQualityResult,
 )  # noqa: F401
 
 from .skill_extractor import SkillExtractor  # noqa: F401
