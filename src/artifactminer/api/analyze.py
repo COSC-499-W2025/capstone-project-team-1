@@ -62,6 +62,7 @@ from ..evidence.orchestrator import (
 from ..evidence.extractors import (
     git_stats_to_evidence,
     infra_signals_to_evidence,
+    repo_quality_to_evidence,
 )
 from ..helpers.project_ranker import rank_projects
 
@@ -462,6 +463,7 @@ async def analyze_zip(
             for signal, converter in [
                 (deep_result.git_stats, lambda s: git_stats_to_evidence(s)),
                 (deep_result.infra_signals, lambda s: infra_signals_to_evidence(s, evidence_date=evidence_date)),
+                (deep_result.repo_quality, lambda s: repo_quality_to_evidence(s, evidence_date=evidence_date)),
             ]:
                 if signal:
                     _persist_optional_evidence(db=db, repo_stat_id=repo_stat.id, evidence_items=converter(signal))

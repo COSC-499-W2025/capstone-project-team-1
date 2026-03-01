@@ -10,6 +10,7 @@ from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
 from artifactminer.skills.signals.infra_signals import get_infra_signals
+from artifactminer.skills.signals.repo_quality_signals import get_repo_quality_signals
 
 
 @dataclass
@@ -47,6 +48,23 @@ class InfraSignalsResult:
 
 
 @dataclass
+class RepoQualityResult:
+    """Repository quality signals: testing, documentation, code quality."""
+
+    test_file_count: int = 0
+    has_tests: bool = False
+    test_frameworks: List[str] = field(default_factory=list)
+    has_readme: bool = False
+    has_changelog: bool = False
+    has_contributing: bool = False
+    has_docs_dir: bool = False
+    has_lint_config: bool = False
+    has_precommit: bool = False
+    has_type_check: bool = False
+    quality_tools: List[str] = field(default_factory=list)
+
+
+@dataclass
 class DeepAnalysisResult:
     """Baseline skills plus higher-order insights."""
 
@@ -54,6 +72,7 @@ class DeepAnalysisResult:
     insights: List[Insight]
     git_stats: GitStatsResult | None = None
     infra_signals: InfraSignalsResult | None = None
+    repo_quality: RepoQualityResult | None = None
 
 
 class DeepRepoAnalyzer:
@@ -119,12 +138,14 @@ class DeepRepoAnalyzer:
             repo_path, user_email, user_contributions, user_stats
         )
         infra_signals = self._extract_infra_signals(repo_path, user_contributions)
+        repo_quality = self._extract_repo_quality(repo_path, user_contributions)
 
         return DeepAnalysisResult(
             skills=skills,
             insights=insights,
             git_stats=git_stats,
             infra_signals=infra_signals,
+            repo_quality=repo_quality,
         )
 
     def _extract_git_stats(
@@ -167,6 +188,17 @@ class DeepRepoAnalyzer:
         summary = signals.get("summary", {})
         valid = {f.name for f in fields(InfraSignalsResult)}
         return InfraSignalsResult(**{k: summary.get(k) for k in valid if k in summary})
+
+    def _extract_repo_quality(
+        self,
+        repo_path: str,
+        user_contributions: Dict | None,
+    ) -> RepoQualityResult | None:
+        """Extract repository quality signals."""
+        touched_paths = (
+            user_contributions.get("touched_paths") if user_contributions else None
+        )
+        return get_repo_quality_signals(repo_path, touched_paths=touched_paths) or None
 
     def _validate_insight_rules(self) -> None:
         """Fail fast if insight rules reference skills that do not exist."""
