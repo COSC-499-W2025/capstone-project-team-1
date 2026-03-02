@@ -2,61 +2,22 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import fields
 from typing import Any, Dict, List
 
-from artifactminer.skills.models import ExtractedSkill, RepoQualityResult
+from artifactminer.skills.models import (
+    DeepAnalysisResult,
+    ExtractedSkill,
+    GitStatsResult,
+    InfraSignalsResult,
+    Insight,
+    RepoQualityResult,
+)
 from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
 from artifactminer.skills.signals.infra_signals import get_infra_signals
 from artifactminer.skills.signals.repo_quality_signals import get_repo_quality_signals
-
-
-@dataclass
-class Insight:
-    """Aggregated insight with rationale."""
-
-    title: str
-    evidence: List[str] = field(default_factory=list)
-    why_it_matters: str = ""
-
-
-@dataclass
-class GitStatsResult:
-    """Git contribution metrics for a user in a repo."""
-
-    commit_count_window: int = 0
-    commit_frequency: float = 0.0
-    contribution_percent: float = 0.0
-    first_commit_date: Any = None
-    last_commit_date: Any = None
-    has_branches: bool = False
-    branch_count: int = 0
-    has_tags: bool = False
-    merge_commits: int = 0
-
-
-@dataclass
-class InfraSignalsResult:
-    """Infrastructure and DevOps configuration signals."""
-
-    ci_cd_tools: List[str] = field(default_factory=list)
-    docker_tools: List[str] = field(default_factory=list)
-    env_build_tools: List[str] = field(default_factory=list)
-    all_tools: List[str] = field(default_factory=list)
-
-
-@dataclass
-class DeepAnalysisResult:
-    """Baseline skills plus higher-order insights."""
-
-    skills: List[ExtractedSkill]
-    insights: List[Insight]
-    git_stats: GitStatsResult | None = None
-    infra_signals: InfraSignalsResult | None = None
-    repo_quality: RepoQualityResult | None = None
-
 
 class DeepRepoAnalyzer:
     """Per-repo analyzer that relies on user additions for attribution."""
