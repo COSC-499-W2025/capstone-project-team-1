@@ -6,7 +6,7 @@ from datetime import date
 from typing import List
 
 from artifactminer.evidence.models import EvidenceItem
-from artifactminer.skills.deep_analysis import RepoQualityResult
+from artifactminer.skills.models import RepoQualityResult
 
 _DOCS_FLAGS = [
     ("has_readme", "README"),

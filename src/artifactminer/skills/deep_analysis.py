@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, List
 
-from artifactminer.skills.models import ExtractedSkill
+from artifactminer.skills.models import ExtractedSkill, RepoQualityResult
 from artifactminer.skills.skill_extractor import SkillExtractor
 from artifactminer.skills.skill_patterns import CODE_REGEX_PATTERNS
 from artifactminer.skills.signals.git_signals import get_git_stats, detect_git_patterns
@@ -45,23 +45,6 @@ class InfraSignalsResult:
     docker_tools: List[str] = field(default_factory=list)
     env_build_tools: List[str] = field(default_factory=list)
     all_tools: List[str] = field(default_factory=list)
-
-
-@dataclass
-class RepoQualityResult:
-    """Repository quality signals: testing, documentation, code quality."""
-
-    test_file_count: int = 0
-    has_tests: bool = False
-    test_frameworks: List[str] = field(default_factory=list)
-    has_readme: bool = False
-    has_changelog: bool = False
-    has_contributing: bool = False
-    has_docs_dir: bool = False
-    has_lint_config: bool = False
-    has_precommit: bool = False
-    has_type_check: bool = False
-    quality_tools: List[str] = field(default_factory=list)
 
 
 @dataclass

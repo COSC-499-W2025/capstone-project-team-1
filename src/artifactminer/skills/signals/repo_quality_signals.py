@@ -7,6 +7,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any, Dict, Set
 
+from artifactminer.skills.models import RepoQualityResult
 from artifactminer.skills.signals.file_signals import path_in_touched
 
 
@@ -266,8 +267,6 @@ def get_repo_quality_signals(
     touched_paths: Set[str] | None = None,
 ):
     """Aggregate all repository quality signals into a dataclass."""
-    from artifactminer.skills.deep_analysis import RepoQualityResult
-
     merged = {
         **detect_test_signals(repo_path, touched_paths=touched_paths),
         **detect_docs_signals(repo_path, touched_paths=touched_paths),
