@@ -1,6 +1,45 @@
 Term 2 Week 1: [Week 15 (Jan 5 - Jan 11)](Week_15.md) 
 Term 2 Week 2: [Week 16 (Jan 12 - Jan 18)](Week_16.md)
 
+
+---
+## Term 2 Week 7-8: Feb 16- Mar 1
+**My Code Contributions For Week 8 (Feb 23- March 1)**:
+My main focus was to write proper API endpoint tests for the local LLM generation and cleaning up old stale tests so that our eventual port to dev works smoothly.
+
+I worked on [Issue 402](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/402) and [Issue 403](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/403) which involved refactoring the local LLM API endpoints to be more semantically correct (renaming from `/resume/pipelines` to `/local-llm/*`) and writing comprehensive smoke and integration tests for the local LLM resume generation flow. The [PR #404](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/404) covers both issues and includes end-to-end integration tests that validate the full generation lifecycle — happy path, cancel, missing model error handling, resource guard, and cleanup verification of both the worker subprocess and `llama-server` process. Also deleted a large amount of older stale tests that were messy and non-comprehensive.
+
+The team had a meeting to decide on how do we plan to integrate this local llm pipeline into the existing codebase. We currently have 3 options: 
+
+a. Keep everything as is and bolt a local llm on top
+b. Scrap the current one and take local LLM as the source of truth, ported into dev using multiple small PRs distributed among the team
+c. Something else entirely depending on how the previous options pan out
+
+**Reviewing Team's PRs- Week 8 (Feb 23- March 1)**:
+1. Reviewed [Evan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/393) as he added a `GET /portfolio/{id}` endpoint. All tests passed, nothing to flag. Approved.
+2. Reviewed [Ahmad's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406) as he also added a `GET /portfolio/{id}` endpoint. Requested changes which Ahmad promptly addressed.
+3. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407) as he added running Alembic migrations on API startup. The change made sense and was approved.
+
+**My Code Contributions For Week 7 (Reading Break)**:
+The reading break was where I worked on finally setting up a pipeline that we can use to use Local LLMs in our TUI. I am quite proud of what I built over the span of a week. There is no issue attached to it as I was experimenting with local LLMs. The PR for is open [here](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/383) .We wont close it as we plan on using smaller PRs to merge the pipeline as significant amount of work is needed by the team.
+
+I also worked to create the TUI screens for the local LLM generation so that I can get feedback from the team and have a design mock ready which the team can iterate upon. 
+
+The team liked the Local LLM generation and thus I started planning on how to merge this big change into our dev branch. The first step, and the lowest hanging fruit, was to update the consent form to include the option to use local llm. The PR for which can be found [here](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/385)
+
+**Reviewing Team's PRs- Week 7 (Reading Break)**:
+1. Reviewed [Evan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/379) where he added a local LLM benchmark summary with evaluation metrics. Left some comments on the PR.
+2. Reviewed [Ahmad's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/377) as he added a `POST /portfolio/generate` endpoint. Requested changes which Ahmad promptly addressed.
+3. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376) as he added testing, docs, and code-quality heuristic extractors. Requested changes which Stavan addressed.
+4. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378) as he added a `POST /resume/{id}/edit` endpoint. Requested changes, all tests passed after fixes and was approved.
+5. Merged [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/371) as he added git/infra extractors and PR-2 alignment fixes. Requested changes which were addressed. **Note: this PR was merged in Week 7 (Feb 16) but I reviewed it in Week 6 (Feb 13).**
+
+**Plan for Next Week**:
+With milestone 2 wrapped up, we will start working on bringing local LLM generation into the dev branch. Hope the transition is smooth.
+
+
+![T2Week8](T2Week8.png)
+
 ---
 ## Term 2 Week 4-5: Jan 26- Feb 8
 
@@ -36,7 +75,7 @@ We wish to complete all Milestone 2 objectives soon. I plan to work with Evan on
 
 ![T2Week5](T2Week5.png)
 
-## Term 2 Week 3: Jan 19- Jan 25:
+---
 
 ## Term 2 Week 3: Jan 19- 25:
 
