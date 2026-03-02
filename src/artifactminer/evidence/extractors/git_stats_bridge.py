@@ -2,20 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
 from typing import List
 
 from artifactminer.evidence.models import EvidenceItem
-from artifactminer.skills.deep_analysis import GitStatsResult
-
-
-def _coerce_date(value: object) -> date | None:
-    """Coerce a date/datetime to a plain date, or return None."""
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    return None
+from artifactminer.evidence.utils import coerce_date
+from artifactminer.skills.models import GitStatsResult
 
 
 def git_stats_to_evidence(git_stats: GitStatsResult) -> List[EvidenceItem]:
@@ -23,7 +14,7 @@ def git_stats_to_evidence(git_stats: GitStatsResult) -> List[EvidenceItem]:
     if not git_stats:
         return []
 
-    evidence_date = _coerce_date(git_stats.last_commit_date)
+    evidence_date = coerce_date(git_stats.last_commit_date)
     items: List[EvidenceItem] = []
 
     _RULES = [
