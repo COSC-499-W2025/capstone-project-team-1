@@ -4,24 +4,14 @@ import re
 from pathlib import Path
 from .store_file_dict import StoreFileDict
 from .check_file_duplicate import is_file_duplicate
-'''
-in mock folder there are 4 readable filetypes
 
-'''
-
-#change this for a path that you choose
-root = Path(__file__).resolve() #get current file path
+root = Path(__file__).resolve()
 project = root.parents[3] #gets project folder (../../../)
 
 MOCKNAME = "mockdirectory"
-CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
+CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME
 
-
-
-readableFileTypes = [] #TODO
-
-ignoredFileNames = [] #file name not file extension
-#NOTE this is the set of file types that will be read by crawler system UNLESS user config says otherwise...
+ignoredFileNames = []
 READABLE_EXTENSIONS = {
      # --- Documents / PDFs ---
     ".pdf",
@@ -510,24 +500,19 @@ READABLE_EXTENSIONS = {
     ".move",
     ".circom",
     ".zk",
-
-
 }
 
-#USER INFORMATION: 
-userExcludeFileName = []    #["excluded_file.py"] #user's file that will be excluded
-userKeepFileName = []    #["include_file.log"] #even though its 'log' the user has specifically asked us to use it
-
-userExcludeFileExtension = [] #user file extension that will be excluded
-userIncludeFileExtension = [] #user file extension that will be included 
-
+#USER INFORMATION:
+userExcludeFileName = []
+userKeepFileName = []
+userExcludeFileExtension = []
+userIncludeFileExtension = []
 userIncludeAllFiles = False 
 
 store_file_dictionary = StoreFileDict()
 
-#storing files from mock folder to dictionary
-#NOTE: return dictionary of file name, path, and extension. and list of all directories.
-def crawl_directory(refresh_dict = True) -> tuple[dict, list[str]]: 
+def crawl_directory(refresh_dict=True) -> tuple[dict, list[str]]:
+    """Crawl directory for files and return file dict and directory list."""
     listforalldirs = []
     if not os.path.exists(CURRENTPATH):
         print("path does not exist")
@@ -536,44 +521,36 @@ def crawl_directory(refresh_dict = True) -> tuple[dict, list[str]]:
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         for single_directory in dirs:
             listforalldirs.append(single_directory)
-        if(files):
+        if files:
             current_folder = os.path.basename(root)
-            print("\n======================= GETTING FILES FROM FOLDER ", current_folder , " ======================================")
-            for file in files: 
-               
+            print(
+                f"\n======================= GETTING FILES FROM FOLDER {current_folder} ======================================"
+            )
+            for file in files:
                 full_path = os.path.join(root, file)
-                if file in userExcludeFileName or get_extension(file) in userExcludeFileExtension: #user 
+                if file in userExcludeFileName or get_extension(file) in userExcludeFileExtension:
                     print("the file the user has excluded: ", file)
                     continue
-                if file not in userKeepFileName and get_extension(file) not in userIncludeFileExtension: #if file in user file name skip other functions
-                    if not is_file_readable(full_path): #check whether filename is even readible
+                if file not in userKeepFileName and get_extension(file) not in userIncludeFileExtension:
+                    if not is_file_readable(full_path):
                         print("file name: ", file, " is not readable")
                         continue
-                    if not is_file_ignored(file): #check whether filename is valid
-                        print("file name: ", file ," is ignored")
+                    if not is_file_ignored(file):
+                        print("file name: ", file, " is ignored")
                         continue
                 else:
                     print("the file the user has included: ", file)
-                
-                print_files(file) #print files
 
+                print_files(file)
                 isDuplicate, fileId = is_file_duplicate(file, root)
-
                 extension = "extension error"
-                
-                if get_extension(full_path) not in "none": #null check
+                if get_extension(full_path) not in "none":
                     extension = get_extension(full_path)
-                
-
                 if not isDuplicate:
-                    '''as promised, this dictionary take in an object of data, both filename/and full path of the file'''
-                    store_file_dictionary.add_to_dict(fileId, (file, full_path, extension)) #key = filename, path = filepath
-    
-    
+                    store_file_dictionary.add_to_dict(fileId, (file, full_path, extension))
 
-    values = copy.deepcopy(store_file_dictionary.get_dict()) #perform deep copy to avoid duplicates
-    
-    if refresh_dict: #do we want to remove all items for dictionary when we call this function or manually? 
+    values = copy.deepcopy(store_file_dictionary.get_dict())
+    if refresh_dict:
         store_file_dictionary.remove_all_dict()
 
 
@@ -594,76 +571,55 @@ def crawl_multiple_directories(paths: list[str | Path]) -> tuple[dict, list[str]
         Tuple of (merged file dict, merged directory list)
     """
     merged_dirs = []
+    if not paths:
+        return {}, []
 
-    if paths is None:
-        return {}, []
-    if len(paths) <= 0:
-        return {}, []
- 
     for path in paths:
+        global CURRENTPATH
+        CURRENTPATH = path
+        crawl_payload = crawl_directory(False)
+        all_dirs = crawl_payload[1]
+        for dir in all_dirs:
+            merged_dirs.append(dir)
 
-       global CURRENTPATH
-       CURRENTPATH = path
-       crawl_payload = crawl_directory(False)
-       all_dirs = crawl_payload[1]
-       for dir in all_dirs:
-           merged_dirs.append(dir)
-    
-    all_file_values = copy.deepcopy(store_file_dictionary.get_dict()) #get dictionary values...
+    all_file_values = copy.deepcopy(store_file_dictionary.get_dict())
     store_file_dictionary.remove_all_dict()
-    
     return all_file_values, merged_dirs 
 
-                
+
 def is_file_readable(full_path: str) -> bool:
-    #1- check if the file exists
     if not os.path.isfile(full_path):
         return False
-    #2- checks that the path exists
     if not os.access(full_path, os.R_OK):
         return False
-    #3- returns the size of a file in bytes
     if os.path.getsize(full_path) == 0:
         return False
-    
     return True 
 
 def is_file_ignored(file_name: str) -> bool:
-
     if file_name in ignoredFileNames:
         return False
     if file_name.startswith(".") and file_name.lower() not in READABLE_EXTENSIONS:
         return False
-
-    # Skip ignored extensions
-    
     _, ext = os.path.splitext(file_name)
     if ext.lower() not in READABLE_EXTENSIONS:
-        return False
-        
-    # Might add this filter for later.
-    #If readableFileTypes is not empty, enforce filter
-    if readableFileTypes and ext.lower() not in readableFileTypes:
         return False
     return True
 def get_extension(fileName) -> str:
     temp = fileName.rfind('.')
-    if(temp != -1):
+    if temp != -1:
         return fileName[temp:]
-    else:
-        return "none"
+    return "none"
 def is_extension(fileName) -> bool:
     if fileName.startswith("*."):
         return True
     return False
-def is_valid_filename(filename: str) -> bool: #is the typed out file even a file? 
-    # Disallow empty or too-long filenames
+def is_valid_filename(filename: str) -> bool:
     if not filename or len(filename) > 255:
         return False
-    invalid_chars = r'[<>:"/\\|?*\x00-\x1F]' #chatgbt generated
+    invalid_chars = r'[<>:"/\\|?*\x00-\x1F]'
     if re.search(invalid_chars, filename):
         return False
-    # Disallow reserved Windows names (case-insensitive) TODO  --> check if OS is windows only
     reserved_names = {
         "CON", "PRN", "AUX", "NUL",
         *(f"COM{i}" for i in range(1, 10)),
@@ -671,40 +627,31 @@ def is_valid_filename(filename: str) -> bool: #is the typed out file even a file
     }
     if os.path.splitext(filename)[0].upper() in reserved_names:
         return False
-
     return True 
 def update_path():
     global CURRENTPATH
     CURRENTPATH = mock_dir = project / "tests" / "directorycrawler" / "mocks" / MOCKNAME #get mock directory path
 
-#USER FUNCTIONS============================
 def user_keep_file(fileName):
     userKeepFileName.append(fileName)
+
 
 def user_exclude_file(fileName):
     userExcludeFileName.append(fileName)
 
+
 def user_keep_extension(exName):
     userIncludeFileExtension.append(exName)
 
+
 def user_exclude_extension(exName):
     userExcludeFileExtension.append(exName)
-#==========================================
+
+
 def print_files(file):
-    print("\n>",file)
+    print(f"\n> {file}")
 
 def print_values_in_dict():
     print("here are the files in the dictionary: \n")
-    '''This message is specific to SHLOK: if you would like to get the files from my system please first
-
-        1) get the dictionary:
-        store_file_dictionary = StoreFileDict()
-
-        2) run directory walk function
-
-        3) get values to be transfered to LLM, it has the name/path. 
-        store_file_dictionary.get_values()
-      
-        '''
     print(store_file_dictionary.get_values())
 
