@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from .analyze import get_consent_level, get_user_email
 from .retrieval import fetch_skill_chronology
 from .schemas import (
+    PortfolioEditRequest,
+    PortfolioEditResponse,
     PortfolioDisplayResponse,
     PortfolioEvidenceItem,
     PortfolioGenerationRequest,
@@ -19,7 +21,7 @@ from .schemas import (
     SkillChronologyItem,
     SummaryResponse,
 )
-from .views import get_prefs
+from .views import get_prefs, save_prefs
 from ..db import (
     ProjectEvidence,
     RepoStat,
@@ -127,7 +129,9 @@ def _apply_preferences(
         if matching:
             ordered = matching
         else:
-            errors.append("No projects matched showcase_project_ids; returning all projects.")
+            errors.append(
+                "No projects matched showcase_project_ids; returning all projects."
+            )
 
     order_tokens = _normalize_tokens(prefs.project_order)
     if not order_tokens:
@@ -222,7 +226,9 @@ async def generate_portfolio(
         )
     
     selected_project_ids = [project.id for project in selected_projects]
-    selected_paths = sorted({project.project_path.rstrip("/") for project in selected_projects})
+    selected_paths = sorted(
+        {project.project_path.rstrip("/") for project in selected_projects}
+    )
 
     resume_items: list[ResumeItemResponse] = []
     if selected_project_ids:
@@ -276,7 +282,9 @@ async def generate_portfolio(
 
     skills_chronology: list[SkillChronologyItem] = []
     if selected_paths:
-        skills_chronology = fetch_skill_chronology(db, project_path_prefixes=selected_paths)
+        skills_chronology = fetch_skill_chronology(
+            db, project_path_prefixes=selected_paths
+        )
 
     project_items = _build_portfolio_project_items(selected_projects, db)
 
@@ -439,4 +447,47 @@ async def get_portfolio(
         summaries=summaries,
         skills_chronology=skills_chronology,
         errors=errors,
+    )
+
+
+@router.post("/{portfolio_id}/edit", response_model=PortfolioEditResponse)
+async def edit_portfolio(
+    portfolio_id: str,
+    request: PortfolioEditRequest,
+    db: Session = Depends(get_db),
+) -> PortfolioEditResponse:
+    """Edit/customize portfolio content. Updates showcase selection, ordering, and preferences.
+
+    ## Features
+    - Update showcase project selection
+    - Reorder projects manually
+    - Highlight or hide specific skills
+    - Override project chronology dates
+    - Set custom project rankings
+    - Configure comparison attributes
+
+    ## Response
+    Returns the updated preferences and portfolio metadata.
+    """
+    portfolio_id = portfolio_id.strip()
+    if not portfolio_id:
+        raise HTTPException(status_code=422, detail="portfolio_id cannot be empty.")
+
+    # Verify portfolio exists
+    portfolio_exists = (
+        db.query(UploadedZip.id)
+        .filter(UploadedZip.portfolio_id == portfolio_id)
+        .first()
+    )
+    if not portfolio_exists:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    # Save preferences (PortfolioEditRequest inherits from RepresentationPreferences)
+    saved_prefs = save_prefs(db, portfolio_id, request)
+
+    return PortfolioEditResponse(
+        success=True,
+        portfolio_id=portfolio_id,
+        updated_at=datetime.now(UTC).replace(tzinfo=None),
+        preferences=saved_prefs,
     )
