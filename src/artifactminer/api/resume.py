@@ -218,6 +218,24 @@ def _clear_job_runtime_payloads(job: JobState) -> None:
     job.event_queue = None
 
 
+def _should_cancel_for_context_switch(job: JobState) -> bool:
+    """Return True when a job should be stopped before replacing active context."""
+    process = job.process
+    if process is not None and process.is_alive():
+        return True
+    return job.status in {"queued", "running", "draft_ready", "polishing"}
+
+
+def _mark_job_cancelled(job: JobState, message: str) -> None:
+    """Finalize in-memory job state as cancelled."""
+    _release_process_handle(job)
+    _clear_job_runtime_payloads(job)
+    job.phase = "none"
+    job.status = "cancelled"
+    job.last_error = None
+    _append_message(job, message)
+
+
 def _stop_local_model_server() -> None:
     """Best-effort llama-server teardown used by cancel and safety guard paths."""
     try:
@@ -740,6 +758,8 @@ async def create_pipeline_intake(
     request: PipelineIntakeCreateRequest,
 ) -> PipelineIntakeCreateResponse:
     """Create an intake from a local ZIP path and discover candidate repos."""
+    global _active_intake_id, _active_job_id
+
     zip_path = _validate_zip_path(request.zip_path)
 
     extraction_parent = Path(tempfile.mkdtemp(prefix="artifactminer-intake-"))
@@ -789,8 +809,39 @@ async def create_pipeline_intake(
         updated_at=now,
     )
 
-    global _active_intake_id, _active_job_id
+    previous_active_job_id: str | None = None
+    running_process: multiprocessing.Process | None = None
+
     with _lock:
+        previous_active_job_id = _active_job_id
+        if previous_active_job_id is not None:
+            previous_job = _jobs.get(previous_active_job_id)
+            if previous_job is not None:
+                _drain_job_events(previous_job)
+                if _should_cancel_for_context_switch(previous_job):
+                    process = previous_job.process
+                    if process is not None and process.is_alive():
+                        running_process = process
+
+    if running_process is not None and running_process.is_alive():
+        try:
+            _terminate_process_now(running_process)
+        except Exception:
+            pass
+
+    if previous_active_job_id is not None:
+        _stop_local_model_server()
+
+    with _lock:
+        if previous_active_job_id is not None:
+            previous_job = _jobs.get(previous_active_job_id)
+            if previous_job is not None:
+                _drain_job_events(previous_job)
+                if _should_cancel_for_context_switch(previous_job):
+                    _mark_job_cancelled(
+                        previous_job,
+                        "Pipeline cancelled because a new context was created.",
+                    )
         _intakes[intake_id] = intake_state
         _active_intake_id = intake_id
         _active_job_id = None
