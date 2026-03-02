@@ -64,8 +64,12 @@ def create_app() -> FastAPI:
         name="project-thumbnails",
     )
 
-    # Create database tables on startup
-    Base.metadata.create_all(bind=engine)
+    # Run Alembic migrations on startup to keep the DB schema in sync
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
+
+    alembic_cfg = AlembicConfig("alembic.ini")
+    alembic_command.upgrade(alembic_cfg, "head")
 
     # Initialize database schema and seed
     db = SessionLocal()
