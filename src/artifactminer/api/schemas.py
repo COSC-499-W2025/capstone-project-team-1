@@ -663,3 +663,4 @@ class CustomRanking(BaseModel):
         description="Custom ranking position (lower value = higher rank).",
         ge=1,
     )
+

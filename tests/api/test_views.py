@@ -31,3 +31,4 @@ def test_put_get_roundtrip_returns_same_payload(client):
     get_payload = get_response.json()
     assert get_payload["showcase_project_ids"] == prefs["showcase_project_ids"]
     assert get_payload["project_order"] == prefs["project_order"]
+
