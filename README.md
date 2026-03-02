@@ -1,266 +1,293 @@
-# Read Me
+# Artifact Miner
 
 ## Team Number: 1
 
-**Team Members**: Shlok Shah SN:50732213, Brendan James SN:31927486, Ahmad Memon SN: 61846432, Stavan Shah SN 43960608:, Evan Crowley SN:82710823, Nathan Helm SN: 68837038
+**Team Members**: Shlok Shah SN:50732213, Brendan James SN:31927486, Ahmad Memon SN:61846432, Stavan Shah SN:43960608, Evan Crowley SN:82710823, Nathan Helm SN:68837038
 
+Artifact Miner analyzes one or more uploaded project ZIPs, discovers Git repositories, extracts repository + user contribution intelligence, derives skills/evidence, and builds resume/portfolio-ready outputs.
 
-
-
- **The purpose of this project** is to have an automated process to create a work portfolio or resume with the user's past work. The process will be able to parse through the user's computer or specified folder and analyze any information deemed important or “resume-worthy”.
-
-**Primary users: CS students, TAs or career advisors**
-
-**Typical scenario:** The user launches the TUI then selects the folder/s they wish to parse. The user can set their preferences, then hit scan. The system will crawl the selected folder and once the process is complete it will bundle a summary resume or portfolio.
-
+**Primary users:** CS students, TAs, and career advisors.
 
 Team Contract link: **[Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)**
 
-### System Architecture Diagram
+## Milestone 2 Status
+
+This README reflects the current Milestone 2 implementation in this repository (FastAPI backend, Textual TUI, CLI pipeline, and experimental OpenTUI React client).
+
+## System Architecture Diagram
 
 ```mermaid
 flowchart TB
-    subgraph User["👤 User Layer"]
-        TUI["Terminal User Interface<br/>(Textual)"]
+    subgraph Clients["Client Layer"]
+        TUI["Textual TUI"]
+        CLI["Python CLI"]
+        React["OpenTUI React (experimental)"]
     end
 
-    subgraph API["🔌 API Layer"]
-        FastAPI["FastAPI Gateway<br/>/health, /consent, /zip, /analyze"]
+    subgraph API["FastAPI Layer"]
+        Gateway["artifactminer.api.app"]
+        Routers["Routers: consent, zip, analyze, projects, retrieval, resume, portfolio, views"]
     end
 
-    subgraph Core["⚙️ Core Processing"]
-        Crawler["Directory Crawler"]
+    subgraph Core["Core Processing"]
+        Ingest["ZIP Ingestion + Extraction"]
         RepoIntel["Repository Intelligence"]
-        Skills["Skills Extractor"]
-        OpenAI["LLM Integration<br/>(Optional)"]
+        Skills["DeepRepoAnalyzer + Skill Extraction"]
+        Evidence["Evidence Orchestration"]
+        Ranking["Ranking + Timeline + Summaries"]
     end
 
-    subgraph Data["💾 Data Layer"]
-        SQLite[("SQLite Database")]
-        FileSystem[("File System<br/>(ZIP uploads)")]
+    subgraph Integrations["Optional LLM Integrations"]
+        OpenAI["OpenAI helper"]
+        Ollama["Ollama helper"]
     end
 
-    TUI <-->|HTTP| FastAPI
-    FastAPI --> Crawler
-    FastAPI --> RepoIntel
-    FastAPI --> Skills
-    FastAPI -.->|If consented| OpenAI
-    Crawler --> FileSystem
+    subgraph Data["Data Layer"]
+        SQLite[("SQLite (artifactminer.db)")]
+        Uploads[("uploads/")]
+        Extracted[(".extracted/")]
+        Thumbs[("uploads/thumbnails/")]
+    end
+
+    TUI --> Gateway
+    CLI --> Gateway
+    React --> Gateway
+    Gateway --> Routers
+
+    Routers --> Ingest
+    Ingest --> Uploads
+    Ingest --> Extracted
+
+    Routers --> RepoIntel
+    Routers --> Skills
+    Skills --> Evidence
+    Routers --> Ranking
+
     RepoIntel --> SQLite
-    Skills --> SQLite
-    FastAPI --> SQLite
+    Evidence --> SQLite
+    Ranking --> SQLite
+    Routers --> Thumbs
+
+    Skills -. consent gated .-> OpenAI
+    Skills -. local option .-> Ollama
 ```
 
-
-This diagram outlines the proposed structure. It illustrates the core components and how it interacts to transform the users data into a resume.
-
-**The user preferences:** The users preferences can be the types of files to scan for (pdfs, python, Java, word), or the exact folders the user wants scanned.
-
-**File Crawler:** A backend system that is responsible for parsing the user specified file system and sending any important data to the LLM.
-
-**Find and Identify Artifacts:** Artifacts are discovered, important files, that have been deemed useful for analysis to be used and sent to the rest of the process.
-
-**Local DB:** The local DB is used to store past important artifacts, and past user results locally.
-
-**Analyzing Artifacts:** The Artifacts are analyzed in order to find any useful information that can be used by the LLM to create a resume or portfolio.
-
-**LLM Call:** A call to the LLM is made with any artifacts that are found for analysis to be turned into a resume.
-
-**Generates and Export Resume:** Exports the generated resume produced from the LLM to be sent to the TUI for a user result. 
-
-**Analysis Dashboard:**  Main part of the TUI that is where all progress and final information is sent, interacts with the analysis process to share the progress, and interacts with the end result in order to display the resume/portfolio.
-
-### Data Flow Diagram (Level 0)
+## Data Flow Diagram (Level 0)
 
 ```mermaid
 flowchart LR
-    User(("👤 User")) -->|"1. Upload ZIP &<br/>Set Preferences"| System["Artifact Miner<br/>System"]
-    System -->|"2. Analyze &<br/>Extract Skills"| System
-    System -->|"3. Resume/<br/>Portfolio"| User
+    User(("User")) --> Interfaces["CLI / Textual TUI / OpenTUI"]
+    Interfaces --> System["Artifact Miner System"]
+    System --> Outputs["Project stats, skills chronology, evidence, summaries, portfolio output"]
+    Outputs --> User
+    System --> DB[("SQLite + Filesystem Stores")]
 ```
 
-### Data Flow Diagram (Level 1)
+## Data Flow Diagram (Level 1)
 
 ```mermaid
 flowchart TB
-    User(("👤 User"))
-    
-    subgraph TUI["1.0 TUI"]
-        Consent["Consent Dialog"]
-        Upload["ZIP Upload"]
-        Results["Results View"]
-    end
-    
-    subgraph Processing["2.0 Processing"]
-        Crawler["2.1 Crawler"]
-        RepoIntel["2.2 Repo Intelligence"]
-        Skills["2.3 Skills Extraction"]
-    end
-    
-    subgraph Storage["3.0 Storage"]
-        DB[("Database")]
-        FS[("File System")]
-    end
-    
-    LLM["4.0 LLM<br/>(Optional)"]
-    
-    User -->|"Preferences"| TUI
-    TUI -->|"API Calls"| Processing
-    Crawler -->|"Read Files"| FS
-    Processing -->|"Store Stats"| DB
-    Skills -.->|"If Consented"| LLM
-    LLM -.->|"Summaries"| Skills
-    Processing -->|"Results"| TUI
-    TUI -->|"Display"| User
+    User(("User"))
+    FSUploads[("uploads/ ZIP store")]
+    FSExtracted[(".extracted/ workspace")]
+    DB[("SQLite DB")]
+    LLM["Optional LLM (OpenAI/Ollama)"]
+
+    P1["1.0 Consent + User Config\n/consent, /questions, /answers"]
+    P2["2.0 ZIP Intake\n/zip/upload, /zip/{id}/directories"]
+    P3["3.0 Repo Discovery + Analysis\n/analyze/{zip_id}, /repos/analyze"]
+    P4["4.0 Skills + Evidence + Ranking\nDeep analyzer, evidence extractors, ranking"]
+    P5["5.0 Retrieval + Portfolio Assembly\n/projects, /resume, /summaries, /portfolio/generate"]
+
+    User --> P1
+    User --> P2
+    P2 --> FSUploads
+    P2 --> FSExtracted
+    P1 --> DB
+
+    FSExtracted --> P3
+    DB --> P3
+    P3 --> DB
+
+    P3 --> P4
+    P4 --> DB
+    P4 -. consent path .-> LLM
+    LLM -. summary response .-> P4
+
+    P4 --> P5
+    DB --> P5
+    P5 --> User
 ```
 
+## DFD Explanation
 
-## DFD explanation:
+- `1.0 Consent + User Config` captures consent and analysis context (email, goals, file filters).
+- `2.0 ZIP Intake` stores uploads and prepares extraction paths for analysis.
+- `3.0 Repo Discovery + Analysis` finds Git repos and computes repository/user contribution stats.
+- `4.0 Skills + Evidence + Ranking` derives skill signals, insights, repository quality evidence, and ranking scores.
+- `5.0 Retrieval + Portfolio Assembly` serves timeline/skills/resume/summaries and builds portfolio-scoped outputs.
 
-The DFD diagram is a proposed solution to our project requirements and is subject to change, however in its current state it shows the flow between the user, the TUI (Terminal User Interface), the file system, the crawler, and the LLM (large language model)
+## Milestone 2 Capabilities
 
-**The user:** The user is the primary actor, the client that would be interacting with the system.
+- Multi-ZIP portfolio flow using `portfolio_id` linkage.
+- Directory-scoped analysis from uploaded ZIP contents.
+- Repository intelligence: languages, frameworks, commit windows, collaboration, health score.
+- User-level contribution intelligence and role metadata.
+- Evidence model with CRUD endpoints for project evidence.
+- Retrieval APIs for skills, skills chronology, resume items, summaries, and timeline.
+- Portfolio generation endpoint with representation preferences per portfolio.
+- Project management endpoints: role, thumbnail upload/URL, soft delete, ranking, timeline.
+- Textual TUI flow for consent, user config, ZIP upload, directory selection, and resume views.
+- CLI interactive and non-interactive export flow (`.txt` or `.json`).
 
-**The TUI:** The Terminal User Interface acts as the frontend for all user interaction and would be responsible for user preferences.
+## API Surface (Current)
 
-**The file system:** The file system is a user specified directory on their machine, this is configured in the TUI.
+**System + Setup**
+- `GET /health`
+- `GET /consent`, `PUT /consent`
+- `GET /questions`, `POST /answers`
+- `GET /useranswer`, `POST /postanswer/`
 
-**The crawler:** A backend system that is responsible for parsing the user specified file system and sending any important data to the LLM.
+**ZIP + Analysis**
+- `POST /zip/upload`
+- `GET /zip/{zip_id}/directories`
+- `GET /zip/portfolios/{portfolio_id}`
+- `POST /analyze/{zip_id}`
+- `POST /repos/analyze`
+- `GET /crawler`
+- `GET /fileintelligence`
 
-**The LLM:** A large language model that takes all information discovered by the crawler such as code files, project names, descriptions and metadata, and turns it into a user-friendly format. 
+**Projects + Evidence**
+- `GET /projects`
+- `GET /projects/{project_id}`
+- `POST /projects/{project_id}/thumbnail`
+- `PUT/POST /projects/{project_id}/role`
+- `POST /projects/{project_id}/evidence`
+- `GET /projects/{project_id}/evidence`
+- `DELETE /projects/{project_id}/evidence/{evidence_id}`
+- `GET /projects/timeline`
+- `GET /projects/ranking`
+- `DELETE /projects/{project_id}`
 
- Data Interactions
+**Retrieval + Resume + Portfolio**
+- `GET /skills`
+- `GET /skills/chronology`
+- `GET /resume`
+- `GET /resume/{resume_id}`
+- `POST /resume/generate`
+- `POST /resume/{resume_id}/edit`
+- `GET /summaries`
+- `GET /AI_summaries`
+- `POST /portfolio/generate`
+- `GET /views/{portfolio_id}/prefs`
+- `PUT /views/{portfolio_id}/prefs`
+- `POST /openai`
 
-1. User and TUI (Terminal User Interface): The user begins the process by adding the directories they wish to scan for and providing their preferences for the scanner, such as what types of files to scan for (pdfs, python, Java, word). The TUI is the central interaction point for the user and will be where the majority of user interaction will happen. The TUI will be where the user can get progress updates on the crawler progress, and the results from the LLM.  
-     
-2. TUI and Crawler: The TUI sends user preferences to the crawler. The crawler is responsible for using the user selected preferences to parse the indicated folder system, and the indicated file types. The parsed file data is then sent to the next component.  
-     
-3. Crawler and File system: The crawler accesses the user specified directories, reads file and sends the parsed file data to the next component.  
-     
-4. Crawler and LLM (Large Language Model):  Once the crawler gathers the data from the file system it sends parsed and formatted information to the LLM for analysis and summarization.  
-5. LLM and TUI: The LLM returns all processed and formatted information to the TUI for the user to see the final product.  
-     
-6. TUI to File System: The TUI can save to the file system once all information from the LLM is returned in a formatted manner.
+## Project Structure
 
-**Updated WBS**
+```text
+src/artifactminer/
+  api/                    FastAPI app + routers
+  db/                     SQLAlchemy models, session, seeders
+  RepositoryIntelligence/ Repo and user contribution analytics
+  skills/                 Skill extraction, deep analysis, signals
+  evidence/               Evidence models and extractors
+  directorycrawler/       ZIP/directory crawl utilities
+  tui/                    Textual app + screens
+  cli/                    Interactive/non-interactive CLI pipeline
+opentui-react-exp/        Experimental React/OpenTUI client
+tests/                    API, DB, crawler, TUI, evidence, signals, repo intelligence
+alembic/                  Database migrations
+```
 
----
+## Local Setup
 
-### **1\) Textual TUI & UX — Owner: Ahmad**
+### Prerequisites
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Consent & LLM Dialogs | Capture data-access consent and optional LLM permission; show privacy note | Ahmad | Easy |
-| Ingest Wizard | Select .zip, show validation errors, progress/cancel, status | Ahmad | Medium |
-| Results Panels | Minimal views for projects, skills, reports (text/JSON preview) | Ahmad | Medium |
-| Retrieve & Delete | Fetch prior report/résumé items; confirm safe delete | Ahmad | Easy |
-| TUI Starter Kit | App frame, panel template, API helper, error/toast patterns | Ahmad | Medium |
+- Python 3.11+
+- [uv](https://github.com/astral-sh/uv)
+- Git
+- Optional: Bun (for `opentui-react-exp`)
+- Optional: OpenAI API key (for OpenAI-backed paths)
+- Optional: local Ollama install (for local LLM paths)
 
----
+### Install and Configure
 
-### **2\) API Gateway, Config & Persistence — Owner: Stavan**
+```bash
+uv sync
+cp .env.example .env
+uv run alembic upgrade head
+```
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Contracts & Stubs | Publish FastAPI endpoints & Pydantic schemas for all rooms | Stavan | Medium |
-| Consent Enforcement | Block processing until consent; expose /privacy/status | Stavan | Easy |
-| Config Store | Persist user emails, target role, prefs (local, restart-safe) | Stavan | Medium |
-| DB & Migrations | SQLite models, Alembic migrations, CRUD for projects/skills/reports | Stavan | Medium |
-| Exports & Safe Delete | JSON/CSV exports; ref-counted deletes to protect shared files | Stavan | Medium |
-| PyPI Package & CLI | PyPI-ready pyproject.toml, dwam CLI (api/tui/analyze) | Stavan | Easy |
+### Run Backend API
 
----
+```bash
+uv run api
+```
 
-### **3\) Ingestion, Classification & Dedupe — Owner: Nathan**
+API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Zip Validation | Accept .zip or file directory; wrong-format error handling | Nathan | Easy |
-| Secure Unzip | Safe extraction (no zip-slip), size/entry limits | Nathan | Medium |
-| Traverse & Index | Walk files/dirs; capture paths, timestamps | Nathan | Medium |
-| MIME & Buckets | Detect type; bucket into code/test/docs/design/devops | Nathan | Medium |
-| SHA-256 Dedupe | Hash artifacts for identity & future duplicate detection | Nathan | Medium |
-| Artifacts API | GET /ingest/{id}/artifacts returns ArtifactMeta\[\] & bucket stats | Nathan | Easy |
+### Run Textual TUI
 
----
+```bash
+uv run artifactminer-tui
+```
 
-### **4\) Repository Intelligence — Owner: Evan**
+### Run CLI
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Repo Discovery | Identify project boundaries (.git or manifest) | Evan | Medium |
-| Duration & Timeline | First↔last commit timestamps per project | Evan | Medium |
-| Lang & Framework | Primary language \+ framework via manifests/imports | Evan | Medium |
-| Collab vs Solo | Flag collaborative projects (authors, remotes) | Evan | Medium |
-| Contribution Estimation | Commits/LOC/ownership shares for the user | Evan | Hard |
-| Repo Stats API | POST /repos/analyze → RepoStats, ContributionStats | Evan | Easy |
+```bash
+uv run artifactminer --help
+uv run artifactminer -i /path/to/projects.zip -o /path/to/report.txt -c no_llm -u you@example.com
+```
 
----
+CLI consent flags currently use `full | no_llm | none` in the CLI pipeline, while the API `/consent` contract uses `local | local-llm | cloud | none`.
 
-### **5\) Metrics, Ranking, Chronology & Reporting — Owner: Brendan**
+### Run Experimental OpenTUI React Client
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Activity Ratios | Code/test/docs/design/devops proportions | Brendan | Medium |
-| Role-Aware Ranking | Rank projects by contribution, role fit, recency, complexity | Brendan | Medium |
-| Chronology (Projects) | Ordered list with durations | Brendan | Easy |
-| Report Assembly | Compose text/JSON outputs for TUI & exports | Brendan | Medium |
-| Retrieval APIs | GET /projects, /projects/chronology, /reports/{id} | Brendan | Easy |
+```bash
+cd opentui-react-exp
+bun install
+bun run src/index.tsx
+```
 
----
+## Tests
 
-### **6\) Skills Extraction & Summarization (Privacy-Gated) — Owner: Shlok**
+```bash
+uv run pytest
+```
 
-| Requirement | Description | Who | H/M/E |
-| ----- | ----- | ----- | ----- |
-| Heuristic Skills | Extract from READMEs/commits/manifests (no LLM) | Shlok | Medium |
-| Skills Chronology | First/last-seen timestamps; timeline output | Shlok | Medium |
-| Offline Summaries | Template/TextRank summaries for top projects | Shlok | Medium |
-| Optional LLM Summaries | Only if consented; metadata-only payloads | Shlok | Hard |
-| Skills/Summary APIs | /skills/extract → SkillSignal\[\]; /summaries/generate | Shlok | Easy |
-
----
-
-**Notes**
-
-* **Parallelization:** API (Room 2\) publishes schemas/stubs first; Rooms 3–6 code behind them; TUI (Room 1\) targets mocks.
-
-* **Local-first:** All rooms default to offline; LLM path is optional and consent-gated (Room 2+6). 
+This repository currently includes tests across API, database, crawler, evidence/signals, repo intelligence, CLI, and TUI layers.
 
 ## Database Migrations (Alembic)
 
-We now manage schema changes with Alembic so developers never have to delete `artifactminer.db`. Always apply migrations instead of rebuilding the file manually.
+Always apply migrations instead of manually recreating `artifactminer.db`.
 
-### First-time setup / keeping the DB up to date
+### Keep DB Up to Date
 
 ```bash
 uv run alembic upgrade head
 ```
 
-Run this command after you clone the repo and whenever you pull schema changes. It applies every migration in `alembic/versions/` and creates `artifactminer.db` if it does not exist.
+### Create a New Migration
 
-> **Already have a DB from before Alembic?** The initial migration represents the schema as of Milestone 1, so older copies of `artifactminer.db` will block `alembic upgrade` with "table already exists" errors. Before running the command above for the first time, either delete or move your existing file (make a backup if you care about the data) and let Alembic recreate it:
-
-```bash
-mv artifactminer.db artifactminer.db.bak  # optional backup
-uv run alembic upgrade head
-```
-
-### Creating a new migration
-
-1. Update the SQLAlchemy models in `src/artifactminer/db/models.py`.
-2. Generate a migration script:
+1. Update SQLAlchemy models in `src/artifactminer/db/models.py`.
+2. Generate migration:
    ```bash
    uv run alembic revision --autogenerate -m "Describe your change"
    ```
-3. Inspect the generated file under `alembic/versions/` (fix anything Alembic could not infer).
-4. Apply it locally with `uv run alembic upgrade head`.
-5. Commit both the model changes and the new migration file.
+3. Review generated file in `alembic/versions/`.
+4. Apply:
+   ```bash
+   uv run alembic upgrade head
+   ```
+5. Commit model + migration together.
 
-### Downgrading / testing migrations
+### Downgrade One Revision
 
-Use `uv run alembic downgrade -1` to roll back the latest revision and verify reversibility. Re-run `uv run alembic upgrade head` afterward to return to the newest schema.
+```bash
+uv run alembic downgrade -1
+```
 
-### Seeding default data
+### Seed Behavior
 
-After migrations are applied, start the API (`uv run api`) to let the existing seeder populate the baseline questions. No manual DB deletion is required; Alembic upgrades keep everyone aligned.
+On API startup, baseline question records are seeded when the questions table is empty.

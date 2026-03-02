@@ -1,7 +1,7 @@
 """Read-only retrieval endpoints for skills, resume items, and summaries.
 
 These endpoints serve data for the final portfolio/resume generation.
-All are GET-only with no side effects.
+All are GET-only with no side effects (write operations moved to resume.py).
 """
 
 from datetime import datetime
@@ -81,8 +81,7 @@ async def get_skills(
             skill_repo_pairs[skill_id].add(repo_stat_id)
 
         project_count_map = {
-            skill_id: len(repo_ids)
-            for skill_id, repo_ids in skill_repo_pairs.items()
+            skill_id: len(repo_ids) for skill_id, repo_ids in skill_repo_pairs.items()
         }
 
     result = []
@@ -230,7 +229,9 @@ async def get_resume_items(
                     .order_by(UserRepoStat.id.desc())
                     .first()
                 )
-                role_cache[key] = latest_user_stat.user_role if latest_user_stat else None
+                role_cache[key] = (
+                    latest_user_stat.user_role if latest_user_stat else None
+                )
             role = role_cache[key]
 
         response_items.append(

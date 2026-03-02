@@ -47,7 +47,7 @@ def client():
 
     db.add(Question(id=1, key="email", question_text="Email?", order=1, required=True))
     db.add(UserAnswer(question_id=1, answer_text="test@example.com", answered_at=now))
-    db.add(Consent(id=1, consent_level="no_llm", accepted_at=now))
+    db.add(Consent(id=1, consent_level="local", accepted_at=now))
     db.add(
         RepoStat(
             id=1,
@@ -107,7 +107,7 @@ def test_generate_single_project(mock_path, mock_collect, mock_analyzer, client)
     assert resp.status_code == 200
     data = resp.json()
     assert data["success"] is True  # Success = no errors, not based on item count
-    assert data["consent_level"] == "no_llm"
+    assert data["consent_level"] == "local"
     assert isinstance(data["resume_items"], list)
     assert data["items_generated"] == 1  # Count of evidence items (insights)
     evidence = client.get("/projects/1/evidence")

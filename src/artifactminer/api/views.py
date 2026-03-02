@@ -32,7 +32,7 @@ def save_prefs(
 ) -> RepresentationPreferences:
     """Upsert preferences for a portfolio."""
     row = db.get(RepresentationPrefs, portfolio_id)
-    prefs_json = json.dumps(prefs.model_dump())
+    prefs_json = json.dumps(prefs.model_dump(mode='json'))
 
     if row is None:
         row = RepresentationPrefs(
