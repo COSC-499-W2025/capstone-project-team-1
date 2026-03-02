@@ -33,6 +33,8 @@ Last period I focused on evidence foundation (PR-1, PR-2) and API retrieval endp
 
 * Added `POST /portfolio/{id}/edit` endpoint — `PortfolioEditRequest` inherits from `RepresentationPreferences` to avoid field duplication; preferences are persisted and affect subsequent `/portfolio/generate` calls ([PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410); closes [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335)).
 
+* Pushed follow-up fixes on evidence PR-4 ([PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376)) and resume edit ([PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378)) addressing review feedback — clarified missing-tests evidence signal, populated role in resume edit response, added category validation, and added rollback on commit failures.
+
 ---
 
 ## Testing & Debugging Tasks
@@ -46,6 +48,10 @@ Last period I focused on evidence foundation (PR-1, PR-2) and API retrieval endp
 ---
 
 ## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #377](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/377) (POST /portfolio/generate by Ahmad) — flagged unindexed `LIKE 'prefix%'` query on `project_path`, suggested DB-side `None` filtering on `extraction_path`, and noted non-deterministic resume item ordering. Approved after fixes.
+
+* Reviewed [PR #379](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/379) (local LLM benchmark summary by Evan) — approved; asked about qwen3:0.5b as alternative to 2.5.
 
 * Reviewed [PR #381](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/381) (markdown logic by Nathan) — flagged `file_values` type mismatch, `str_response` overwrite-on-loop bug, inconsistent return types, and weak test assertion. Approved after fixes.
 
@@ -80,7 +86,7 @@ Last period I focused on evidence foundation (PR-1, PR-2) and API retrieval endp
 | Merge dev to main | ✅ Done | [PR #382](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/382) |
 | Fix Alembic startup migration | ✅ Done | [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407) |
 | Add `POST /portfolio/{id}/edit` | 🔄 In review | [PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410) |
-| Review PRs (#381, #385, #392, #404, #406) | ✅ Done | Reviewed + follow-up requested changes |
+| Review PRs (#377, #379, #381, #385, #392, #404, #406) | ✅ Done | Reviewed + follow-up requested changes |
 
 ![Tasks Week 7-8](Tasks_T2_Week7-8.png)
 
