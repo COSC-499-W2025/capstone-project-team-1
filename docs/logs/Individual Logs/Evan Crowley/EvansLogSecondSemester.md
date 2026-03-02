@@ -191,3 +191,42 @@ I plan to continue working on file analysis but primarily want to focus on local
 
 
 
+
+# Evan Crowley
+## Log: March 1 2026
+
+
+
+### From Peer Review
+![Tasks_I_Did](Tasks%20March1.png)
+
+
+### Week 4 Feb 16 - 22
+Began work on issue number 333 branch “333-Add-GET-/portfolio/{id}-endpoint” in order to get ready for the milestone presentation. Removing the legacy POST /resume/generate endpoint and its schemas.
+
+
+### Week 5 Feb 23 - March 1
+Had our milestone #2 presentations. We presented last and managed to get out the majority of what we wanted to mention. Addressed issues in the “333-Add-GET-/portfolio/{id}-endpoint” PR. Ensured there were no merge conflicts. Worked on issue 396, submitted for PR review and it was determined that it would be addressed in a different branch. Determined what we needed to get done before the end of the term, and what to expect on the quiz this Wednesday.
+
+
+### Reflection:
+This week was good, I was able to finalize some tasks and complete the presentation. I think that overall there was some good additions and that next week should see some good progress.
+
+
+### Team Dynamic:
+Good, we worked together this week to make sure everyone was ready for the peer review.
+
+
+### Plan:
+Address all the branch migrations we have to do before the end of the semester in order to have the “experimental-llamacpp-v3” fully integrated into the development branch.
+
+
+
+
+
+
+
+
+
+
+
