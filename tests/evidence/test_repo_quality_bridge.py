@@ -5,7 +5,7 @@ from datetime import date
 from artifactminer.evidence.extractors.repo_quality_bridge import (
     repo_quality_to_evidence,
 )
-from artifactminer.skills.deep_analysis import RepoQualityResult
+from artifactminer.skills.models import RepoQualityResult
 
 
 def test_repo_quality_to_evidence_returns_negative_for_bare_defaults():
