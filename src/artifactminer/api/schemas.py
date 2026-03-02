@@ -574,6 +574,18 @@ class PortfolioGenerationRequest(BaseModel):
     )
 
 
+class PortfolioEvidenceItem(BaseModel):
+    """Evidence item for portfolio display."""
+    
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: int
+    type: EvidenceType
+    content: str
+    source: str | None = None
+    date: _dt.date | None = None
+
+
 class PortfolioProjectItem(BaseModel):
     """Project entry included in portfolio generation output."""
 
@@ -586,6 +598,9 @@ class PortfolioProjectItem(BaseModel):
     last_commit: datetime | None = None
     ranking_score: float | None = None
     health_score: float | None = None
+    thumbnail_url: str | None = None
+    user_role: str | None = None
+    evidence: list[PortfolioEvidenceItem] = Field(default_factory=list)
 
 
 class PortfolioGenerationResponse(BaseModel):
@@ -603,6 +618,25 @@ class PortfolioGenerationResponse(BaseModel):
     summaries: list[SummaryResponse]
     skills_chronology: list[SkillChronologyItem]
     errors: list[str] = Field(default_factory=list)
+
+
+class PortfolioDisplayResponse(BaseModel):
+    """Portfolio display data for GET /portfolio/{id} endpoint."""
+
+    success: bool = Field(description="True when at least one project is included.")
+    portfolio_id: str
+    consent_level: str
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    preferences: RepresentationPreferences
+    projects: list[PortfolioProjectItem]
+    resume_items: list[ResumeItemResponse]
+    summaries: list[SummaryResponse]
+    skills_chronology: list[SkillChronologyItem]
+    errors: list[str] = Field(default_factory=list)
+
+
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
