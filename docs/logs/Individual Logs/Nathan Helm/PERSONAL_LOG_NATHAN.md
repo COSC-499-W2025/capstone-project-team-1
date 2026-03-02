@@ -135,4 +135,72 @@ I’m proud of the way our team collaborates and supports one another. Our respo
 
 This upcoming week, I add more to file intelligence and provide another extension.
 
-![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Feb8.png)
+
+
+<hr>
+
+<h1>PERSONAL LOG-- 01/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar1.png)
+
+<h3> Schedule</h3>
+
+- Monday: Presentations
+
+- Wednsday: no class, presentations
+
+- Saturday: meeting, discussing tasks
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/392 
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/411
+
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+### PR 1 ###
+- test_user_based_directory_walk()
+- test_exclude_file_user_setting()
+- test_include_file_user_setting()
+- test_gathered_files_from_oswalk()
+
+### PR 2 ###
+- test_custom_ranking_rank_must_be_ge_1()
+- test_invalid_comparison_attribute_raises()
+- test_accepts_valid_payload_and_parses_dates()
+- test_defaults_are_empty_lists()
+
+
+
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/393
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406
+
+
+
+
+**Reflection & Team Dynamic**
+
+I really value the strong sense of teamwork we have and the way everyone shows up for each other. Our feedback on pull requests helps keep things moving smoothly and prevents bottlenecks. I’m also feeling energized by the projects on my plate right now and have a solid grasp of my responsibilities and goals.
+
+**Next Week** 
+
+This upcoming week, I will work on our frontend and prepare for PR testing. 
+
+
+
