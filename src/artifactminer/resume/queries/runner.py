@@ -1665,6 +1665,7 @@ def run_polish_query(
         or feedback.additions
         or feedback.removals
     )
+    should_run_llm_polish = has_content_feedback
 
     output = ResumeOutput(stage="polish")
     output.portfolio_data = draft_output.portfolio_data
@@ -1696,7 +1697,7 @@ def run_polish_query(
     feedback_text = " ".join(feedback_parts)
 
     for project_name, section in draft_output.project_sections.items():
-        if has_content_feedback and section.bullets:
+        if should_run_llm_polish and section.bullets:
             if progress:
                 progress(f"  [Stage 3] Polishing bullets for {project_name}...")
             target_bullets = max(2, min(4, len(section.bullets[:4]) or 2))
@@ -1743,7 +1744,7 @@ def run_polish_query(
 
     # --- Summary polish ---
     if (
-        has_content_feedback
+        should_run_llm_polish
         and draft_output.professional_summary
         and not output.professional_summary
     ):
@@ -1768,7 +1769,7 @@ def run_polish_query(
 
     # --- Profile polish ---
     if (
-        has_content_feedback
+        should_run_llm_polish
         and draft_output.developer_profile
         and not output.developer_profile
     ):
