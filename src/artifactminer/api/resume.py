@@ -712,6 +712,14 @@ def _phase3_worker(
             ],
         )
 
+        emit(
+            "POLISH feedback summary: "
+            f"notes={'yes' if feedback.general_notes else 'no'}, "
+            f"tone={'yes' if feedback.tone else 'no'}, "
+            f"additions={len(feedback.additions)}, "
+            f"removals={len(feedback.removals)}"
+        )
+
         emit("POLISH started: refining draft from saved output")
         push_telemetry()
 
@@ -1023,6 +1031,29 @@ async def polish_resume_pipeline(
                 detail="A pipeline worker is already running for this job",
             )
 
+        normalized_notes = str(request.general_notes or "").strip()
+        normalized_tone = str(request.tone or "").strip()
+        normalized_additions = [
+            str(item).strip() for item in request.additions if str(item).strip()
+        ]
+        normalized_removals = [
+            str(item).strip() for item in request.removals if str(item).strip()
+        ]
+
+        if not (
+            normalized_notes
+            or normalized_tone
+            or normalized_additions
+            or normalized_removals
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "No feedback provided. Add General Notes, Tone, Additions, "
+                    "or Removals before starting polish."
+                ),
+            )
+
         if job.event_queue is None:
             job.event_queue = multiprocessing.Queue()
 
@@ -1040,7 +1071,20 @@ async def polish_resume_pipeline(
         )
         _append_message(job, "Polish requested.")
 
-        feedback_payload = request.model_dump()
+        feedback_payload = {
+            "general_notes": normalized_notes,
+            "tone": normalized_tone,
+            "additions": normalized_additions,
+            "removals": normalized_removals,
+        }
+        _append_message(
+            job,
+            "Polish feedback accepted "
+            f"(notes={'yes' if normalized_notes else 'no'}, "
+            f"tone={'yes' if normalized_tone else 'no'}, "
+            f"additions={len(normalized_additions)}, "
+            f"removals={len(normalized_removals)}).",
+        )
         process = multiprocessing.Process(
             target=_phase3_worker,
             args=(
