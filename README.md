@@ -10,9 +10,9 @@ Artifact Miner analyzes one or more uploaded project ZIPs, discovers Git reposit
 
 Team Contract link: **[Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)**
 
-## Milestone 3 Status
+## Milestone 2 Status
 
-This README reflects the current Milestone 3 implementation in this repository (FastAPI backend, Textual TUI, CLI pipeline, and experimental OpenTUI React client).
+This README reflects the current Milestone 2 implementation in this repository (FastAPI backend, Textual TUI, CLI pipeline, and experimental OpenTUI React client).
 
 ## System Architecture Diagram
 
@@ -127,7 +127,7 @@ flowchart TB
 - `4.0 Skills + Evidence + Ranking` derives skill signals, insights, repository quality evidence, and ranking scores.
 - `5.0 Retrieval + Portfolio Assembly` serves timeline/skills/resume/summaries and builds portfolio-scoped outputs.
 
-## Milestone 3 Capabilities
+## Milestone 2 Capabilities
 
 - Multi-ZIP portfolio flow using `portfolio_id` linkage.
 - Directory-scoped analysis from uploaded ZIP contents.
