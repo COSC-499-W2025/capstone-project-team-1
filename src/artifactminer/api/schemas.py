@@ -14,8 +14,15 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 # ---------------------------------------------------------------------------
 
 EvidenceType = Literal[
-    "metric", "feedback", "evaluation", "award", "custom",
-    "testing", "documentation", "code_quality", "test_coverage",
+    "metric",
+    "feedback",
+    "evaluation",
+    "award",
+    "custom",
+    "testing",
+    "documentation",
+    "code_quality",
+    "test_coverage",
 ]
 
 
@@ -543,16 +550,18 @@ class RepresentationPreferences(BaseModel):
             "Partial overrides allowed (provide only first_commit or last_commit)."
         ),
     )
-    comparison_attributes: list[Literal[
-        "languages",
-        "frameworks",
-        "skills",
-        "total_commits",
-        "ranking_score",
-        "health_score",
-        "primary_language",
-        "role",
-    ]] = Field(
+    comparison_attributes: list[
+        Literal[
+            "languages",
+            "frameworks",
+            "skills",
+            "total_commits",
+            "ranking_score",
+            "health_score",
+            "primary_language",
+            "role",
+        ]
+    ] = Field(
         default_factory=list,
         description=(
             "Allowed attributes for project comparison. Valid values: languages, frameworks, "
@@ -563,6 +572,33 @@ class RepresentationPreferences(BaseModel):
         default_factory=list,
         description="Manual custom rankings for projects (list of {project_id, rank}).",
     )
+
+
+class PortfolioEditRequest(RepresentationPreferences):
+    """Request payload for editing/customizing portfolio content.
+
+    Inherits all fields from RepresentationPreferences and adds input validation.
+    """
+
+    @model_validator(mode="after")
+    def validate_positive_project_ids(self) -> "PortfolioEditRequest":
+        """Ensure all project IDs are non-negative."""
+        for field in ["showcase_project_ids", "project_order"]:
+            values = getattr(self, field)
+            if any(v < 0 for v in values):
+                raise ValueError(f"{field} must contain non-negative integers")
+        return self
+
+
+class PortfolioEditResponse(BaseModel):
+    """Response after editing portfolio content."""
+
+    success: bool = Field(description="True when edit succeeded.")
+    portfolio_id: str
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    preferences: RepresentationPreferences
 
 
 class PortfolioGenerationRequest(BaseModel):
@@ -603,6 +639,8 @@ class PortfolioGenerationResponse(BaseModel):
     summaries: list[SummaryResponse]
     skills_chronology: list[SkillChronologyItem]
     errors: list[str] = Field(default_factory=list)
+
+
 class UserAIIntelligenceSummaryResponse(BaseModel):
     repo_path: str
     user_email: str
@@ -611,6 +649,7 @@ class UserAIIntelligenceSummaryResponse(BaseModel):
 
 class ChronologyOverride(BaseModel):
     """Manual override for project chronology metadata."""
+
     project_id: int = Field(description="Project identifier (repo_stat ID as integer).")
     first_commit: _dt.date | None = Field(
         default=None,
@@ -621,6 +660,7 @@ class ChronologyOverride(BaseModel):
         description="Optional override for last commit date (YYYY-MM-DD).",
     )
 
+
 class CustomRanking(BaseModel):
     """Manual override for project ranking position."""
 
@@ -629,4 +669,3 @@ class CustomRanking(BaseModel):
         description="Custom ranking position (lower value = higher rank).",
         ge=1,
     )
-
