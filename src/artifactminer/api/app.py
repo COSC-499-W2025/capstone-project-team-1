@@ -68,7 +68,8 @@ def create_app() -> FastAPI:
     from alembic.config import Config as AlembicConfig
     from alembic import command as alembic_command
 
-    alembic_cfg = AlembicConfig("alembic.ini")
+    _repo_root = Path(__file__).resolve().parents[3]
+    alembic_cfg = AlembicConfig(str(_repo_root / "alembic.ini"))
     alembic_command.upgrade(alembic_cfg, "head")
 
     # Initialize database schema and seed
