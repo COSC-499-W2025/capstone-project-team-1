@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
 - [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
 - [Term 2 Week 3 (Jan 19 - Jan 25)](#logs---term-2-week-3)
 - [Term 2 Week 2 (Jan 12 - Jan 18)](#logs---term-2-week-2)
@@ -8,6 +9,80 @@
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 7-8
+
+## Connection to Previous Week
+Last period I focused on evidence foundation (PR-1, PR-2) and API retrieval endpoints. Over this two-week period, I merged the remaining evidence PRs (PR-3 and PR-4), added the resume edit endpoint, fixed Alembic startup migration drift, started the portfolio edit endpoint, and continued active code reviews across the team.
+
+---
+
+## Coding Tasks
+
+* Merged evidence PR-3: git contribution metrics and infra signal extractors — commit window count, commit frequency, contribution %, CI/CD and Docker detection, wired into evidence persistence ([PR #371](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/371); closes [Issue #356](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/356)).
+
+* Merged evidence PR-4: testing/docs/code-quality heuristic extractors — 3 detectors for test signals, docs signals, and code-quality tooling across 7 languages ([PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376); closes [Issue #354](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/354)).
+
+* Added `POST /resume/{id}/edit` endpoint with Pydantic validation requiring at least one field ([PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378); closes [Issue #332](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/332)).
+
+* Merged development changes into main ([PR #382](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/382)).
+
+* Fixed Alembic startup migration bug — replaced direct `Base.metadata.create_all()` with Alembic `upgrade head` at startup so schema stays consistent across environments ([PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407)).
+
+* Added `POST /portfolio/{id}/edit` endpoint — `PortfolioEditRequest` inherits from `RepresentationPreferences` to avoid field duplication; preferences are persisted and affect subsequent `/portfolio/generate` calls ([PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410); closes [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335)).
+
+---
+
+## Testing & Debugging Tasks
+
+* Added 5 tests for resume edit endpoint covering full update, partial update, 404, empty request rejection, and soft-deleted item (`tests/api/test_resume_edit.py`).
+
+* Added 14 integration tests for portfolio edit endpoint covering happy path, 404, 422, persistence, idempotency, full replacement, chronology overrides, and generate-side effects (`tests/api/test_portfolio_edit.py`).
+
+* Added 18 unit tests for schema models — ChronologyOverride, CustomRanking, RepresentationPreferences (`tests/api/test_representation_preferences.py`).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #381](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/381) (markdown logic by Nathan) — flagged `file_values` type mismatch, `str_response` overwrite-on-loop bug, inconsistent return types, and weak test assertion. Approved after fixes.
+
+* Reviewed [PR #385](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/385) (consent enums + TUI redesign by Shlok) — requested React cleanup logic for unmounted components, proper error handling in `.catch`, and a shared `ConsentPanel` component to deduplicate Panel1/2/3. Approved after updates.
+
+* Reviewed [PR #392](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/392) (extend user representation preferences by Nathan) — flagged incomplete schema-to-API wiring. Approved after requested changes.
+
+* Reviewed [PR #404](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/404) (local LLM testing + API rename by Shlok) — flagged orphaned-job risk from resetting `_active_job_id` without teardown. Approved after graceful teardown fix.
+
+* Reviewed [PR #406](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406) (GET /portfolio/{id} by Ahmad) — requested title/body alignment, flagged duplicated `_coerce_date` helper, suggested keeping dataclasses in `models.py`.
+
+---
+
+## Blockers & Issues
+
+* API startup was using direct SQLAlchemy table creation instead of Alembic migrations, causing schema drift across environments — resolved with [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407).
+
+---
+
+## Plan for Next Week
+
+* Continue portfolio edit and generation endpoint work: [Issue #334](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/334), [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335).
+* Address remaining review feedback on open PRs.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Evidence PR-3 git/infra extractors | ✅ Done | [PR #371](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/371) — merged Feb 16 |
+| Evidence PR-4 testing/docs/code-quality | ✅ Done | [PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376) — merged Feb 22 |
+| Add `POST /resume/{id}/edit` | ✅ Done | [PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378) — merged Feb 22 |
+| Merge dev to main | ✅ Done | [PR #382](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/382) |
+| Fix Alembic startup migration | ✅ Done | [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407) |
+| Add `POST /portfolio/{id}/edit` | 🔄 In review | [PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410) |
+| Review PRs (#381, #385, #392, #404, #406) | ✅ Done | Reviewed + follow-up requested changes |
+
+![Tasks Week 7-8](Tasks_T2_Week7-8.png)
 
 ---
 
