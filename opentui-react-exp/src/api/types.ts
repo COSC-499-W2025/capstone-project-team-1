@@ -123,7 +123,8 @@ export type PipelineJobStatus =
 	| "polishing"
 	| "complete"
 	| "error"
-	| "cancelled";
+	| "cancelled"
+	| "failed_resource_guard";
 
 export type PipelineStage =
 	| "ANALYZE"
@@ -160,7 +161,7 @@ export interface PipelineContributorsResponse {
 }
 
 export interface PipelineStartRequest {
-	intake_id: string;
+	intake_id?: string | null;
 	repo_ids: string[];
 	user_email: string;
 	stage1_model: string;

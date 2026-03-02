@@ -393,6 +393,7 @@ PipelineJobStatus = Literal[
     "complete",
     "error",
     "cancelled",
+    "failed_resource_guard",
 ]
 
 # Pipeline stage is a lightweight progress indicator for UI/telemetry.
@@ -448,7 +449,7 @@ class PipelineContributorsResponse(BaseModel):
 class PipelineStartRequest(BaseModel):
     """Request payload to launch phase 1 of the local resume pipeline."""
 
-    intake_id: str = Field(min_length=1)
+    intake_id: str | None = Field(default=None, min_length=1)
     repo_ids: list[str] = Field(min_length=1)
     user_email: str = Field(min_length=3)
     stage1_model: str = Field(default="qwen2.5-coder-3b-q4", min_length=1)

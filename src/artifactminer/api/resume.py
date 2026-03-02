@@ -6,6 +6,7 @@ import json
 import multiprocessing
 import queue
 import shutil
+import subprocess
 import tempfile
 import threading
 import time
@@ -44,7 +45,7 @@ from .analyze import get_consent_level, get_user_email
 from ..evidence.orchestrator import persist_insights_as_project_evidence
 from ..RepositoryIntelligence.repo_intelligence_user import collect_user_additions
 from ..resume.assembler import assemble_json
-from ..resume.llm_client import ensure_model_available
+from ..resume.llm_client import ensure_model_available, unload_model
 from ..resume.models import ResumeOutput, UserFeedback
 from ..resume.pipeline import extract_and_distill_for_repos
 from ..resume.queries.runner import (
@@ -61,9 +62,15 @@ router = APIRouter(
     tags=["resume"],
 )
 
+local_llm_router = APIRouter(
+    prefix="/local-llm",
+    tags=["local-llm"],
+)
+
 
 JobPhase = Literal["phase1", "phase3", "none"]
 _TERMINATE_TIMEOUT_SECONDS = 1.0
+_RESOURCE_GUARD_MAX_RAM_MB = 6144.0
 
 
 @dataclass
@@ -123,6 +130,8 @@ class JobState:
 # Ephemeral in-memory stores
 _intakes: dict[str, IntakeState] = {}
 _jobs: dict[str, JobState] = {}
+_active_intake_id: str | None = None
+_active_job_id: str | None = None
 _lock = threading.Lock()
 
 
@@ -189,6 +198,110 @@ def _release_process_handle(job: JobState) -> None:
     except Exception:
         pass
     job.process = None
+
+
+def _clear_job_runtime_payloads(job: JobState) -> None:
+    """Drop heavyweight in-memory payloads for hard stop paths."""
+    job.draft_output = None
+    job.draft_json = None
+    job.final_json = None
+
+    event_queue = job.event_queue
+    if event_queue is not None:
+        while True:
+            try:
+                event_queue.get_nowait()
+            except queue.Empty:
+                break
+            except Exception:
+                break
+    job.event_queue = None
+
+
+def _should_cancel_for_context_switch(job: JobState) -> bool:
+    """Return True when a job should be stopped before replacing active context."""
+    process = job.process
+    if process is not None and process.is_alive():
+        return True
+    return job.status in {"queued", "running", "draft_ready", "polishing"}
+
+
+def _mark_job_cancelled(job: JobState, message: str) -> None:
+    """Finalize in-memory job state as cancelled."""
+    _release_process_handle(job)
+    _clear_job_runtime_payloads(job)
+    job.phase = "none"
+    job.status = "cancelled"
+    job.last_error = None
+    _append_message(job, message)
+
+
+def _stop_local_model_server() -> None:
+    """Best-effort llama-server teardown used by cancel and safety guard paths."""
+    try:
+        unload_model()
+    except Exception:
+        pass
+
+
+def _get_process_rss_mb(process: multiprocessing.Process) -> float | None:
+    """Read RSS memory for a process in megabytes using `ps`."""
+    pid = getattr(process, "pid", None)
+    if not isinstance(pid, int) or pid <= 0:
+        return None
+
+    try:
+        proc = subprocess.run(
+            ["ps", "-o", "rss=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=0.2,
+        )
+    except Exception:
+        return None
+
+    if proc.returncode != 0:
+        return None
+
+    output = proc.stdout.strip()
+    if not output:
+        return None
+
+    try:
+        rss_kb = int(output.splitlines()[-1].strip().split()[0])
+    except (ValueError, IndexError):
+        return None
+
+    return rss_kb / 1024.0
+
+
+def _enforce_resource_guard(job: JobState, process: multiprocessing.Process) -> bool:
+    """Kill runaway local generation when process RAM exceeds safety threshold."""
+    if job.status not in {"queued", "running", "polishing"}:
+        return False
+
+    rss_mb = _get_process_rss_mb(process)
+    if rss_mb is None or rss_mb <= _RESOURCE_GUARD_MAX_RAM_MB:
+        return False
+
+    try:
+        _terminate_process_now(process)
+    except Exception:
+        pass
+
+    _stop_local_model_server()
+    _release_process_handle(job)
+    _clear_job_runtime_payloads(job)
+
+    job.phase = "none"
+    job.status = "failed_resource_guard"
+    job.last_error = (
+        f"Resource guard triggered: process RAM {rss_mb:.1f} MB exceeded "
+        f"{_RESOURCE_GUARD_MAX_RAM_MB:.0f} MB limit."
+    )
+    _append_message(job, job.last_error)
+    return True
 
 
 def _drain_events_once(job: JobState) -> None:
@@ -265,6 +378,8 @@ def _drain_job_events(job: JobState) -> None:
         return
 
     if process.is_alive():
+        if _enforce_resource_guard(job, process):
+            return
         return
 
     # Final queue drain after process exits.
@@ -283,6 +398,7 @@ def _drain_job_events(job: JobState) -> None:
         "complete",
         "error",
         "cancelled",
+        "failed_resource_guard",
     }:
         _release_process_handle(job)
 
@@ -637,11 +753,13 @@ def _phase3_worker(
         )
 
 
-@router.post("/pipelines/intakes", response_model=PipelineIntakeCreateResponse)
+@local_llm_router.post("/context", response_model=PipelineIntakeCreateResponse)
 async def create_pipeline_intake(
     request: PipelineIntakeCreateRequest,
 ) -> PipelineIntakeCreateResponse:
     """Create an intake from a local ZIP path and discover candidate repos."""
+    global _active_intake_id, _active_job_id
+
     zip_path = _validate_zip_path(request.zip_path)
 
     extraction_parent = Path(tempfile.mkdtemp(prefix="artifactminer-intake-"))
@@ -691,8 +809,42 @@ async def create_pipeline_intake(
         updated_at=now,
     )
 
+    previous_active_job_id: str | None = None
+    running_process: multiprocessing.Process | None = None
+
     with _lock:
+        previous_active_job_id = _active_job_id
+        if previous_active_job_id is not None:
+            previous_job = _jobs.get(previous_active_job_id)
+            if previous_job is not None:
+                _drain_job_events(previous_job)
+                if _should_cancel_for_context_switch(previous_job):
+                    process = previous_job.process
+                    if process is not None and process.is_alive():
+                        running_process = process
+
+    if running_process is not None and running_process.is_alive():
+        try:
+            _terminate_process_now(running_process)
+        except Exception:
+            pass
+
+    if previous_active_job_id is not None:
+        _stop_local_model_server()
+
+    with _lock:
+        if previous_active_job_id is not None:
+            previous_job = _jobs.get(previous_active_job_id)
+            if previous_job is not None:
+                _drain_job_events(previous_job)
+                if _should_cancel_for_context_switch(previous_job):
+                    _mark_job_cancelled(
+                        previous_job,
+                        "Pipeline cancelled because a new context was created.",
+                    )
         _intakes[intake_id] = intake_state
+        _active_intake_id = intake_id
+        _active_job_id = None
 
     return PipelineIntakeCreateResponse(
         intake_id=intake_id,
@@ -704,19 +856,21 @@ async def create_pipeline_intake(
     )
 
 
-@router.post(
-    "/pipelines/intakes/{intake_id}/contributors",
+@local_llm_router.post(
+    "/context/contributors",
     response_model=PipelineContributorsResponse,
 )
 async def list_pipeline_contributors(
-    intake_id: str,
     request: PipelineContributorsRequest,
 ) -> PipelineContributorsResponse:
     """Return contributor identities from selected repositories only."""
     with _lock:
-        intake = _intakes.get(intake_id)
+        intake = _intakes.get(_active_intake_id or "")
         if intake is None:
-            raise HTTPException(status_code=404, detail="Intake not found")
+            raise HTTPException(
+                status_code=404,
+                detail="No active context found. Create context first.",
+            )
         selected_repos = _resolve_selected_repos(intake, request.repo_ids)
 
     try:
@@ -730,15 +884,20 @@ async def list_pipeline_contributors(
     return PipelineContributorsResponse(contributors=contributors)
 
 
-@router.post("/pipelines", response_model=PipelineStartResponse)
+@local_llm_router.post("/generation/start", response_model=PipelineStartResponse)
 async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartResponse:
     """Start phase 1 pipeline for selected repos and identity."""
     user_email = _normalize_email_or_422(request.user_email)
 
+    global _active_job_id
     with _lock:
-        intake = _intakes.get(request.intake_id)
+        intake_id = request.intake_id or _active_intake_id
+        intake = _intakes.get(intake_id or "")
         if intake is None:
-            raise HTTPException(status_code=404, detail="Intake not found")
+            raise HTTPException(
+                status_code=404,
+                detail="No active context found. Create context first.",
+            )
 
         selected_repos = _resolve_selected_repos(intake, request.repo_ids)
 
@@ -772,6 +931,7 @@ async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartR
             updated_at=now,
         )
         _jobs[job_id] = job_state
+        _active_job_id = job_id
 
     process = multiprocessing.Process(
         target=_phase1_worker,
@@ -805,13 +965,16 @@ async def start_resume_pipeline(request: PipelineStartRequest) -> PipelineStartR
     return PipelineStartResponse(job_id=job_id, status="running")
 
 
-@router.get("/pipelines/{job_id}", response_model=PipelineStatusResponse)
-async def get_resume_pipeline_status(job_id: str) -> PipelineStatusResponse:
+@local_llm_router.get("/generation/status", response_model=PipelineStatusResponse)
+async def get_resume_pipeline_status() -> PipelineStatusResponse:
     """Poll current status for a pipeline job."""
     with _lock:
-        job = _jobs.get(job_id)
+        job = _jobs.get(_active_job_id or "")
         if job is None:
-            raise HTTPException(status_code=404, detail="Pipeline job not found")
+            raise HTTPException(
+                status_code=404,
+                detail="No active generation found. Start generation first.",
+            )
 
         _drain_job_events(job)
         telemetry = _coerce_telemetry(job)
@@ -827,16 +990,18 @@ async def get_resume_pipeline_status(job_id: str) -> PipelineStatusResponse:
         )
 
 
-@router.post("/pipelines/{job_id}/polish", response_model=PipelinePolishResponse)
+@local_llm_router.post("/generation/polish", response_model=PipelinePolishResponse)
 async def polish_resume_pipeline(
-    job_id: str,
     request: PipelinePolishRequest,
 ) -> PipelinePolishResponse:
     """Run Stage 3 polish from the saved Stage 2 draft."""
     with _lock:
-        job = _jobs.get(job_id)
+        job = _jobs.get(_active_job_id or "")
         if job is None:
-            raise HTTPException(status_code=404, detail="Pipeline job not found")
+            raise HTTPException(
+                status_code=404,
+                detail="No active generation found. Start generation first.",
+            )
 
         _drain_job_events(job)
 
@@ -892,7 +1057,7 @@ async def polish_resume_pipeline(
         process.start()
     except Exception as exc:
         with _lock:
-            current_job = _jobs.get(job_id)
+            current_job = _jobs.get(_active_job_id or "")
             if current_job is not None:
                 current_job.status = "error"
                 current_job.phase = "none"
@@ -906,7 +1071,7 @@ async def polish_resume_pipeline(
         ) from exc
 
     with _lock:
-        current_job = _jobs.get(job_id)
+        current_job = _jobs.get(_active_job_id or "")
         if current_job is not None:
             current_job.process = process
             current_job.updated_at = _now_utc_naive()
@@ -914,15 +1079,18 @@ async def polish_resume_pipeline(
     return PipelinePolishResponse(ok=True, status="polishing")
 
 
-@router.post("/pipelines/{job_id}/cancel", response_model=PipelineCancelResponse)
-async def cancel_resume_pipeline(job_id: str) -> PipelineCancelResponse:
+@local_llm_router.post("/generation/cancel", response_model=PipelineCancelResponse)
+async def cancel_resume_pipeline() -> PipelineCancelResponse:
     """Cancel a running or paused pipeline immediately."""
     process: multiprocessing.Process | None = None
 
     with _lock:
-        job = _jobs.get(job_id)
+        job = _jobs.get(_active_job_id or "")
         if job is None:
-            raise HTTPException(status_code=404, detail="Pipeline job not found")
+            raise HTTPException(
+                status_code=404,
+                detail="No active generation found. Start generation first.",
+            )
 
         _drain_job_events(job)
 
@@ -942,12 +1110,17 @@ async def cancel_resume_pipeline(job_id: str) -> PipelineCancelResponse:
         except Exception:
             pass
 
+    _stop_local_model_server()
+
     with _lock:
-        job = _jobs.get(job_id)
+        job = _jobs.get(_active_job_id or "")
         if job is None:
             return PipelineCancelResponse(ok=True, status="cancelled")
 
         _release_process_handle(job)
+        _clear_job_runtime_payloads(job)
+
+        # TODO: add a graceful-stop mode that preserves partial draft output.
         job.phase = "none"
         job.status = "cancelled"
         job.last_error = None
