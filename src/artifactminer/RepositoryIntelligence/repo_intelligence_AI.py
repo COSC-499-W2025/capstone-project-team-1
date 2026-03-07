@@ -7,7 +7,7 @@ from artifactminer.db.models import Consent, UserAIntelligenceSummary
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.helpers.openai import get_gpt5_nano_response
-from artifactminer.helpers.ollama import get_ollama_response
+from artifactminer.helpers.local_llm import get_local_llm_response
 
 
 def get_user_llm_selection() -> str:
@@ -38,7 +38,7 @@ async def getLLMResponse(prompt: str) -> str:
     if get_user_llm_selection() == "chatGPT":
         return await get_gpt5_nano_response(prompt)
     else:
-        return get_ollama_response(prompt)
+        return get_local_llm_response(prompt)
 
 # Check if user has allowed LLM usage via consent
 def user_allows_llm() -> bool:
@@ -47,7 +47,7 @@ def user_allows_llm() -> bool:
         consent = db.get(Consent, 1)
         if consent is None: #no consent row means no consent given
             consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
-        return bool(consent and (consent.consent_level or "").lower() in ("local-llm", "cloud"))
+        return bool(consent and (consent.consent_level or "").lower() == "full")
     finally:
         db.close()
 # Set user consent level for LLM usage
