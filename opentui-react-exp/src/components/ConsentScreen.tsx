@@ -10,7 +10,7 @@ interface ConsentScreenProps {
 	onBack: () => void;
 }
 
-const OPTIONS: ConsentLevel[] = ["local", "local-llm", "cloud"];
+const OPTIONS: ConsentLevel[] = ["no_llm", "full"];
 
 // ── ConsentPanel ──────────────────────────────────────────────────────────────
 
@@ -108,8 +108,8 @@ type PanelConfig = Omit<ConsentPanelProps, "selected">;
 
 const PANELS: PanelConfig[] = [
 	{
-		level: "local",
-		title: "Local Only",
+		level: "no_llm",
+		title: "Without LLM",
 		subtitle: "pattern-based",
 		description: "Reads your repos using static rules. No AI model needed or involved.",
 		sections: [
@@ -142,10 +142,10 @@ const PANELS: PanelConfig[] = [
 		],
 	},
 	{
-		level: "local-llm",
-		title: "Local AI",
+		level: "full",
+		title: "With LLM",
 		subtitle: "recommended",
-		description: "Static analysis plus a small model that runs entirely on your device.",
+		description: "Perform full LLM-powered analysis using your consent.",
 		sections: [
 			{
 				heading: "What we read",
@@ -163,7 +163,7 @@ const PANELS: PanelConfig[] = [
 				items: [
 					{ text: "Summaries & metrics only —" },
 					{ text: "never your raw source code." },
-					{ text: "Commit messages only reach the AI", color: theme.textDim },
+					{ text: "Commit messages only reach the LLM", color: theme.textDim },
 					{ text: "if our classifier can't label them.", color: theme.textDim },
 				],
 			},
@@ -185,46 +185,12 @@ const PANELS: PanelConfig[] = [
 			{ text: " - Needs available RAM", color: theme.warning },
 		],
 	},
-	{
-		level: "cloud",
-		title: "Cloud AI",
-		subtitle: "coming soon",
-		description: "Static analysis plus a cloud model. Best quality, no local storage needed.",
-		sections: [
-			{
-				heading: "What gets sent",
-				headingColor: theme.cyan,
-				items: [
-					{ text: "· File & technology names" },
-					{ text: "· Commit messages" },
-					{ text: "· Summaries & metrics" },
-					{ text: "Sent to an external AI service.", color: theme.textDim },
-				],
-			},
-			{
-				heading: "Privacy",
-				headingColor: theme.gold,
-				items: [
-					{ text: "Metadata leaves your device." },
-					{ text: "Subject to provider's data policy." },
-					{ text: "Raw source code is never sent.", color: theme.textDim },
-				],
-			},
-		],
-		ratings: [
-			{ text: " + Best quality results", color: theme.success },
-			{ text: " + No local setup or storage", color: theme.success },
-			{ text: " ~ Not yet available", color: theme.warning },
-			{ text: " - Requires network", color: theme.warning },
-			{ text: " - Data leaves device", color: theme.warning },
-		],
-	},
 ];
 
 // ── ConsentScreen ─────────────────────────────────────────────────────────────
 
 export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-	const [selected, setSelected] = useState<ConsentLevel>("local-llm");
+	const [selected, setSelected] = useState<ConsentLevel>("full");
 	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {

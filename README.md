@@ -240,7 +240,7 @@ uv run artifactminer --help
 uv run artifactminer -i /path/to/projects.zip -o /path/to/report.txt -c no_llm -u you@example.com
 ```
 
-CLI consent flags currently use `full | no_llm | none` in the CLI pipeline, while the API `/consent` contract uses `local | local-llm | cloud | none`.
+CLI consent flags currently use `full | no_llm | none` in the CLI pipeline, and the API `/consent` contract also uses `full | no_llm | none`.
 
 ### Run Experimental OpenTUI React Client
 
