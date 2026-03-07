@@ -14,7 +14,7 @@ def get_user_llm_selection() -> str:
     db = SessionLocal() #create a new database session
     try:
         consent = db.get(Consent, 1)
-        if consent is None: #no consent row means default to ollama
+        if consent is None: #no consent row means default to chatGPT
             consent = db.query(Consent).order_by(Consent.id.desc()).first() #get the latest consent row if multiple exist
         return consent.LLM_model if consent and consent.LLM_model else "chatGPT"#return user's LLM selection or default to "chatGPT"
     except Exception as e:

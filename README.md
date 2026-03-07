@@ -39,7 +39,7 @@ flowchart TB
 
     subgraph Integrations["Optional LLM Integrations"]
         OpenAI["OpenAI helper"]
-        Ollama["Ollama helper"]
+        LocalLLM["Local LLM (llama.cpp)"]
     end
 
     subgraph Data["Data Layer"]
@@ -69,7 +69,7 @@ flowchart TB
     Routers --> Thumbs
 
     Skills -. consent gated .-> OpenAI
-    Skills -. local option .-> Ollama
+    Skills -. local option .-> LocalLLM
 ```
 
 ## Data Flow Diagram (Level 0)
@@ -91,7 +91,7 @@ flowchart TB
     FSUploads[("uploads/ ZIP store")]
     FSExtracted[(".extracted/ workspace")]
     DB[("SQLite DB")]
-    LLM["Optional LLM (OpenAI/Ollama)"]
+    LLM["Optional LLM (OpenAI/Local)"]
 
     P1["1.0 Consent + User Config\n/consent, /questions, /answers"]
     P2["2.0 ZIP Intake\n/zip/upload, /zip/{id}/directories"]
@@ -209,7 +209,7 @@ alembic/                  Database migrations
 - Git
 - Optional: Bun (for `opentui-react-exp`)
 - Optional: OpenAI API key (for OpenAI-backed paths)
-- Optional: local Ollama install (for local LLM paths)
+- Optional: local LLM setup (llama.cpp with models) for enhanced analysis
 
 ### Install and Configure
 
