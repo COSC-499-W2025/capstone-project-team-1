@@ -209,7 +209,7 @@ alembic/                  Database migrations
 - Git
 - Optional: Bun (for `opentui-react-exp`)
 - Optional: OpenAI API key (for OpenAI-backed paths)
-- Optional: local LLM setup (llama.cpp with models) for enhanced analysis
+- Optional: local LLM setup (llama.cpp with models) — see [LOCAL_LLM_SETUP.md](LOCAL_LLM_SETUP.md)
 
 ### Install and Configure
 
@@ -218,6 +218,8 @@ uv sync
 cp .env.example .env
 uv run alembic upgrade head
 ```
+
+**For local LLM support:** Follow the [Local LLM Setup Guide](LOCAL_LLM_SETUP.md) to install llama-server and download models.
 
 ### Run Backend API
 
