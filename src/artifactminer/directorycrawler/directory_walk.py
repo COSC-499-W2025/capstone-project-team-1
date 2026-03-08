@@ -520,7 +520,10 @@ def crawl_directory(refresh_dict=True) -> tuple[dict, list[str]]:
 
     for (root,dirs,files) in os.walk(CURRENTPATH, topdown=True):
         for single_directory in dirs:
-            listforalldirs.append(single_directory)
+            # Include full relative path for each directory
+            full_dir_path = os.path.join(root, single_directory)
+            rel_dir_path = os.path.relpath(full_dir_path, CURRENTPATH)
+            listforalldirs.append(rel_dir_path)
         if files:
             current_folder = os.path.basename(root)
             print(
