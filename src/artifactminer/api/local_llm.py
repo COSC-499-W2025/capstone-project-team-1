@@ -15,10 +15,8 @@ from pathlib import Path
 from typing import List
 from zipfile import ZipFile, is_zipfile
 
-from fastapi import APIRouter, Body, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException
 
-from ..db import get_db
 from .local_llm_schemas import (
     IntakeCreateRequest,
     IntakeCreateResponse,
@@ -85,8 +83,7 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
 
 @router.post("/context", response_model=IntakeCreateResponse)
 async def create_intake(
-    request: IntakeCreateRequest = Body(...),
-    db: Session = Depends(get_db),
+    request: IntakeCreateRequest,
 ) -> IntakeCreateResponse:
     """Create a new intake from an uploaded ZIP file.
     
@@ -99,7 +96,6 @@ async def create_intake(
     
     Args:
         request: IntakeCreateRequest with zip_path
-        db: Database session (for future use)
         
     Returns:
         IntakeCreateResponse with intake_id and discovered repositories

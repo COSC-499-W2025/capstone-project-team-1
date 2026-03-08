@@ -1,18 +1,18 @@
 """Tests for local LLM API endpoints."""
 
-import tempfile
-from pathlib import Path
 from zipfile import ZipFile
 
-import pytest
+from artifactminer.api import local_llm
 
 
 def test_local_llm_router_is_registered(client):
-    """Verify the local-llm router is mounted and reachable."""
-    # Try hitting a non-existent route to get 404, which proves router is mounted
-    response = client.get("/local-llm/nonexistent")
-    # Should get 404 if router is mounted, 404 means router exists but route doesn't
-    assert response.status_code == 404
+    """Verify the local-llm router is mounted with /local-llm/context."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/context" in paths
+    assert "post" in paths["/local-llm/context"]
 
 
 def test_context_endpoint_exists(client):
@@ -181,6 +181,24 @@ def test_create_intake_corrupted_zip(client, tmp_path):
     assert response.status_code == 400
     detail = response.json()["detail"]
     assert "invalid" in detail.lower() or "failed" in detail.lower()
+
+
+def test_create_intake_internal_error_maps_to_500(client, monkeypatch):
+    """Test 500 mapping when the route encounters an unexpected error."""
+
+    def _raise_runtime_error(_zip_path: str):
+        raise RuntimeError("unexpected failure")
+
+    monkeypatch.setattr(local_llm, "_discover_repos_in_zip", _raise_runtime_error)
+
+    response = client.post(
+        "/local-llm/context",
+        json={"zip_path": "any.zip"},
+    )
+
+    assert response.status_code == 500
+    detail = response.json()["detail"]
+    assert "failed to create intake" in detail.lower()
 
 
 def test_create_intake_response_contract(client, tmp_path):
