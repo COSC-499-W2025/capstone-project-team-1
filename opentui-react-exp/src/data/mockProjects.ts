@@ -1,6 +1,4 @@
-import type { Project, ResumeData, Skill } from "../types";
-
-export const mockProjects: Project[] = [
+export const mockProjects = [
 	{
 		id: "go-task-runner",
 		name: "Go Task Runner",
@@ -131,7 +129,7 @@ export const mockProjects: Project[] = [
 	},
 ];
 
-export const mockSkills: Skill[] = [
+export const mockSkills = [
 	{
 		name: "Python",
 		level: "expert",
@@ -168,12 +166,16 @@ export const mockSkills: Skill[] = [
 	},
 ];
 
-export const mockResumeData: ResumeData = {
+export const mockResumeData = {
 	skills: mockSkills,
 	projects: mockProjects,
 	summary:
 		"Full-stack developer with expertise in Python, TypeScript, and cloud infrastructure. Experienced in building scalable backend services, modern web applications, and DevOps pipelines. Strong foundation in algorithms, data structures, and machine learning.",
 };
+
+export type Project = (typeof mockProjects)[number];
+export type Skill = (typeof mockSkills)[number];
+export type ResumeData = typeof mockResumeData;
 
 // Analysis steps for the analysis screen
 export const analysisSteps = [
