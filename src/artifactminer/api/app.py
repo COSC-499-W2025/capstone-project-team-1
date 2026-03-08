@@ -36,6 +36,7 @@ from .user_info import router as user_info_router
 from .portfolio import router as portfolio_router
 from .file_intelligence import router as file_intelligence_router
 from .resume import router as resume_router
+from .local_llm import router as local_llm_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
     getRepoStats,
     saveRepoStats,
@@ -237,6 +238,7 @@ def create_app() -> FastAPI:
     app.include_router(retrieval_router)
     app.include_router(portfolio_router)
     app.include_router(resume_router)
+    app.include_router(local_llm_router)
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
     app.include_router(views_router)
