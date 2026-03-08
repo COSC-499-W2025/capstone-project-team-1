@@ -1,17 +1,12 @@
 import { expect, test } from "bun:test";
 import { ApiClient, ApiError } from "./client";
 
-type MockFetch = (
-	input: Parameters<typeof fetch>[0],
-	init?: Parameters<typeof fetch>[1],
-) => Promise<Response>;
-
 const withMockFetch = async (
-	mock: MockFetch,
+	mock: typeof fetch,
 	fn: () => Promise<void>
 ): Promise<void> => {
 	const originalFetch = globalThis.fetch;
-	globalThis.fetch = mock as typeof fetch;
+	globalThis.fetch = mock;
 	try {
 		await fn();
 	} finally {

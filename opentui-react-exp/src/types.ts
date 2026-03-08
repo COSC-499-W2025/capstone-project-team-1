@@ -1,5 +1,6 @@
 export type Screen =
 	| "landing"
+	| "consent"
 	| "consent-policy"
 	| "file-upload"
 	| "project-list"
@@ -12,9 +13,38 @@ export type Screen =
 
 export type AnalysisMode = "phase1" | "phase3";
 
+export interface Project {
+	id: string;
+	name: string;
+	language: string;
+	description: string;
+	technologies: string[];
+	commits: number;
+	files: number;
+	lastUpdated: string;
+}
+
+export interface Skill {
+	name: string;
+	level: "beginner" | "intermediate" | "advanced" | "expert";
+	projects: string[];
+}
+
+export interface ResumeData {
+	skills: Skill[];
+	projects: Project[];
+	summary: string;
+}
+
 export interface KeyAction {
 	key: string;
 	label: string;
+}
+
+export interface AnalysisStep {
+	id: string;
+	label: string;
+	status: "pending" | "in-progress" | "completed";
 }
 
 export const theme = {

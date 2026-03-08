@@ -1,5 +1,4 @@
-import type { ResumeData } from "../data/mockProjects";
-import { theme } from "../types";
+import { type ResumeData, theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {

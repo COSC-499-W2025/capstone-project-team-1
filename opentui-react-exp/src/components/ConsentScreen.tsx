@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import { api } from "../api/endpoints";
-import type { ConsentLevel as ApiConsentLevel } from "../api/types";
+import type { ConsentLevel } from "../api/types";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -10,9 +10,7 @@ interface ConsentScreenProps {
 	onBack: () => void;
 }
 
-type ConsentOption = "local" | "local-llm" | "cloud";
-
-const OPTIONS: ConsentOption[] = ["local", "local-llm", "cloud"];
+const OPTIONS: ConsentLevel[] = ["local", "local-llm", "cloud"];
 
 // ── ConsentPanel ──────────────────────────────────────────────────────────────
 
@@ -33,8 +31,8 @@ interface RatingItem {
 }
 
 interface ConsentPanelProps {
-	level: ConsentOption;
-	selected: ConsentOption;
+	level: ConsentLevel;
+	selected: ConsentLevel;
 	title: string;
 	subtitle: string;
 	description: string;
@@ -226,15 +224,14 @@ const PANELS: PanelConfig[] = [
 // ── ConsentScreen ─────────────────────────────────────────────────────────────
 
 export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
-	const [selected, setSelected] = useState<ConsentOption>("local-llm");
+	const [selected, setSelected] = useState<ConsentLevel>("local-llm");
 	const [saving, setSaving] = useState(false);
 
 	useEffect(() => {
 		let ignore = false;
 		api.getConsent().then((resp) => {
-			if (!ignore) {
-				if (resp.consent_level === "full") setSelected("cloud");
-				if (resp.consent_level === "no_llm") setSelected("local");
+			if (!ignore && resp.consent_level !== "none") {
+				setSelected(resp.consent_level);
 			}
 		}).catch((err) => { console.error("Failed to load consent:", err); });
 		return () => { ignore = true; };
@@ -246,18 +243,18 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		if (key.name === "left") {
 			setSelected((prev) => {
 				const idx = OPTIONS.indexOf(prev);
-				return OPTIONS[Math.max(0, idx - 1)] ?? prev;
+				return OPTIONS[Math.max(0, idx - 1)];
 			});
 		}
 		if (key.name === "right") {
 			setSelected((prev) => {
 				const idx = OPTIONS.indexOf(prev);
-				return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)] ?? prev;
+				return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)];
 			});
 		}
 		if (key.name === "return") {
 			setSaving(true);
-			api.updateConsent(selected as unknown as ApiConsentLevel).then(() => {
+			api.updateConsent(selected).then(() => {
 				onContinue();
 			}).catch(() => {
 				setSaving(false);
