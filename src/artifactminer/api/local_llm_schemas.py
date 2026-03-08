@@ -1,8 +1,27 @@
 """Transport-layer schemas for local LLM generation workflow.
 
-This module defines the request/response contracts for the /local-llm/* route family.
-Schemas are workflow-oriented and provider-agnostic, focusing on the logical stages
-of local resume generation rather than implementation details or provider branding.
+This module defines the request/response contracts (schemas) for the /local-llm/* route in experimental llama branch.
+
+If your at curious about the schema migrations this file has from the llama branch, here they are: 
+
+
+experimental llama schemas -> this file schema
+
+PipelineIntakeCreateRequest → migrated as IntakeCreateRequest
+PipelineIntakeCreateResponse → migrated as IntakeCreateResponse
+PipelineRepoCandidate → migrated as RepositoryCandidate
+PipelineContributorsRequest → migrated as ContributorDiscoveryRequest
+PipelineContributorIdentity → migrated as ContributorIdentity
+PipelineContributorsResponse → migrated as ContributorDiscoveryResponse
+PipelineStartRequest → migrated as GenerationStartRequest
+PipelineStartResponse → migrated as GenerationStartResponse
+PipelineTelemetry → migrated as GenerationTelemetry
+PipelineStatusResponse → migrated as GenerationStatusResponse
+PipelinePolishRequest → migrated as PolishRequest
+PipelinePolishResponse → migrated as PolishResponse
+PipelineCancelResponse → migrated as CancellationResponse
+
+
 """
 
 from __future__ import annotations
