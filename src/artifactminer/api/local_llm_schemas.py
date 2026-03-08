@@ -29,7 +29,7 @@ from __future__ import annotations
 from datetime import datetime, UTC
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 # ---------------------------------------------------------------------------
@@ -165,8 +165,8 @@ class GenerationStartRequest(BaseModel):
     repo_ids: list[str] = Field(
         min_length=1, description="Selected repository IDs for processing"
     )
-    user_email: str = Field(
-        min_length=3, description="User email for attribution and identification"
+    user_email: EmailStr = Field(
+        description="User email for attribution and identification"
     )
     stage1_model: str = Field(
         default="qwen2.5-coder-3b-q4",
