@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Project } from "../data/mockProjects";
-import { theme } from "../types";
+import { mockProjects } from "../data/mockProjects";
+import { type Project, theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ProjectListProps {
