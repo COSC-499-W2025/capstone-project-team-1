@@ -2,9 +2,13 @@ export type ConsentLevel =
 	| "none"
 	| "local"
 	| "local-llm"
-	| "cloud"
-	| "full"
-	| "no_llm";
+	| "cloud";
+
+// Legacy generation responses may still use pre-PR1a consent labels.
+export type AnalysisConsentLevel =
+	| ConsentLevel
+	| "no_llm"
+	| "full";
 
 export interface ConsentResponse {
 	consent_level: ConsentLevel;
@@ -118,7 +122,7 @@ export interface AnalysisResponse {
 	repos_analyzed: RepoAnalysisResult[];
 	rankings: RankingResult[];
 	summaries: SummaryResult[];
-	consent_level: ConsentLevel;
+	consent_level: AnalysisConsentLevel;
 	user_email: string;
 }
 
