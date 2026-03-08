@@ -1,4 +1,10 @@
-export type ConsentLevel = "full" | "no_llm" | "none";
+export type ConsentLevel =
+	| "none"
+	| "local"
+	| "local-llm"
+	| "cloud"
+	| "full"
+	| "no_llm";
 
 export interface ConsentResponse {
 	consent_level: ConsentLevel;

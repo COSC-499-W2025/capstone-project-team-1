@@ -18,7 +18,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Get Started" },
 		{ key: "Esc", label: "Exit" },
 	],
-	"consent-policy": [
+	consent: [
 		{ key: "←/→", label: "Navigate" },
 		{ key: "Enter", label: "Confirm" },
 		{ key: "Esc", label: "Back" },
@@ -36,10 +36,6 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Esc", label: "Back" },
 	],
 	analysis: [{ key: "", label: "Processing..." }],
-	identity: [],
-	"pipeline-launch": [],
-	"draft-pause": [],
-	feedback: [],
 	"resume-preview": [
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
@@ -63,19 +59,19 @@ function App() {
 		switch (screen) {
 			case "landing":
 				if (key.name === "return") {
-					setScreen("consent-policy");
+					setScreen("consent");
 				} else if (key.name === "escape") {
 					renderer.destroy();
 				}
 				break;
 
-			case "consent-policy":
+			case "consent":
 				// Consent wizard handles its own keyboard events
 				break;
 
 			case "file-upload":
 				if (key.name === "escape") {
-					setScreen("consent-policy");
+					setScreen("consent");
 				}
 				break;
 
@@ -104,9 +100,9 @@ function App() {
 	const renderScreen = () => {
 		switch (screen) {
 			case "landing":
-				return <Landing onGetStarted={() => setScreen("consent-policy")} />;
+				return <Landing onGetStarted={() => setScreen("consent")} />;
 
-			case "consent-policy":
+			case "consent":
 				return (
 					<ConsentScreen
 						onContinue={() => {
@@ -123,7 +119,7 @@ function App() {
 							setFilePath(path);
 							setScreen("project-list");
 						}}
-						onBack={() => setScreen("consent-policy")}
+						onBack={() => setScreen("consent")}
 					/>
 				);
 
