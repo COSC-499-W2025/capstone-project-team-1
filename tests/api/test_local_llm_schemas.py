@@ -175,9 +175,9 @@ class TestGenerationStartRequest:
         with pytest.raises(ValidationError):
             GenerationStartRequest(repo_ids=[], user_email="user@example.com")
 
-    def test_rejects_short_email(self):
+    def test_rejects_invalid_email_format(self):
         with pytest.raises(ValidationError):
-            GenerationStartRequest(repo_ids=["repo-1"], user_email="ab")
+            GenerationStartRequest(repo_ids=["repo-1"], user_email="not-an-email")
 
     def test_rejects_empty_model(self):
         with pytest.raises(ValidationError):
