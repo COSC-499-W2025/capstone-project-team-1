@@ -159,6 +159,7 @@ class GenerationStartRequest(BaseModel):
 
     intake_id: Optional[str] = Field(
         default=None,
+        min_length=1,
         description="Intake ID to use (optional; creates new if not provided)",
     )
     repo_ids: list[str] = Field(
