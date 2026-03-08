@@ -31,21 +31,9 @@ MODEL_FAMILY_SAMPLING_DEFAULTS: dict[str, InferenceOptions] = {
         top_p=0.9,
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
-    "phi-4": InferenceOptions(
+    "fallback": InferenceOptions(
         temperature=0.2,
         top_p=0.9,
-        max_tokens=DEFAULT_MAX_TOKENS,
-    ),
-    "ministral": InferenceOptions(
-        temperature=0.3,
-        top_p=0.9,
-        repetition_penalty=1.05,
-        max_tokens=DEFAULT_MAX_TOKENS,
-    ),
-    "llama": InferenceOptions(
-        temperature=0.4,
-        top_p=0.9,
-        repetition_penalty=1.1,
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
 }
@@ -80,6 +68,8 @@ def resolve_context_window(model_context: int | None = None) -> int:
 
     if model_context is None:
         return DEFAULT_CONTEXT_WINDOW
+    if model_context <= 0:
+        raise ValueError("Context window must be a positive integer.")
     return model_context
 
 
@@ -87,9 +77,6 @@ def get_sampling_defaults(model: str) -> InferenceOptions:
     """Return sampling defaults for a known model family via prefix matching."""
 
     for prefix, options in MODEL_FAMILY_SAMPLING_DEFAULTS.items():
-        if model.startswith(prefix):
-            return options
-    raise ValueError(
-        f"No sampling defaults found for model '{model}'. "
-        f"Known families: {list(MODEL_FAMILY_SAMPLING_DEFAULTS)}"
-    )
+        if prefix != "fallback" and model.startswith(prefix):
+            return options.model_copy(deep=True)
+    return MODEL_FAMILY_SAMPLING_DEFAULTS["fallback"].model_copy(deep=True)
