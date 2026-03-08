@@ -113,45 +113,53 @@ Full type definitions: see `opentui-react-exp/src/api/types.ts` on `origin/exper
 ## Dependency Graph
 
 ```
-Wave 1 (no deps):        PR1a ─────────────────┐
-                         PR1b ──────────────┐   │
-                                            │   │
-Wave 2 (after PR1a):     PR2 ◄──────────────┼───┘
-                         PR3 ◄──────────────┼───┘
-                                            │
-Wave 3 (after PR2+PR3):  PR4 ◄──────────────┤
-                         PR5a ◄─── (PR3)    │
-                         PR5b ◄─── (PR3)    │
-                                            │
-Wave 4 (after PR4):      PR6a ◄─── (PR4)   │
-                         PR6b ◄─── (PR6a)   │
-                         PR7a ◄─── (PR4)    │
-                         PR7b ◄─── (PR4)    │
-                         PR8 ◄──── (PR1b + PR6b)
-                         PR9a ◄─── (PR4)
-                         PR9b ◄─── (PR4)
-                         PR9c ◄─── (PR4)
+Wave 1 (no deps):           PR1a (additive, backward-compat)
+
+Wave 2 (after PR1a):        PR1b ◄─── (PR1a)
+                            PR2  ◄─── (PR1a)
+                            PR3  ◄─── (PR1a)
+
+Wave 3 (after PR2+PR3):     PR5a ◄─── (PR2+PR3)  [Ahmad]
+                            PR5b ◄─── (PR2+PR3)  [Stavan]
+                            PR6a ◄─── (PR2+PR3)  [Ahmad]
+                            PR7a ◄─── (PR2+PR3)  [Ahmad]
+                            PR7b ◄─── (PR2+PR3)  [Stavan]
+                            PR9c ◄─── (PR2+PR3)  [Stavan]
+
+Wave 4 (after wave 3):      PR6b ◄─── (PR6a)              [Stavan]
+                            PR8  ◄─── (PR1b+PR3+PR6b)     [Ahmad]
+                            PR9b ◄─── (PR3)               [Ahmad]
+
+Wave 5 (final integration): PR4  ◄─── (all screens+PR9b)  [Stavan]
+                            PR9a ◄─── (PR4+PR6a)          [Stavan]
 ```
+
+Key rules:
+- PR1a must be additive/backward-compatible (keep legacy Screen values until PR4)
+- PR6a and PR6b modify the same file — must be strictly sequential
+- PR4 is the final integration PR — only merge after all screen components exist
+- PR9a deletes mockProjects.ts — only after all imports are cleaned up
+- PR9b renames Landing prop `onGetStarted` → `onReady` — must land before PR4
 
 ## PR Summary
 
-| PR | Title | Owner | ~Net LOC | Key Files |
-|----|-------|-------|----------|-----------|
-| PR1a | Pipeline Types | Stavan | ~125 | `api/types.ts`, `types.ts` |
-| PR1b | Resume Utils | Ahmad | ~348 | `utils/resumeText.ts`, `utils/errorMessage.ts`, `utils/index.ts`, `utils/pathHelpers.ts` |
-| PR2 | API Endpoints | Stavan | ~79 | `api/endpoints.ts`, `api/client.test.ts` |
-| PR3 | AppContext Rewrite | Ahmad | ~92 | `context/AppContext.tsx` |
-| PR4 | Root Navigation | Stavan | ~127 | `index.tsx` |
-| PR5a | IdentityScreen | Ahmad | ~252 | `components/IdentityScreen.tsx` |
-| PR5b | PipelineLaunchScreen | Stavan | ~181 | `components/PipelineLaunchScreen.tsx` |
-| PR6a | Analysis Polling+State | Ahmad | ~120 | `components/Analysis.tsx` (partial) |
-| PR6b | Analysis UI Panels | Stavan | ~245 | `components/Analysis.tsx` (remainder) |
-| PR7a | DraftPauseScreen | Ahmad | ~280 | `components/DraftPauseScreen.tsx` |
-| PR7b | FeedbackScreen | Stavan | ~253 | `components/FeedbackScreen.tsx` |
-| PR8 | ResumePreview | Ahmad | ~136 | `components/ResumePreview.tsx` |
-| PR9a | Mock Cleanup + ProjectList | Stavan | ~130 | `data/mockProjects.ts` (delete), `components/ProjectList.tsx` |
-| PR9b | UI Polish & Formatting | Ahmad | ~16 | `TopBar.tsx`, `BottomBar.tsx`, `Landing.tsx`, `ConsentScreen.tsx` |
-| PR9c | FileUpload + Config | Stavan | ~103 | `FileUpload.tsx`, `searchFilter.ts`, `zipScanner.ts`, `tsconfig.json` |
+| PR | Title | Owner | Wave | ~Net LOC | Key Files |
+|----|-------|-------|------|----------|-----------|
+| PR1a | Pipeline Types (additive) | Stavan | 1 | ~125 | `api/types.ts`, `types.ts` |
+| PR1b | Resume Utils | Ahmad | 2 | ~348 | `utils/resumeText.ts`, `utils/errorMessage.ts`, `utils/index.ts`, `utils/pathHelpers.ts` |
+| PR2 | API Endpoints | Stavan | 2 | ~79 | `api/endpoints.ts`, `api/client.test.ts` |
+| PR3 | AppContext Rewrite | Ahmad | 2 | ~92 | `context/AppContext.tsx` |
+| PR5a | IdentityScreen | Ahmad | 3 | ~252 | `components/IdentityScreen.tsx` |
+| PR5b | PipelineLaunchScreen | Stavan | 3 | ~181 | `components/PipelineLaunchScreen.tsx` |
+| PR6a | Analysis Polling+State | Ahmad | 3 | ~120 | `components/Analysis.tsx` (polling/state only) |
+| PR7a | DraftPauseScreen | Ahmad | 3 | ~280 | `components/DraftPauseScreen.tsx` |
+| PR7b | FeedbackScreen | Stavan | 3 | ~253 | `components/FeedbackScreen.tsx` |
+| PR9c | FileUpload + Config | Stavan | 3 | ~103 | `FileUpload.tsx`, `searchFilter.ts`, `zipScanner.ts`, `tsconfig.json` |
+| PR6b | Analysis UI Panels | Stavan | 4 | ~245 | `components/Analysis.tsx` (rendering) |
+| PR8 | ResumePreview | Ahmad | 4 | ~136 | `components/ResumePreview.tsx` |
+| PR9b | UI Polish & Formatting | Ahmad | 4 | ~16 | `TopBar`, `BottomBar`, `Landing`, `ConsentScreen` |
+| PR4 | Root Navigation (integration) | Stavan | 5 | ~127 | `index.tsx` |
+| PR9a | Mock Cleanup + ProjectList | Stavan | 5 | ~130 | `data/mockProjects.ts` (delete), `components/ProjectList.tsx` |
 
 ## Backend Dependency Note
 
