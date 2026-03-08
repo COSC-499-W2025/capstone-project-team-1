@@ -2,6 +2,26 @@ Term 2 Week 1: [Week 15 (Jan 5 - Jan 11)](Week_15.md)
 Term 2 Week 2: [Week 16 (Jan 12 - Jan 18)](Week_16.md)
 
 ---
+## Term 2 Week 9: Mar 2- Mar 8
+**My Code Contributions For Week 9**:
+This week was about laying the groundwork for porting local LLM generation from `experimental-llamacpp-v3` into `development`.
+
+I worked on [Issue 450](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/450) which establishes the core runtime primitives for the `local_llm` module. [PR #462](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/462) adds Pydantic data models (`InferenceOptions`, `ModelDescriptor`, `RuntimeStatus`), platform-aware GPU layer detection (Apple Silicon vs others), context window resolution, sampling defaults for our target model families, and a typed exception hierarchy for llama-server failures. Wrote a 14-case test suite covering all of the above.
+
+I also created the migration plan for how we bring local LLM generation into `development` in [PR #447](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/447). It covers the API diff between the two branches, the target `/local-llm/*` route family, what stays unchanged, and the recommended sequencing for the team. Also planned out how to bring llama-server into dev and what the new directory structure should look like.
+
+**Reviewing Team's PRs- Week 9**:
+
+1. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/420) as he added a migration plan doc for the OpenTUI frontend. Documentation only, no changes were required. The plan will make sure anyone who works on the migration has relevant context
+2. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/436) as he ported the pipeline API types and updated screen/theme types for the OpenTUI migration. Requested changes which Stavan addressed promptly.
+3. Reviewed [Evan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/448) as he replaced Ollama with a llama-cpp wrapper and updated the consent levels. Decided that I will take up the llama-cpp server migration and thus closed this PR with an appropriate comment.
+4. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/449) as he migrated 13 transport schemas from `experimental-llamacpp-v3` into `development`. Requested changes which Nathan addressed promptly.
+5. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/460) as he added a 41-case test suite for the transport schemas. Requested changes which Nathan addressed promptly.
+
+**Plan for Next Week**:
+****
+We have started working on bringing our local LLM generation to dev. The work is going on smoothly. Next week will see more of the same- bringing more features into dev and deciding what to keep and what to deprecate. 
+
 
 ## Term 2 Week 7-8: Feb 16- Mar 1
 
