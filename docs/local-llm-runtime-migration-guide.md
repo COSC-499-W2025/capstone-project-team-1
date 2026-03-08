@@ -2,7 +2,7 @@
 
 This document defines the runtime work needed to move Artifact Miner toward a fully local `llama-server`-based LLM path on `development`.
 
-It is written to be forwarded directly to teammates who will implement the runtime work.
+It is written as a single-owner implementation plan for the person responsible for the runtime migration.
 
 ## Goal
 
@@ -281,11 +281,9 @@ Keep the interface small.
 
 Do not expose raw provider-specific details unless absolutely necessary.
 
-## Team Split
+## Single-Owner Scope
 
-## Teammate A: `llama-server` Path Owner
-
-This person owns server lifecycle and runtime state.
+One person owns the full runtime migration.
 
 ### Files Owned
 
@@ -293,6 +291,10 @@ This person owns server lifecycle and runtime state.
 - `src/artifactminer/llm/runtime/health.py`
 - `src/artifactminer/llm/runtime/config.py`
 - `src/artifactminer/llm/runtime/errors.py`
+- `src/artifactminer/llm/runtime/registry.py`
+- `src/artifactminer/llm/runtime/inference.py`
+- `src/artifactminer/llm/client.py`
+- `src/artifactminer/llm/models.py`
 
 ### Responsibilities
 
@@ -304,35 +306,6 @@ This person owns server lifecycle and runtime state.
 - implement server reuse when the same model is already running
 - implement health polling and startup timeout handling
 - expose enough runtime state for debugging
-
-### Acceptance Criteria
-
-- starting the same model twice does not start two servers
-- switching models restarts cleanly
-- missing `llama-server` produces a clear actionable error
-- startup timeout is explicit
-- server crash after startup is detectable
-- runtime uses local loopback only
-
-### Out Of Scope
-
-- no prompt-writing logic
-- no JSON schema shaping beyond runtime validation
-- no resume code
-
-## Teammate B: Model Registry And Inference Owner
-
-This person owns model resolution and the query layer.
-
-### Files Owned
-
-- `src/artifactminer/llm/runtime/registry.py`
-- `src/artifactminer/llm/runtime/inference.py`
-- `src/artifactminer/llm/client.py`
-- `src/artifactminer/llm/models.py`
-
-### Responsibilities
-
 - define model aliases and metadata
 - resolve aliases to local GGUF files
 - support direct `.gguf` paths
@@ -346,6 +319,12 @@ This person owns model resolution and the query layer.
 
 ### Acceptance Criteria
 
+- starting the same model twice does not start two servers
+- switching models restarts cleanly
+- missing `llama-server` produces a clear actionable error
+- startup timeout is explicit
+- server crash after startup is detectable
+- runtime uses local loopback only
 - aliases resolve to expected local files
 - direct paths work
 - missing-model errors show the expected path
@@ -355,11 +334,11 @@ This person owns model resolution and the query layer.
 
 ### Out Of Scope
 
-- no subprocess lifecycle logic
-- no feature prompt definitions
-- no route logic
+- no prompt-writing logic in the runtime
+- no resume-specific code
+- no route-specific logic inside runtime internals
 
-## Shared Integration Follow-Up
+## Integration Follow-Up
 
 After the runtime exists, other code should be rewired to use it.
 
@@ -414,7 +393,7 @@ Follow this order.
 
 Owner:
 
-- Teammate A
+- Runtime migration owner
 
 Scope:
 
@@ -437,7 +416,7 @@ Deliverable:
 
 Owner:
 
-- Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -459,7 +438,7 @@ Deliverable:
 
 Owner:
 
-- Teammate A
+- Runtime migration owner
 
 Scope:
 
@@ -480,7 +459,7 @@ Deliverable:
 
 Owner:
 
-- Teammate A
+- Runtime migration owner
 
 Scope:
 
@@ -503,7 +482,7 @@ Deliverable:
 
 Owner:
 
-- Teammate A
+- Runtime migration owner
 
 Scope:
 
@@ -524,7 +503,7 @@ Deliverable:
 
 Owner:
 
-- Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -546,7 +525,7 @@ Deliverable:
 
 Owner:
 
-- Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -567,7 +546,7 @@ Deliverable:
 
 Owner:
 
-- Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -588,7 +567,7 @@ Deliverable:
 
 Owner:
 
-- Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -609,7 +588,7 @@ Deliverable:
 
 Owner:
 
-- Teammate A and Teammate B
+- Runtime migration owner
 
 Scope:
 
@@ -628,24 +607,20 @@ Deliverable:
 
 ## Suggested Branch Ownership
 
-One teammate should own only the runtime process path PRs.
+Keep the runtime migration under one owner and one active branch at a time.
 
-One teammate should own only registry and inference PRs.
-
-Do not have both teammates editing the same new runtime file in parallel unless the work has been explicitly split.
+Do not split new runtime files across multiple parallel branches unless review pressure forces it later.
 
 Recommended ownership:
 
-- Teammate A
-  `errors.py`, `config.py`, `health.py`, `process_manager.py`
-- Teammate B
-  `models.py`, `registry.py`, `inference.py`, `client.py`
+- Runtime migration owner
+  `errors.py`, `config.py`, `health.py`, `process_manager.py`, `models.py`, `registry.py`, `inference.py`, `client.py`
 
 PR ownership summary:
 
-- Teammate A owns PR 1, PR 3, PR 4, and PR 5
-- Teammate B owns PR 2, PR 6, PR 7, PR 8, and PR 9
-- PR 10 is shared, but Teammate A should review all lifecycle changes and Teammate B should review all caller rewires and client-surface changes
+- the same owner takes PR 1 through PR 10 in sequence
+- each PR should land before the next dependent PR begins
+- reviewer feedback can come from anywhere, but implementation ownership stays with the runtime migration owner
 
 ## Testing Expectations
 
@@ -712,7 +687,7 @@ The runtime migration is complete when:
 
 ## Immediate Next Step
 
-Start with PR 1 and PR 2 only.
+Start with PR 1 first, then PR 2.
 
 Do not start rewiring callers before:
 
@@ -720,4 +695,4 @@ Do not start rewiring callers before:
 - typed errors exist
 - model registry exists
 
-That order keeps the work reviewable and prevents merge conflicts across teammates.
+That order keeps the work reviewable and keeps the migration manageable for one owner.
