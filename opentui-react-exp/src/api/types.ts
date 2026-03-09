@@ -100,3 +100,49 @@ export interface AnalysisResponse {
 	consent_level: ConsentLevel;
 	user_email: string;
 }
+
+export interface ResumeV3ProjectPeriod {
+	first_commit: string | null;
+	last_commit: string | null;
+}
+
+export interface ResumeV3Project {
+	name: string;
+	type: string;
+	primary_language: string | null;
+	frameworks: string[];
+	contribution_pct: number | null;
+	commit_breakdown: Record<string, number>;
+	period: ResumeV3ProjectPeriod;
+	description?: string;
+	bullets?: string[];
+	bullet_fact_ids?: string[][];
+	narrative?: string;
+}
+
+export interface ResumeV3Metadata {
+	model_used: string | null;
+	models_used: string[];
+	stage: string;
+	generation_time_seconds: number;
+	errors: string[];
+	quality_metrics: Record<string, unknown>;
+}
+
+export interface ResumeV3Portfolio {
+	total_projects: number;
+	total_commits: number;
+	languages_used: string[];
+	frameworks_used: string[];
+	project_types: Record<string, number>;
+	top_skills: string[];
+}
+
+export interface ResumeV3Output {
+	professional_summary: string;
+	skills_section: string;
+	developer_profile: string;
+	projects: ResumeV3Project[];
+	metadata: ResumeV3Metadata;
+	portfolio?: ResumeV3Portfolio;
+}

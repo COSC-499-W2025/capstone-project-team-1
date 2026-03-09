@@ -1,48 +1,4 @@
-interface ResumeProjectPeriod {
-	first_commit: string | null;
-	last_commit: string | null;
-}
-
-interface ResumeProject {
-	name: string;
-	type: string;
-	primary_language: string | null;
-	frameworks: string[];
-	contribution_pct: number | null;
-	commit_breakdown: Record<string, number>;
-	period: ResumeProjectPeriod;
-	description?: string;
-	bullets?: string[];
-	bullet_fact_ids?: string[][];
-	narrative?: string;
-}
-
-interface ResumeMetadata {
-	model_used: string | null;
-	models_used: string[];
-	stage: string;
-	generation_time_seconds: number;
-	errors: string[];
-	quality_metrics: Record<string, unknown>;
-}
-
-interface ResumePortfolio {
-	total_projects: number;
-	total_commits: number;
-	languages_used: string[];
-	frameworks_used: string[];
-	project_types: Record<string, number>;
-	top_skills: string[];
-}
-
-export interface ResumeRenderData {
-	professional_summary: string;
-	skills_section: string;
-	developer_profile: string;
-	projects: ResumeProject[];
-	metadata: ResumeMetadata;
-	portfolio?: ResumePortfolio;
-}
+import type { ResumeV3Output } from "../api/types";
 
 export interface ResumeSection {
 	id: string;
@@ -51,7 +7,7 @@ export interface ResumeSection {
 	lines: string[];
 }
 
-export function resumeToSections(data: ResumeRenderData | null): ResumeSection[] {
+export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 	if (!data) {
 		return [
 			{
@@ -180,7 +136,7 @@ function section(title: string): string {
 	return `${title}\n${"-".repeat(title.length)}`;
 }
 
-export function resumeToText(data: ResumeRenderData | null): string {
+export function resumeToText(data: ResumeV3Output | null): string {
 	if (!data) {
 		return EMPTY_PREVIEW_TEXT;
 	}
@@ -252,7 +208,7 @@ export function resumeToText(data: ResumeRenderData | null): string {
 	return lines.join("\n");
 }
 
-export function resumeToLines(data: ResumeRenderData | null): string[] {
+export function resumeToLines(data: ResumeV3Output | null): string[] {
 	return resumeToText(data).split("\n");
 }
 
@@ -263,7 +219,7 @@ export interface DiffRow {
 	changed: boolean;
 }
 
-interface KeyedLine {
+export interface KeyedLine {
 	key: string;
 	text: string;
 }
@@ -350,8 +306,8 @@ export function createUnifiedDiff(oldText: string, newText: string): string {
 }
 
 export function buildLineDiff(
-	draft: ResumeRenderData | null,
-	finalOutput: ResumeRenderData | null,
+	draft: ResumeV3Output | null,
+	finalOutput: ResumeV3Output | null,
 ): DiffRow[] {
 	const leftLines = resumeToLines(draft);
 	const rightLines = resumeToLines(finalOutput);
