@@ -1,5 +1,6 @@
 """Tests for local LLM API endpoints."""
 
+import uuid
 from zipfile import ZipFile
 
 from artifactminer.api import local_llm
@@ -49,8 +50,9 @@ def test_create_intake_with_valid_zip(client, tmp_path):
     assert "zip_path" in data
     assert "repos" in data
     
-    # Verify intake_id matches ZIP filename stem
-    assert data["intake_id"] == "test_repo"
+    # Verify intake_id is a valid UUID
+    parsed_intake_id = uuid.UUID(data["intake_id"])
+    assert str(parsed_intake_id) == data["intake_id"]
     assert data["zip_path"] == str(zip_path)
     
     # Verify discovered repositories
@@ -68,14 +70,17 @@ def test_create_intake_with_multiple_repos(client, tmp_path):
     with ZipFile(zip_path, 'w') as zf:
         # Add first repo
         zf.writestr("repo-one/.git/config", "[core]")
+        zf.writestr("repo-one/.git/HEAD", "ref: refs/heads/main")
         zf.writestr("repo-one/README.md", "# Repo One")
         
         # Add second repo
         zf.writestr("repo-two/.git/config", "[core]")
+        zf.writestr("repo-two/.git/HEAD", "ref: refs/heads/main")
         zf.writestr("repo-two/main.py", "# Repo Two")
         
         # Add nested repo
         zf.writestr("projects/nested-repo/.git/config", "[core]")
+        zf.writestr("projects/nested-repo/.git/HEAD", "ref: refs/heads/main")
         zf.writestr("projects/nested-repo/index.js", "// Nested")
     
     response = client.post(
@@ -112,11 +117,9 @@ def test_create_intake_with_empty_zip(client, tmp_path):
         json={"zip_path": str(zip_path)}
     )
     
-    assert response.status_code == 200
-    data = response.json()
-    
-    # Should return empty repos list
-    assert len(data["repos"]) == 0
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "no git repositories" in detail.lower()
 
 
 def test_create_intake_missing_zip_path(client):
@@ -207,6 +210,7 @@ def test_create_intake_response_contract(client, tmp_path):
     
     with ZipFile(zip_path, 'w') as zf:
         zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
     
     response = client.post(
         "/local-llm/context",
@@ -238,11 +242,12 @@ def test_create_intake_response_contract(client, tmp_path):
 
 
 def test_create_intake_idempotency(client, tmp_path):
-    """Test that calling create_intake twice with same ZIP returns consistent results."""
+    """Test that repeated intake calls return same repos but unique intake IDs."""
     zip_path = tmp_path / "idempotent.zip"
     
     with ZipFile(zip_path, 'w') as zf:
         zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
     
     response1 = client.post(
         "/local-llm/context",
@@ -256,9 +261,18 @@ def test_create_intake_idempotency(client, tmp_path):
     
     assert response1.status_code == 200
     assert response2.status_code == 200
-    
-    # Results should be identical
-    assert response1.json() == response2.json()
+
+    data1 = response1.json()
+    data2 = response2.json()
+
+    # Validate both IDs are UUIDs and unique per request.
+    assert str(uuid.UUID(data1["intake_id"])) == data1["intake_id"]
+    assert str(uuid.UUID(data2["intake_id"])) == data2["intake_id"]
+    assert data1["intake_id"] != data2["intake_id"]
+
+    # ZIP path and discovered repositories should remain stable.
+    assert data1["zip_path"] == data2["zip_path"]
+    assert data1["repos"] == data2["repos"]
 
 
 def test_repository_candidate_fields(client, tmp_path):
@@ -268,6 +282,7 @@ def test_repository_candidate_fields(client, tmp_path):
     with ZipFile(zip_path, 'w') as zf:
         # Create repo with descriptive path
         zf.writestr("workspace/my-awesome-project/.git/config", "[core]")
+        zf.writestr("workspace/my-awesome-project/.git/HEAD", "ref: refs/heads/main")
         zf.writestr("workspace/my-awesome-project/README.md", "# Project")
     
     response = client.post(

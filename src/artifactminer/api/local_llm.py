@@ -11,16 +11,16 @@ These endpoints support the full local generation pipeline as an alternative
 to cloud-based generation workflows.
 """
 
-import os
 import shutil
 import tempfile
+import uuid
 from pathlib import Path
 from typing import List
 from zipfile import ZipFile, is_zipfile
 
 from fastapi import APIRouter, HTTPException
 
-from ..directorycrawler import directory_walk
+from .analyze import discover_git_repos
 from .local_llm_schemas import (
     IntakeCreateRequest,
     IntakeCreateResponse,
@@ -36,10 +36,10 @@ router = APIRouter(
 
 def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
     """Scan a ZIP file for git repositories and return candidates.
-    
-    Extracts the ZIP to a temporary directory and uses directory_walk to crawl
-    the directory structure. Identifies repositories by finding .git directories
-    in the returned directory list.
+
+    Extracts the ZIP to a temporary directory, reuses shared repository
+    discovery, and keeps only repositories with a valid non-bare git shape
+    (`.git/HEAD` present).
     
     Args:
         zip_path: Filesystem path to the ZIP file
@@ -71,27 +71,29 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
             # Extraction failures are user errors (corrupted ZIP, etc.)
             raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         
-        # Scan extracted directory for .git directories
-        # Using os.walk since .git file contents are not in readable extensions
-        for root, dirs, files in os.walk(temp_extracted_dir):
-            if '.git' in dirs:
-                repo_rel_path = os.path.relpath(root, temp_extracted_dir)
-                
-                if repo_rel_path not in seen_repos:
-                    seen_repos.add(repo_rel_path)
-                    repo_name = os.path.basename(root)
-                    
-                    candidates.append(
-                        RepositoryCandidate(
-                            id=repo_rel_path,
-                            name=repo_name,
-                            rel_path=repo_rel_path,
-                        )
+        extracted_root = Path(temp_extracted_dir)
+
+        # Reuse repository traversal behavior, then keep only repositories that
+        # include a readable HEAD file under .git.
+        for repo_path in discover_git_repos(extracted_root):
+            if not (repo_path / ".git" / "HEAD").is_file():
+                continue
+
+            repo_rel_path = repo_path.relative_to(extracted_root).as_posix()
+
+            if repo_rel_path not in seen_repos:
+                seen_repos.add(repo_rel_path)
+                candidates.append(
+                    RepositoryCandidate(
+                        id=repo_rel_path,
+                        name=repo_path.name,
+                        rel_path=repo_rel_path,
                     )
+                )
     
     finally:
         # Clean up temporary directory
-        if temp_extracted_dir and os.path.exists(temp_extracted_dir):
+        if temp_extracted_dir and Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
     
     return sorted(candidates, key=lambda x: x.name)
@@ -107,8 +109,7 @@ async def create_intake(
     of discovered candidates. This is the first step in the local LLM
     generation workflow.
     
-    The intake_id is derived from the ZIP filename for simplicity in this
-    initial implementation. Future versions may persist intake state to DB.
+    A unique UUID is generated for each intake request.
     
     Args:
         request: IntakeCreateRequest with zip_path
@@ -122,9 +123,12 @@ async def create_intake(
     try:
         # Validate and discover repositories
         repos = _discover_repos_in_zip(request.zip_path)
-        
-        # Generate intake_id from ZIP filename
-        intake_id = Path(request.zip_path).stem
+
+        if not repos:
+            raise ValueError("No git repositories found in ZIP")
+
+        # Generate globally unique intake identifier
+        intake_id = str(uuid.uuid4())
         
         return IntakeCreateResponse(
             intake_id=intake_id,
