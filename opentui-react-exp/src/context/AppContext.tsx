@@ -1,49 +1,72 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import {
+	createContext,
+	type ReactNode,
+	useCallback,
+	useContext,
+	useMemo,
+	useState,
+} from "react";
 import type {
-	AnalysisResponse,
-	ConsentLevel,
-	ResumeItem,
-	Summary,
+	PipelineContributorIdentity,
+	PipelineJobStatus,
+	PipelineRepoCandidate,
+	PipelineStage,
+	PipelineTelemetry,
+	ResumeV3Output,
 } from "../api/types";
 
-export type AnalysisStatus = "idle" | "running" | "complete" | "error";
-
 export interface AppState {
-	consentLevel: ConsentLevel;
-	userEmail: string | null;
-	zipId: number | null;
-	directories: string[];
-	selectedDirectories: string[];
-	analysisResult: AnalysisResponse | null;
-	analysisStatus: AnalysisStatus;
-	resumeItems: ResumeItem[];
-	summaries: Summary[];
+	zipPath: string;
+	intakeId: string | null;
+	detectedRepos: PipelineRepoCandidate[];
+	selectedRepoIds: string[];
+	contributors: PipelineContributorIdentity[];
+	selectedEmail: string | null;
+	pipelineJobId: string | null;
+	pipelineStatus: PipelineJobStatus | "idle";
+	pipelineStage: PipelineStage | null;
+	pipelineTelemetry: PipelineTelemetry | null;
+	pipelineMessages: string[];
+	resumeV3Draft: ResumeV3Output | null;
+	resumeV3Output: ResumeV3Output | null;
+	pipelineNotice: string | null;
 }
 
 interface AppContextValue {
 	state: AppState;
-	setConsentLevel: (value: ConsentLevel) => void;
-	setUserEmail: (value: string | null) => void;
-	setZipId: (value: number | null) => void;
-	setDirectories: (value: string[]) => void;
-	setSelectedDirectories: (value: string[]) => void;
-	setAnalysisResult: (value: AnalysisResponse | null) => void;
-	setAnalysisStatus: (value: AnalysisStatus) => void;
-	setResumeItems: (value: ResumeItem[]) => void;
-	setSummaries: (value: Summary[]) => void;
+	setZipPath: (value: string) => void;
+	setIntakeId: (value: string | null) => void;
+	setDetectedRepos: (value: PipelineRepoCandidate[]) => void;
+	setSelectedRepoIds: (value: string[]) => void;
+	setContributors: (value: PipelineContributorIdentity[]) => void;
+	setSelectedEmail: (value: string | null) => void;
+	setPipelineJobId: (value: string | null) => void;
+	setPipelineStatus: (value: PipelineJobStatus | "idle") => void;
+	setPipelineStage: (value: PipelineStage | null) => void;
+	setPipelineTelemetry: (value: PipelineTelemetry | null) => void;
+	setPipelineMessages: (value: string[]) => void;
+	setResumeV3Draft: (value: ResumeV3Output | null) => void;
+	setResumeV3Output: (value: ResumeV3Output | null) => void;
+	setPipelineNotice: (value: string | null) => void;
+	resetRunState: () => void;
 	reset: () => void;
 }
 
 const initialState: AppState = {
-	consentLevel: "none",
-	userEmail: null,
-	zipId: null,
-	directories: [],
-	selectedDirectories: [],
-	analysisResult: null,
-	analysisStatus: "idle",
-	resumeItems: [],
-	summaries: [],
+	zipPath: "",
+	intakeId: null,
+	detectedRepos: [],
+	selectedRepoIds: [],
+	contributors: [],
+	selectedEmail: null,
+	pipelineJobId: null,
+	pipelineStatus: "idle",
+	pipelineStage: null,
+	pipelineTelemetry: null,
+	pipelineMessages: [],
+	resumeV3Draft: null,
+	resumeV3Output: null,
+	pipelineNotice: null,
 };
 
 const AppContext = createContext<AppContextValue | undefined>(undefined);
@@ -51,45 +74,114 @@ const AppContext = createContext<AppContextValue | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
 	const [state, setState] = useState<AppState>(initialState);
 
-	const setConsentLevel = (value: ConsentLevel) =>
-		setState((prev) => ({ ...prev, consentLevel: value }));
-	const setUserEmail = (value: string | null) =>
-		setState((prev) => ({ ...prev, userEmail: value }));
-	const setZipId = (value: number | null) =>
-		setState((prev) => ({ ...prev, zipId: value }));
-	const setDirectories = (value: string[]) =>
-		setState((prev) => ({ ...prev, directories: value }));
-	const setSelectedDirectories = (value: string[]) =>
-		setState((prev) => ({ ...prev, selectedDirectories: value }));
-	const setAnalysisResult = (value: AnalysisResponse | null) =>
-		setState((prev) => ({ ...prev, analysisResult: value }));
-	const setAnalysisStatus = (value: AnalysisStatus) =>
-		setState((prev) => ({ ...prev, analysisStatus: value }));
-	const setResumeItems = (value: ResumeItem[]) =>
-		setState((prev) => ({ ...prev, resumeItems: value }));
-	const setSummaries = (value: Summary[]) =>
-		setState((prev) => ({ ...prev, summaries: value }));
-	const reset = () => setState(initialState);
-
-	return (
-		<AppContext.Provider
-			value={{
-				state,
-				setConsentLevel,
-				setUserEmail,
-				setZipId,
-				setDirectories,
-				setSelectedDirectories,
-				setAnalysisResult,
-				setAnalysisStatus,
-				setResumeItems,
-				setSummaries,
-				reset,
-			}}
-		>
-			{children}
-		</AppContext.Provider>
+	const setZipPath = useCallback((value: string) => {
+		setState((prev) => ({ ...prev, zipPath: value }));
+	}, []);
+	const setIntakeId = useCallback((value: string | null) => {
+		setState((prev) => ({ ...prev, intakeId: value }));
+	}, []);
+	const setDetectedRepos = useCallback((value: PipelineRepoCandidate[]) => {
+		setState((prev) => ({ ...prev, detectedRepos: value }));
+	}, []);
+	const setSelectedRepoIds = useCallback((value: string[]) => {
+		setState((prev) => ({ ...prev, selectedRepoIds: value }));
+	}, []);
+	const setContributors = useCallback(
+		(value: PipelineContributorIdentity[]) => {
+			setState((prev) => ({ ...prev, contributors: value }));
+		},
+		[],
 	);
+	const setSelectedEmail = useCallback((value: string | null) => {
+		setState((prev) => ({ ...prev, selectedEmail: value }));
+	}, []);
+	const setPipelineJobId = useCallback((value: string | null) => {
+		setState((prev) => ({ ...prev, pipelineJobId: value }));
+	}, []);
+	const setPipelineStatus = useCallback((value: PipelineJobStatus | "idle") => {
+		setState((prev) => ({ ...prev, pipelineStatus: value }));
+	}, []);
+	const setPipelineStage = useCallback((value: PipelineStage | null) => {
+		setState((prev) => ({ ...prev, pipelineStage: value }));
+	}, []);
+	const setPipelineTelemetry = useCallback(
+		(value: PipelineTelemetry | null) => {
+			setState((prev) => ({ ...prev, pipelineTelemetry: value }));
+		},
+		[],
+	);
+	const setPipelineMessages = useCallback((value: string[]) => {
+		setState((prev) => ({ ...prev, pipelineMessages: value }));
+	}, []);
+	const setResumeV3Draft = useCallback((value: ResumeV3Output | null) => {
+		setState((prev) => ({ ...prev, resumeV3Draft: value }));
+	}, []);
+	const setResumeV3Output = useCallback((value: ResumeV3Output | null) => {
+		setState((prev) => ({ ...prev, resumeV3Output: value }));
+	}, []);
+	const setPipelineNotice = useCallback((value: string | null) => {
+		setState((prev) => ({ ...prev, pipelineNotice: value }));
+	}, []);
+
+	const resetRunState = useCallback(
+		() =>
+			setState((prev) => ({
+				...prev,
+				pipelineJobId: null,
+				pipelineStatus: "idle",
+				pipelineStage: null,
+				pipelineTelemetry: null,
+				pipelineMessages: [],
+				resumeV3Draft: null,
+				resumeV3Output: null,
+			})),
+		[],
+	);
+
+	const reset = useCallback(() => setState(initialState), []);
+
+	const value = useMemo(
+		() => ({
+			state,
+			setZipPath,
+			setIntakeId,
+			setDetectedRepos,
+			setSelectedRepoIds,
+			setContributors,
+			setSelectedEmail,
+			setPipelineJobId,
+			setPipelineStatus,
+			setPipelineStage,
+			setPipelineTelemetry,
+			setPipelineMessages,
+			setResumeV3Draft,
+			setResumeV3Output,
+			setPipelineNotice,
+			resetRunState,
+			reset,
+		}),
+		[
+			reset,
+			resetRunState,
+			setContributors,
+			setDetectedRepos,
+			setIntakeId,
+			setPipelineJobId,
+			setPipelineMessages,
+			setPipelineNotice,
+			setPipelineStage,
+			setPipelineStatus,
+			setPipelineTelemetry,
+			setResumeV3Draft,
+			setResumeV3Output,
+			setSelectedEmail,
+			setSelectedRepoIds,
+			setZipPath,
+			state,
+		],
+	);
+
+	return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useAppState() {
