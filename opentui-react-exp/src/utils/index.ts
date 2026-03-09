@@ -43,7 +43,6 @@ export {
 	buildLineDiff,
 	keyedLines,
 	type DiffRow,
-	type ResumeRenderData,
 	type ResumeSection,
 	type StatLine,
 } from "./resumeText";
