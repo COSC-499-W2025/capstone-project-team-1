@@ -12,7 +12,6 @@ from artifactminer.api.local_llm_schemas import (
     RepositoryCandidate,
     ContributorDiscoveryRequest,
     ContributorIdentity,
-    ContributorDiscoveryResponse,
     GenerationStartRequest,
     GenerationStartResponse,
     GenerationStatusResponse,
@@ -178,6 +177,12 @@ class TestGenerationStartRequest:
     def test_rejects_invalid_email_format(self):
         with pytest.raises(ValidationError):
             GenerationStartRequest(repo_ids=["repo-1"], user_email="not-an-email")
+
+    def test_accepts_complex_valid_email(self):
+        req = GenerationStartRequest(
+            repo_ids=["repo-1"], user_email="user+tag@sub.domain.com"
+        )
+        assert req.user_email == "user+tag@sub.domain.com"
 
     def test_rejects_empty_model(self):
         with pytest.raises(ValidationError):
