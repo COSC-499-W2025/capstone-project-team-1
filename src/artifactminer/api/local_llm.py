@@ -63,14 +63,13 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
     try:
         # Extract ZIP to temporary directory
         temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
-        with ZipFile(zip_path, 'r') as zf:
-            zf.extractall(temp_extracted_dir)
         
-        # Set directory_walk's CURRENTPATH to the extracted directory
-        directory_walk.CURRENTPATH = Path(temp_extracted_dir)
-        
-        # Call crawl_directory to scan the extracted files
-        files_dict, dirs_list = directory_walk.crawl_directory(refresh_dict=True)
+        try:
+            with ZipFile(zip_path, 'r') as zf:
+                zf.extractall(temp_extracted_dir)
+        except Exception as e:
+            # Extraction failures are user errors (corrupted ZIP, etc.)
+            raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         
         # Scan extracted directory for .git directories
         # Using os.walk since .git file contents are not in readable extensions
@@ -89,9 +88,6 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
                             rel_path=repo_rel_path,
                         )
                     )
-    
-    except Exception as e:
-        raise ValueError(f"Failed to process ZIP file: {str(e)}")
     
     finally:
         # Clean up temporary directory
