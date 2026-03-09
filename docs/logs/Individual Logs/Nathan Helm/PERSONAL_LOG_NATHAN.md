@@ -202,5 +202,102 @@ I really value the strong sense of teamwork we have and the way everyone shows u
 
 This upcoming week, I will work on our frontend and prepare for PR testing. 
 
+--
+
+<hr>
+
+<h1>PERSONAL LOG-- 08/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar8.png)
+
+<h3> Schedule</h3>
+
+- Monday: No class
+
+- Wednsday: Quiz 3
+
+- Saturday: disscuss tasks on discord
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/460
+
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/449
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+
+### pr 2 handled all tests for pr 1 
+> test_valid_zip_path
+test_rejects_empty_zip_path
+test_requires_zip_path
+test_valid_candidate
+test_all_fields_required
+test_serialization
+test_with_multiple_repos
+test_empty_repos
+test_deserialization
+test_valid_repo_ids
+test_single_repo_id
+test_rejects_empty_list
+test_complete_identity
+test_optional_name
+test_zero_counts
+test_minimal_request
+test_with_intake_id
+test_custom_models
+test_rejects_empty_repo_ids
+test_rejects_short_email
+test_rejects_empty_model
+test_valid_response
+test_all_valid_statuses
+test_rejects_invalid_status
+test_defaults
+test_with_progress
+test_all_stages
+test_rejects_invalid_stage
+test_queued_status
+test_with_draft
+test_with_output
+test_with_error
+test_with_messages
+test_defaults
+test_with_feedback
+test_success
+test_all_statuses
+test_cancelled
+test_failed_cancel
+test_full_generation_flow
+test_cancellation_flow
+
+
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/461
+
+- closed but worth mentioning: 
+https://github.com/COSC-499-W2025/capstone-project-team-1/pull/448
+
+
+
+**Reflection & Team Dynamic**
+
+I truly appreciate the strong sense of teamwork we share and how everyone supports one another. The feedback we provide on pull requests helps maintain smooth progress and avoids any bottlenecks. I’m also feeling motivated by my current projects and have a clear understanding of my responsibilities and objectives.
+
+**Next Week** 
+
+This upcoming week, I will work migrating more code to handle milestone 3.
 
 
