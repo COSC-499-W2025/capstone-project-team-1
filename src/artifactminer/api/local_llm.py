@@ -20,7 +20,6 @@ from zipfile import ZipFile, is_zipfile
 
 from fastapi import APIRouter, HTTPException
 
-from .analyze import discover_git_repos
 from .local_llm_schemas import (
     IntakeCreateRequest,
     IntakeCreateResponse,
@@ -34,12 +33,37 @@ router = APIRouter(
 )
 
 
+def _is_git_repo(path: Path) -> bool:
+    """Check if a path is a valid git repository.
+    
+    Aligned with experimental-llamacpp-v3 validation logic.
+    Requires both .git directory and HEAD file to exist.
+    """
+    git_dir = path / ".git"
+    return git_dir.is_dir() and (git_dir / "HEAD").is_file()
+
+
+def _is_macos_metadata(path: Path, base_path: Path) -> bool:
+    """Check if path is macOS metadata that should be ignored.
+    
+    Filters __MACOSX directories and resource fork files (._*).
+    Aligned with experimental-llamacpp-v3 filtering logic.
+    """
+    try:
+        parts = path.relative_to(base_path).parts
+    except ValueError:
+        parts = path.parts
+    return any(part == "__MACOSX" or part.startswith("._") for part in parts)
+
+
 def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
     """Scan a ZIP file for git repositories and return candidates.
 
-    Extracts the ZIP to a temporary directory, reuses shared repository
-    discovery, and keeps only repositories with a valid non-bare git shape
-    (`.git/HEAD` present).
+    Extracts the ZIP to a temporary directory and discovers git repositories
+    using validation logic aligned with experimental-llamacpp-v3:
+    - Requires both .git directory and .git/HEAD file
+    - Filters out macOS metadata (__MACOSX, ._* files)
+    - Skips nested repositories
     
     Args:
         zip_path: Filesystem path to the ZIP file
@@ -73,23 +97,43 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
         
         extracted_root = Path(temp_extracted_dir)
 
-        # Reuse repository traversal behavior, then keep only repositories that
-        # include a readable HEAD file under .git.
-        for repo_path in discover_git_repos(extracted_root):
-            if not (repo_path / ".git" / "HEAD").is_file():
-                continue
-
-            repo_rel_path = repo_path.relative_to(extracted_root).as_posix()
-
+        # Discovery logic aligned with experimental-llamacpp-v3
+        # Check base path first
+        if _is_git_repo(extracted_root) and not _is_macos_metadata(extracted_root, extracted_root):
+            repo_rel_path = "."
             if repo_rel_path not in seen_repos:
                 seen_repos.add(repo_rel_path)
                 candidates.append(
                     RepositoryCandidate(
                         id=repo_rel_path,
-                        name=repo_path.name,
+                        name=extracted_root.name,
                         rel_path=repo_rel_path,
                     )
                 )
+
+        # Search subdirectories
+        for path in extracted_root.rglob("*"):
+            if not path.is_dir() or _is_macos_metadata(path, extracted_root):
+                continue
+
+            if _is_git_repo(path):
+                # Avoid nested repos
+                is_nested = any(
+                    _is_git_repo(parent)
+                    for parent in path.parents
+                    if parent != extracted_root and parent.is_relative_to(extracted_root)
+                )
+                if not is_nested:
+                    repo_rel_path = path.relative_to(extracted_root).as_posix()
+                    if repo_rel_path not in seen_repos:
+                        seen_repos.add(repo_rel_path)
+                        candidates.append(
+                            RepositoryCandidate(
+                                id=repo_rel_path,
+                                name=path.name,
+                                rel_path=repo_rel_path,
+                            )
+                        )
     
     finally:
         # Clean up temporary directory
