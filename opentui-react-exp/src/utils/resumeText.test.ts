@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { ApiError } from "../api/client";
+import type { ResumeV3Output } from "../api/types";
 import {
 	buildLineDiff,
 	createUnifiedDiff,
@@ -7,11 +8,10 @@ import {
 	resumeStats,
 	resumeToSections,
 	resumeToText,
-	type ResumeRenderData,
 	toErrorMessage,
 } from "./index";
 
-const sampleResume: ResumeRenderData = {
+const sampleResume: ResumeV3Output = {
 	professional_summary: "Backend-focused software developer",
 	skills_section: "Python\nTypeScript",
 	developer_profile: "Enjoys shipping practical tooling.",
@@ -82,7 +82,7 @@ test("resumeStats surfaces compact sidebar metrics", () => {
 });
 
 test("buildLineDiff and createUnifiedDiff mark changed lines", () => {
-	const finalResume: ResumeRenderData = {
+	const finalResume: ResumeV3Output = {
 		...sampleResume,
 		professional_summary: "Backend and platform engineer",
 	};
