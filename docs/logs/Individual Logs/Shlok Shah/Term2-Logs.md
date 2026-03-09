@@ -19,9 +19,10 @@ I also created the migration plan for how we bring local LLM generation into `de
 5. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/460) as he added a 41-case test suite for the transport schemas. Requested changes which Nathan addressed promptly.
 
 **Plan for Next Week**:
-****
+
 We have started working on bringing our local LLM generation to dev. The work is going on smoothly. Next week will see more of the same- bringing more features into dev and deciding what to keep and what to deprecate. 
 
+![T2Week9](T2Week9.png)
 
 ## Term 2 Week 7-8: Feb 16- Mar 1
 
