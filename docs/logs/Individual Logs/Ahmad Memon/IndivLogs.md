@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
 - [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
 - [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
 - [Term 2 Week 3 (Jan 19 - Jan 25)](Log-01-25-26.md)
@@ -17,6 +18,82 @@
 - [Term 1 Week 4 (Sep 15 - Sep 21)](Log-9-21-25.md)
 
 ---
+
+# logs - Term 2 Week 9
+
+## Connection to Previous Week
+
+Last period I focused on evidence pipeline stabilization and post-milestone cleanup. This week I shifted back into the OpenTUI migration and worked on the core frontend foundations needed for resume preview rendering and pipeline-driven application state.
+
+---
+
+## Coding Tasks
+
+* Implemented the OpenTUI `Resume Utils` slice by adding helpers to convert `ResumeV3` data into preview sections, readable text output, compact stats, keyed lines, and unified diffs in branch `codex/422-resume-rendering-utils-helpers`.
+
+* Added reusable error normalization helpers so frontend screens can surface API/client failures consistently.
+
+* Rewrote `AppContext` around pipeline-oriented state in branch `codex/424-appcontext-rewrite`, covering intake tracking, detected repos, contributor selection, pipeline job status/stage/telemetry, messages, resume draft/final output, and pipeline notices.
+
+* Added follow-up cleanup to align resume utilities with the current source types and kept helper formatting consistent after rebasing onto newer OpenTUI changes.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added tests for resume rendering helpers covering ordered section generation, text rendering, sidebar stats, diff generation, repeated-line keying, and error normalization.
+
+* Added `AppContext` tests covering initial state, setter behavior, `resetRunState`, and full reset behavior.
+
+* Fixed type mismatches between the new resume utilities and the latest `api/types.ts` source models during follow-up integration.
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #404](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/404) (local LLM endpoint testing + API rename by Shlok) and approved after the `_active_job_id` / context-switching teardown concern was addressed.
+
+
+* Reviewed [PR #420](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/420) (OpenTUI frontend migration plan by Stavan) and approved the migration direction.
+
+* Reviewed [PR #447](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/447) (Local LLM API migration plan by Shlok) and approved the proposed integration plan.
+
+* Reviewed [PR #461](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/461) (local intake endpoint + router registration by Evan), requested changes on ZIP directory behavior / error handling, then approved after fixes were made.
+
+* Kept the OpenTUI implementation aligned with the migration plan by scoping my own work to the planned `PR1b` (`Resume Utils`) and `PR3` (`AppContext Rewrite`) slices for easier review and merge sequencing.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+* Main challenge was keeping the new resume helper layer aligned with changing OpenTUI source types while the application state model was being rewritten in parallel; this was resolved with targeted follow-up fixes and added tests.
+
+---
+
+## Plan for Next Week
+
+* Continue the OpenTUI migration with screens that consume the new pipeline state and resume helper utilities.
+
+* Expand frontend test coverage as more OpenTUI components are wired to the rewritten `AppContext`.
+
+* Keep the OpenTUI branches synchronized with development to reduce integration churn.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Implement resume rendering helpers | Done | `codex/422-resume-rendering-utils-helpers` |
+| Add resume helper tests | Done | Covered sections, text, stats, diff, and error handling |
+| Rewrite AppContext for pipeline state | Done | `codex/424-appcontext-rewrite` |
+| Add AppContext state tests | Done | Initial state, setters, `resetRunState`, and `reset` |
+| Align resume utils with source types | Done | Follow-up fix after syncing with newer OpenTUI types |
+| Path helper cleanup | Done | Formatting consistency cleanup |
+| Review PRs #404, #407, #420, #447, #461 | Done | Requested changes where needed, then approved after fixes |
+
+---
+![Personal Logs Week 9](Personal_logs-3-8-26.png)
 
 # logs - Term 2 Week 7-8
 
