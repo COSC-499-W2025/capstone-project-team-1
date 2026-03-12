@@ -15,21 +15,6 @@ _HEALTH_MODULE = "artifactminer.local_llm.runtime.health"
 _MODEL = "qwen3.5-4b-q4"
 
 
-class FakeClock:
-    """Simple controllable clock for polling tests."""
-
-    def __init__(self) -> None:
-        self.now = 0.0
-        self.sleeps: list[float] = []
-
-    def monotonic(self) -> float:
-        return self.now
-
-    def sleep(self, seconds: float) -> None:
-        self.sleeps.append(seconds)
-        self.now += seconds
-
-
 @patch(f"{_HEALTH_MODULE}.httpx.get", return_value=httpx.Response(200))
 def test_check_health_returns_true_on_200(mock_get) -> None:
     assert _check_health(8080) is True
@@ -63,26 +48,29 @@ def test_poll_returns_immediately_when_healthy() -> None:
 
 
 def test_poll_retries_until_healthy() -> None:
-    clock = FakeClock()
-
+    # First monotonic() sets the deadline; later values are loop checks before
+    # each health probe. This gives two failed polls, then one success.
     with patch(
         f"{_HEALTH_MODULE}._check_health",
         side_effect=[False, False, True],
     ) as mock_check, patch(
-        f"{_HEALTH_MODULE}.time.monotonic", side_effect=clock.monotonic
-    ), patch(f"{_HEALTH_MODULE}.time.sleep", side_effect=clock.sleep):
+        f"{_HEALTH_MODULE}.time.monotonic",
+        side_effect=[0.0, 0.0, 0.25, 0.5],
+    ), patch(f"{_HEALTH_MODULE}.time.sleep") as mock_sleep:
         poll_until_healthy(8080, _MODEL, timeout=1.0, poll_interval=0.25)
 
     assert mock_check.call_count == 3
-    assert clock.sleeps == [0.25, 0.25]
+    assert mock_sleep.call_count == 2
+    mock_sleep.assert_called_with(0.25)
 
 
 def test_poll_raises_timeout_error_with_default_timeout() -> None:
-    clock = FakeClock()
-
+    # The second loop check lands past the default deadline, so polling should
+    # stop with the typed timeout error.
     with patch(f"{_HEALTH_MODULE}._check_health", return_value=False), patch(
-        f"{_HEALTH_MODULE}.time.monotonic", side_effect=clock.monotonic
-    ), patch(f"{_HEALTH_MODULE}.time.sleep", side_effect=clock.sleep):
+        f"{_HEALTH_MODULE}.time.monotonic",
+        side_effect=[0.0, 0.0, DEFAULT_HEALTH_TIMEOUT_SECONDS + 0.01],
+    ), patch(f"{_HEALTH_MODULE}.time.sleep"):
         with pytest.raises(ModelStartupTimeoutError) as exc_info:
             poll_until_healthy(8080, _MODEL)
 
@@ -91,13 +79,13 @@ def test_poll_raises_timeout_error_with_default_timeout() -> None:
 
 
 def test_poll_respects_custom_interval_and_stops_at_deadline() -> None:
-    clock = FakeClock()
-
+    # One failed check is allowed before sleep moves time past the deadline.
     with patch(f"{_HEALTH_MODULE}._check_health", return_value=False) as mock_check, patch(
-        f"{_HEALTH_MODULE}.time.monotonic", side_effect=clock.monotonic
-    ), patch(f"{_HEALTH_MODULE}.time.sleep", side_effect=clock.sleep):
+        f"{_HEALTH_MODULE}.time.monotonic",
+        side_effect=[0.0, 0.0, 0.3],
+    ), patch(f"{_HEALTH_MODULE}.time.sleep") as mock_sleep:
         with pytest.raises(ModelStartupTimeoutError):
             poll_until_healthy(8080, _MODEL, timeout=0.1, poll_interval=0.25)
 
     assert mock_check.call_count == 1
-    assert clock.sleeps == [0.25]
+    mock_sleep.assert_called_once_with(0.25)
