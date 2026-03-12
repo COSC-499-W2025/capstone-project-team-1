@@ -10,6 +10,7 @@ from .config import DEFAULT_HEALTH_TIMEOUT_SECONDS
 from .errors import ModelStartupTimeoutError
 
 _PER_REQUEST_TIMEOUT = 2.0
+# The local runtime only ever talks to a user-managed llama-server on loopback.
 _LOOPBACK = "127.0.0.1"
 _DEFAULT_POLL_INTERVAL = 0.25
 
@@ -24,6 +25,8 @@ def _check_health(port: int) -> bool:
         )
         return resp.status_code == 200
     except httpx.RequestError:
+        # Transport failures still mean "not ready yet" here; the public polling
+        # helper converts prolonged failure into the typed timeout error.
         return False
 
 
@@ -41,6 +44,8 @@ def poll_until_healthy(
     """
 
     deadline = time.monotonic() + timeout
+    # Re-check the deadline before each probe so we do not issue one extra
+    # request after the timeout window has already expired.
     while time.monotonic() < deadline:
         if _check_health(port):
             return
