@@ -45,8 +45,8 @@ def test_exports_are_stable() -> None:
         "InvalidLLMResponseError", "LlamaServerNotFoundError", "LocalLLMRuntimeError",
         "ModelNotFoundError", "ModelServerCrashedError", "ModelStartupTimeoutError",
         "default_gpu_layers", "get_sampling_defaults", "list_available_models",
-        "list_supported_models", "resolve_context_window", "resolve_model_descriptor",
-        "resolve_model_path",
+        "list_supported_models", "poll_until_healthy", "resolve_context_window",
+        "resolve_model_descriptor", "resolve_model_path",
     }
     assert set(runtime.__all__) == expected_runtime
     assert runtime.list_supported_models is list_supported_models
@@ -80,13 +80,13 @@ def test_inference_options_rejects_invalid(
 
 def test_model_descriptor_valid_and_frozen() -> None:
     descriptor = ModelDescriptor(
-        name="qwen3-4b-q4",
-        filename="Qwen3-4B-Q4_K_M.gguf",
+        name="qwen3.5-4b-q4",
+        filename="Qwen 3.5 4B Q4 K_M.gguf",
         repo_url="https://huggingface.co/example/model",
         context_window=20480,
         path="/tmp/model.gguf",
     )
-    assert descriptor.name == "qwen3-4b-q4"
+    assert descriptor.name == "qwen3.5-4b-q4"
     assert descriptor.repo_url == "https://huggingface.co/example/model"
     assert descriptor.path == Path("/tmp/model.gguf")
     with pytest.raises((ValidationError, TypeError)):
@@ -144,7 +144,7 @@ def test_resolve_context_window() -> None:
 
 
 def test_get_sampling_defaults() -> None:
-    qwen3 = get_sampling_defaults("qwen3-4b-q4")
+    qwen3 = get_sampling_defaults("qwen3.5-4b-q4")
     qwen_coder = get_sampling_defaults("qwen2.5-coder-3b-q4")
     lfm = get_sampling_defaults("lfm2.5-1.2b-q4")
     fallback = get_sampling_defaults("unknown-model-family")
@@ -161,8 +161,8 @@ def test_error_classes() -> None:
     search_path = Path("/tmp/model.gguf")
 
     not_found = ModelNotFoundError("missing-model", search_path)
-    timeout = ModelStartupTimeoutError("qwen3-4b-q4", 60.0)
-    crashed = ModelServerCrashedError("qwen3-4b-q4", 137)
+    timeout = ModelStartupTimeoutError("qwen3.5-4b-q4", 60.0)
+    crashed = ModelServerCrashedError("qwen3.5-4b-q4", 137)
     invalid = InvalidLLMResponseError("bad json", '{"oops":true}')
     missing_binary = LlamaServerNotFoundError()
 
