@@ -23,6 +23,7 @@ from .errors import (
     ModelStartupTimeoutError,
 )
 from .health import poll_until_healthy
+from .process_manager import start_server, stop_server
 from .registry import (
     list_available_models,
     list_supported_models,
@@ -51,4 +52,6 @@ __all__ = [
     "resolve_model_descriptor",
     "resolve_model_path",
     "resolve_context_window",
+    "start_server",
+    "stop_server",
 ]
