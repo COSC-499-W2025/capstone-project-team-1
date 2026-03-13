@@ -29,6 +29,7 @@ _server_port: int | None = None
 _server_model: str | None = None
 
 _TERMINATE_TIMEOUT_SECONDS = 5
+_atexit_registered = False
 
 
 def _find_llama_server() -> str:
@@ -102,7 +103,10 @@ def start_server(
     _server_process = proc
     _server_port = port
     _server_model = model
-    atexit.register(stop_server)
+    global _atexit_registered  # noqa: PLW0603
+    if not _atexit_registered:
+        atexit.register(stop_server)
+        _atexit_registered = True
 
     try:
         poll_until_healthy(port, model, timeout=timeout)
