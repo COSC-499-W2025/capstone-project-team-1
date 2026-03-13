@@ -23,8 +23,10 @@ def _reset_module_state():
     """Ensure module-level state is clean before and after every test."""
 
     process_manager._reset_state()
+    process_manager._atexit_registered = False
     yield
     process_manager._reset_state()
+    process_manager._atexit_registered = False
 
 
 @pytest.fixture()
