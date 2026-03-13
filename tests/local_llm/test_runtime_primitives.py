@@ -60,6 +60,8 @@ def test_exports_are_stable() -> None:
         "resolve_context_window",
         "resolve_model_descriptor",
         "resolve_model_path",
+        "start_server",
+        "stop_server",
     }
     assert set(runtime.__all__) == expected_runtime
     assert runtime.list_supported_models is list_supported_models
