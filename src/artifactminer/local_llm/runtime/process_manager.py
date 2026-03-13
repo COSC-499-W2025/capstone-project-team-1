@@ -98,7 +98,7 @@ def start_server(
         "--log-disable",
     ]
 
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     _server_process = proc
     _server_port = port
     _server_model = model
