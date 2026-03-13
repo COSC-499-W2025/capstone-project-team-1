@@ -87,10 +87,14 @@ def start_server(
 
     cmd = [
         binary,
-        "--model", str(descriptor.path),
-        "--ctx-size", str(ctx),
-        "--n-gpu-layers", str(gpu),
-        "--port", str(port),
+        "--model",
+        str(descriptor.path),
+        "--ctx-size",
+        str(ctx),
+        "--n-gpu-layers",
+        str(gpu),
+        "--port",
+        str(port),
         "--log-disable",
     ]
 
