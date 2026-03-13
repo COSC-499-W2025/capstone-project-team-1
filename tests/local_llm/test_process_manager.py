@@ -283,7 +283,9 @@ class TestStopServer:
         process_manager.stop_server()
 
         mock_proc.terminate.assert_called_once()
-        mock_proc.wait.assert_called_once_with(timeout=5)
+        mock_proc.wait.assert_called_once_with(
+            timeout=process_manager._TERMINATE_TIMEOUT_SECONDS
+        )
         assert process_manager._server_process is None
         assert process_manager._server_port is None
         assert process_manager._server_model is None
