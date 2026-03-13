@@ -17,7 +17,7 @@ _SUPPORTED_MODELS = MappingProxyType(
     {
         "qwen3.5-4b-q4": ModelDescriptor(
             name="qwen3.5-4b-q4",
-            filename="Qwen 3.5 4B Q4 K_M.gguf",
+            filename="Qwen3.5-4B-Q4_K_M.gguf",
             repo_url="https://huggingface.co/unsloth/Qwen3.5-4B-GGUF?show_file_info=Qwen3.5-4B-Q4_K_M.gguf",
             context_window=20480,
         ),
@@ -66,7 +66,7 @@ def list_available_models(
     for model_name in sorted(_SUPPORTED_MODELS):
         descriptor = _SUPPORTED_MODELS[model_name]
         resolved_path = models_dir / _require_filename(model_name, descriptor)
-        if resolved_path.exists():
+        if resolved_path.is_file():
             available.append(descriptor.model_copy(update={"path": resolved_path}))
     return available
 
@@ -81,7 +81,7 @@ def resolve_model_descriptor(
 
     descriptor = _SUPPORTED_MODELS[model]
     resolved_path = models_dir / _require_filename(model, descriptor)
-    if not resolved_path.exists():
+    if not resolved_path.is_file():
         raise _build_missing_model_error(model, resolved_path, models_dir)
     return descriptor.model_copy(update={"path": resolved_path})
 
