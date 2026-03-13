@@ -85,14 +85,22 @@ class TestStartServer:
         mock_proc.pid = 12345
 
         with (
-            patch.object(process_manager, "_find_llama_server", return_value="/bin/llama-server"),
-            patch.object(process_manager, "resolve_model_descriptor", return_value=stub_descriptor),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
             patch.object(process_manager, "_pick_free_port", return_value=9999),
             patch("subprocess.Popen", return_value=mock_proc) as mock_popen,
             patch.object(process_manager, "poll_until_healthy") as mock_poll,
             patch("atexit.register") as mock_atexit,
         ):
-            process_manager.start_server("stub-model", models_dir=Path("/tmp"), timeout=10.0)
+            process_manager.start_server(
+                "stub-model", models_dir=Path("/tmp"), timeout=10.0
+            )
 
             mock_popen.assert_called_once()
             cmd = mock_popen.call_args[0][0]
@@ -113,8 +121,14 @@ class TestStartServer:
         mock_proc = MagicMock(spec=subprocess.Popen)
 
         with (
-            patch.object(process_manager, "_find_llama_server", return_value="/bin/llama-server"),
-            patch.object(process_manager, "resolve_model_descriptor", return_value=stub_descriptor) as mock_resolve,
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ) as mock_resolve,
             patch.object(process_manager, "_pick_free_port", return_value=8888),
             patch("subprocess.Popen", return_value=mock_proc),
             patch.object(process_manager, "poll_until_healthy"),
@@ -127,14 +141,22 @@ class TestStartServer:
                 process_manager.DEFAULT_MODELS_DIR,
             )
 
-    def test_command_includes_gpu_and_context(self, stub_descriptor: ModelDescriptor) -> None:
+    def test_command_includes_gpu_and_context(
+        self, stub_descriptor: ModelDescriptor
+    ) -> None:
         """Spawned command includes --n-gpu-layers and --ctx-size flags."""
 
         mock_proc = MagicMock(spec=subprocess.Popen)
 
         with (
-            patch.object(process_manager, "_find_llama_server", return_value="/bin/llama-server"),
-            patch.object(process_manager, "resolve_model_descriptor", return_value=stub_descriptor),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
             patch.object(process_manager, "_pick_free_port", return_value=7777),
             patch("subprocess.Popen", return_value=mock_proc) as mock_popen,
             patch.object(process_manager, "poll_until_healthy"),
@@ -166,8 +188,14 @@ class TestStartServer:
         mock_proc.poll.return_value = None  # still alive
 
         with (
-            patch.object(process_manager, "_find_llama_server", return_value="/bin/llama-server"),
-            patch.object(process_manager, "resolve_model_descriptor", return_value=stub_descriptor),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
             patch.object(process_manager, "_pick_free_port", return_value=6666),
             patch("subprocess.Popen", return_value=mock_proc),
             patch.object(
@@ -178,7 +206,9 @@ class TestStartServer:
             patch("atexit.register"),
         ):
             with pytest.raises(ModelStartupTimeoutError):
-                process_manager.start_server("stub-model", models_dir=Path("/tmp"), timeout=10.0)
+                process_manager.start_server(
+                    "stub-model", models_dir=Path("/tmp"), timeout=10.0
+                )
 
             assert process_manager._server_process is None
             assert process_manager._server_port is None
@@ -194,8 +224,14 @@ class TestStartServer:
         mock_proc.returncode = 1
 
         with (
-            patch.object(process_manager, "_find_llama_server", return_value="/bin/llama-server"),
-            patch.object(process_manager, "resolve_model_descriptor", return_value=stub_descriptor),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
             patch.object(process_manager, "_pick_free_port", return_value=5555),
             patch("subprocess.Popen", return_value=mock_proc),
             patch.object(
@@ -206,7 +242,9 @@ class TestStartServer:
             patch("atexit.register"),
         ):
             with pytest.raises(ModelServerCrashedError):
-                process_manager.start_server("stub-model", models_dir=Path("/tmp"), timeout=10.0)
+                process_manager.start_server(
+                    "stub-model", models_dir=Path("/tmp"), timeout=10.0
+                )
 
             assert process_manager._server_process is None
 
@@ -252,7 +290,10 @@ class TestStopServer:
         """Forced kill when terminate wait times out."""
 
         mock_proc = MagicMock(spec=subprocess.Popen)
-        mock_proc.wait.side_effect = [subprocess.TimeoutExpired("llama-server", 5), None]
+        mock_proc.wait.side_effect = [
+            subprocess.TimeoutExpired("llama-server", 5),
+            None,
+        ]
         process_manager._server_process = mock_proc
         process_manager._server_port = 9999
         process_manager._server_model = "stub-model"
