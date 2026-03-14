@@ -1,5 +1,8 @@
 """Runtime configuration and error primitives for local LLM support."""
 
+# This package-level module is the stable import surface for lightweight runtime
+# helpers. Higher layers should import from here instead of reaching into deeper
+# modules unless they need implementation-specific behavior.
 from .config import (
     DEFAULT_CONTEXT_WINDOW,
     DEFAULT_HEALTH_TIMEOUT_SECONDS,
@@ -19,6 +22,12 @@ from .errors import (
     ModelServerCrashedError,
     ModelStartupTimeoutError,
 )
+from .registry import (
+    list_available_models,
+    list_supported_models,
+    resolve_model_descriptor,
+    resolve_model_path,
+)
 
 __all__ = [
     "DEFAULT_CONTEXT_WINDOW",
@@ -35,5 +44,9 @@ __all__ = [
     "ModelStartupTimeoutError",
     "default_gpu_layers",
     "get_sampling_defaults",
+    "list_available_models",
+    "list_supported_models",
+    "resolve_model_descriptor",
+    "resolve_model_path",
     "resolve_context_window",
 ]
