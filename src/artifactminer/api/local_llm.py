@@ -24,6 +24,7 @@ from zipfile import ZipFile, is_zipfile
 from fastapi import APIRouter, HTTPException
 
 from ..directorycrawler import directory_walk
+from ..helpers.zip_utils import safe_extract_zip
 from .local_llm_schemas import (
     ContributorDiscoveryRequest,
     ContributorDiscoveryResponse,
@@ -117,7 +118,7 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
         # Extract ZIP to temporary directory
         temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
         with ZipFile(zip_path, 'r') as zf:
-            zf.extractall(temp_extracted_dir)
+            safe_extract_zip(zf, Path(temp_extracted_dir))
         
         # Set directory_walk's CURRENTPATH to the extracted directory
         directory_walk.CURRENTPATH = Path(temp_extracted_dir)
@@ -297,7 +298,7 @@ async def create_intake(
         
         try:
             with ZipFile(request.zip_path, 'r') as zf:
-                zf.extractall(temp_extracted_dir)
+                safe_extract_zip(zf, Path(temp_extracted_dir))
         except Exception as e:
             raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         

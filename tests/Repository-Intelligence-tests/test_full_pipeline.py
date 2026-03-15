@@ -23,6 +23,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     generate_summaries_for_ranked
 )
 from artifactminer.helpers.project_ranker import rank_projects
+from artifactminer.helpers.zip_utils import safe_extract_zip
 from artifactminer.RepositoryIntelligence.repo_intelligence_AI import set_user_consent
 import pytest
 
@@ -72,7 +73,7 @@ async def test_full_pipeline_zip_to_summaries():
         extract_dir.mkdir(exist_ok=True)
 
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
+            safe_extract_zip(zip_ref, extract_dir)
 
         uploaded_zip.extraction_path = str(extract_dir)
         db.commit()
