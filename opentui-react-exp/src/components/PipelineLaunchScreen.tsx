@@ -58,9 +58,6 @@ export function PipelineLaunchScreen({
 		setIsStarting(true);
 
 		try {
-			resetRunState();
-			setPipelineNotice(null);
-
 			const response = await api.startPipeline({
 				intake_id: state.intakeId,
 				repo_ids: state.selectedRepoIds,
@@ -70,6 +67,8 @@ export function PipelineLaunchScreen({
 				stage3_model: DEFAULT_STAGE3_MODEL,
 			});
 
+			resetRunState();
+			setPipelineNotice(null);
 			setPipelineJobId(response.job_id);
 			setPipelineStatus(response.status);
 			setPipelineStage("ANALYZE");
