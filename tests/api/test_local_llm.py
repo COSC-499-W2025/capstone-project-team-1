@@ -619,3 +619,223 @@ def test_contributors_endpoint_in_openapi(client):
     assert "/local-llm/context/contributors" in paths
     assert "post" in paths["/local-llm/context/contributors"]
 
+
+# ============================================================================
+# Generation Start Tests
+# ============================================================================
+
+
+def test_generation_start_endpoint_exists(client):
+    """Verify POST /local-llm/generation/start endpoint is registered."""
+    response = client.post("/local-llm/generation/start", json={})
+    assert response.status_code == 422
+
+
+def test_generation_start_valid_request(client, tmp_path):
+    """Test successful generation start with valid intake, repo selection, and identity."""
+    zip_path = tmp_path / "generation_start.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo-one/.git/config", "[core]")
+        zf.writestr("repo-one/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+            "stage1_model": "qwen2.5-coder-3b-q4",
+            "stage2_model": "lfm2.5-1.2b-q4",
+            "stage3_model": "lfm2.5-1.2b-q4",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+
+    assert "job_id" in data
+    assert "status" in data
+    parsed_job_id = uuid.UUID(data["job_id"])
+    assert str(parsed_job_id) == data["job_id"]
+    assert data["status"] == "queued"
+
+    # Verify job envelope persisted for subsequent workflow routes.
+    assert data["job_id"] in local_llm._generation_jobs
+
+
+def test_generation_start_invalid_email(client, tmp_path):
+    """Test 422 response when user_email is invalid."""
+    zip_path = tmp_path / "invalid_email.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    repo_id = intake_response.json()["repos"][0]["id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "repo_ids": [repo_id],
+            "user_email": "not-an-email",
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any("user_email" in str(err).lower() for err in detail)
+
+
+def test_generation_start_missing_identity_input(client, tmp_path):
+    """Test 422 response when user identity input is missing."""
+    zip_path = tmp_path / "missing_identity.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    repo_id = intake_response.json()["repos"][0]["id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "repo_ids": [repo_id],
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any("user_email" in str(err).lower() for err in detail)
+
+
+def test_generation_start_empty_model_selection_rejected(client, tmp_path):
+    """Test 422 response when a model-selection field is provided as empty."""
+    zip_path = tmp_path / "empty_model.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    repo_id = intake_response.json()["repos"][0]["id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "repo_ids": [repo_id],
+            "user_email": "developer@example.com",
+            "stage1_model": "",
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert any("stage1_model" in str(err).lower() for err in detail)
+
+
+def test_generation_start_missing_active_context(client):
+    """Test 404 response when no active intake context exists."""
+    local_llm._active_intakes.clear()
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "repo_ids": ["repo-one"],
+            "user_email": "developer@example.com",
+        },
+    )
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert "active intake" in detail.lower()
+
+
+def test_generation_start_invalid_intake_reference(client, tmp_path):
+    """Test 404 response when intake_id does not reference an active context."""
+    zip_path = tmp_path / "valid_context.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    repo_id = intake_response.json()["repos"][0]["id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": "missing-intake-id",
+            "repo_ids": [repo_id],
+            "user_email": "developer@example.com",
+        },
+    )
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert "active intake" in detail.lower()
+
+
+def test_generation_start_invalid_repo_selection(client, tmp_path):
+    """Test 422 response when selected repo IDs are not in intake context."""
+    zip_path = tmp_path / "invalid_repo_selection.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo-one/.git/config", "[core]")
+        zf.writestr("repo-one/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_id = intake_response.json()["intake_id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["nonexistent-repo"],
+            "user_email": "developer@example.com",
+        },
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "invalid" in detail.lower() and "repository" in detail.lower()
+
+
+def test_generation_start_endpoint_in_openapi(client):
+    """Verify POST /local-llm/generation/start appears in OpenAPI schema."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/generation/start" in paths
+    assert "post" in paths["/local-llm/generation/start"]
+
