@@ -40,17 +40,18 @@ def test_check_health_returns_false_on_request_error(mock_get) -> None:
 def test_poll_returns_immediately_when_healthy() -> None:
     with (
         patch(f"{_HEALTH_MODULE}._check_health", return_value=True) as mock_check,
+        patch(f"{_HEALTH_MODULE}.time.monotonic", side_effect=[0.0, 0.0]),
         patch(f"{_HEALTH_MODULE}.time.sleep") as mock_sleep,
     ):
         poll_until_healthy(8080, _MODEL, timeout=5.0)
 
-    mock_check.assert_called_once_with(8080)
+    mock_check.assert_called_once_with(8080, timeout=2.0)
     mock_sleep.assert_not_called()
 
 
 def test_poll_retries_until_healthy() -> None:
-    # First monotonic() sets the deadline; later values are loop checks before
-    # each health probe. This gives two failed polls, then one success.
+    # Monotonic sequence: deadline-setup, initial remaining, then one
+    # remaining-recheck after each failed probe.
     with (
         patch(
             f"{_HEALTH_MODULE}._check_health",
@@ -58,7 +59,7 @@ def test_poll_retries_until_healthy() -> None:
         ) as mock_check,
         patch(
             f"{_HEALTH_MODULE}.time.monotonic",
-            side_effect=[0.0, 0.0, 0.25, 0.5],
+            side_effect=[0.0, 0.0, 0.1, 0.35],
         ),
         patch(f"{_HEALTH_MODULE}.time.sleep") as mock_sleep,
     ):
@@ -70,25 +71,28 @@ def test_poll_retries_until_healthy() -> None:
 
 
 def test_poll_raises_timeout_error_with_default_timeout() -> None:
-    # The second loop check lands past the default deadline, so polling should
-    # stop with the typed timeout error.
+    # One failed probe, then the remaining-recheck and next while-check both
+    # land past the default deadline so polling stops with the typed error.
+    past_deadline = DEFAULT_HEALTH_TIMEOUT_SECONDS + 0.01
     with (
         patch(f"{_HEALTH_MODULE}._check_health", return_value=False),
         patch(
             f"{_HEALTH_MODULE}.time.monotonic",
-            side_effect=[0.0, 0.0, DEFAULT_HEALTH_TIMEOUT_SECONDS + 0.01],
+            side_effect=[0.0, 0.0, past_deadline],
         ),
-        patch(f"{_HEALTH_MODULE}.time.sleep"),
+        patch(f"{_HEALTH_MODULE}.time.sleep") as mock_sleep,
     ):
         with pytest.raises(ModelStartupTimeoutError) as exc_info:
             poll_until_healthy(8080, _MODEL)
 
     assert exc_info.value.model == _MODEL
     assert exc_info.value.timeout_seconds == DEFAULT_HEALTH_TIMEOUT_SECONDS
+    mock_sleep.assert_not_called()
 
 
 def test_poll_respects_custom_interval_and_stops_at_deadline() -> None:
-    # One failed check is allowed before sleep moves time past the deadline.
+    # One failed check; the remaining-recheck shows the budget is already
+    # exhausted, so sleep is skipped and the next while-check exits the loop.
     with (
         patch(f"{_HEALTH_MODULE}._check_health", return_value=False) as mock_check,
         patch(
@@ -101,4 +105,4 @@ def test_poll_respects_custom_interval_and_stops_at_deadline() -> None:
             poll_until_healthy(8080, _MODEL, timeout=0.1, poll_interval=0.25)
 
     assert mock_check.call_count == 1
-    mock_sleep.assert_called_once_with(0.25)
+    mock_sleep.assert_not_called()
