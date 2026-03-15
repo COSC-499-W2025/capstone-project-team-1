@@ -26,6 +26,8 @@ from .local_llm_schemas import (
     ContributorDiscoveryRequest,
     ContributorDiscoveryResponse,
     ContributorIdentity,
+    GenerationStartRequest,
+    GenerationStartResponse,
     IntakeCreateRequest,
     IntakeCreateResponse,
     RepositoryCandidate,
@@ -41,6 +43,11 @@ router = APIRouter(
 # In-memory storage for active intake contexts
 # Maps intake_id -> {zip_path, repos}
 _active_intakes: Dict[str, Dict] = {}
+
+# In-memory storage for generation jobs
+# Maps job_id -> minimal generation request context
+_generation_jobs: Dict[str, Dict] = {}
+_active_generation_id: str | None = None
 
 
 class IntakeContext:
@@ -419,4 +426,85 @@ async def discover_contributors(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to discover contributors: {str(e)}",
+        )
+
+
+@router.post("/generation/start", response_model=GenerationStartResponse)
+async def start_generation(
+    request: GenerationStartRequest,
+) -> GenerationStartResponse:
+    """Start the local generation workflow for selected repositories.
+
+    Validates intake context and selected repositories, then creates a new
+    generation job record. Runtime execution lifecycle is intentionally out of
+    scope for this endpoint.
+
+    Args:
+        request: GenerationStartRequest with repo selection, user identity,
+                 and optional intake/model selection
+
+    Returns:
+        GenerationStartResponse with created job ID and initial status
+
+    Raises:
+        HTTPException: 404 if no active intake, 422 if repo selection invalid,
+                      422 if request validation fails, 500 on internal error
+    """
+    global _active_generation_id
+
+    try:
+        # Resolve intake context from explicit reference or current active context.
+        if request.intake_id:
+            context = _active_intakes.get(request.intake_id)
+            if context is None:
+                raise ValueError(
+                    f"No active intake context found for intake_id: {request.intake_id}"
+                )
+        else:
+            if not _active_intakes:
+                raise ValueError("No active intake context found")
+
+            # Use the most recently created intake context.
+            context = list(_active_intakes.values())[-1]
+
+        # Validate all selected repositories belong to the resolved intake.
+        valid_repo_ids = {repo.id for repo in context.repos}
+        requested_repo_ids = set(request.repo_ids)
+        invalid_ids = requested_repo_ids - valid_repo_ids
+
+        if invalid_ids:
+            raise ValueError(
+                f"Invalid repository IDs for active intake: {', '.join(sorted(invalid_ids))}"
+            )
+
+        # Create a queued job envelope for downstream polling/worker endpoints.
+        job_id = str(uuid.uuid4())
+        _generation_jobs[job_id] = {
+            "job_id": job_id,
+            "status": "queued",
+            "intake_id": context.intake_id,
+            "repo_ids": list(request.repo_ids),
+            "user_email": str(request.user_email),
+            "stage1_model": request.stage1_model,
+            "stage2_model": request.stage2_model,
+            "stage3_model": request.stage3_model,
+        }
+        _active_generation_id = job_id
+
+        return GenerationStartResponse(job_id=job_id, status="queued")
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "no active intake" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        elif "invalid repository ids" in error_msg.lower():
+            raise HTTPException(status_code=422, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        # Internal server error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to start generation: {str(e)}",
         )
