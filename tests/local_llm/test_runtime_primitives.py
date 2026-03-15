@@ -28,6 +28,12 @@ from artifactminer.local_llm.runtime.errors import (
     ModelServerCrashedError,
     ModelStartupTimeoutError,
 )
+from artifactminer.local_llm.runtime.registry import (
+    list_available_models,
+    list_supported_models,
+    resolve_model_descriptor,
+    resolve_model_path,
+)
 
 
 def test_exports_are_stable() -> None:
@@ -38,9 +44,15 @@ def test_exports_are_stable() -> None:
         "DEFAULT_MODEL_NAME", "DEFAULT_MODELS_DIR", "DEFAULT_STARTUP_TIMEOUT_SECONDS",
         "InvalidLLMResponseError", "LlamaServerNotFoundError", "LocalLLMRuntimeError",
         "ModelNotFoundError", "ModelServerCrashedError", "ModelStartupTimeoutError",
-        "default_gpu_layers", "get_sampling_defaults", "resolve_context_window",
+        "default_gpu_layers", "get_sampling_defaults", "list_available_models",
+        "list_supported_models", "resolve_context_window", "resolve_model_descriptor",
+        "resolve_model_path",
     }
     assert set(runtime.__all__) == expected_runtime
+    assert runtime.list_supported_models is list_supported_models
+    assert runtime.list_available_models is list_available_models
+    assert runtime.resolve_model_descriptor is resolve_model_descriptor
+    assert runtime.resolve_model_path is resolve_model_path
 
 
 def test_inference_options_valid_and_frozen() -> None:
@@ -70,10 +82,12 @@ def test_model_descriptor_valid_and_frozen() -> None:
     descriptor = ModelDescriptor(
         name="qwen3-4b-q4",
         filename="Qwen3-4B-Q4_K_M.gguf",
+        repo_url="https://huggingface.co/example/model",
         context_window=20480,
         path="/tmp/model.gguf",
     )
     assert descriptor.name == "qwen3-4b-q4"
+    assert descriptor.repo_url == "https://huggingface.co/example/model"
     assert descriptor.path == Path("/tmp/model.gguf")
     with pytest.raises((ValidationError, TypeError)):
         descriptor.name = "other"  # type: ignore[misc]
@@ -132,7 +146,7 @@ def test_resolve_context_window() -> None:
 def test_get_sampling_defaults() -> None:
     qwen3 = get_sampling_defaults("qwen3-4b-q4")
     qwen_coder = get_sampling_defaults("qwen2.5-coder-3b-q4")
-    lfm = get_sampling_defaults("lfm2.5-1.2b-bf16")
+    lfm = get_sampling_defaults("lfm2.5-1.2b-q4")
     fallback = get_sampling_defaults("unknown-model-family")
 
     assert qwen3.temperature == 0.2
@@ -162,6 +176,7 @@ def test_error_classes() -> None:
     assert str(missing_binary) == "llama-server binary not found on PATH."
 
     assert str(ModelNotFoundError("x")) == "Model 'x' was not found."
+    assert str(ModelNotFoundError("x", search_path, message="custom")) == "custom"
     assert str(ModelServerCrashedError()) == "llama-server exited unexpectedly."
     assert str(ModelServerCrashedError(model="x")) == "llama-server exited unexpectedly (model=x)."
     assert InvalidLLMResponseError("empty").raw_response is None

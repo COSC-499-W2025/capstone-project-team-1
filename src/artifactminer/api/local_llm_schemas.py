@@ -174,12 +174,12 @@ class GenerationStartRequest(BaseModel):
         description="Model for analysis stage",
     )
     stage2_model: str = Field(
-        default="lfm2.5-1.2b-bf16",
+        default="lfm2.5-1.2b-q4",
         min_length=1,
         description="Model for facts extraction stage",
     )
     stage3_model: str = Field(
-        default="lfm2.5-1.2b-bf16",
+        default="lfm2.5-1.2b-q4",
         min_length=1,
         description="Model for polish/refinement stage",
     )
