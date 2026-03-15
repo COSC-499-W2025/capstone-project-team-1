@@ -59,7 +59,7 @@ def list_available_models(
 ) -> list[ModelDescriptor]:
     """Return the supported models that are currently installed locally."""
 
-    if not models_dir.exists():
+    if not models_dir.is_dir():
         return []
 
     available: list[ModelDescriptor] = []
