@@ -11,6 +11,7 @@ These endpoints support the full local generation pipeline as an alternative
 to cloud-based generation workflows.
 """
 
+import os
 import shutil
 import tempfile
 import uuid
@@ -20,6 +21,7 @@ from zipfile import ZipFile, is_zipfile
 
 from fastapi import APIRouter, HTTPException
 
+from ..directorycrawler import directory_walk
 from .local_llm_schemas import (
     IntakeCreateRequest,
     IntakeCreateResponse,
@@ -58,12 +60,10 @@ def _is_macos_metadata(path: Path, base_path: Path) -> bool:
 
 def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
     """Scan a ZIP file for git repositories and return candidates.
-
-    Extracts the ZIP to a temporary directory and discovers git repositories
-    using validation logic aligned with experimental-llamacpp-v3:
-    - Requires both .git directory and .git/HEAD file
-    - Filters out macOS metadata (__MACOSX, ._* files)
-    - Skips nested repositories
+    
+    Extracts the ZIP to a temporary directory and uses directory_walk to crawl
+    the directory structure. Identifies repositories by finding .git directories
+    in the returned directory list.
     
     Args:
         zip_path: Filesystem path to the ZIP file
@@ -81,67 +81,50 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
         raise ValueError(f"Invalid ZIP file: {zip_path}")
     
     candidates = []
-    seen_repos = set()
     temp_extracted_dir = None
     
     try:
         # Extract ZIP to temporary directory
         temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
+        with ZipFile(zip_path, 'r') as zf:
+            zf.extractall(temp_extracted_dir)
         
-        try:
-            with ZipFile(zip_path, 'r') as zf:
-                zf.extractall(temp_extracted_dir)
-        except Exception as e:
-            # Extraction failures are user errors (corrupted ZIP, etc.)
-            raise ValueError(f"Failed to extract ZIP file: {str(e)}")
+        # Set directory_walk's CURRENTPATH to the extracted directory
+        directory_walk.CURRENTPATH = Path(temp_extracted_dir)
         
-        extracted_root = Path(temp_extracted_dir)
-
-        # Discovery logic aligned with experimental-llamacpp-v3
-        # Check base path first
-        if _is_git_repo(extracted_root) and not _is_macos_metadata(extracted_root, extracted_root):
-            repo_rel_path = "."
-            if repo_rel_path not in seen_repos:
-                seen_repos.add(repo_rel_path)
+        # Call crawl_directory to scan the extracted files and directories
+        _, dirs_list = directory_walk.crawl_directory(refresh_dict=True)
+        
+        # Find repositories by looking for .git directories in dirs_list
+        for dir_path in dirs_list:
+            # Check if this is a .git directory
+            if dir_path.endswith('.git') or dir_path.endswith('/.git'):
+                # Extract the repository path (everything before .git)
+                if dir_path.endswith('/.git'):
+                    repo_rel_path = dir_path[:-5]  # Remove '/.git'
+                else:
+                    repo_rel_path = dir_path[:-4]  # Remove '.git'
+                
+                # Get repo name from the path
+                repo_name = os.path.basename(repo_rel_path) if repo_rel_path else os.path.basename(temp_extracted_dir)
+                
                 candidates.append(
                     RepositoryCandidate(
                         id=repo_rel_path,
-                        name=extracted_root.name,
+                        name=repo_name,
                         rel_path=repo_rel_path,
                     )
                 )
-
-        # Search subdirectories
-        for path in extracted_root.rglob("*"):
-            if not path.is_dir() or _is_macos_metadata(path, extracted_root):
-                continue
-
-            if _is_git_repo(path):
-                # Avoid nested repos
-                is_nested = any(
-                    _is_git_repo(parent)
-                    for parent in path.parents
-                    if parent != extracted_root and parent.is_relative_to(extracted_root)
-                )
-                if not is_nested:
-                    repo_rel_path = path.relative_to(extracted_root).as_posix()
-                    if repo_rel_path not in seen_repos:
-                        seen_repos.add(repo_rel_path)
-                        candidates.append(
-                            RepositoryCandidate(
-                                id=repo_rel_path,
-                                name=path.name,
-                                rel_path=repo_rel_path,
-                            )
-                        )
+    
+    except Exception as e:
+        raise ValueError(f"Failed to process ZIP file: {str(e)}")
     
     finally:
         # Clean up temporary directory
-        if temp_extracted_dir and Path(temp_extracted_dir).exists():
+        if temp_extracted_dir and os.path.exists(temp_extracted_dir):
             shutil.rmtree(temp_extracted_dir)
     
     return sorted(candidates, key=lambda x: x.name)
-
 
 @router.post("/context", response_model=IntakeCreateResponse)
 async def create_intake(
