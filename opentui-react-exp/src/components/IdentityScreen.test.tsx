@@ -74,6 +74,7 @@ describe("IdentityScreen helpers", () => {
 			resolveIdentitySelection({
 				focusMode: "manual",
 				manualEmail: " Manual@Example.com ",
+				selectedContributor: contributorsFixture[0],
 			}),
 		).toEqual({ selectedEmail: "manual@example.com" });
 

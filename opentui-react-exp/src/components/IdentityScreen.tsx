@@ -112,9 +112,6 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 		}
 
 		setSelectedEmail(result.selectedEmail ?? null);
-		if (selectedContributor) {
-			setManualEmail(selectedContributor.email);
-		}
 		setError(null);
 		onNext();
 	};
