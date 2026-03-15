@@ -38,7 +38,11 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 	);
 
 	const submitFeedback = async () => {
-		if (!state.pipelineJobId || isSubmitting) {
+		if (!state.pipelineJobId) {
+			setError("No active pipeline job.");
+			return;
+		}
+		if (isSubmitting || isCancelling) {
 			return;
 		}
 
@@ -60,7 +64,11 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 	};
 
 	const cancelJob = async () => {
-		if (!state.pipelineJobId || isCancelling) {
+		if (!state.pipelineJobId) {
+			setError("No active pipeline job to cancel.");
+			return;
+		}
+		if (isCancelling || isSubmitting) {
 			return;
 		}
 		setIsCancelling(true);
