@@ -15,13 +15,13 @@ _LOOPBACK = "127.0.0.1"
 _DEFAULT_POLL_INTERVAL = 0.25
 
 
-def _check_health(port: int) -> bool:
+def _check_health(port: int, *, timeout: float = _PER_REQUEST_TIMEOUT) -> bool:
     """Single-shot GET to the llama-server /health endpoint."""
 
     try:
         resp = httpx.get(
             f"http://{_LOOPBACK}:{port}/health",
-            timeout=_PER_REQUEST_TIMEOUT,
+            timeout=timeout,
         )
         return resp.status_code == 200
     except httpx.RequestError:
@@ -44,10 +44,13 @@ def poll_until_healthy(
     """
 
     deadline = time.monotonic() + timeout
-    # Re-check the deadline before each probe so we do not issue one extra
-    # request after the timeout window has already expired.
-    while time.monotonic() < deadline:
-        if _check_health(port):
+    # Cap both the per-request timeout and sleep to the remaining budget so the
+    # total wall-clock time never exceeds the caller's timeout.
+    remaining = deadline - time.monotonic()
+    while remaining > 0:
+        if _check_health(port, timeout=min(_PER_REQUEST_TIMEOUT, remaining)):
             return
-        time.sleep(poll_interval)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(poll_interval, remaining))
     raise ModelStartupTimeoutError(model, timeout)
