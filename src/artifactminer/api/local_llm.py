@@ -251,8 +251,8 @@ def _discover_contributors_in_repos(
             # Timeout is an error - repo may be corrupted or too large
             raise ValueError(f"Git operation timed out for {repo_path}")
         except Exception as e:
-            # Other errors (e.g., permission issues) are warnings - skip repo
-            continue
+            # All other errors should be surfaced - don't silently skip repos
+            raise ValueError(f"Failed to analyze git repository {repo_path}: {str(e)}")
     
     # Convert to ContributorIdentity objects
     identities = []
