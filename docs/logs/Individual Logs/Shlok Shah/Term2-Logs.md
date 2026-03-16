@@ -2,6 +2,29 @@ Term 2 Week 1: [Week 15 (Jan 5 - Jan 11)](Week_15.md)
 Term 2 Week 2: [Week 16 (Jan 12 - Jan 18)](Week_16.md)
 
 ---
+## Term 2 Week 10: Mar 9- Mar 15
+**My Code Contributions For Week 10**:
+
+This week was a continuation of the local LLM runtime work from Week 9. I shipped three stacked PRs that build on each other to give us a fully functional `llama-server` lifecycle within the `local_llm` module.
+
+1. Worked on [Issue 451](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/451) — [PR #473](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/473) adds the model registry that maps our three approved local models to their expected GGUF files in `~/.artifactminer/models`, rejects unsupported names, and raises typed errors when a model file is missing.
+2. Worked on [Issue 452](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/452) — [PR #474](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/474) adds a loopback-only health check poller that waits until the local `llama-server` is ready or times out cleanly with a typed `ModelStartupTimeoutError`.
+3. Worked on [Issue 453](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/453) — [PR #475](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/475) adds the process manager with `start_server()` and `stop_server()` to spawn, health-check, and tear down the `llama-server` subprocess. Full `local_llm` suite sits at 45 tests, all green.
+
+**Reviewing Team's PRs for Week 10**:
+
+1. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472) as he migrated the pipeline endpoint client methods to the OpenTUI frontend. Approved.
+2. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476) as he added the pipeline launch screen to OpenTUI. Requested changes which Stavan addressed.
+3. Reviewed [Ahmad's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477) as he migrated the identity screen to OpenTUI. Requested changes which Ahmad addressed.
+4. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478) as he added the FeedbackScreen component to OpenTUI. Requested changes which Stavan addressed.
+5. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/479) as he added the contributor discovery endpoint for the local LLM workflow. Requested changes which Nathan addressed promptly.
+6. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/481) as he refactored the `_discover_repos_in_zip` function to reuse directory iteration from the crawl. Requested changes which Nathan addressed.
+
+**Plan for Next Week**:
+
+The goal is to close out the remaining Local LLM Runtime issues: process reuse and runtime status ([#454](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/454)), text inference layer ([#455](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/455)), structured JSON / grammar-constrained inference ([#456](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/456)), public client surface ([#457](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/457)), rewiring repo intelligence to the shared runtime ([#458](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/458)), and removing the legacy Ollama-era entry points ([#459](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/459)).
+
+![T2Week10](T2Week10.png)
 ## Term 2 Week 9: Mar 2- Mar 8
 **My Code Contributions For Week 9**:
 This week was about laying the groundwork for porting local LLM generation from `experimental-llamacpp-v3` into `development`.
