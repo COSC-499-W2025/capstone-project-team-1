@@ -4,6 +4,7 @@ import pytest
 import unittest.mock
 import subprocess
 from artifactminer.helpers.project_ranker import rank_projects
+from artifactminer.helpers.zip_utils import safe_extract_zip
 
 
 @pytest.fixture(scope="module")
@@ -19,7 +20,7 @@ def real_projects_data(tmp_path_factory):
     # Extract to a temporary directory
     temp_dir = tmp_path_factory.mktemp("projects_data")
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(temp_dir)
+        safe_extract_zip(zip_ref, temp_dir)
 
     # The zip contains a 'projects' folder at the root
     projects_root = temp_dir / "projects"

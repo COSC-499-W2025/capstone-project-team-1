@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from artifactminer.helpers.zip_utils import safe_extract_zip
+
 
 ROOT = Path(__file__).resolve().parents[2]
 V1_ZIP = ROOT / "tests" / "data" / "mock_projects.zip"
@@ -24,7 +26,7 @@ def _repo_names(zip_path: Path) -> set[str]:
 
 def _extract(zip_path: Path, out_dir: Path) -> Path:
     with zipfile.ZipFile(zip_path, "r") as zf:
-        zf.extractall(out_dir)
+        safe_extract_zip(zf, out_dir)
     return out_dir / "projects"
 
 
