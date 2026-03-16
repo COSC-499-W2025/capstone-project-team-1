@@ -276,6 +276,38 @@ I plan to continue working on the github issues so that our project is reviewed 
 
 
 
+### Week March 9 - 15
+Evan Crowley
+
+
+### From Peer Review
+![Tasks_I_Did](Tasks%20March9-15.png)
+
+### Monday
+We got together as a group and discussed what we did the week before. We determined what we needed to get done over the coming week, and what we needed to have before peer reviews.
+
+### Saturday
+Connected with Nathan about what we need to do in order to continue working on issues. Determined that the issue I need would be done by next day which is when I could start work on that issue
+
+### Sunday
+Completed a PR closing issue #440. Reviewed #479 in order to complete an issue thats a dependency for issue #440 .
+
+### My Prs:
+#482 - Issue 440 generation start endpoint
+
+### My Pr Reviews:
+#479 - Issue #439, Contributor Discovery Endpoint added.
+
+#478 - OpenTUI Migration PR7b: FeedbackScreen
+
+
+### Reflection:
+This week was good, I had a few other classes that I had to work on so I didn't get as much done as I wanted, but I still managed to work on a PR and review a couple PRs. I also worked on the peer testing task list for this week.
+Team Dynamic:
+We worked good as a team this week and communicated about who needed to get what done. We ended up being able to get a lot done this week and I think the peer review tomorrow will go well.
+
+### Plan:
+My plan is to continue the work of transferring work from the experimental branch into development. I hope to get at least two or three issues done next week so that we're ready for the final milestone deadline.
 
 
 
