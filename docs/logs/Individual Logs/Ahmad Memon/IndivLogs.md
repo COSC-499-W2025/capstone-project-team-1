@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 10 (Mar 9 - Mar 15)](#logs---term-2-week-10)
 - [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
 - [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
 - [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
@@ -18,6 +19,77 @@
 - [Term 1 Week 4 (Sep 15 - Sep 21)](Log-9-21-25.md)
 
 ---
+
+# logs - Term 2 Week 10
+
+## Connection to Previous Week
+
+Last week I focused on the first OpenTUI migration foundations for resume rendering and shared pipeline state. This week I stayed on the frontend migration and finished the review/integration pass for the identity flow while also helping keep the local-LLM migration moving in parallel.
+
+---
+
+## Coding Tasks
+
+* Finalized and merged the OpenTUI `IdentityScreen` work in [PR #477](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477), carrying the screen from initial implementation into a merge-ready state for the current migration sequence.
+
+* Added the identity selection / manual entry flow needed before pipeline launch so the frontend can collect and confirm contributor identity in a cleaner way.
+
+* Fixed the confirm interaction by switching the screen to the `Select` component's `onSelect` flow instead of a more brittle confirm path.
+
+* Fixed a state bug where manually entered identity values could be lost while switching between typed input and suggested selections.
+
+* Helped land the llama-server health-check work by merging [PR #474](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/474), keeping the local-LLM runtime migration moving alongside the frontend work.
+
+---
+
+## Testing & Debugging Tasks
+
+* Carried forward `IdentityScreen` component coverage and updated the related tests during review follow-up for the manual-input preservation fix.
+
+* Debugged identity selection state transitions while the screen was being integrated with newer pipeline/client changes landing in development.
+
+* Validated that the final identity confirmation path followed the component event model correctly after the `onSelect` interaction fix.
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Synced with the team on how the identity flow fits into the broader OpenTUI migration alongside the pipeline launch and feedback screen work.
+
+* Coordinated around active migration PRs so the frontend identity screen stayed compatible with adjacent pipeline and local-LLM changes.
+
+* Closed out the week by making sure both the identity-screen work and the llama-server health-check work were merged cleanly into the ongoing milestone 3 migration effort.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+* Main challenge was frontend interaction/state churn while adjacent migration PRs were landing; this was handled with small follow-up fixes rather than a larger rewrite.
+
+---
+
+## Plan for Next Week
+
+* Continue wiring the remaining OpenTUI screens against the newer migration state flow.
+
+* Expand frontend coverage around screen transitions and identity-to-pipeline handoff behavior.
+
+* Keep supporting milestone 3 integration work as the frontend and local-LLM migration slices converge.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Finalize OpenTUI `IdentityScreen` | Done | [PR #477](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477) merged this week |
+| Preserve manual identity input | Done | Follow-up fix during review/integration |
+| Fix identity confirm interaction | Done | Switched to `Select` `onSelect` flow |
+| Update `IdentityScreen` tests | Done | Adjusted coverage during follow-up fixes |
+| Merge llama-server health check work | Done | [PR #474](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/474) |
+
+---
+![Personal Logs Week 10](Personal_logs-03-15-26.png)
 
 # logs - Term 2 Week 9
 
