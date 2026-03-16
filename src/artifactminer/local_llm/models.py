@@ -10,6 +10,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class InferenceOptions(BaseModel):
     """Reusable sampling and response-shaping options for local inference."""
 
+    # Frozen models make runtime defaults safer to share across helpers without
+    # accidental mutation leaking between requests.
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     system: str | None = Field(
@@ -45,15 +47,21 @@ class InferenceOptions(BaseModel):
 class ModelDescriptor(BaseModel):
     """Metadata for a locally available or registry-backed model."""
 
+    # This model is used both for curated registry entries and for ad-hoc local
+    # GGUF files discovered on disk, so most fields are optional except the
+    # user-facing name and resolved context window.
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    name: str = Field(min_length=1, description="Friendly model identifier or alias.")
+    name: str = Field(
+        min_length=1,
+        description="Approved model name used across the local runtime.",
+    )
     filename: str | None = Field(
         default=None, description="Expected GGUF filename for registry-backed models."
     )
-    repo_id: str | None = Field(
+    repo_url: str | None = Field(
         default=None,
-        description="Optional source repository identifier (Hugging Face Repo Link) for manual downloads.",
+        description="Optional source URL for manual model downloads.",
     )
     context_window: int = Field(
         gt=0, description="Recommended runtime context window for the model."
@@ -66,6 +74,8 @@ class ModelDescriptor(BaseModel):
 class RuntimeStatus(BaseModel):
     """Runtime process status exposed to future client layers."""
 
+    # This is intentionally small and transport-friendly so higher layers can
+    # report runtime state without knowing subprocess details.
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     loaded_model: str | None = Field(

@@ -20,13 +20,21 @@ class LlamaServerNotFoundError(LocalLLMRuntimeError):
 class ModelNotFoundError(LocalLLMRuntimeError):
     """Raised when a requested model cannot be resolved locally."""
 
-    def __init__(self, model: str, searched_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        searched_path: Path | None = None,
+        message: str | None = None,
+    ) -> None:
         self.model = model
         self.searched_path = searched_path
-        if searched_path is None:
-            message = f"Model '{model}' was not found."
-        else:
-            message = f"Model '{model}' was not found at {searched_path}."
+        # Most callers can rely on the default message, but registry helpers can
+        # pass a richer message while keeping the same typed exception.
+        if message is None:
+            if searched_path is None:
+                message = f"Model '{model}' was not found."
+            else:
+                message = f"Model '{model}' was not found at {searched_path}."
         super().__init__(message)
 
 
@@ -48,6 +56,8 @@ class ModelServerCrashedError(LocalLLMRuntimeError):
         self.model = model
         self.exit_code = exit_code
 
+        # Build the message from optional details so callers can surface exactly
+        # what was known at the time of the crash.
         details: list[str] = []
         if model is not None:
             details.append(f"model={model}")

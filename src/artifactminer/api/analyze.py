@@ -28,6 +28,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..db import get_db
+from ..helpers.zip_utils import safe_extract_zip
 from ..db.models import (
     UploadedZip,
     Question,
@@ -252,8 +253,8 @@ def extract_zip_to_persistent_location(zip_path: str, zip_id: int) -> Path:
                     detail=f"Corrupted ZIP file: bad entry '{bad_file}'",
                 )
 
-            # Extract all contents
-            zf.extractall(extraction_dir)
+            # Extract all contents (with zip-slip vulnerability protection)
+            safe_extract_zip(zf, extraction_dir)
 
     except zipfile.BadZipFile:
         # Clean up on failure

@@ -148,7 +148,8 @@ class TestGenerationStartRequest:
         )
         assert req.intake_id is None
         assert req.stage1_model == "qwen2.5-coder-3b-q4"
-        assert req.stage2_model == "lfm2.5-1.2b-bf16"
+        assert req.stage2_model == "lfm2.5-1.2b-q4"
+        assert req.stage3_model == "lfm2.5-1.2b-q4"
 
     def test_with_intake_id(self):
         req = GenerationStartRequest(
