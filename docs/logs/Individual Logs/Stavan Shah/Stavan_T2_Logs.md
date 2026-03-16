@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 10 (Mar 9 - Mar 15)](#logs---term-2-week-10)
 - [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
 - [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
 - [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
@@ -10,6 +11,77 @@
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 10
+
+## Connection to Previous Week
+Last week I merged the final outstanding PRs (#407, #410), synced development into main, authored the OpenTUI frontend migration plan with a 15-PR issue breakdown, submitted the first migration PR (#436), merged dev-to-main (#470), and submitted Week 9 logs. This week I continued the OpenTUI migration by submitting three new migration PRs — pipeline endpoint client methods, PipelineLaunchScreen, and FeedbackScreen — and conducted six PR reviews across the team including local LLM runtime work and frontend migration screens.
+
+---
+
+## Coding Tasks
+
+* Submitted OpenTUI migration PR2: migrated six pipeline client methods (`uploadZip`, `runAnalysis`, `getStatus`, `getResume`, `startGeneration`, `getPortfolio`) to `opentui-react-exp/src/api/endpoints.ts` with full endpoint behavior tests ([PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472); closes [Issue #423](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/423)).
+
+* Submitted OpenTUI migration PR5b: added `PipelineLaunchScreen` component allowing users to select a repository candidate and launch the resume generation pipeline ([PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476); closes [Issue #427](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/427)).
+
+* Submitted OpenTUI migration PR7b: added `FeedbackScreen` component with `onNext(target)` callback contract, calling `onNext("analysis")` on submit to match the issue specification ([PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478); closes [Issue #431](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/431)).
+
+* Fixed two concurrency bugs in `PipelineLaunchScreen` — guarded submit/cancel against concurrent calls and missing job ID, and moved `resetRunState` after successful API response to prevent premature state reset.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added endpoint behavior tests for all six new pipeline client methods covering request construction, response handling, and `runAnalysis` optional directories handling (`opentui-react-exp/src/api/endpoints.test.ts` — 166 lines added in [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472)).
+
+* Added 224 lines of focused tests for `PipelineLaunchScreen` covering component rendering, repo selection, pipeline launch flow, and error states (`opentui-react-exp/src/components/PipelineLaunchScreen.test.tsx` in [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476)).
+
+* Added 194 lines of focused tests for `FeedbackScreen` covering rendering, form interaction, and callback contract (`opentui-react-exp/src/components/FeedbackScreen.test.tsx` in [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478)).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #473](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/473) (model registry by Shlok) — flagged incorrect model filename that wouldn't match after a normal Hugging Face download, and suggested `is_file()` over `exists()` to prevent a directory false-positive. Approved after fixes.
+
+* Reviewed [PR #474](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/474) (llama-server health check by Shlok) — approved; noted strong test coverage around timeout behavior, exported runtime symbols, and registry resolution.
+
+* Reviewed [PR #475](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/475) (process manager by Shlok) — requested explicit `127.0.0.1` bind for `llama-server` to satisfy [Issue #453](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/453) loopback-only requirement, even though it is the default.
+
+* Reviewed [PR #477](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477) (IdentityScreen by Ahmad) — flagged a bug where the selected contributor's email overwrote the manual email input after the user had already confirmed via manual mode. Approved after fix.
+
+* Reviewed [PR #481](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/481) (find git repo refactor by Nathan) — questioned necessity of refactor, flagged lost macOS metadata filtering and nested repo detection, overly broad exception catch wrapping its own `ValueError`, duplicate ZIP extraction, and incorrect `repos_with_commits` counter incrementing per commit line instead of per repo. Approved after fixes.
+
+* Reviewed [PR #482](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/482) (generation start endpoint by Evan) — approved; satisfied all acceptance criteria from [Issue #440](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/440), clean and well-tested.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Get open OpenTUI migration PRs merged: [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472), [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476), [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478).
+* Continue OpenTUI migration: [Issue #428](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/428), [Issue #429](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/429), [Issue #430](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/430).
+* Review teammate PRs as migration and local LLM runtime work progresses.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| OpenTUI PR2: pipeline endpoint client methods | 🔄 In review | [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472) — closes #423 |
+| OpenTUI PR5b: PipelineLaunchScreen | 🔄 In review | [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476) — closes #427 |
+| OpenTUI PR7b: FeedbackScreen | 🔄 In review | [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478) — closes #431 |
+| Fix concurrency bugs in PipelineLaunchScreen | ✅ Done | Guard submit/cancel + resetRunState ordering |
+| Review PRs (#473, #474, #475, #477, #481, #482) | ✅ Done | Reviewed + approved |
+
+![Tasks Week 10](Tasks_T2_Week10.png)
 
 ---
 
