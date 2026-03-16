@@ -135,4 +135,229 @@ I’m proud of the way our team collaborates and supports one another. Our respo
 
 This upcoming week, I add more to file intelligence and provide another extension.
 
-![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Feb8.png)
+
+
+<hr>
+
+<h1>PERSONAL LOG-- 01/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar1.png)
+
+<h3> Schedule</h3>
+
+- Monday: Presentations
+
+- Wednsday: no class, presentations
+
+- Saturday: meeting, discussing tasks
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/392 
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/411
+
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+### PR 1 ###
+- test_user_based_directory_walk()
+- test_exclude_file_user_setting()
+- test_include_file_user_setting()
+- test_gathered_files_from_oswalk()
+
+### PR 2 ###
+- test_custom_ranking_rank_must_be_ge_1()
+- test_invalid_comparison_attribute_raises()
+- test_accepts_valid_payload_and_parses_dates()
+- test_defaults_are_empty_lists()
+
+
+
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/393
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406
+
+
+
+
+**Reflection & Team Dynamic**
+
+I really value the strong sense of teamwork we have and the way everyone shows up for each other. Our feedback on pull requests helps keep things moving smoothly and prevents bottlenecks. I’m also feeling energized by the projects on my plate right now and have a solid grasp of my responsibilities and goals.
+
+**Next Week** 
+
+This upcoming week, I will work on our frontend and prepare for PR testing. 
+
+--
+
+<hr>
+
+<h1>PERSONAL LOG-- 08/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar8.png)
+
+<h3> Schedule</h3>
+
+- Monday: No class
+
+- Wednsday: Quiz 3
+
+- Saturday: disscuss tasks on discord
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/460
+
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/449
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+
+### pr 2 handled all tests for pr 1 
+> test_valid_zip_path
+test_rejects_empty_zip_path
+test_requires_zip_path
+test_valid_candidate
+test_all_fields_required
+test_serialization
+test_with_multiple_repos
+test_empty_repos
+test_deserialization
+test_valid_repo_ids
+test_single_repo_id
+test_rejects_empty_list
+test_complete_identity
+test_optional_name
+test_zero_counts
+test_minimal_request
+test_with_intake_id
+test_custom_models
+test_rejects_empty_repo_ids
+test_rejects_short_email
+test_rejects_empty_model
+test_valid_response
+test_all_valid_statuses
+test_rejects_invalid_status
+test_defaults
+test_with_progress
+test_all_stages
+test_rejects_invalid_stage
+test_queued_status
+test_with_draft
+test_with_output
+test_with_error
+test_with_messages
+test_defaults
+test_with_feedback
+test_success
+test_all_statuses
+test_cancelled
+test_failed_cancel
+test_full_generation_flow
+test_cancellation_flow
+
+
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/461
+
+- closed but worth mentioning: 
+https://github.com/COSC-499-W2025/capstone-project-team-1/pull/448
+
+
+
+**Reflection & Team Dynamic**
+
+I truly appreciate the strong sense of teamwork we share and how everyone supports one another. The feedback we provide on pull requests helps maintain smooth progress and avoids any bottlenecks. I’m also feeling motivated by my current projects and have a clear understanding of my responsibilities and objectives.
+
+**Next Week** 
+
+This upcoming week, I will work migrating more code to handle milestone 3.
+
+<hr>
+
+<h1>PERSONAL LOG-- 08/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar15.png)
+
+<h3> Schedule</h3>
+
+- Monday: review contributions + team progress.
+
+- Wednsday: No class
+
+- Saturday: disscuss tasks on discord
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/481 
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/449
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+
+test_contributors_endpoint_exists - Endpoint is registered
+test_discover_contributors_valid_selection - Valid repo selection succeeds
+test_discover_contributors_missing_active_context - Returns 404 without active intake
+test_discover_contributors_invalid_repo_ids - Returns 422 for invalid repo IDs
+test_discover_contributors_mixed_valid_invalid - Returns 422 for mixed valid/invalid IDs
+test_discover_contributors_missing_repo_ids - Returns 422 when repo_ids missing
+test_discover_contributors_empty_repo_ids - Returns 422 for empty repo_ids list
+test_discover_contributors_response_contract - Response matches schema contract
+test_discover_contributors_multiple_repos - Discovers contributors across multiple repos
+test_discover_contributors_subset_selection - Can select subset of available repos
+test_contributors_endpoint_in_openapi - Endpoint appears in OpenAPI schema
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/482
+
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477
+
+
+
+**Reflection & Team Dynamic**
+
+I really appreciate the strong sense of teamwork within the group and how everyone consistently supports each other. The feedback we give on pull requests helps keep things moving efficiently and prevents bottlenecks. I’m also feeling motivated by the projects I’m working on and have a clear understanding of my responsibilities and goals.
+
+**Next Week** 
+
+This upcoming week we will continue follow migration issues for milestone 3.

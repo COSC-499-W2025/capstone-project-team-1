@@ -25,6 +25,7 @@ This week was a continuation of the local LLM runtime work from Week 9. I shippe
 The goal is to close out the remaining Local LLM Runtime issues: process reuse and runtime status ([#454](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/454)), text inference layer ([#455](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/455)), structured JSON / grammar-constrained inference ([#456](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/456)), public client surface ([#457](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/457)), rewiring repo intelligence to the shared runtime ([#458](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/458)), and removing the legacy Ollama-era entry points ([#459](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/459)).
 
 ![T2Week10](T2Week10.png)
+
 ## Term 2 Week 9: Mar 2- Mar 8
 **My Code Contributions For Week 9**:
 This week was about laying the groundwork for porting local LLM generation from `experimental-llamacpp-v3` into `development`.
