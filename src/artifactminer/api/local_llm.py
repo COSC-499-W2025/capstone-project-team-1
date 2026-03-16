@@ -87,7 +87,7 @@ def _is_macos_metadata(path: Path, base_path: Path) -> bool:
     return any(part == "__MACOSX" or part.startswith("._") for part in parts)
 
 
-def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
+def _discover_repos_in_zip(zip_path: str) -> tuple[List[RepositoryCandidate], str]:
     """Scan a ZIP file for git repositories and return candidates.
 
     Extracts the ZIP to a temporary directory and discovers git repositories
@@ -100,7 +100,8 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
         zip_path: Filesystem path to the ZIP file
         
     Returns:
-        List of RepositoryCandidate objects sorted by repository name
+        Tuple of (List of RepositoryCandidate objects sorted by name, path to extracted directory)
+        The extracted directory should be cleaned up by the caller.
         
     Raises:
         ValueError: If ZIP is invalid or cannot be read
@@ -113,17 +114,17 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
     
     candidates = []
     seen_repos = set()
-    temp_extracted_dir = None
+    
+    # Extract ZIP to temporary directory
+    temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
     
     try:
-        # Extract ZIP to temporary directory
-        temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
-        
         try:
             with ZipFile(zip_path, 'r') as zf:
-                zf.extractall(temp_extracted_dir)
+                safe_extract_zip(zf, Path(temp_extracted_dir))
         except Exception as e:
             # Extraction failures are user errors (corrupted ZIP, etc.)
+            shutil.rmtree(temp_extracted_dir)
             raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         
         extracted_root = Path(temp_extracted_dir)
@@ -165,13 +166,17 @@ def _discover_repos_in_zip(zip_path: str) -> List[RepositoryCandidate]:
                                 rel_path=repo_rel_path,
                             )
                         )
-    
-    finally:
-        # Clean up temporary directory
-        if temp_extracted_dir and Path(temp_extracted_dir).exists():
+    except ValueError:
+        # Re-raise ValueError without cleaning up temp_extracted_dir 
+        # (it's already cleaned up by the inner exception handler)
+        raise
+    except Exception as e:
+        # Clean up on unexpected errors
+        if Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
+        raise ValueError(f"Failed to discover repositories: {str(e)}")
     
-    return sorted(candidates, key=lambda x: x.name)
+    return sorted(candidates, key=lambda x: x.name), temp_extracted_dir
 
 
 def _discover_contributors_in_repos(
@@ -300,24 +305,14 @@ async def create_intake(
     temp_extracted_dir = None
     
     try:
-        # Validate and discover repositories
-        repos = _discover_repos_in_zip(request.zip_path)
+        # Validate and discover repositories (includes extraction)
+        repos, temp_extracted_dir = _discover_repos_in_zip(request.zip_path)
 
         if not repos:
             raise ValueError("No git repositories found in ZIP")
 
         # Generate globally unique intake identifier
         intake_id = str(uuid.uuid4())
-        
-        # For context storage, we need to keep the extracted directory around
-        # In a production system, this would be managed more carefully
-        temp_extracted_dir = tempfile.mkdtemp(prefix="intake_")
-        
-        try:
-            with ZipFile(request.zip_path, 'r') as zf:
-                safe_extract_zip(zf, Path(temp_extracted_dir))
-        except Exception as e:
-            raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         
         # Store intake context for later use
         context = IntakeContext(
