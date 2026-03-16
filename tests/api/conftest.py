@@ -5,6 +5,7 @@ from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 from artifactminer.api.app import create_app
+from artifactminer.api import local_llm
 from artifactminer.db import Base, get_db, seed_questions, seed_repo_stats
 
 
@@ -38,7 +39,18 @@ def client():
     finally:
         db.close()
     
+    # Clear any active intakes from previous tests
+    local_llm._active_intakes.clear()
+    
     yield TestClient(app)
+    
+    # Clean up active intakes after test
+    for context in local_llm._active_intakes.values():
+        import shutil
+        from pathlib import Path
+        if hasattr(context, 'extracted_dir') and Path(context.extracted_dir).exists():
+            shutil.rmtree(context.extracted_dir)
+    local_llm._active_intakes.clear()
     
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
