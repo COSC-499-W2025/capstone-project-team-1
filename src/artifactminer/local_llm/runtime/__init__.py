@@ -22,8 +22,14 @@ from .errors import (
     ModelServerCrashedError,
     ModelStartupTimeoutError,
 )
-from .health import poll_until_healthy
-from .process_manager import start_server, stop_server
+from .health import check_health, poll_until_healthy
+from .process_manager import (
+    ensure_server,
+    get_server_status,
+    restart_server,
+    start_server,
+    stop_server,
+)
 from .registry import (
     list_available_models,
     list_supported_models,
@@ -44,14 +50,18 @@ __all__ = [
     "ModelNotFoundError",
     "ModelServerCrashedError",
     "ModelStartupTimeoutError",
+    "check_health",
     "default_gpu_layers",
+    "ensure_server",
     "get_sampling_defaults",
+    "get_server_status",
     "list_available_models",
     "list_supported_models",
     "poll_until_healthy",
     "resolve_model_descriptor",
     "resolve_model_path",
     "resolve_context_window",
+    "restart_server",
     "start_server",
     "stop_server",
 ]
