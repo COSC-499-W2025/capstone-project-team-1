@@ -109,6 +109,8 @@ class TestStartServer:
             assert cmd[0] == "/bin/llama-server"
             assert "--model" in cmd
             assert str(stub_descriptor.path) in cmd
+            host_idx = cmd.index("--host")
+            assert cmd[host_idx + 1] == "127.0.0.1"
 
             mock_poll.assert_called_once_with(9999, "stub-model", timeout=10.0)
             mock_atexit.assert_called_once_with(process_manager.stop_server)

@@ -94,6 +94,8 @@ def start_server(
         str(ctx),
         "--n-gpu-layers",
         str(gpu),
+        "--host",
+        "127.0.0.1",
         "--port",
         str(port),
         "--log-disable",
