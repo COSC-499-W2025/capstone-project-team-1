@@ -300,4 +300,64 @@ I truly appreciate the strong sense of teamwork we share and how everyone suppor
 
 This upcoming week, I will work migrating more code to handle milestone 3.
 
+<hr>
 
+<h1>PERSONAL LOG-- 08/03/2026</h1>
+
+![weekly](/docs/logs/Individual%20Logs/Nathan%20Helm/Image/Mar15.png)
+
+<h3> Schedule</h3>
+
+- Monday: review contributions + team progress.
+
+- Wednsday: No class
+
+- Saturday: disscuss tasks on discord
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/481 
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/449
+
+ 
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+
+test_contributors_endpoint_exists - Endpoint is registered
+test_discover_contributors_valid_selection - Valid repo selection succeeds
+test_discover_contributors_missing_active_context - Returns 404 without active intake
+test_discover_contributors_invalid_repo_ids - Returns 422 for invalid repo IDs
+test_discover_contributors_mixed_valid_invalid - Returns 422 for mixed valid/invalid IDs
+test_discover_contributors_missing_repo_ids - Returns 422 when repo_ids missing
+test_discover_contributors_empty_repo_ids - Returns 422 for empty repo_ids list
+test_discover_contributors_response_contract - Response matches schema contract
+test_discover_contributors_multiple_repos - Discovers contributors across multiple repos
+test_discover_contributors_subset_selection - Can select subset of available repos
+test_contributors_endpoint_in_openapi - Endpoint appears in OpenAPI schema
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/482
+
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477
+
+
+
+**Reflection & Team Dynamic**
+
+I really appreciate the strong sense of teamwork within the group and how everyone consistently supports each other. The feedback we give on pull requests helps keep things moving efficiently and prevents bottlenecks. I’m also feeling motivated by the projects I’m working on and have a clear understanding of my responsibilities and goals.
+
+**Next Week** 
+
+This upcoming week we will continue follow migration issues for milestone 3.
