@@ -41,6 +41,8 @@ def client():
     
     # Clear any active intakes from previous tests
     local_llm._active_intakes.clear()
+    local_llm._generation_jobs.clear()
+    local_llm._active_generation_id = None
     
     yield TestClient(app)
     
@@ -51,6 +53,8 @@ def client():
         if hasattr(context, 'extracted_dir') and Path(context.extracted_dir).exists():
             shutil.rmtree(context.extracted_dir)
     local_llm._active_intakes.clear()
+    local_llm._generation_jobs.clear()
+    local_llm._active_generation_id = None
     
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)
