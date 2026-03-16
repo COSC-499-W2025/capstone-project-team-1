@@ -5,7 +5,6 @@ import type { PipelineContributorIdentity } from "../api/types";
 import { AppProvider, useAppState } from "../context/AppContext";
 import {
 	formatContributorName,
-	getNextSelectedIndex,
 	getToggledFocusMode,
 	IdentityScreen,
 	resolveIdentitySelection,
@@ -52,13 +51,6 @@ describe("IdentityScreen helpers", () => {
 		expect(getToggledFocusMode("list", 2)).toBe("manual");
 		expect(getToggledFocusMode("manual", 2)).toBe("list");
 		expect(getToggledFocusMode("list", 0)).toBe("manual");
-	});
-
-	test("moves selected index within list bounds", () => {
-		expect(getNextSelectedIndex(0, "up", 2)).toBe(0);
-		expect(getNextSelectedIndex(0, "down", 2)).toBe(1);
-		expect(getNextSelectedIndex(1, "down", 2)).toBe(1);
-		expect(getNextSelectedIndex(5, "down", 0)).toBe(0);
 	});
 
 	test("resolves contributor and manual identity selections", () => {

@@ -26,22 +26,6 @@ export const getToggledFocusMode = (
 	return currentMode === "list" ? "manual" : "list";
 };
 
-export const getNextSelectedIndex = (
-	currentIndex: number,
-	direction: "up" | "down",
-	total: number,
-): number => {
-	if (total <= 0) {
-		return 0;
-	}
-
-	if (direction === "up") {
-		return Math.max(0, currentIndex - 1);
-	}
-
-	return Math.min(total - 1, currentIndex + 1);
-};
-
 export const resolveIdentitySelection = ({
 	focusMode,
 	manualEmail,
@@ -116,6 +100,11 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 		onNext();
 	};
 
+	const handleContributorSelect = () => {
+		setError(null);
+		confirmIdentity();
+	};
+
 	useKeyboard((key) => {
 		if (key.name === "tab") {
 			setFocusMode((prev) =>
@@ -125,31 +114,8 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 			return;
 		}
 
-		if (
-			(key.name === "return" || key.name === "enter") &&
-			(focusMode === "manual" || state.contributors.length > 0)
-		) {
+		if ((key.name === "return" || key.name === "enter") && focusMode === "manual") {
 			confirmIdentity();
-			return;
-		}
-
-		if (focusMode !== "list" || !state.contributors.length) {
-			return;
-		}
-
-		if (key.name === "up") {
-			setSelectedIndex((prev) =>
-				getNextSelectedIndex(prev, "up", state.contributors.length),
-			);
-			setError(null);
-			return;
-		}
-
-		if (key.name === "down") {
-			setSelectedIndex((prev) =>
-				getNextSelectedIndex(prev, "down", state.contributors.length),
-			);
-			setError(null);
 		}
 	});
 
@@ -182,6 +148,7 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 								setSelectedIndex(index);
 								setError(null);
 							}}
+							onSelect={handleContributorSelect}
 							selectedIndex={selectedIndex}
 							focused={focusMode === "list"}
 							height={18}
