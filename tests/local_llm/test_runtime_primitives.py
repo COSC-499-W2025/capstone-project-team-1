@@ -40,12 +40,25 @@ def test_exports_are_stable() -> None:
     assert local_llm.__all__ == ["InferenceOptions", "ModelDescriptor", "RuntimeStatus"]
     assert local_llm.InferenceOptions is InferenceOptions
     expected_runtime = {
-        "DEFAULT_CONTEXT_WINDOW", "DEFAULT_HEALTH_TIMEOUT_SECONDS", "DEFAULT_MAX_TOKENS",
-        "DEFAULT_MODEL_NAME", "DEFAULT_MODELS_DIR", "DEFAULT_STARTUP_TIMEOUT_SECONDS",
-        "InvalidLLMResponseError", "LlamaServerNotFoundError", "LocalLLMRuntimeError",
-        "ModelNotFoundError", "ModelServerCrashedError", "ModelStartupTimeoutError",
-        "default_gpu_layers", "get_sampling_defaults", "list_available_models",
-        "list_supported_models", "resolve_context_window", "resolve_model_descriptor",
+        "DEFAULT_CONTEXT_WINDOW",
+        "DEFAULT_HEALTH_TIMEOUT_SECONDS",
+        "DEFAULT_MAX_TOKENS",
+        "DEFAULT_MODEL_NAME",
+        "DEFAULT_MODELS_DIR",
+        "DEFAULT_STARTUP_TIMEOUT_SECONDS",
+        "InvalidLLMResponseError",
+        "LlamaServerNotFoundError",
+        "LocalLLMRuntimeError",
+        "ModelNotFoundError",
+        "ModelServerCrashedError",
+        "ModelStartupTimeoutError",
+        "default_gpu_layers",
+        "get_sampling_defaults",
+        "list_available_models",
+        "list_supported_models",
+        "poll_until_healthy",
+        "resolve_context_window",
+        "resolve_model_descriptor",
         "resolve_model_path",
     }
     assert set(runtime.__all__) == expected_runtime
@@ -56,7 +69,9 @@ def test_exports_are_stable() -> None:
 
 
 def test_inference_options_valid_and_frozen() -> None:
-    options = InferenceOptions(temperature=0.0, top_p=1.0, max_tokens=256, repetition_penalty=1.1)
+    options = InferenceOptions(
+        temperature=0.0, top_p=1.0, max_tokens=256, repetition_penalty=1.1
+    )
     assert options.temperature == 0.0
     assert options.top_p == 1.0
     with pytest.raises((ValidationError, TypeError)):
@@ -79,14 +94,15 @@ def test_inference_options_rejects_invalid(
 
 
 def test_model_descriptor_valid_and_frozen() -> None:
+    # Use a real supported alias so these shared-model fixtures stay aligned with the local-only registry tests elsewhere in the suite.
     descriptor = ModelDescriptor(
-        name="qwen3-4b-q4",
-        filename="Qwen3-4B-Q4_K_M.gguf",
+        name="qwen3.5-4b-q4",
+        filename="Qwen 3.5 4B Q4 K_M.gguf",
         repo_url="https://huggingface.co/example/model",
         context_window=20480,
         path="/tmp/model.gguf",
     )
-    assert descriptor.name == "qwen3-4b-q4"
+    assert descriptor.name == "qwen3.5-4b-q4"
     assert descriptor.repo_url == "https://huggingface.co/example/model"
     assert descriptor.path == Path("/tmp/model.gguf")
     with pytest.raises((ValidationError, TypeError)):
@@ -144,12 +160,13 @@ def test_resolve_context_window() -> None:
 
 
 def test_get_sampling_defaults() -> None:
-    qwen3 = get_sampling_defaults("qwen3-4b-q4")
+
+    qwen3_5 = get_sampling_defaults("qwen3.5-4b-q4")
     qwen_coder = get_sampling_defaults("qwen2.5-coder-3b-q4")
     lfm = get_sampling_defaults("lfm2.5-1.2b-q4")
     fallback = get_sampling_defaults("unknown-model-family")
 
-    assert qwen3.temperature == 0.2
+    assert qwen3_5.temperature == 0.2
     assert qwen_coder.temperature == 0.15
     assert lfm.temperature == 0.1
     assert lfm.repetition_penalty == 1.05
@@ -161,8 +178,8 @@ def test_error_classes() -> None:
     search_path = Path("/tmp/model.gguf")
 
     not_found = ModelNotFoundError("missing-model", search_path)
-    timeout = ModelStartupTimeoutError("qwen3-4b-q4", 60.0)
-    crashed = ModelServerCrashedError("qwen3-4b-q4", 137)
+    timeout = ModelStartupTimeoutError("qwen3.5-4b-q4", 60.0)
+    crashed = ModelServerCrashedError("qwen3.5-4b-q4", 137)
     invalid = InvalidLLMResponseError("bad json", '{"oops":true}')
     missing_binary = LlamaServerNotFoundError()
 
@@ -178,6 +195,9 @@ def test_error_classes() -> None:
     assert str(ModelNotFoundError("x")) == "Model 'x' was not found."
     assert str(ModelNotFoundError("x", search_path, message="custom")) == "custom"
     assert str(ModelServerCrashedError()) == "llama-server exited unexpectedly."
-    assert str(ModelServerCrashedError(model="x")) == "llama-server exited unexpectedly (model=x)."
+    assert (
+        str(ModelServerCrashedError(model="x"))
+        == "llama-server exited unexpectedly (model=x)."
+    )
     assert InvalidLLMResponseError("empty").raw_response is None
     assert LlamaServerNotFoundError("custom").binary_name == "custom"

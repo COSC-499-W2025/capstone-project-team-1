@@ -22,6 +22,7 @@ from .errors import (
     ModelServerCrashedError,
     ModelStartupTimeoutError,
 )
+from .health import poll_until_healthy
 from .registry import (
     list_available_models,
     list_supported_models,
@@ -46,6 +47,7 @@ __all__ = [
     "get_sampling_defaults",
     "list_available_models",
     "list_supported_models",
+    "poll_until_healthy",
     "resolve_model_descriptor",
     "resolve_model_path",
     "resolve_context_window",
