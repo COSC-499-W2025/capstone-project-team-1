@@ -15,10 +15,11 @@ import shutil
 import subprocess
 import tempfile
 import uuid
-from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from zipfile import ZipFile, is_zipfile
+from ..helpers.zip_utils import safe_extract_zip
+
 
 from fastapi import APIRouter, HTTPException
 
@@ -214,6 +215,8 @@ def _discover_contributors_in_repos(
             if result.returncode != 0:
                 continue
             
+            repos_with_commits += 1
+            
             # Parse commits
             for line in result.stdout.strip().split("\n"):
                 if not line.strip():
@@ -228,8 +231,6 @@ def _discover_contributors_in_repos(
                 
                 if not email:
                     continue
-                
-                repos_with_commits += 1
                 
                 # Update or create contributor entry
                 if email not in contributors_map:
@@ -314,7 +315,7 @@ async def create_intake(
         
         try:
             with ZipFile(request.zip_path, 'r') as zf:
-                zf.extractall(temp_extracted_dir)
+                safe_extract_zip(zf, Path(temp_extracted_dir))
         except Exception as e:
             raise ValueError(f"Failed to extract ZIP file: {str(e)}")
         
