@@ -15,6 +15,7 @@ from .config import (
     resolve_context_window,
 )
 from .errors import (
+    InferenceRequestError,
     InvalidLLMResponseError,
     LlamaServerNotFoundError,
     LocalLLMRuntimeError,
@@ -23,6 +24,7 @@ from .errors import (
     ModelStartupTimeoutError,
 )
 from .health import check_health, poll_until_healthy
+from .inference import query_llm_text
 from .process_manager import (
     ensure_server,
     get_server_status,
@@ -44,6 +46,7 @@ __all__ = [
     "DEFAULT_MODEL_NAME",
     "DEFAULT_MODELS_DIR",
     "DEFAULT_STARTUP_TIMEOUT_SECONDS",
+    "InferenceRequestError",
     "InvalidLLMResponseError",
     "LlamaServerNotFoundError",
     "LocalLLMRuntimeError",
@@ -58,6 +61,7 @@ __all__ = [
     "list_available_models",
     "list_supported_models",
     "poll_until_healthy",
+    "query_llm_text",
     "resolve_model_descriptor",
     "resolve_model_path",
     "resolve_context_window",
