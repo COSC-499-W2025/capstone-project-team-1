@@ -31,6 +31,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [isSearchFocused, setIsSearchFocused] = useState(false);
+	const [isSubmitting, setIsSubmitting] = useState(false);
 
 	// Global ZIP scan state
 	const [allZips, setAllZips] = useState<ZipFile[]>([]);
@@ -86,8 +87,25 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 
 	const selectedEntry = filteredEntries[selectedIndex];
 
+	const submitZip = useCallback(
+		(zipPath: string) => {
+			if (isSubmitting) {
+				return;
+			}
+
+			setIsSubmitting(true);
+			try {
+				onSubmit(zipPath);
+			} catch (error) {
+				setIsSubmitting(false);
+				throw error;
+			}
+		},
+		[isSubmitting, onSubmit],
+	);
+
 	const handleSelect = () => {
-		if (!selectedEntry) return;
+		if (!selectedEntry || isSubmitting) return;
 
 		if ("isParent" in selectedEntry && selectedEntry.isParent) {
 			setCurrentPath(dirname(currentPath));
@@ -95,7 +113,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 		}
 
 		if ("type" in selectedEntry && selectedEntry.type === "zip") {
-			onSubmit(selectedEntry.fullPath);
+			submitZip(selectedEntry.fullPath);
 			return;
 		}
 
@@ -127,6 +145,20 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 	});
 
 	const breadcrumbs = pathToBreadcrumbs(currentPath);
+	const breadcrumbItems = useMemo(() => {
+		const counts = new Map<string, number>();
+		let position = 0;
+		return breadcrumbs.map((crumb) => {
+			position += 1;
+			const nextCount = (counts.get(crumb) || 0) + 1;
+			counts.set(crumb, nextCount);
+			return {
+				crumb,
+				isLast: position === breadcrumbs.length,
+				key: `${crumb}-${nextCount}`,
+			};
+		});
+	}, [breadcrumbs]);
 
 	// Get display info for each entry
 	const getEntryDisplay = (
@@ -251,9 +283,10 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 								onChange={(index) => setSelectedIndex(index)}
 								onSelect={handleSelect}
 								selectedIndex={selectedIndex}
-								focused={!isSearchFocused}
+								focused={!isSearchFocused && !isSubmitting}
 								height={16}
 								showScrollIndicator
+								itemSpacing={1}
 							/>
 						)}
 					</box>
@@ -269,32 +302,47 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 						alignItems="center"
 					>
 						<text>
-							{breadcrumbs.map((crumb, i) => (
-								<>
-									<span
-										key={i}
-										fg={i === breadcrumbs.length - 1 ? theme.cyan : theme.textSecondary}
-									>
-										{crumb === "/" ? "~" : crumb}
-									</span>
-									{i < breadcrumbs.length - 1 && (
-										<span fg={theme.textDim}> / </span>
-									)}
-								</>
+							{breadcrumbItems.map((crumb) => (
+								<span
+									key={crumb.key}
+									fg={crumb.isLast ? theme.cyan : theme.textSecondary}
+								>
+									{crumb.crumb === "/" ? "~" : crumb.crumb}
+									{!crumb.isLast && <span fg={theme.textDim}> / </span>}
+								</span>
 							))}
 						</text>
-						{selectedEntry && "type" in selectedEntry && selectedEntry.type === "zip" ? (
-							<text>
-								<span fg={theme.success}>⏎ Select this ZIP</span>
-							</text>
-						) : selectedEntry && "zipCount" in selectedEntry && !("isParent" in selectedEntry && selectedEntry.isParent) ? (
-							<text>
-								<span fg={theme.textDim}>⏎ Open folder</span>
-							</text>
-						) : null}
+						{textHint(selectedEntry)}
 					</box>
 				</box>
 			</box>
 		</box>
 	);
+}
+
+function textHint(selectedEntry: SearchableEntry | undefined) {
+	if (!selectedEntry) {
+		return null;
+	}
+
+	if ("type" in selectedEntry && selectedEntry.type === "zip") {
+		return (
+			<text>
+				<span fg={theme.success}>⏎ Select this ZIP</span>
+			</text>
+		);
+	}
+
+	if (
+		"zipCount" in selectedEntry &&
+		!("isParent" in selectedEntry && selectedEntry.isParent)
+	) {
+		return (
+			<text>
+				<span fg={theme.textDim}>⏎ Open folder</span>
+			</text>
+		);
+	}
+
+	return null;
 }
