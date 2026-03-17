@@ -17,7 +17,7 @@ import {
 } from "../utils";
 
 interface FileUploadProps {
-	onSubmit: (path: string) => void;
+	onSubmit: (path: string) => void | Promise<void>;
 	onBack: () => void;
 	/** Root path to scan for ZIPs. Defaults to homedir() */
 	scanRoot?: string;
@@ -88,17 +88,18 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 	const selectedEntry = filteredEntries[selectedIndex];
 
 	const submitZip = useCallback(
-		(zipPath: string) => {
+		async (zipPath: string) => {
 			if (isSubmitting) {
 				return;
 			}
 
 			setIsSubmitting(true);
 			try {
-				onSubmit(zipPath);
+				await onSubmit(zipPath);
 			} catch (error) {
-				setIsSubmitting(false);
 				throw error;
+			} finally {
+				setIsSubmitting(false);
 			}
 		},
 		[isSubmitting, onSubmit],
@@ -144,8 +145,8 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 		}
 	});
 
-	const breadcrumbs = pathToBreadcrumbs(currentPath);
 	const breadcrumbItems = useMemo(() => {
+		const breadcrumbs = pathToBreadcrumbs(currentPath);
 		const counts = new Map<string, number>();
 		let position = 0;
 		return breadcrumbs.map((crumb) => {
@@ -158,7 +159,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 				key: `${crumb}-${nextCount}`,
 			};
 		});
-	}, [breadcrumbs]);
+	}, [currentPath]);
 
 	// Get display info for each entry
 	const getEntryDisplay = (
