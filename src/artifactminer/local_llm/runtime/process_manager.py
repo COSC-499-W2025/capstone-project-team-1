@@ -184,8 +184,11 @@ def ensure_server(
     # Process exited unexpectedly → crash
     _detect_crash()
 
-    # Same model, still alive → reuse
+    # Same model, healthy → reuse
     if _server_model == model:
+        if _server_port is not None and check_health(_server_port):
+            return
+        restart_server(model, models_dir=models_dir, timeout=timeout)
         return
 
     # Different model requested → restart

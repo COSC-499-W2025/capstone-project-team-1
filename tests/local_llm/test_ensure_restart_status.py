@@ -158,9 +158,44 @@ class TestEnsureServer:
 
         _inject_running_server(model="stub-model")
 
-        with patch("subprocess.Popen") as mock_popen:
+        with (
+            patch.object(process_manager, "check_health", return_value=True),
+            patch("subprocess.Popen") as mock_popen,
+        ):
             process_manager.ensure_server("stub-model")
             mock_popen.assert_not_called()
+
+    def test_restarts_same_model_when_unhealthy(
+        self, stub_descriptor: ModelDescriptor
+    ) -> None:
+        """Restarts the current model when the process is alive but unhealthy."""
+
+        old_proc = _inject_running_server(model="stub-model")
+
+        new_proc = MagicMock(spec=subprocess.Popen)
+        new_proc.pid = 67890
+
+        with (
+            patch.object(process_manager, "check_health", return_value=False),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
+            patch.object(process_manager, "_pick_free_port", return_value=8888),
+            patch("subprocess.Popen", return_value=new_proc),
+            patch.object(process_manager, "poll_until_healthy"),
+            patch("atexit.register"),
+        ):
+            process_manager.ensure_server("stub-model", models_dir=Path("/tmp"))
+
+        old_proc.terminate.assert_called_once()
+        assert process_manager._server_process is new_proc
+        assert process_manager._server_model == "stub-model"
+        assert process_manager._server_port == 8888
 
     def test_restarts_for_different_model(
         self, alt_descriptor: ModelDescriptor
@@ -208,7 +243,10 @@ class TestEnsureServer:
 
         _inject_running_server(model="stub-model", port=9999)
 
-        with patch("subprocess.Popen") as mock_popen:
+        with (
+            patch.object(process_manager, "check_health", return_value=True),
+            patch("subprocess.Popen") as mock_popen,
+        ):
             process_manager.ensure_server("stub-model")
             process_manager.ensure_server("stub-model")
             mock_popen.assert_not_called()
