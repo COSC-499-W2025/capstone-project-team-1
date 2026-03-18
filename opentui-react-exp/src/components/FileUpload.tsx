@@ -236,10 +236,15 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                 setColumns(columns.slice(0, activeColumnIndex + 1));
             }
         }
-        if (key.name === "escape") {
-            onBack();
-        }
-    });
+         if (key.name === "escape") {
+             onBack();
+         }
+         if (key.name === "o") {
+             const path = openNativeZipPicker();
+             if (path) onSubmit(path);
+         }
+     });
+
 
     return (
         <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
