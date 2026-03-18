@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
+import { useToast } from "./Toast";
 import {
     scanForZips,
     buildEntries,
@@ -29,6 +30,7 @@ const MAX_VISIBLE_COLUMNS = 4;
 
 export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
     const rootPath = scanRoot || homedir();
+    const toast = useToast();
 
     // Global ZIP scan state
     const [allZips, setAllZips] = useState<ZipFile[]>([]);
@@ -63,9 +65,11 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
         if (scanAbortRef.current) return;
         if (result.error) {
             setScanStatus("error");
+            toast.show({ variant: "error", message: "Failed to scan for ZIP files" });
         } else {
             setAllZips(result.zips);
             setScanStatus("complete");
+            toast.show({ variant: "success", message: `Found ${result.zips.length} ZIP files`, duration: 3000 });
         }
     }, [rootPath]);
 
@@ -222,19 +226,6 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
         }
     });
 
-    const getScanStatusText = (): string => {
-        switch (scanStatus) {
-            case "scanning":
-                return "Scanning...";
-            case "complete":
-                return `${allZips.length} ZIPs found`;
-            case "error":
-                return "Scan failed";
-            default:
-                return "";
-        }
-    };
-
     return (
         <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
             <TopBar title="Upload" />
@@ -292,12 +283,6 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                             <text>
                                 <span fg={theme.cyan}>
                                     {searchResults.length} matches
-                                </span>
-                            </text>
-                        ) : scanStatus === "complete" ? (
-                            <text>
-                                <span fg={theme.success}>
-                                    {allZips.length} ZIPs found
                                 </span>
                             </text>
                         ) : null}
