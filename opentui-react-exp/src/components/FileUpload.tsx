@@ -1,6 +1,5 @@
 import { useKeyboard } from "@opentui/react";
 import { homedir } from "node:os";
-import { spawnSync } from "bun";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
@@ -13,26 +12,6 @@ import {
     type DirEntry,
     type SearchableEntry,
 } from "../utils";
-
-function openNativeZipPicker(): string | null {
-    const script = `
-try
-    set theFile to choose file of type {"zip"} with prompt "Select a ZIP file" default location (POSIX file "${homedir()}/Downloads")
-    return POSIX path of theFile
-on error number -128
-    return "USER_CANCELLED"
-end try`;
-    const result = spawnSync(["osascript", "-e", script]);
-    const output = result.stdout.toString().trim();
-    if (result.exitCode !== 0 || output === "USER_CANCELLED") return null;
-    return output;
-}
-
-interface FileUploadProps {
-    onSubmit: (path: string) => void;
-    onBack: () => void;
-    scanRoot?: string;
-}
 
 type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
@@ -239,10 +218,6 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
          if (key.name === "escape") {
              onBack();
          }
-         if (key.name === "o") {
-             const path = openNativeZipPicker();
-             if (path) onSubmit(path);
-         }
      });
 
 
@@ -268,70 +243,50 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 
                  {/* Search bar + Browse — hidden during scan */}
                  {scanStatus !== "scanning" ? (
-                     <box flexDirection="row" alignItems="center" gap={2}>
-                         <box
-                             borderBottom
-                             borderTop={false}
-                             borderLeft={false}
-                             borderRight={false}
-                             borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
-                             paddingLeft={1}
-                             paddingBottom={1}
-                             flexDirection="row"
-                             alignItems="center"
-                             gap={1}
+                     <box
+                         borderBottom
+                         borderTop={false}
+                         borderLeft={false}
+                         borderRight={false}
+                         borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
+                         paddingLeft={1}
+                         paddingBottom={1}
+                         flexDirection="row"
+                         alignItems="center"
+                         gap={1}
+                         onMouseDown={() => setIsSearchFocused(true)}
+                     >
+                         <text>
+                             <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
+                                 {"🔍"}
+                             </span>
+                         </text>
+                         <input
+                             value={searchQuery}
+                             onChange={setSearchQuery}
+                             placeholder="Search for ZIP files..."
+                             focused={isSearchFocused}
+                             backgroundColor={theme.bgDark}
+                             focusedBackgroundColor={theme.bgDark}
+                             textColor={theme.textPrimary}
+                             focusedTextColor={theme.textPrimary}
+                             cursorColor={theme.cyan}
+                             placeholderColor={theme.textDim}
                              flexGrow={1}
-                             onMouseDown={() => setIsSearchFocused(true)}
-                         >
+                         />
+                         {searchQuery ? (
                              <text>
-                                 <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
-                                     {"🔍"}
+                                 <span fg={theme.cyan}>
+                                     {searchResults.length} matches
                                  </span>
                              </text>
-                             <input
-                                 value={searchQuery}
-                                 onChange={setSearchQuery}
-                                 placeholder="Search for ZIP files..."
-                                 focused={isSearchFocused}
-                                 backgroundColor={theme.bgDark}
-                                 focusedBackgroundColor={theme.bgDark}
-                                 textColor={theme.textPrimary}
-                                 focusedTextColor={theme.textPrimary}
-                                 cursorColor={theme.cyan}
-                                 placeholderColor={theme.textDim}
-                                 flexGrow={1}
-                             />
-                             {searchQuery ? (
-                                 <text>
-                                     <span fg={theme.cyan}>
-                                         {searchResults.length} matches
-                                     </span>
-                                 </text>
-                             ) : null}
-                         </box>
-                         <box
-                             border
-                             borderStyle="rounded"
-                             borderColor={theme.gold}
-                             paddingLeft={2}
-                             paddingRight={2}
-                             onMouseDown={() => {
-                                 const path = openNativeZipPicker();
-                                 if (path) onSubmit(path);
-                             }}
-                         >
-                             <text>
-                                 <span fg={theme.gold}>
-                                     <strong>{"Browse"}</strong>
-                                 </span>
-                             </text>
-                         </box>
+                         ) : null}
                      </box>
                  ) : null}
 
                 {/* Breadcrumbs */}
                 {!searchQuery && scanStatus !== "scanning" ? (
-                    <box flexDirection="row" alignItems="center">
+                    <box flexDirection="row" alignItems="center" paddingLeft={2}>
                         {columns.map((col, i) => {
                             const name =
                                 col.path === rootPath
