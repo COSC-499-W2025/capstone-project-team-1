@@ -223,9 +223,12 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 
     return (
         <box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-            <TopBar title="Upload" />
+            <TopBar
+                title="Upload"
+                description="Find the ZIP file that contains your coding projects. Open folders to browse their contents, or use the search bar to find a file by name."
+            />
 
-            {/* Header area — description, search, breadcrumbs */}
+            {/* Search bar, breadcrumbs */}
             <box
                 flexDirection="column"
                 paddingLeft={2}
@@ -233,54 +236,36 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                 gap={1}
                 paddingBottom={1}
             >
-                <text>
-                    <span fg={theme.textSecondary}>
-                        {
-                            "Select a ZIP file containing your project repositories."
-                        }
-                    </span>
-                </text>
-
-                 {/* Search bar + Browse — hidden during scan */}
+                 {/* Search bar — hidden during scan */}
                  {scanStatus !== "scanning" ? (
                      <box
-                         borderBottom
-                         borderTop={false}
-                         borderLeft={false}
-                         borderRight={false}
-                         borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
+                         border
+                         borderStyle="single"
+                         borderColor={isSearchFocused ? theme.gold : theme.bgLight}
+                         backgroundColor={theme.bgMedium}
                          paddingLeft={1}
-                         paddingBottom={1}
+                         paddingRight={1}
                          flexDirection="row"
-                         alignItems="center"
-                         gap={1}
-                         onMouseDown={() => setIsSearchFocused(true)}
                      >
-                         <text>
-                             <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
-                                 {"🔍"}
-                             </span>
-                         </text>
+                         <box width={3} onMouseDown={() => setIsSearchFocused(true)}>
+                             <text>
+                                 <span fg={isSearchFocused ? theme.gold : theme.textDim}>{"🔍"}</span>
+                             </text>
+                         </box>
                          <input
                              value={searchQuery}
                              onChange={setSearchQuery}
                              placeholder="Search for ZIP files..."
                              focused={isSearchFocused}
-                             backgroundColor={theme.bgDark}
-                             focusedBackgroundColor={theme.bgDark}
+                             backgroundColor={theme.bgMedium}
+                             focusedBackgroundColor={theme.bgMedium}
                              textColor={theme.textPrimary}
                              focusedTextColor={theme.textPrimary}
                              cursorColor={theme.cyan}
                              placeholderColor={theme.textDim}
                              flexGrow={1}
+                             onMouseDown={() => setIsSearchFocused(true)}
                          />
-                         {searchQuery ? (
-                             <text>
-                                 <span fg={theme.cyan}>
-                                     {searchResults.length} matches
-                                 </span>
-                             </text>
-                         ) : null}
                      </box>
                  ) : null}
 
@@ -428,7 +413,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                 </box>
             ) : (
                 /* Miller columns */
-                <box flexGrow={1} flexDirection="row" padding={1} gap={0}>
+                <box flexGrow={1} flexDirection="row" padding={1} gap={0} maxHeight="70%">
                     {visibleColumns.map((col, colIdx) => {
                         const entries = columnEntries[colIdx] ?? [];
                         const realColIdx = visibleStartIndex + colIdx;
