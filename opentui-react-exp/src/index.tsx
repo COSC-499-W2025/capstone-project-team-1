@@ -1,6 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { ConsentScreen } from "./components/ConsentScreen";
@@ -42,11 +42,17 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	],
 };
 
-
 function App() {
 	const renderer = useRenderer();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
+	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
+
+	useEffect(() => {
+		if (screen === "landing") {
+			setIsLandingIntroPhase(true);
+		}
+	}, [screen]);
 
 	// Global keyboard handler
 	useKeyboard((key) => {
@@ -100,7 +106,12 @@ function App() {
 	const renderScreen = () => {
 		switch (screen) {
 			case "landing":
-				return <Landing onGetStarted={() => setScreen("consent")} />;
+				return (
+					<Landing
+						onGetStarted={() => setScreen("consent")}
+						onIntroPhaseChange={setIsLandingIntroPhase}
+					/>
+				);
 
 			case "consent":
 				return (
@@ -151,16 +162,25 @@ function App() {
 		}
 	};
 
-	const screenNav: Record<string, { onBack?: () => void; onForward?: () => void; forwardLabel?: string }> = {
-		landing: { onForward: () => setScreen("consent"), forwardLabel: "Get Started" },
+	const screenNav: Record<
+		string,
+		{ onBack?: () => void; onForward?: () => void; forwardLabel?: string }
+	> = {
+		landing: {},
 		consent: { onBack: () => setScreen("landing") },
 		"file-upload": { onBack: () => setScreen("consent") },
-		"project-list": { onBack: () => setScreen("file-upload"), onForward: () => setScreen("analysis"), forwardLabel: "Analyze" },
+		"project-list": {
+			onBack: () => setScreen("file-upload"),
+			onForward: () => setScreen("analysis"),
+			forwardLabel: "Analyze",
+		},
 		analysis: {},
 		"resume-preview": { onBack: () => setScreen("analysis") },
 	};
 
 	const nav = screenNav[screen] ?? {};
+	const visibleActions =
+		screen === "landing" && isLandingIntroPhase ? [] : screenActions[screen];
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -169,7 +189,7 @@ function App() {
 
 			{/* Bottom bar */}
 			<BottomBar
-				actions={screenActions[screen]}
+				actions={visibleActions}
 				onBack={nav.onBack}
 				onForward={nav.onForward}
 				forwardLabel={nav.forwardLabel}
@@ -184,5 +204,5 @@ createRoot(renderer).render(
 		<ToastProvider>
 			<App />
 		</ToastProvider>
-	</AppProvider>
+	</AppProvider>,
 );
