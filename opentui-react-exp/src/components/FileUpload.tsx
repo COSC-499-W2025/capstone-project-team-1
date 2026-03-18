@@ -261,48 +261,68 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                     </span>
                 </text>
 
-                 {/* Search bar — hidden during scan */}
+                 {/* Search bar + Browse — hidden during scan */}
                  {scanStatus !== "scanning" ? (
-                     <box
-                         borderBottom
-                         borderTop={false}
-                         borderLeft={false}
-                         borderRight={false}
-                         borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
-                         paddingLeft={1}
-                         paddingBottom={1}
-                         flexDirection="row"
-                         alignItems="center"
-                         gap={1}
-                         onMouseDown={() => setIsSearchFocused(true)}
-                     >
-                         <text>
-                             <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
-                                 {"🔍"}
-                             </span>
-                         </text>
-                        <input
-                            value={searchQuery}
-                            onChange={setSearchQuery}
-                            placeholder="Search for ZIP files..."
-                            focused={isSearchFocused}
-                            backgroundColor={theme.bgDark}
-                            focusedBackgroundColor={theme.bgDark}
-                            textColor={theme.textPrimary}
-                            focusedTextColor={theme.textPrimary}
-                            cursorColor={theme.cyan}
-                            placeholderColor={theme.textDim}
-                            flexGrow={1}
-                        />
-                        {searchQuery ? (
-                            <text>
-                                <span fg={theme.cyan}>
-                                    {searchResults.length} matches
-                                </span>
-                            </text>
-                        ) : null}
-                    </box>
-                ) : null}
+                     <box flexDirection="row" alignItems="center" gap={2}>
+                         <box
+                             borderBottom
+                             borderTop={false}
+                             borderLeft={false}
+                             borderRight={false}
+                             borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
+                             paddingLeft={1}
+                             paddingBottom={1}
+                             flexDirection="row"
+                             alignItems="center"
+                             gap={1}
+                             flexGrow={1}
+                             onMouseDown={() => setIsSearchFocused(true)}
+                         >
+                             <text>
+                                 <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
+                                     {"🔍"}
+                                 </span>
+                             </text>
+                             <input
+                                 value={searchQuery}
+                                 onChange={setSearchQuery}
+                                 placeholder="Search for ZIP files..."
+                                 focused={isSearchFocused}
+                                 backgroundColor={theme.bgDark}
+                                 focusedBackgroundColor={theme.bgDark}
+                                 textColor={theme.textPrimary}
+                                 focusedTextColor={theme.textPrimary}
+                                 cursorColor={theme.cyan}
+                                 placeholderColor={theme.textDim}
+                                 flexGrow={1}
+                             />
+                             {searchQuery ? (
+                                 <text>
+                                     <span fg={theme.cyan}>
+                                         {searchResults.length} matches
+                                     </span>
+                                 </text>
+                             ) : null}
+                         </box>
+                         <box
+                             border
+                             borderStyle="rounded"
+                             borderColor={theme.gold}
+                             paddingLeft={2}
+                             paddingRight={2}
+                             onMouseDown={() => {
+                                 const path = openNativeZipPicker();
+                                 if (path) onSubmit(path);
+                             }}
+                         >
+                             <text>
+                                 <span fg={theme.gold}>
+                                     <strong>{"Browse"}</strong>
+                                 </span>
+                             </text>
+                         </box>
+                     </box>
+                 ) : null}
 
                 {/* Breadcrumbs */}
                 {!searchQuery && scanStatus !== "scanning" ? (
