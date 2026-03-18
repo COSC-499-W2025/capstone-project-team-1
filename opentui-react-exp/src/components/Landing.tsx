@@ -23,6 +23,10 @@ const getRandomSubtitle = () => {
 
 const TITLE_SEQUENCE = [getRandomSubtitle(), "ARTIFACT MINER"];
 const CTA_TEXT = "Get Started";
+const INTRO_ANIMATION_SLOWDOWN = 1.5;
+
+const scaleTiming = (ms: number) =>
+	Math.round(ms * INTRO_ANIMATION_SLOWDOWN);
 
 // Gold color cycle for pulsing border glow
 const glowColors = [
@@ -56,17 +60,17 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 			if (titleText.length < targetText.length) {
 				timer = setTimeout(() => {
 					setTitleText(targetText.slice(0, titleText.length + 1));
-				}, 80);
+				}, scaleTiming(80));
 			} else {
 				timer = setTimeout(() => {
 					setTitlePhase("pause");
-				}, 700);
+				}, scaleTiming(700));
 			}
 		} else if (titlePhase === "deleting") {
 			if (titleText.length > 0) {
 				timer = setTimeout(() => {
 					setTitleText(titleText.slice(0, -1));
-				}, 45);
+				}, scaleTiming(45));
 			} else {
 				setTitlePhase("typing");
 				setTitleIndex((index) => index + 1);
@@ -79,7 +83,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 
 			timer = setTimeout(() => {
 				setTitlePhase("deleting");
-			}, 700);
+			}, scaleTiming(700));
 		}
 
 		return () => {
@@ -93,7 +97,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 	useEffect(() => {
 		const glowInterval = setInterval(() => {
 			setGlowIndex((i) => (i + 1) % glowColors.length);
-		}, 400);
+		}, scaleTiming(400));
 		return () => clearInterval(glowInterval);
 	}, []);
 
@@ -107,11 +111,11 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 		const fadeStep = 1 / 12;
 		const fadeInterval = setInterval(() => {
 			setCtaOpacity((value) => Math.min(1, value + fadeStep));
-		}, 50);
+		}, scaleTiming(50));
 
 		const rippleInterval = setInterval(() => {
 			setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
-		}, 60);
+		}, scaleTiming(60));
 
 		return () => {
 			clearInterval(rippleInterval);
