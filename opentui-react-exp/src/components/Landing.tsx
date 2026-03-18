@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-// import { TopBar } from "./TopBar";
 import { theme } from "../types";
 
 interface LandingProps {
@@ -8,10 +7,8 @@ interface LandingProps {
 }
 
 const SUBTITLE_OPTIONS = [
-	// "Projects become portfolio",
 	"We build your narrative",
 	"Your repos, rewritten by us",
-	// "From terminal to timeline",
 	"Proof of work, now polished by us",
 	"Turning your TODOs to ta-das",
 ];
@@ -24,9 +21,12 @@ const getRandomSubtitle = () => {
 const TITLE_SEQUENCE = [getRandomSubtitle(), "ARTIFACT MINER"];
 const CTA_TEXT = "Get Started";
 const INTRO_ANIMATION_SLOWDOWN = 1.5;
+const CTA_CHARACTERS = CTA_TEXT.split("").map((char, index) => ({
+	id: `cta-${char}-${index}`,
+	char,
+}));
 
-const scaleTiming = (ms: number) =>
-	Math.round(ms * INTRO_ANIMATION_SLOWDOWN);
+const scaleTiming = (ms: number) => Math.round(ms * INTRO_ANIMATION_SLOWDOWN);
 
 // Gold color cycle for pulsing border glow
 const glowColors = [
@@ -70,7 +70,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 			if (titleText.length > 0) {
 				timer = setTimeout(() => {
 					setTitleText(titleText.slice(0, -1));
-				}, scaleTiming(45));
+				}, scaleTiming(25));
 			} else {
 				setTitlePhase("typing");
 				setTitleIndex((index) => index + 1);
@@ -114,7 +114,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 		}, scaleTiming(50));
 
 		const rippleInterval = setInterval(() => {
-			setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6)); // +6 for pause at end
+			setRippleIndex((i) => (i + 1) % (CTA_TEXT.length + 6));
 		}, scaleTiming(60));
 
 		return () => {
@@ -128,7 +128,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 	}, [enableCtaRipple, onIntroPhaseChange]);
 
 	const renderCtaText = () =>
-		CTA_TEXT.split("").map((char, i) => {
+		CTA_CHARACTERS.map(({ id, char }, i) => {
 			const distance = Math.abs(i - rippleIndex);
 
 			let color: string;
@@ -143,7 +143,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 			}
 
 			return (
-				<span key={i} fg={color}>
+				<span key={id} fg={color}>
 					{char}
 				</span>
 			);
@@ -162,18 +162,19 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 	};
 
 	return (
-		<box flexGrow={1} flexDirection="column" backgroundColor="#000000">
-			{/* <TopBar
-        step="ARTIFACT MINER"
-        title="Welcome"
-        description="Transform your code into a professional resume"
-      /> */}
+		<box
+			flexGrow={1}
+			flexDirection="column"
+			backgroundColor="#000000"
+			position="relative"
+		>
+			{/* Wandering mascot appears after intro */}
 			<box
 				flexGrow={1}
 				flexDirection="column"
 				alignItems="center"
 				justifyContent="center"
-				gap={3}
+				gap={2}
 			>
 				{/* Title Section with typewriter effect */}
 				<box
@@ -181,7 +182,7 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 					alignItems="center"
 					justifyContent="center"
 					gap={1}
-					height={8}
+					height={9}
 				>
 					<box flexDirection="row" alignItems="flex-end" gap={1}>
 						{renderTitle()}
@@ -191,34 +192,30 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 				{/* Get Started Button with pulsing glow */}
 				{enableCtaRipple ? (
 					<box
-						border
-						borderStyle="rounded"
-						borderColor={glowColors[glowIndex]}
-						backgroundColor="#1a1a00"
-						paddingLeft={4}
-						paddingRight={4}
-						paddingTop={1}
-						paddingBottom={1}
-						onMouseDown={onGetStarted}
+						flexDirection="column"
+						alignItems="center"
+						gap={1}
 						style={{ opacity: ctaOpacity }}
+						zIndex={1}
 					>
-						<text>
-							<strong>{renderCtaText()}</strong>
-						</text>
+						{/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes act as clickable terminal widgets. */}
+						<box
+							border
+							borderStyle="rounded"
+							borderColor={glowColors[glowIndex]}
+							backgroundColor="#1a1a00"
+							paddingLeft={4}
+							paddingRight={4}
+							paddingTop={1}
+							paddingBottom={1}
+							onMouseDown={onGetStarted}
+						>
+							<text>
+								<strong>{renderCtaText()}</strong>
+							</text>
+						</box>
 					</box>
 				) : null}
-
-				{/* Feature highlights */}
-				{/* <box flexDirection="column" alignItems="center" gap={0} marginTop={2}>
-        <text>
-          <span fg={theme.cyan}>Upload</span>
-          <span fg={theme.textDim}> your projects </span>
-          <span fg={theme.cyan}>→</span>
-          <span fg={theme.textDim}> Analyze code </span>
-          <span fg={theme.cyan}>→</span>
-          <span fg={theme.textDim}> Generate resume</span>
-        </text>
-      </box> */}
 			</box>
 		</box>
 	);
