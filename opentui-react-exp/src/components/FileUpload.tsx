@@ -258,24 +258,18 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                 {/* Search bar — hidden during scan */}
                 {scanStatus !== "scanning" ? (
                     <box
-                        border
-                        borderStyle="rounded"
-                        borderColor={
-                            isSearchFocused ? theme.cyan : theme.bgLight
-                        }
-                        paddingLeft={1}
-                        paddingRight={1}
                         flexDirection="row"
                         alignItems="center"
+                        backgroundColor={theme.bgMedium}
+                        paddingLeft={2}
+                        paddingRight={2}
+                        border={["left"]}
+                        borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
                         onMouseDown={() => setIsSearchFocused(true)}
                     >
                         <text>
-                            <span
-                                fg={
-                                    isSearchFocused ? theme.cyan : theme.textDim
-                                }
-                            >
-                                {"🔍"}
+                            <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
+                                {"🔍 "}
                             </span>
                         </text>
                         <input
@@ -283,9 +277,13 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                             onChange={setSearchQuery}
                             placeholder="Search for ZIP files..."
                             focused={isSearchFocused}
+                            focusedBackgroundColor={theme.bgMedium}
+                            backgroundColor={theme.bgMedium}
+                            textColor={theme.textPrimary}
+                            focusedTextColor={theme.textPrimary}
+                            cursorColor={theme.cyan}
+                            placeholderColor={theme.textDim}
                             flexGrow={1}
-                            marginLeft={1}
-                            paddingRight={1}
                         />
                         {searchQuery ? (
                             <text>
