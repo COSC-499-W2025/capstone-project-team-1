@@ -255,23 +255,26 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                     </span>
                 </text>
 
-                {/* Search bar — hidden during scan */}
-                {scanStatus !== "scanning" ? (
-                    <box
-                        flexDirection="row"
-                        alignItems="center"
-                        backgroundColor={theme.bgMedium}
-                        paddingLeft={2}
-                        paddingRight={2}
-                        border={["left"]}
-                        borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
-                        onMouseDown={() => setIsSearchFocused(true)}
-                    >
-                        <text>
-                            <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
-                                {"🔍 "}
-                            </span>
-                        </text>
+                 {/* Search bar — hidden during scan */}
+                 {scanStatus !== "scanning" ? (
+                     <box
+                         borderBottom
+                         borderTop={false}
+                         borderLeft={false}
+                         borderRight={false}
+                         borderColor={isSearchFocused ? theme.cyan : theme.bgLight}
+                         paddingLeft={1}
+                         paddingBottom={1}
+                         flexDirection="row"
+                         alignItems="center"
+                         gap={1}
+                         onMouseDown={() => setIsSearchFocused(true)}
+                     >
+                         <text>
+                             <span fg={isSearchFocused ? theme.cyan : theme.textDim}>
+                                 {"🔍"}
+                             </span>
+                         </text>
                         <input
                             value={searchQuery}
                             onChange={setSearchQuery}
