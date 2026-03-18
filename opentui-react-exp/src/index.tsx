@@ -27,7 +27,6 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	"file-upload": [
 		{ key: "↑/↓", label: "Navigate" },
 		{ key: "Enter", label: "Open/Select" },
-		{ key: "o", label: "Browse" },
 		{ key: "Esc", label: "Back" },
 	],
 	"project-list": [
