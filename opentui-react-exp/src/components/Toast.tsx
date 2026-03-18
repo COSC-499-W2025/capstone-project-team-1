@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from "react";
-import { useTerminalDimensions } from "@opentui/react";
+import { useTerminalDimensions, useTimeline } from "@opentui/react";
 import { theme } from "../types";
 
 type ToastVariant = "info" | "success" | "warning" | "error";
 
 interface ToastOptions {
-	message: string;
+	message: ReactNode;
 	title?: string;
 	variant?: ToastVariant;
 	/** Auto-dismiss duration in ms. Default 5000 */
@@ -58,39 +58,67 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 	return (
 		<ToastContext.Provider value={{ show, error, dismiss }}>
 			{children}
-			{toast ? <ToastDisplay toast={toast} onDismiss={dismiss} /> : null}
+			{toast ? (
+				<box position="absolute" top={2} right={2}>
+					<ToastDisplay toast={toast} onDismiss={dismiss} />
+				</box>
+			) : null}
 		</ToastContext.Provider>
 	);
 }
 
+const VARIANT_ICONS: Record<ToastVariant, string> = {
+	info: "💡",
+	success: "✅",
+	warning: "⚠️",
+	error: "❌",
+};
+
 function ToastDisplay({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void }) {
 	const { width } = useTerminalDimensions();
 	const color = VARIANT_COLORS[toast.variant];
+	const [offset, setOffset] = useState(40);
+
+	const timeline = useTimeline();
+
+	useEffect(() => {
+		timeline.add(
+			{ offset: 40 },
+			{
+				offset: 0,
+				duration: 200,
+				ease: "easeInCubic",
+				onUpdate: (anim) => {
+					setOffset(Math.round(anim.targets[0].offset));
+				},
+			},
+		);
+	}, []);
 
 	return (
-		<box
-			position="absolute"
-			top={2}
-			right={2}
-			maxWidth={Math.min(60, width - 6)}
-			paddingLeft={2}
-			paddingRight={2}
-			paddingTop={1}
-			paddingBottom={1}
-			backgroundColor={theme.bgMedium}
-			borderLeft
-			borderRight
-			borderTop={false}
-			borderBottom={false}
-			borderColor={color}
-			onMouseDown={onDismiss}
-		>
-			{toast.title ? (
-				<text fg={theme.textPrimary}>
-					<strong>{toast.title}</strong>
+		<box position="relative" left={offset}>
+			<box
+				maxWidth={Math.min(60, width - 6)}
+				paddingLeft={2}
+				paddingRight={2}
+				paddingTop={1}
+				paddingBottom={1}
+				backgroundColor={toast.variant === "success" ? "#0a2e0a" : toast.variant === "error" ? "#2e0a0a" : theme.bgMedium}
+				border
+				borderStyle="rounded"
+				borderColor={color}
+				onMouseDown={onDismiss}
+			>
+				{toast.title ? (
+					<text>
+						<span fg={color}><strong>{toast.title}</strong></span>
+					</text>
+				) : null}
+				<text>
+					<span fg={color}>{VARIANT_ICONS[toast.variant]} </span>
+					<span fg={theme.textPrimary}>{toast.message}</span>
 				</text>
-			) : null}
-			<text fg={theme.textSecondary}>{toast.message}</text>
+			</box>
 		</box>
 	);
 }
