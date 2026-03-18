@@ -1,5 +1,6 @@
 import { useKeyboard } from "@opentui/react";
 import { homedir } from "node:os";
+import { spawnSync } from "bun";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
@@ -12,6 +13,20 @@ import {
     type DirEntry,
     type SearchableEntry,
 } from "../utils";
+
+function openNativeZipPicker(): string | null {
+    const script = `
+try
+    set theFile to choose file of type {"zip"} with prompt "Select a ZIP file" default location (POSIX file "${homedir()}/Downloads")
+    return POSIX path of theFile
+on error number -128
+    return "USER_CANCELLED"
+end try`;
+    const result = spawnSync(["osascript", "-e", script]);
+    const output = result.stdout.toString().trim();
+    if (result.exitCode !== 0 || output === "USER_CANCELLED") return null;
+    return output;
+}
 
 interface FileUploadProps {
     onSubmit: (path: string) => void;
