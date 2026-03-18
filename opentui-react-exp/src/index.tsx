@@ -8,6 +8,7 @@ import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
 import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
+import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
@@ -181,6 +182,8 @@ function App() {
 const renderer = await createCliRenderer();
 createRoot(renderer).render(
 	<AppProvider>
-		<App />
+		<ToastProvider>
+			<App />
+		</ToastProvider>
 	</AppProvider>
 );
