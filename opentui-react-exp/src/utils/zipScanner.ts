@@ -188,10 +188,12 @@ export function buildEntries(
 		});
 	}
 
-	// Add directories that contain ZIPs
+	// Add directories that contain ZIPs (skip hidden folders)
 	const childDirs = getChildDirsWithZips(zips, currentPath);
 	for (const dir of childDirs) {
-		result.push(dir);
+		if (!dir.name.startsWith(".")) {
+			result.push(dir);
+		}
 	}
 
 	// Add ZIPs in current directory
