@@ -275,17 +275,10 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar title="Consent" />
-
-			<box paddingLeft={4} paddingRight={4} paddingBottom={1}>
-				<text>
-					<span fg={theme.textSecondary}>
-						{"Before we analyze your projects, please choose how you'd like your data to be processed. "}
-						{"Each option below offers a different balance of privacy and quality. "}
-						{"Your source code never leaves your machine regardless of which option you choose."}
-					</span>
-				</text>
-			</box>
+			<TopBar
+				title="Consent"
+				description="Before we analyze your projects, please choose how you'd like your data to be processed. Each option below offers a different balance of privacy and quality. Your source code never leaves your machine regardless of which option you choose."
+			/>
 
 			<box
 				flexGrow={1}

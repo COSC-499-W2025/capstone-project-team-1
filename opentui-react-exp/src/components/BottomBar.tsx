@@ -1,14 +1,22 @@
-import type { KeyAction } from "../types";
+import type { KeyAction, Screen } from "../types";
 import { theme } from "../types";
+
+export interface Breadcrumb {
+	screen: Screen;
+	label: string;
+	visited: boolean;
+}
 
 interface BottomBarProps {
 	actions: KeyAction[];
-	onBack?: () => void;
+	breadcrumbs?: Breadcrumb[];
+	currentScreen?: Screen;
+	onNavigate?: (screen: Screen) => void;
 	onForward?: () => void;
 	forwardLabel?: string;
 }
 
-export function BottomBar({ actions, onBack, onForward, forwardLabel = "Continue" }: BottomBarProps) {
+export function BottomBar({ actions, breadcrumbs, currentScreen, onNavigate, onForward, forwardLabel = "Continue" }: BottomBarProps) {
 	return (
 		<box
 			width="100%"
@@ -19,19 +27,44 @@ export function BottomBar({ actions, onBack, onForward, forwardLabel = "Continue
 			height={1}
 			backgroundColor={theme.bgDark}
 		>
-			{/* Left: back button */}
-			<box width={10}>
-				{onBack ? (
-					<box onMouseDown={onBack}>
-						<text>
-							<span fg={theme.textDim}>{"‹ back"}</span>
-						</text>
-					</box>
-				) : null}
+			{/* Left: breadcrumbs */}
+			<box flexDirection="row" alignItems="center">
+				{breadcrumbs?.map((crumb, i) => {
+					const isCurrent = crumb.screen === currentScreen;
+					const canClick = crumb.visited && !isCurrent;
+					const color = isCurrent
+						? theme.gold
+						: crumb.visited
+							? theme.textSecondary
+							: theme.textDim;
+
+					return (
+						<box key={crumb.screen} flexDirection="row">
+							{/* biome-ignore lint/a11y/noStaticElementInteractions: breadcrumb nav */}
+							<box
+								onMouseDown={canClick ? () => onNavigate?.(crumb.screen) : undefined}
+							>
+								<text>
+									<span fg={color}>
+										{isCurrent ? <strong>{crumb.label}</strong> : crumb.label}
+									</span>
+								</text>
+							</box>
+							{i < breadcrumbs.length - 1 ? (
+								<text>
+									<span fg={theme.textDim}>{" › "}</span>
+								</text>
+							) : null}
+						</box>
+					);
+				})}
 			</box>
 
-			{/* Center: keyboard shortcuts */}
-			<box flexGrow={1} flexDirection="row" justifyContent="center" gap={3}>
+			{/* Spacer */}
+			<box flexGrow={1} />
+
+			{/* Right: keyboard shortcuts + forward button */}
+			<box flexDirection="row" alignItems="center" gap={3}>
 				{actions.map((action, index) => (
 					<box key={index} flexDirection="row" gap={1}>
 						<text>
@@ -42,10 +75,6 @@ export function BottomBar({ actions, onBack, onForward, forwardLabel = "Continue
 						</text>
 					</box>
 				))}
-			</box>
-
-			{/* Right: forward button */}
-			<box width={14}>
 				{onForward ? (
 					<box onMouseDown={onForward}>
 						<text>
