@@ -280,8 +280,8 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
                             onChange={setSearchQuery}
                             placeholder="Search for ZIP files..."
                             focused={isSearchFocused}
-                            focusedBackgroundColor={theme.bgMedium}
-                            backgroundColor={theme.bgMedium}
+                            backgroundColor={theme.bgDark}
+                            focusedBackgroundColor={theme.bgDark}
                             textColor={theme.textPrimary}
                             focusedTextColor={theme.textPrimary}
                             cursorColor={theme.cyan}
