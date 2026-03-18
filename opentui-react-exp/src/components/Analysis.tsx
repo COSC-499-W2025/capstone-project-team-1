@@ -57,11 +57,7 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Step 3"
-				title="Analysis"
-				description="Mining artifacts and generating insights..."
-			/>
+			<TopBar title="Analysis" />
 
 			{/* Main content */}
 			<box

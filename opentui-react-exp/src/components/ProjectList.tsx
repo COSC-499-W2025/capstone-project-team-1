@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { mockProjects } from "../data/mockProjects";
 import { type Project, theme } from "../types";
+import { ClickableList } from "../utils/mouse";
 import { TopBar } from "./TopBar";
 
 interface ProjectListProps {
@@ -19,11 +20,7 @@ export function ProjectList({
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Step 2"
-				title="Review Detected Projects"
-				description="Select a project to see details."
-			/>
+			<TopBar title="Projects" />
 
 			{/* Split view */}
 			<box flexGrow={1} flexDirection="row">
@@ -48,17 +45,19 @@ export function ProjectList({
 						</text>
 					</box>
 
-					<select
-						options={projects.map((p) => ({
-							name: p.name,
-							description: `${p.language} • ${p.commits} commits`,
-							value: p.id,
+					<ClickableList
+						items={projects.map((p) => ({
+							id: p.id,
+							label: p.name,
+							description: `${p.language} · ${p.commits} commits`,
 						}))}
-						onChange={(index) => setSelectedIndex(index)}
-						selectedIndex={selectedIndex}
-						focused
+						selectedId={selectedProject?.id ?? null}
+						onSelect={(_id, index) => setSelectedIndex(index)}
 						height={16}
-						showScrollIndicator
+						selectedTextColor={theme.gold}
+						selectedRowBg={theme.bgMedium}
+						evenRowBg={theme.bgDark}
+						oddRowBg="#111111"
 					/>
 				</box>
 

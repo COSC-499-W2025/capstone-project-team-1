@@ -38,6 +38,7 @@ interface ConsentPanelProps {
 	description: string;
 	sections: Section[];
 	ratings: RatingItem[];
+	onSelect: () => void;
 }
 
 function ConsentPanel({
@@ -48,6 +49,7 @@ function ConsentPanel({
 	description,
 	sections,
 	ratings,
+	onSelect,
 }: ConsentPanelProps) {
 	const isSelected = selected === level;
 	const borderColor = isSelected ? theme.gold : theme.textDim;
@@ -64,6 +66,7 @@ function ConsentPanel({
 			borderColor={borderColor}
 			backgroundColor={bgColor}
 			gap={1}
+			onMouseDown={onSelect}
 		>
 			<text>
 				<span fg={titleColor}>
@@ -227,6 +230,16 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 	const [selected, setSelected] = useState<ConsentLevel>("local-llm");
 	const [saving, setSaving] = useState(false);
 
+	const handleConfirm = () => {
+		if (saving) return;
+		setSaving(true);
+		api.updateConsent(selected).then(() => {
+			onContinue();
+		}).catch(() => {
+			setSaving(false);
+		});
+	};
+
 	useEffect(() => {
 		let ignore = false;
 		api.getConsent().then((resp) => {
@@ -253,12 +266,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 			});
 		}
 		if (key.name === "return") {
-			setSaving(true);
-			api.updateConsent(selected).then(() => {
-				onContinue();
-			}).catch(() => {
-				setSaving(false);
-			});
+			handleConfirm();
 		}
 		if (key.name === "escape") {
 			onBack();
@@ -267,11 +275,17 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Privacy"
-				title="Analysis Mode"
-				description="Choose how your project data is processed. All options keep your source code on-device."
-			/>
+			<TopBar title="Consent" />
+
+			<box paddingLeft={4} paddingRight={4} paddingBottom={1}>
+				<text>
+					<span fg={theme.textSecondary}>
+						{"Before we analyze your projects, please choose how you'd like your data to be processed. "}
+						{"Each option below offers a different balance of privacy and quality. "}
+						{"Your source code never leaves your machine regardless of which option you choose."}
+					</span>
+				</text>
+			</box>
 
 			<box
 				flexGrow={1}
@@ -283,8 +297,32 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 				paddingBottom={1}
 			>
 				{PANELS.map((panel) => (
-					<ConsentPanel key={panel.level} {...panel} selected={selected} />
+					<ConsentPanel
+						key={panel.level}
+						{...panel}
+						selected={selected}
+						onSelect={() => setSelected(panel.level)}
+					/>
 				))}
+			</box>
+
+			{/* Confirm button */}
+			<box flexDirection="row" justifyContent="center">
+				<box
+					border
+					borderStyle="rounded"
+					borderColor={saving ? theme.textDim : theme.gold}
+					backgroundColor={saving ? theme.bgDark : "#1a1a00"}
+					paddingLeft={2}
+					paddingRight={2}
+					onMouseDown={handleConfirm}
+				>
+					<text>
+						<span fg={saving ? theme.textDim : theme.gold}>
+							<strong>{saving ? "Saving..." : "Confirm"}</strong>
+						</span>
+					</text>
+				</box>
 			</box>
 		</box>
 	);

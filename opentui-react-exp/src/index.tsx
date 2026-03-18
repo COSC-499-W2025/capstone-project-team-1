@@ -27,7 +27,6 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "↑/↓", label: "Navigate" },
 		{ key: "Enter", label: "Open/Select" },
 		{ key: "Backspace", label: "Up" },
-		{ key: "Ctrl+H", label: "Hidden" },
 		{ key: "Esc", label: "Back" },
 	],
 	"project-list": [
@@ -42,6 +41,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Esc", label: "Exit" },
 	],
 };
+
 
 function App() {
 	const renderer = useRenderer();
@@ -151,13 +151,29 @@ function App() {
 		}
 	};
 
+	const screenNav: Record<string, { onBack?: () => void; onForward?: () => void; forwardLabel?: string }> = {
+		landing: { onForward: () => setScreen("consent"), forwardLabel: "Get Started" },
+		consent: { onBack: () => setScreen("landing") },
+		"file-upload": { onBack: () => setScreen("consent") },
+		"project-list": { onBack: () => setScreen("file-upload"), onForward: () => setScreen("analysis"), forwardLabel: "Analyze" },
+		analysis: {},
+		"resume-preview": { onBack: () => setScreen("analysis") },
+	};
+
+	const nav = screenNav[screen] ?? {};
+
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			{/* Main content area */}
 			<box flexGrow={1}>{renderScreen()}</box>
 
-			{/* Bottom bar with keyboard shortcuts */}
-			<BottomBar actions={screenActions[screen]} />
+			{/* Bottom bar */}
+			<BottomBar
+				actions={screenActions[screen]}
+				onBack={nav.onBack}
+				onForward={nav.onForward}
+				forwardLabel={nav.forwardLabel}
+			/>
 		</box>
 	);
 }
