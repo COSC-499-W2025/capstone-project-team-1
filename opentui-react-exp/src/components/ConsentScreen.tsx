@@ -6,7 +6,7 @@ import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ConsentScreenProps {
-	onContinue: () => void;
+	onContinue: (level?: ConsentLevel) => void;
 	onBack: () => void;
 }
 
@@ -235,7 +235,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		if (saving) return;
 		setSaving(true);
 		api.updateConsent(selected).then(() => {
-			onContinue();
+			onContinue(selected);
 		}).catch(() => {
 			setSaving(false);
 		});
