@@ -27,17 +27,11 @@ export function CloudResumePreview({
 					viewportOptions: { padding: 2 },
 				}}
 			>
-				<box
-					flexDirection="column"
-					border
-					borderStyle="rounded"
-					borderColor={theme.gold}
-					padding={2}
-				>
-					<text>
-						<span fg={theme.textSecondary}>{markdown}</span>
-					</text>
-				</box>
+				<code
+					code={markdown}
+					language="markdown"
+					backgroundColor={theme.bgDark}
+				/>
 			</scrollbox>
 		</box>
 	);
