@@ -1,4 +1,3 @@
-import { SyntaxStyle, RGBA } from "@opentui/core";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -8,25 +7,82 @@ interface CloudResumePreviewProps {
 	onRestart: () => void;
 }
 
-const syntaxStyle = SyntaxStyle.fromStyles({
-	"markup.heading.1": { fg: RGBA.fromHex(theme.gold), bold: true },
-	"markup.heading.2": { fg: RGBA.fromHex(theme.cyan), bold: true },
-	"markup.heading.3": { fg: RGBA.fromHex(theme.cyan), bold: true },
-	"markup.heading": { fg: RGBA.fromHex(theme.cyan), bold: true },
-	"markup.list": { fg: RGBA.fromHex(theme.textSecondary) },
-	"markup.bold": { fg: RGBA.fromHex(theme.textPrimary), bold: true },
-	"markup.strong": { fg: RGBA.fromHex(theme.textPrimary), bold: true },
-	"markup.italic": { fg: RGBA.fromHex(theme.textSecondary), italic: true },
-	"markup.raw": { fg: RGBA.fromHex(theme.gold) },
-	"markup.link": { fg: RGBA.fromHex(theme.cyan), underline: true },
-	default: { fg: RGBA.fromHex(theme.textSecondary) },
-});
+interface MdBlock {
+	type: "h1" | "h2" | "h3" | "paragraph" | "bullet" | "blank";
+	text: string;
+}
+
+function parseMarkdown(raw: string): MdBlock[] {
+	const blocks: MdBlock[] = [];
+	for (const line of raw.split("\n")) {
+		if (line.startsWith("### ")) {
+			blocks.push({ type: "h3", text: line.slice(4) });
+		} else if (line.startsWith("## ")) {
+			blocks.push({ type: "h2", text: line.slice(3) });
+		} else if (line.startsWith("# ")) {
+			blocks.push({ type: "h1", text: line.slice(2) });
+		} else if (line.startsWith("- ")) {
+			blocks.push({ type: "bullet", text: line.slice(2) });
+		} else if (line.trim() === "") {
+			blocks.push({ type: "blank", text: "" });
+		} else {
+			blocks.push({ type: "paragraph", text: line });
+		}
+	}
+	return blocks;
+}
+
+/**
+ * Render inline markdown: **bold** and `code`.
+ * Splits text on bold/code markers and returns styled spans.
+ */
+function InlineText({ text }: { text: string }) {
+	const parts: JSX.Element[] = [];
+	const pattern = /\*\*(.+?)\*\*|`(.+?)`/g;
+	let last = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = pattern.exec(text)) !== null) {
+		if (match.index > last) {
+			parts.push(
+				<span key={`t${last}`} fg={theme.textSecondary}>
+					{text.slice(last, match.index)}
+				</span>,
+			);
+		}
+		if (match[1] !== undefined) {
+			parts.push(
+				<span key={`b${match.index}`} fg={theme.textPrimary}>
+					<strong>{match[1]}</strong>
+				</span>,
+			);
+		} else if (match[2] !== undefined) {
+			parts.push(
+				<span key={`c${match.index}`} fg={theme.gold}>
+					{match[2]}
+				</span>,
+			);
+		}
+		last = match.index + match[0].length;
+	}
+	if (last < text.length) {
+		parts.push(
+			<span key={`t${last}`} fg={theme.textSecondary}>
+				{text.slice(last)}
+			</span>,
+		);
+	}
+
+	return <text>{parts}</text>;
+}
 
 export function CloudResumePreview({
 	markdown,
 	onBack,
 	onRestart,
 }: CloudResumePreviewProps) {
+	const blocks = parseMarkdown(markdown);
+
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
@@ -42,11 +98,59 @@ export function CloudResumePreview({
 					viewportOptions: { padding: 2 },
 				}}
 			>
-				<markdown
-					content={markdown}
-					syntaxStyle={syntaxStyle}
-					conceal
-				/>
+				<box flexDirection="column" gap={0}>
+					{blocks.map((block, i) => {
+						switch (block.type) {
+							case "h1":
+								return (
+									<box key={i} paddingBottom={1}>
+										<text>
+											<span fg={theme.gold}>
+												<strong>{block.text}</strong>
+											</span>
+										</text>
+									</box>
+								);
+							case "h2":
+								return (
+									<box key={i} paddingTop={1}>
+										<text>
+											<span fg={theme.cyan}>
+												<strong>{block.text}</strong>
+											</span>
+										</text>
+									</box>
+								);
+							case "h3":
+								return (
+									<box key={i} paddingTop={1}>
+										<text>
+											<span fg={theme.cyan}>
+												{block.text}
+											</span>
+										</text>
+									</box>
+								);
+							case "bullet":
+								return (
+									<box key={i} paddingLeft={2}>
+										<text>
+											<span fg={theme.textDim}>• </span>
+										</text>
+										<InlineText text={block.text} />
+									</box>
+								);
+							case "blank":
+								return <box key={i} height={1} />;
+							case "paragraph":
+								return (
+									<box key={i}>
+										<InlineText text={block.text} />
+									</box>
+								);
+						}
+					})}
+				</box>
 			</scrollbox>
 		</box>
 	);
