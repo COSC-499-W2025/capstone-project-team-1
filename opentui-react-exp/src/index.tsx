@@ -3,6 +3,8 @@ import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
+import { CloudGeneration } from "./components/CloudGeneration";
+import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
@@ -10,6 +12,7 @@ import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
+import type { ConsentLevel } from "./api/types";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
@@ -52,12 +55,20 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
 	],
+	"cloud-generation": [{ key: "Esc", label: "Back" }],
+	"cloud-resume": [
+		{ key: "↑/↓", label: "Scroll" },
+		{ key: "r", label: "Restart" },
+		{ key: "Esc", label: "Exit" },
+	],
 };
 
 function App() {
 	const renderer = useRenderer();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
+	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
+	const [cloudMarkdown, setCloudMarkdown] = useState("");
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 
@@ -124,6 +135,18 @@ function App() {
 					renderer.destroy();
 				}
 				break;
+
+			case "cloud-generation":
+				// CloudGeneration handles its own keyboard
+				break;
+
+			case "cloud-resume":
+				if (key.name === "r") {
+					setScreen("landing");
+				} else if (key.name === "escape") {
+					renderer.destroy();
+				}
+				break;
 		}
 	});
 
@@ -140,7 +163,8 @@ function App() {
 			case "consent":
 				return (
 					<ConsentScreen
-						onContinue={() => {
+						onContinue={(level?: ConsentLevel) => {
+							if (level) setConsentLevel(level);
 							setScreen("file-upload");
 						}}
 						onBack={() => setScreen("landing")}
@@ -152,7 +176,11 @@ function App() {
 					<FileUpload
 						onSubmit={(path) => {
 							setFilePath(path);
-							setScreen("project-list");
+							if (consentLevel === "cloud") {
+								setScreen("cloud-generation");
+							} else {
+								setScreen("project-list");
+							}
 						}}
 						onBack={() => setScreen("consent")}
 					/>
@@ -180,6 +208,27 @@ function App() {
 					<ResumePreview
 						data={mockResumeData}
 						onBack={() => setScreen("analysis")}
+						onRestart={() => setScreen("landing")}
+					/>
+				);
+
+			case "cloud-generation":
+				return (
+					<CloudGeneration
+						zipPath={filePath}
+						onComplete={(md) => {
+							setCloudMarkdown(md);
+							setScreen("cloud-resume");
+						}}
+						onBack={() => setScreen("file-upload")}
+					/>
+				);
+
+			case "cloud-resume":
+				return (
+					<CloudResumePreview
+						markdown={cloudMarkdown}
+						onBack={() => setScreen("cloud-generation")}
 						onRestart={() => setScreen("landing")}
 					/>
 				);
