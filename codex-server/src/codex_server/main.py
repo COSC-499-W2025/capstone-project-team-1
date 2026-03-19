@@ -36,6 +36,21 @@ async def codex_status() -> dict:
     }
 
 
+@app.get("/codex/account")
+async def read_account():
+    return await codex.read_account()
+
+
+@app.post("/codex/account/login")
+async def login():
+    return await codex.login_chatgpt()
+
+
+@app.post("/codex/account/logout")
+async def logout():
+    return await codex.logout()
+
+
 class ThreadRequest(BaseModel):
     instructions: str | None = None
 
