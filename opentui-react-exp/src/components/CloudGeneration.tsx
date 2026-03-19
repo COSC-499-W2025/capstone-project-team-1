@@ -89,8 +89,16 @@ export function CloudGeneration({
 			} catch (err) {
 				if (cancelled) return;
 				setPhase("error");
+				const msg =
+					err instanceof Error ? err.message : "Unknown error occurred";
+				const isConnErr =
+					msg.includes("Unable to connect") ||
+					msg.includes("ECONNREFUSED") ||
+					msg.includes("fetch failed");
 				setError(
-					err instanceof Error ? err.message : "Unknown error occurred",
+					isConnErr
+						? "Codex server is not running. Start it with:\n  cd codex-server && uv run uvicorn codex_server.main:app --host 127.0.0.1 --port 8100"
+						: msg,
 				);
 			}
 		}
