@@ -160,11 +160,17 @@ class CodexProcess:
 
     # -- high-level thread / turn API -----------------------------------------
 
-    async def start_thread(self, instructions: str | None = None) -> str:
+    async def start_thread(
+        self,
+        instructions: str | None = None,
+        cwd: str | None = None,
+    ) -> str:
         """Create a new conversation thread. Returns the thread ID."""
         params: dict = {"approvalPolicy": "never"}
         if instructions:
             params["baseInstructions"] = instructions
+        if cwd:
+            params["cwd"] = cwd
         resp = await self.send_request("thread/start", params)
         thread = resp["result"]["thread"]
         thread_id: str = thread["id"]
