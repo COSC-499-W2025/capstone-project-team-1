@@ -191,36 +191,37 @@ const PANELS: PanelConfig[] = [
 	{
 		level: "cloud",
 		title: "Cloud AI",
-		subtitle: "coming soon",
-		description: "Static analysis plus a cloud model. Best quality, no local storage needed.",
+		subtitle: "uses ChatGPT",
+		description: "Uses your ChatGPT subscription via Codex. Best quality, no local model needed.",
 		sections: [
 			{
-				heading: "What gets sent",
+				heading: "What Codex sees",
 				headingColor: theme.cyan,
 				items: [
-					{ text: "· File & technology names" },
-					{ text: "· Commit messages" },
-					{ text: "· Summaries & metrics" },
-					{ text: "Sent to an external AI service.", color: theme.textDim },
+					{ text: "· Your full project source code" },
+					{ text: "· Commit history & messages" },
+					{ text: "· README files & documentation" },
+					{ text: "Analyzed by OpenAI Codex.", color: theme.textDim },
 				],
 			},
 			{
 				heading: "Privacy",
 				headingColor: theme.gold,
 				items: [
-					{ text: "Metadata leaves your device." },
-					{ text: "Subject to provider's data policy." },
-					{ text: "Raw source code is never sent.", color: theme.textDim },
+					{ text: "Code is sent to OpenAI servers." },
+					{ text: "Subject to OpenAI's data policy." },
+					{ text: "Uses your ChatGPT Plus/Pro plan.", color: theme.textDim },
 				],
 			},
 		],
 		ratings: [
 			{ text: " + Best quality results", color: theme.success },
-			{ text: " + No local setup or storage", color: theme.success },
-			{ text: " ~ Not yet available", color: theme.warning },
+			{ text: " + No local model download", color: theme.success },
+			{ text: " + Uses existing ChatGPT plan", color: theme.success },
 			{ text: " - Requires network", color: theme.warning },
-			{ text: " - Data leaves device", color: theme.warning },
+			{ text: " - Code leaves your device", color: theme.warning },
 		],
+		onSelect: () => {},
 	},
 ];
 
