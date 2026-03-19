@@ -18,6 +18,27 @@ class ProcessState(str, Enum):
     ERROR = "error"
 
 
+class TurnResult:
+    """Accumulates streamed output for a single turn."""
+
+    def __init__(self) -> None:
+        self.text: str = ""
+        self.status: str = "inProgress"
+        self.error: str | None = None
+        self._done: asyncio.Event = asyncio.Event()
+
+    def append_delta(self, delta: str) -> None:
+        self.text += delta
+
+    def complete(self, status: str, error: str | None = None) -> None:
+        self.status = status
+        self.error = error
+        self._done.set()
+
+    async def wait(self) -> None:
+        await self._done.wait()
+
+
 class CodexProcess:
     """Lifecycle wrapper around `codex app-server` over stdio."""
 
@@ -28,6 +49,8 @@ class CodexProcess:
         self._request_id: int = 0
         self._pending: dict[int, asyncio.Future[dict]] = {}
         self._reader_task: asyncio.Task | None = None
+        # track active turns: turn_id -> TurnResult
+        self._turns: dict[str, TurnResult] = {}
 
     # -- public properties ---------------------------------------------------
 
@@ -99,6 +122,41 @@ class CodexProcess:
         self._proc = None
         self._state = ProcessState.STOPPED
         self._pending.clear()
+
+    # -- high-level thread / turn API -----------------------------------------
+
+    async def start_thread(self, instructions: str | None = None) -> str:
+        """Create a new conversation thread. Returns the thread ID."""
+        params: dict = {"approvalPolicy": "never"}
+        if instructions:
+            params["baseInstructions"] = instructions
+        resp = await self.send_request("thread/start", params)
+        thread = resp["result"]["thread"]
+        thread_id: str = thread["id"]
+        log.info("thread started: %s", thread_id)
+        return thread_id
+
+    async def send_turn(self, thread_id: str, message: str) -> TurnResult:
+        """Send a user message and wait for the full agent response."""
+        resp = await self.send_request(
+            "turn/start",
+            {
+                "threadId": thread_id,
+                "input": [{"type": "text", "text": message}],
+            },
+        )
+        turn = resp["result"]["turn"]
+        turn_id: str = turn["id"]
+
+        result = TurnResult()
+        self._turns[turn_id] = result
+
+        # Wait for turn/completed notification
+        await result.wait()
+
+        # Clean up
+        self._turns.pop(turn_id, None)
+        return result
 
     # -- JSON-RPC communication -----------------------------------------------
 
@@ -172,6 +230,26 @@ class CodexProcess:
                 future.set_result(msg)
             return
 
-        # Server notification — log for now, hook handling comes later
+        # Server notification
         method = msg.get("method", "")
-        log.debug("notification: %s", method)
+        params = msg.get("params", {})
+
+        if method == "item/agentMessage/delta":
+            turn_id = params.get("turnId", "")
+            turn_result = self._turns.get(turn_id)
+            if turn_result:
+                turn_result.append_delta(params.get("delta", ""))
+
+        elif method == "turn/completed":
+            turn = params.get("turn", {})
+            turn_id = turn.get("id", "")
+            turn_result = self._turns.get(turn_id)
+            if turn_result:
+                status = turn.get("status", "completed")
+                error = None
+                if turn.get("error"):
+                    error = turn["error"].get("message", "unknown error")
+                turn_result.complete(status, error)
+
+        else:
+            log.debug("notification: %s", method)
