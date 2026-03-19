@@ -42,14 +42,10 @@ export function CloudResumePreview({
 					viewportOptions: { padding: 2 },
 				}}
 			>
-				<code
+				<markdown
 					content={markdown}
-					filetype="markdown"
-					conceal
-					drawUnstyledText={false}
 					syntaxStyle={syntaxStyle}
-					fg={theme.textSecondary}
-					backgroundColor={theme.bgDark}
+					conceal
 				/>
 			</scrollbox>
 		</box>
