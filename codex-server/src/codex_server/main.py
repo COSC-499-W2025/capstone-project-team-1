@@ -127,8 +127,14 @@ async def generate_resume(body: GenerateRequest):
     # Send the resume generation prompt
     result = await codex.send_turn(thread_id, RESUME_PROMPT)
 
+    # Strip any preamble before the first markdown heading
+    text = result.text
+    heading_pos = text.find("\n#")
+    if heading_pos != -1:
+        text = text[heading_pos + 1:]
+
     return {
-        "markdown": result.text,
+        "markdown": text,
         "status": result.status,
         "error": result.error,
     }
