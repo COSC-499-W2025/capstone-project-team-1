@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import logging
+import tempfile
+import zipfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from codex_server.process import CodexProcess
@@ -72,6 +75,60 @@ async def create_turn(body: TurnRequest):
     result = await codex.send_turn(body.thread_id, body.message)
     return {
         "text": result.text,
+        "status": result.status,
+        "error": result.error,
+    }
+
+
+RESUME_PROMPT = """\
+You are a resume writer. Analyze ALL the code, commits, README files, and \
+project structure in the current working directory. Then produce a polished \
+developer resume in Markdown format.
+
+The resume MUST include:
+- A professional summary (2-3 sentences)
+- A technical skills section grouped by category
+- A projects section with: name, description, technologies used, and \
+  key contributions (as bullet points)
+
+Output ONLY the Markdown resume — no explanations, no commentary.
+"""
+
+
+class GenerateRequest(BaseModel):
+    zip_path: str
+
+
+def _safe_extract(zip_path: Path, dest: Path) -> None:
+    """Extract a ZIP file, guarding against zip-slip attacks."""
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        for member in zf.namelist():
+            target = (dest / member).resolve()
+            if not str(target).startswith(str(dest.resolve())):
+                raise HTTPException(400, f"Unsafe path in ZIP: {member}")
+        zf.extractall(dest)
+
+
+@app.post("/codex/generate")
+async def generate_resume(body: GenerateRequest):
+    zip_file = Path(body.zip_path)
+    if not zip_file.exists():
+        raise HTTPException(404, f"ZIP file not found: {body.zip_path}")
+    if not zipfile.is_zipfile(zip_file):
+        raise HTTPException(400, f"Not a valid ZIP file: {body.zip_path}")
+
+    # Extract to a temporary directory
+    tmp = tempfile.mkdtemp(prefix="codex-gen-")
+    _safe_extract(zip_file, Path(tmp))
+
+    # Create a thread pointed at the extracted directory
+    thread_id = await codex.start_thread(cwd=tmp)
+
+    # Send the resume generation prompt
+    result = await codex.send_turn(thread_id, RESUME_PROMPT)
+
+    return {
+        "markdown": result.text,
         "status": result.status,
         "error": result.error,
     }
