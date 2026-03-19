@@ -133,7 +133,7 @@ export function CloudResumePreview({
 								);
 							case "bullet":
 								return (
-									<box key={i} paddingLeft={2}>
+									<box key={i} paddingLeft={2} flexDirection="row">
 										<text>
 											<span fg={theme.textDim}>• </span>
 										</text>
