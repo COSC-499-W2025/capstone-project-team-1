@@ -51,6 +51,9 @@ class CodexProcess:
         self._reader_task: asyncio.Task | None = None
         # track active turns: turn_id -> TurnResult
         self._turns: dict[str, TurnResult] = {}
+        # login flow synchronization
+        self._login_event: asyncio.Event = asyncio.Event()
+        self._login_result: dict = {}
 
     # -- public properties ---------------------------------------------------
 
@@ -122,6 +125,38 @@ class CodexProcess:
         self._proc = None
         self._state = ProcessState.STOPPED
         self._pending.clear()
+
+    # -- authentication -------------------------------------------------------
+
+    async def read_account(self) -> dict:
+        """Return the current account state from Codex."""
+        resp = await self.send_request("account/read", {})
+        return resp.get("result", {})
+
+    async def login_chatgpt(self) -> dict:
+        """Start the ChatGPT OAuth login flow managed by Codex.
+
+        Codex opens a browser for the user to authenticate. The response
+        returns immediately with a login ID; completion arrives via the
+        account/login/completed notification.
+        """
+        self._login_event = asyncio.Event()
+        self._login_result: dict = {}
+        resp = await self.send_request(
+            "account/login/start",
+            {"type": "chatgpt"},
+        )
+        result = resp.get("result", {})
+        log.info("login/start response: %s", result)
+
+        # Wait for the account/login/completed notification
+        await self._login_event.wait()
+        return self._login_result
+
+    async def logout(self) -> dict:
+        """Log out of the current Codex account."""
+        resp = await self.send_request("account/logout", {})
+        return resp.get("result", {})
 
     # -- high-level thread / turn API -----------------------------------------
 
@@ -239,6 +274,10 @@ class CodexProcess:
             turn_result = self._turns.get(turn_id)
             if turn_result:
                 turn_result.append_delta(params.get("delta", ""))
+
+        elif method == "account/login/completed":
+            self._login_result = params
+            self._login_event.set()
 
         elif method == "turn/completed":
             turn = params.get("turn", {})
