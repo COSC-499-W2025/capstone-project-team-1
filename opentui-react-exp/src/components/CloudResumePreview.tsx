@@ -1,3 +1,11 @@
+import { useEffect, useRef } from "react";
+import {
+	MarkdownRenderable,
+	SyntaxStyle,
+	RGBA,
+	type BoxRenderable,
+} from "@opentui/core";
+import { useRenderer } from "@opentui/react";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
@@ -7,11 +15,46 @@ interface CloudResumePreviewProps {
 	onRestart: () => void;
 }
 
+const syntaxStyle = SyntaxStyle.fromStyles({
+	"markup.heading.1": { fg: RGBA.fromHex(theme.gold), bold: true },
+	"markup.heading.2": { fg: RGBA.fromHex(theme.cyan), bold: true },
+	"markup.heading.3": { fg: RGBA.fromHex(theme.cyan), bold: true },
+	"markup.list": { fg: RGBA.fromHex(theme.textSecondary) },
+	"markup.bold": { fg: RGBA.fromHex(theme.textPrimary), bold: true },
+	"markup.italic": { fg: RGBA.fromHex(theme.textSecondary), italic: true },
+	"markup.raw": { fg: RGBA.fromHex(theme.gold) },
+	default: { fg: RGBA.fromHex(theme.textSecondary) },
+});
+
 export function CloudResumePreview({
 	markdown,
 	onBack,
 	onRestart,
 }: CloudResumePreviewProps) {
+	const renderer = useRenderer();
+	const containerRef = useRef<BoxRenderable>(null);
+	const mdRef = useRef<MarkdownRenderable | null>(null);
+
+	useEffect(() => {
+		const container = containerRef.current;
+		if (!container) return;
+
+		const md = new MarkdownRenderable(renderer, {
+			id: "resume-md",
+			content: markdown,
+			syntaxStyle,
+			conceal: true,
+		});
+		mdRef.current = md;
+		container.add(md);
+
+		return () => {
+			container.remove(md);
+			md.destroy();
+			mdRef.current = null;
+		};
+	}, [renderer, markdown]);
+
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
@@ -27,11 +70,7 @@ export function CloudResumePreview({
 					viewportOptions: { padding: 2 },
 				}}
 			>
-				<code
-					code={markdown}
-					language="markdown"
-					backgroundColor={theme.bgDark}
-				/>
+				<box ref={containerRef} flexDirection="column" />
 			</scrollbox>
 		</box>
 	);
