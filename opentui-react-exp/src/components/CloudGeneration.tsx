@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { platform } from "node:os";
 import { useEffect, useRef, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import {
@@ -10,6 +12,19 @@ import {
 import { api } from "../api/endpoints";
 import { theme } from "../types";
 import { TopBar } from "./TopBar";
+
+/** Open a URL in the user's default browser (macOS, Linux, Windows). */
+function openInBrowser(url: string): void {
+	const os = platform();
+	const cmd =
+		os === "darwin" ? "open"
+		: os === "win32" ? "cmd"
+		: "xdg-open";
+	const args =
+		os === "win32" ? ["/c", "start", "", url]
+		: [url];
+	spawn(cmd, args, { detached: true, stdio: "ignore" }).unref();
+}
 
 interface CloudGenerationProps {
 	zipPath: string;
