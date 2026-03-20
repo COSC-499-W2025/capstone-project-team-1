@@ -29,6 +29,8 @@ from .local_llm_schemas import (
     ContributorIdentity,
     GenerationStartRequest,
     GenerationStartResponse,
+    GenerationStatusResponse,
+    GenerationTelemetry,
     IntakeCreateRequest,
     IntakeCreateResponse,
     RepositoryCandidate,
@@ -503,4 +505,75 @@ async def start_generation(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start generation: {str(e)}",
+        )
+"""
+note that the data is initally returned with null/zero values
+its expected that a background worker would need to update the job as it processes. 
+"""
+@router.get("/generation/status", response_model=GenerationStatusResponse)
+async def get_generation_status() -> GenerationStatusResponse:
+    """Get the current status of the active generation job.
+    
+    Returns the real-time status of an in-flight generation, including
+    current stage, progress metrics (telemetry), draft output, and errors.
+    This endpoint supports polling-based monitoring of the generation pipeline.
+
+    Returns:
+        GenerationStatusResponse with current job state, or 404 if no active generation
+
+    Raises:
+        HTTPException: 404 if no active generation job exists
+    """
+    global _active_generation_id
+
+    try:
+        # Check if there's an active generation
+        if not _active_generation_id or _active_generation_id not in _generation_jobs:
+            raise ValueError("No active generation job found")
+
+        # Retrieve the job state
+        job_data = _generation_jobs[_active_generation_id]
+
+        # Build response from stored job state
+        # Initialize telemetry with defaults if not present
+        telemetry_data = job_data.get("telemetry", {})
+        if not telemetry_data:
+            telemetry_data = {
+                "stage": "ANALYZE",
+                "active_model": None,
+                "repos_total": len(job_data.get("repo_ids", [])),
+                "repos_done": 0,
+                "current_repo": None,
+                "facts_total": 0,
+                "draft_projects": 0,
+                "polished_projects": 0,
+                "elapsed_seconds": 0.0,
+                "model_check_seconds": 0.0,
+                "selected_repos": job_data.get("repo_ids", []),
+            }
+
+        telemetry = GenerationTelemetry(**telemetry_data)
+
+        return GenerationStatusResponse(
+            status=job_data.get("status", "queued"),
+            stage=telemetry.stage,
+            messages=job_data.get("messages", []),
+            telemetry=telemetry,
+            draft=job_data.get("draft"),
+            output=job_data.get("output"),
+            error=job_data.get("error"),
+        )
+
+    except ValueError as e:
+        # No active generation is a 404
+        raise HTTPException(
+            status_code=404,
+            detail=str(e),
+        )
+
+    except Exception as e:
+        # Internal server error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve generation status: {str(e)}",
         )
