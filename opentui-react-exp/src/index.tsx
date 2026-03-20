@@ -12,6 +12,7 @@ import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
+import { useSelectionCopy } from "./hooks/useSelectionCopy";
 import type { ConsentLevel } from "./api/types";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
@@ -65,6 +66,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 
 function App() {
 	const renderer = useRenderer();
+	useSelectionCopy();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
 	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
