@@ -48,6 +48,11 @@ export interface DirectoriesResponse {
 	cleanedfilespath: string[];
 }
 
+export interface ExtractLocalResponse {
+	zip_id: number;
+	extraction_path: string;
+}
+
 export interface ProjectTimelineItem {
 	id: number;
 	project_name: string;
