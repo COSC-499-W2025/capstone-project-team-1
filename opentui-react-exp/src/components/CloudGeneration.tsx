@@ -126,6 +126,7 @@ export function CloudGeneration({
 			await loginCopilot({
 				onAuth: (info) => {
 					setDeviceUrl(info.url);
+					openInBrowser(info.url);
 					if (info.instructions) {
 						// Extract just the code from "Enter code: XXXX-XXXX"
 						const code = info.instructions.replace("Enter code: ", "");
@@ -245,16 +246,23 @@ export function CloudGeneration({
 				>
 					{deviceUrl && deviceCode ? (
 						<>
-							{/* Instructions */}
+							{/* Browser opened notice */}
+							<text>
+								<span fg={theme.success}>
+									✓ Opened GitHub in your browser
+								</span>
+							</text>
+
+							{/* Fallback URL */}
 							<box flexDirection="column" alignItems="center" gap={1}>
 								<text>
-									<span fg={theme.textSecondary}>
-										Open this URL in your browser:
+									<span fg={theme.textDim}>
+										If it didn't open, go to:
 									</span>
 								</text>
 								<text>
 									<span fg={theme.cyan}>
-										<strong>{deviceUrl}</strong>
+										<strong><u>{deviceUrl}</u></strong>
 									</span>
 								</text>
 							</box>
