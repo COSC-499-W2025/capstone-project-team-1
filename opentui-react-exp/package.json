@@ -19,6 +19,7 @@
 		"typescript": "^5"
 	},
 	"dependencies": {
+		"@mariozechner/pi-coding-agent": "^0.60.0",
 		"@opentui/core": "^0.1.88",
 		"@opentui/react": "^0.1.88",
 		"fdir": "^6.5.0",
