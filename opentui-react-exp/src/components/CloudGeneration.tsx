@@ -74,6 +74,13 @@ export function CloudGeneration({
 
 	// Check auth on mount
 	useEffect(() => {
+		// HACK: skip real auth check for TUI development
+		// TODO: remove this and restore the real flow
+		setPhase("copilot-login");
+		setDeviceUrl("https://github.com/login/device");
+		setDeviceCode("ABCD-1234");
+		return;
+
 		let cancelled = false;
 
 		async function check() {
@@ -126,7 +133,7 @@ export function CloudGeneration({
 			await loginCopilot({
 				onAuth: (info) => {
 					setDeviceUrl(info.url);
-					openInBrowser(info.url);
+					// openInBrowser(info.url); // TODO: restore after TUI dev
 					if (info.instructions) {
 						// Extract just the code from "Enter code: XXXX-XXXX"
 						const code = info.instructions.replace("Enter code: ", "");
