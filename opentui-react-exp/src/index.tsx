@@ -3,7 +3,7 @@ import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
-import { CloudGeneration } from "./components/CloudGeneration";
+import { CloudFlow } from "./components/cloud-ai";
 import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
@@ -216,7 +216,7 @@ function App() {
 
 			case "cloud-generation":
 				return (
-					<CloudGeneration
+					<CloudFlow
 						zipPath={filePath}
 						onComplete={(md) => {
 							setCloudMarkdown(md);
