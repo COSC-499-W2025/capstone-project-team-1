@@ -260,7 +260,7 @@ export function CloudGeneration({
 										If it didn't open, go to:
 									</span>
 								</text>
-								<text>
+								<text selectable>
 									<span fg={theme.cyan}>
 										<strong><u>{deviceUrl}</u></strong>
 									</span>
@@ -277,7 +277,7 @@ export function CloudGeneration({
 								paddingTop={1}
 								paddingBottom={1}
 							>
-								<text>
+								<text selectable>
 									<span fg={theme.textDim}>Enter code: </span>
 									<span fg={theme.gold}>
 										<strong>{deviceCode}</strong>
@@ -483,7 +483,7 @@ export function CloudGeneration({
 						width={60}
 						height={6}
 					>
-						<text wrap>
+						<text wrap selectable>
 							<span fg={theme.textDim}>
 								{streamedText.slice(-200)}
 							</span>
@@ -500,7 +500,7 @@ export function CloudGeneration({
 						padding={2}
 						width={60}
 					>
-						<text wrap>
+						<text wrap selectable>
 							<span fg={theme.error}>{error}</span>
 						</text>
 					</box>
