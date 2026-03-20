@@ -10,7 +10,8 @@ import {
 	type AgentSession,
 	type AgentSessionEvent,
 	createAgentSession,
-	createCodingTools,
+	createBashTool,
+	createReadOnlyTools,
 	DefaultResourceLoader,
 	ModelRegistry,
 	SessionManager,
@@ -121,7 +122,7 @@ export async function createResumeSession(
 		cwd,
 		model,
 		thinkingLevel: "off",
-		tools: createCodingTools(cwd),
+		tools: [...createReadOnlyTools(cwd), createBashTool(cwd)],
 		resourceLoader: loader,
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
