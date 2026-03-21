@@ -82,3 +82,29 @@ class InvalidLLMResponseError(LocalLLMRuntimeError):
     def __init__(self, message: str, raw_response: str | None = None) -> None:
         self.raw_response = raw_response
         super().__init__(message)
+
+
+class EmptyLLMResponseError(InvalidLLMResponseError):
+    """Raised when the model returns an empty content payload."""
+
+    pass
+
+
+class MalformedJSONResponseError(InvalidLLMResponseError):
+    """Raised when the model response is not valid JSON."""
+
+    pass
+
+
+class SchemaValidationResponseError(InvalidLLMResponseError):
+    """Raised when parsed JSON does not satisfy the requested schema/type."""
+
+    def __init__(
+        self,
+        message: str,
+        raw_response: str | None = None,
+        *,
+        validation_error: Exception | None = None,
+    ) -> None:
+        self.validation_error = validation_error
+        super().__init__(message, raw_response=raw_response)
