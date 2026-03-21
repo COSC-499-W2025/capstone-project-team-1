@@ -24,6 +24,7 @@ from ..helpers.zip_utils import safe_extract_zip
 from fastapi import APIRouter, HTTPException
 
 from .local_llm_schemas import (
+    CancellationResponse,
     ContributorDiscoveryRequest,
     ContributorDiscoveryResponse,
     ContributorIdentity,
@@ -504,3 +505,35 @@ async def start_generation(
             status_code=500,
             detail=f"Failed to start generation: {str(e)}",
         )
+
+
+@router.post("/generation/cancel", response_model=CancellationResponse)
+async def cancel_generation() -> CancellationResponse:
+    """Cancel the current active local generation job.
+
+    This operation is idempotent. If there is no active generation job,
+    it returns a typed response with ok=False and status=cancelled.
+
+    Returns:
+        CancellationResponse describing the post-cancel state.
+    """
+    global _active_generation_id
+
+    # No active job to cancel.
+    if _active_generation_id is None:
+        return CancellationResponse(ok=False, status="cancelled")
+
+    active_job = _generation_jobs.get(_active_generation_id)
+
+    # If active pointer is stale, clear it and report no-op cancellation.
+    if active_job is None:
+        _active_generation_id = None
+        return CancellationResponse(ok=False, status="cancelled")
+
+    # Idempotent repeat-cancel behavior.
+    if active_job.get("status") == "cancelled":
+        return CancellationResponse(ok=True, status="cancelled")
+
+    active_job["status"] = "cancelled"
+    _active_generation_id = None
+    return CancellationResponse(ok=True, status="cancelled")
