@@ -12,6 +12,7 @@ from .errors import InferenceRequestError, InvalidLLMResponseError
 from .process_manager import ensure_server, get_server_status
 
 _LOCAL_MODEL_ID = "local"
+_SERVER_READY_LOCK = asyncio.Lock()
 
 
 def _build_client(port: int) -> AsyncOpenAI:
@@ -60,8 +61,9 @@ def _extract_text_content(response: Any) -> str:
 async def query_llm_text(prompt: str, model: str = DEFAULT_MODEL_NAME) -> str:
     """Generate plain text from the active local llama-server runtime."""
 
-    await asyncio.to_thread(ensure_server, model)
-    status = get_server_status()
+    async with _SERVER_READY_LOCK:
+        await asyncio.to_thread(ensure_server, model)
+        status = get_server_status()
     if not status.is_running or not status.is_healthy or status.server_port is None:
         raise InferenceRequestError(
             f"Local LLM runtime is not ready for model '{model}'.",
@@ -89,12 +91,15 @@ async def query_llm_text(prompt: str, model: str = DEFAULT_MODEL_NAME) -> str:
         request_kwargs["extra_body"] = extra_body
 
     try:
-        response = await client.chat.completions.create(**request_kwargs)
-    except Exception as exc:  # pragma: no cover - concrete exceptions are SDK-dependent
-        raise InferenceRequestError(
-            f"Local LLM inference request failed for model '{model}': "
-            f"{type(exc).__name__}: {exc}",
-            model=model,
-        ) from exc
+        try:
+            response = await client.chat.completions.create(**request_kwargs)
+        except Exception as exc:  # pragma: no cover - concrete exceptions are SDK-dependent
+            raise InferenceRequestError(
+                f"Local LLM inference request failed for model '{model}': "
+                f"{type(exc).__name__}: {exc}",
+                model=model,
+            ) from exc
+    finally:
+        await client.close()
 
     return _extract_text_content(response)
