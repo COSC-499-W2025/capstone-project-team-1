@@ -48,6 +48,38 @@ export function GenerationProgress({
 	useEffect(() => {
 		let cancelled = false;
 
+		// HACK: fake progress for TUI development
+		// TODO: remove this block and uncomment the real flow below
+		(async () => {
+			setPhase("extracting");
+			await new Promise((r) => setTimeout(r, 1500));
+			if (cancelled) return;
+
+			setPhase("generating");
+			setToolsUsed(["read", "bash", "grep"]);
+			setCurrentTool("bash");
+			await new Promise((r) => setTimeout(r, 1000));
+			if (cancelled) return;
+			setCurrentTool("read");
+			await new Promise((r) => setTimeout(r, 1000));
+			if (cancelled) return;
+			setCurrentTool(null);
+
+			const fakeText = "# Resume\n\n## Summary\nFull-stack developer with experience in React, Python, and cloud infrastructure...\n\n## Technical Skills\n- **Languages**: TypeScript, Python, Go\n- **Frameworks**: React, FastAPI, OpenTUI\n\n## Projects\n### Artifact Miner\n- Code analysis and resume generation tool\n- Built with FastAPI + React + OpenTUI";
+			for (const char of fakeText) {
+				if (cancelled) return;
+				resultRef.current += char;
+				setStreamedText((prev) => prev + char);
+				await new Promise((r) => setTimeout(r, 15));
+			}
+
+			if (cancelled) return;
+			setPhase("done");
+		})();
+
+		return () => { cancelled = true; };
+
+		/* REAL FLOW — uncomment when done with TUI dev
 		const onEvent = (event: ResumeEvent) => {
 			if (cancelled) return;
 			switch (event.type) {
@@ -103,6 +135,7 @@ export function GenerationProgress({
 		return () => {
 			cancelled = true;
 		};
+		*/
 	}, [zipPath]);
 
 	useKeyboard((key) => {
