@@ -18,22 +18,15 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 	const [spinnerIndex, setSpinnerIndex] = useState(0);
 	const abortRef = useRef<AbortController | null>(null);
 
-	// Spinner
 	useEffect(() => {
+		if (error) return;
 		const interval = setInterval(() => {
 			setSpinnerIndex((i) => (i + 1) % spinnerFrames.length);
 		}, 80);
 		return () => clearInterval(interval);
-	}, []);
+	}, [error]);
 
-	// Start device flow on mount
 	useEffect(() => {
-		// HACK: skip real auth for TUI development
-		// TODO: remove this and restore the real flow
-		setDeviceUrl("https://github.com/login/device");
-		setDeviceCode("ABCD-1234");
-		return;
-
 		const abortController = new AbortController();
 		abortRef.current = abortController;
 
@@ -42,7 +35,7 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 				await loginCopilot({
 					onAuth: (info) => {
 						setDeviceUrl(info.url);
-						// openInBrowser(info.url); // TODO: restore after TUI dev
+						openInBrowser(info.url);
 						if (info.instructions) {
 							const code = info.instructions.replace("Enter code: ", "");
 							setDeviceCode(code);
@@ -99,14 +92,12 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 					</box>
 				) : deviceUrl && deviceCode ? (
 					<>
-						{/* Browser opened notice */}
 						<text>
 							<span fg={theme.success}>
 								✓ Opened GitHub in your browser
 							</span>
 						</text>
 
-						{/* Fallback URL */}
 						<box flexDirection="column" alignItems="center" gap={1}>
 							<text>
 								<span fg={theme.textDim}>
@@ -120,7 +111,6 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 							</text>
 						</box>
 
-						{/* Device code */}
 						<box
 							border
 							borderStyle="rounded"
@@ -138,7 +128,6 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 							</text>
 						</box>
 
-						{/* Waiting indicator */}
 						<text>
 							<span fg={theme.cyan}>
 								{spinnerFrames[spinnerIndex]} Waiting for
@@ -160,7 +149,6 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 					</text>
 				)}
 
-				{/* Info for students */}
 				<box
 					border
 					borderStyle="rounded"

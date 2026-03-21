@@ -81,61 +81,6 @@ export function SnakeWithProgress({
 	useEffect(() => {
 		let cancelled = false;
 
-		// HACK: fake progress for TUI development
-		// TODO: remove this block and uncomment the real flow below
-		(async () => {
-			setPhase("extracting");
-			pushActivity("system", "Extracting ZIP archive...");
-			await new Promise((r) => setTimeout(r, 1200));
-			if (cancelled) return;
-			pushActivity("system", "3 repositories found");
-
-			setPhase("generating");
-			pushActivity("system", "Connecting to Claude Sonnet 4...");
-			await new Promise((r) => setTimeout(r, 800));
-			if (cancelled) return;
-
-			const fakeActions: [string, string][] = [
-				["bash", "ls -la"],
-				["read", "README.md"],
-				["bash", "git log --oneline -20"],
-				["grep", "import|require"],
-				["read", "package.json"],
-				["read", "src/index.tsx"],
-				["bash", "find . -name '*.py' | head"],
-				["read", "pyproject.toml"],
-				["bash", "git shortlog -sn"],
-				["read", "src/api/app.py"],
-				["grep", "def |class "],
-				["read", "tests/conftest.py"],
-			];
-
-			for (const [tool, detail] of fakeActions) {
-				if (cancelled) return;
-				setCurrentTool(tool);
-				setToolsUsed((prev) => prev.includes(tool) ? prev : [...prev, tool]);
-				pushActivity(tool, detail);
-				await new Promise((r) => setTimeout(r, 500 + Math.random() * 500));
-			}
-			if (cancelled) return;
-			setCurrentTool(null);
-			pushActivity("system", "Writing resume...");
-
-			const fakeText = "# Resume\n\n## Summary\nFull-stack developer with experience in React, Python, and cloud infrastructure.\n\n## Technical Skills\n- **Languages**: TypeScript, Python, Go\n- **Frameworks**: React, FastAPI, OpenTUI\n\n## Projects\n### Artifact Miner\n- Code analysis and resume generation\n- Built with FastAPI + React + OpenTUI\n- Deep repo analysis with skill extraction";
-			for (const char of fakeText) {
-				if (cancelled) return;
-				resultRef.current += char;
-				await new Promise((r) => setTimeout(r, 12));
-			}
-
-			if (cancelled) return;
-			pushActivity("system", "Resume complete!");
-			setPhase("done");
-		})();
-
-		return () => { cancelled = true; };
-
-		/* REAL FLOW — uncomment when done with TUI dev
 		const onEvent = (event: ResumeEvent) => {
 			if (cancelled) return;
 			switch (event.type) {
@@ -145,7 +90,7 @@ export function SnakeWithProgress({
 				case "tool_start":
 					setCurrentTool(event.toolName);
 					setToolsUsed((prev) => prev.includes(event.toolName) ? prev : [...prev, event.toolName]);
-					pushActivity(event.toolName, `Using ${event.toolName}...`);
+					pushActivity(event.toolName, `${event.toolName}...`);
 					break;
 				case "tool_end":
 					setCurrentTool(null);
@@ -167,18 +112,28 @@ export function SnakeWithProgress({
 				pushActivity("system", "Extracting ZIP archive...");
 				const { extraction_path } = await api.extractLocal(zipPath);
 				if (cancelled) return;
+				pushActivity("system", "Extraction complete");
 
 				setPhase("generating");
+				pushActivity("system", "Starting AI agent...");
 				await generateResume(extraction_path, onEvent);
 			} catch (err) {
 				if (cancelled) return;
 				setPhase("error");
-				setError(err instanceof Error ? err.message : String(err));
+				const msg = err instanceof Error ? err.message : String(err);
+				const isConnErr =
+					msg.includes("Unable to connect") ||
+					msg.includes("ECONNREFUSED") ||
+					msg.includes("fetch failed");
+				setError(
+					isConnErr
+						? "Backend server is not running. Start it with:\n  uv run uvicorn artifactminer.api.app:app"
+						: msg,
+				);
 			}
 		})();
 
 		return () => { cancelled = true; };
-		*/
 	}, [zipPath]);
 
 	useKeyboard(

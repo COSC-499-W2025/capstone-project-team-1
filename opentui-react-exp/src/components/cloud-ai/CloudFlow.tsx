@@ -1,12 +1,14 @@
 /**
  * Orchestrator for the cloud AI resume generation flow.
  *
- * Manages sub-screens: CopilotLogin → GenerationProgress → (parent handles resume preview)
+ * CopilotLogin → SnakeWithProgress → (parent handles resume preview)
+ *
+ * Checks for existing auth on mount — skips login if already authenticated.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { checkAvailableModels } from "../../agent";
 import { CopilotLogin } from "./CopilotLogin";
-import { GenerationProgress } from "./GenerationProgress";
+import { SnakeWithProgress } from "./SnakeWithProgress";
 
 interface CloudFlowProps {
 	zipPath: string;
@@ -14,12 +16,24 @@ interface CloudFlowProps {
 	onBack: () => void;
 }
 
-type Step = "auth" | "generate";
+type Step = "checking" | "auth" | "generate";
 
 export function CloudFlow({ zipPath, onComplete, onBack }: CloudFlowProps) {
-	// HACK: skip straight to generation screen for TUI dev
-	// TODO: change back to "auth"
-	const [step, setStep] = useState<Step>("generate");
+	const [step, setStep] = useState<Step>("checking");
+
+	// Check if already authenticated on mount
+	useEffect(() => {
+		(async () => {
+			try {
+				const result = await checkAvailableModels();
+				setStep(result.available ? "generate" : "auth");
+			} catch {
+				setStep("auth");
+			}
+		})();
+	}, []);
+
+	if (step === "checking") return null;
 
 	if (step === "auth") {
 		return (
@@ -31,7 +45,7 @@ export function CloudFlow({ zipPath, onComplete, onBack }: CloudFlowProps) {
 	}
 
 	return (
-		<GenerationProgress
+		<SnakeWithProgress
 			zipPath={zipPath}
 			onComplete={onComplete}
 			onBack={() => setStep("auth")}
