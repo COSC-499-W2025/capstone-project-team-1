@@ -13,6 +13,13 @@ import {
     type SearchableEntry,
 } from "../utils";
 
+interface FileUploadProps {
+    onSubmit: (path: string) => void | Promise<void>;
+    onBack: () => void;
+    /** Root path to scan for ZIPs. Defaults to homedir() */
+    scanRoot?: string;
+}
+
 type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
 interface Column {
