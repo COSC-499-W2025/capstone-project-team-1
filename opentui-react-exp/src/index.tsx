@@ -23,6 +23,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Confirm" },
 		{ key: "Esc", label: "Back" },
 	],
+	"consent-policy": [{ key: "Esc", label: "Back" }],
 	"file-upload": [
 		{ key: "↑/↓", label: "Navigate" },
 		{ key: "Enter", label: "Open/Select" },
@@ -35,7 +36,25 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Analyze" },
 		{ key: "Esc", label: "Back" },
 	],
+	identity: [
+		{ key: "↑/↓", label: "Navigate" },
+		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
+	"pipeline-launch": [
+		{ key: "Enter", label: "Start" },
+		{ key: "Esc", label: "Back" },
+	],
 	analysis: [{ key: "", label: "Processing..." }],
+	"draft-pause": [
+		{ key: "Enter", label: "Continue" },
+		{ key: "Esc", label: "Back" },
+	],
+	feedback: [
+		{ key: "Tab", label: "Next Field" },
+		{ key: "Enter", label: "Submit" },
+		{ key: "Esc", label: "Cancel" },
+	],
 	"resume-preview": [
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
@@ -67,6 +86,13 @@ function App() {
 
 			case "consent":
 				// Consent wizard handles its own keyboard events
+				break;
+
+			case "consent-policy":
+			case "identity":
+			case "pipeline-launch":
+			case "draft-pause":
+			case "feedback":
 				break;
 
 			case "file-upload":
@@ -148,6 +174,13 @@ function App() {
 						onRestart={() => setScreen("landing")}
 					/>
 				);
+
+			case "consent-policy":
+			case "identity":
+			case "pipeline-launch":
+			case "draft-pause":
+			case "feedback":
+				return null;
 		}
 	};
 
