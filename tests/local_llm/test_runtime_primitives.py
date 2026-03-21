@@ -21,13 +21,16 @@ from artifactminer.local_llm.runtime.config import (
     resolve_context_window,
 )
 from artifactminer.local_llm.runtime.errors import (
+    EmptyLLMResponseError,
     InferenceRequestError,
     InvalidLLMResponseError,
     LlamaServerNotFoundError,
     LocalLLMRuntimeError,
+    MalformedJSONResponseError,
     ModelNotFoundError,
     ModelServerCrashedError,
     ModelStartupTimeoutError,
+    SchemaValidationResponseError,
 )
 from artifactminer.local_llm.runtime.registry import (
     list_available_models,
@@ -47,13 +50,16 @@ def test_exports_are_stable() -> None:
         "DEFAULT_MODEL_NAME",
         "DEFAULT_MODELS_DIR",
         "DEFAULT_STARTUP_TIMEOUT_SECONDS",
+        "EmptyLLMResponseError",
         "InferenceRequestError",
         "InvalidLLMResponseError",
         "LlamaServerNotFoundError",
         "LocalLLMRuntimeError",
+        "MalformedJSONResponseError",
         "ModelNotFoundError",
         "ModelServerCrashedError",
         "ModelStartupTimeoutError",
+        "SchemaValidationResponseError",
         "check_health",
         "default_gpu_layers",
         "ensure_server",
@@ -62,6 +68,7 @@ def test_exports_are_stable() -> None:
         "list_available_models",
         "list_supported_models",
         "poll_until_healthy",
+        "query_llm_json",
         "query_llm_text",
         "resolve_context_window",
         "resolve_model_descriptor",
@@ -191,6 +198,11 @@ def test_error_classes() -> None:
     crashed = ModelServerCrashedError("qwen3.5-4b-q4", 137)
     request_failed = InferenceRequestError("request failed", model="qwen3.5-4b-q4")
     invalid = InvalidLLMResponseError("bad json", '{"oops":true}')
+    empty = EmptyLLMResponseError("empty", raw_response="")
+    malformed_json = MalformedJSONResponseError("invalid json", raw_response="{")
+    schema_invalid = SchemaValidationResponseError(
+        "schema validation failed", raw_response='{"name":"Ada"}'
+    )
     missing_binary = LlamaServerNotFoundError()
 
     for err in (
@@ -199,6 +211,9 @@ def test_error_classes() -> None:
         crashed,
         request_failed,
         invalid,
+        empty,
+        malformed_json,
+        schema_invalid,
         missing_binary,
     ):
         assert isinstance(err, LocalLLMRuntimeError)
@@ -208,7 +223,13 @@ def test_error_classes() -> None:
     assert "exit_code=137" in str(crashed)
     assert request_failed.model == "qwen3.5-4b-q4"
     assert invalid.raw_response == '{"oops":true}'
+    assert empty.raw_response == ""
+    assert malformed_json.raw_response == "{"
+    assert schema_invalid.raw_response == '{"name":"Ada"}'
     assert str(missing_binary) == "llama-server binary not found on PATH."
+    assert isinstance(empty, InvalidLLMResponseError)
+    assert isinstance(malformed_json, InvalidLLMResponseError)
+    assert isinstance(schema_invalid, InvalidLLMResponseError)
 
     assert str(ModelNotFoundError("x")) == "Model 'x' was not found."
     assert str(ModelNotFoundError("x", search_path, message="custom")) == "custom"
