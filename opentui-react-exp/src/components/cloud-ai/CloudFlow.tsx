@@ -17,7 +17,9 @@ interface CloudFlowProps {
 type Step = "auth" | "generate";
 
 export function CloudFlow({ zipPath, onComplete, onBack }: CloudFlowProps) {
-	const [step, setStep] = useState<Step>("auth");
+	// HACK: skip straight to generation screen for TUI dev
+	// TODO: change back to "auth"
+	const [step, setStep] = useState<Step>("generate");
 
 	if (step === "auth") {
 		return (
