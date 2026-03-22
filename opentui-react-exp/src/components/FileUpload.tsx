@@ -182,7 +182,24 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
             return;
         }
         if (isSearchFocused) {
-            // Only intercept Escape — let the input handle everything else
+            // Navigate search results with arrow keys / Enter
+            if (searchQuery && searchResults.length > 0) {
+                if (key.name === "up") {
+                    setSearchSelectedIndex((i) => Math.max(0, i - 1));
+                    return;
+                }
+                if (key.name === "down") {
+                    setSearchSelectedIndex((i) =>
+                        Math.min(searchResults.length - 1, i + 1),
+                    );
+                    return;
+                }
+                if (key.name === "return") {
+                    onSubmit(searchResults[searchSelectedIndex].fullPath);
+                    return;
+                }
+            }
+            // Let the input handle everything else
             return;
         }
 
