@@ -1,3 +1,4 @@
+import { useKeyboard } from "@opentui/react";
 import { useState } from "react";
 import { mockProjects } from "../data/mockProjects";
 import { type Project, theme } from "../types";
@@ -17,6 +18,21 @@ export function ProjectList({
 }: ProjectListProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const selectedProject = projects[selectedIndex];
+
+	useKeyboard((key) => {
+		if (key.name === "up" || key.name === "k") {
+			setSelectedIndex((i) => Math.max(0, i - 1));
+		}
+		if (key.name === "down" || key.name === "j") {
+			setSelectedIndex((i) => Math.min(projects.length - 1, i + 1));
+		}
+		if (key.name === "return") {
+			onContinue();
+		}
+		if (key.name === "escape") {
+			onBack();
+		}
+	});
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
