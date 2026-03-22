@@ -1,54 +1,249 @@
-import { useEffect, useState } from "react";
-import { analysisSteps } from "../data/mockProjects";
-import { theme } from "../types";
+import { useKeyboard } from "@opentui/react";
+import { useEffect, useRef, useState } from "react";
+import { api } from "../api/endpoints";
+import { useAppState } from "../context/AppContext";
+import { type AnalysisMode, theme } from "../types";
+import { toErrorMessage } from "../utils";
 import { TopBar } from "./TopBar";
 
 interface AnalysisProps {
-	onComplete: () => void;
-	onBack: () => void;
+	onNext?: (target: string) => void;
+	analysisMode?: AnalysisMode;
+	onComplete?: () => void;
+	onBack?: () => void;
 }
+
+const steps = [
+	{ id: "analyze", label: "Analyze repositories" },
+	{ id: "facts", label: "Compile technical facts" },
+	{ id: "draft", label: "Generate draft resume" },
+	{ id: "polish", label: "Apply final polish" },
+];
 
 const spinnerFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function Analysis({ onComplete, onBack }: AnalysisProps) {
+export function Analysis({
+	onNext,
+	analysisMode = "phase1",
+	onComplete,
+	onBack,
+}: AnalysisProps) {
+	const {
+		state,
+		setPipelineMessages,
+		setPipelineNotice,
+		setPipelineStage,
+		setPipelineStatus,
+		setPipelineTelemetry,
+		setResumeV3Draft,
+		setResumeV3Output,
+	} = useAppState();
 	const [currentStep, setCurrentStep] = useState(0);
 	const [spinnerIndex, setSpinnerIndex] = useState(0);
 	const [progress, setProgress] = useState(0);
 	const [logs, setLogs] = useState<string[]>([]);
+	const [error, setError] = useState<string | null>(null);
+	const [isCancelling, setIsCancelling] = useState(false);
+	const handledStatusRef = useRef<string | null>(null);
+	const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-	// Spinner animation
+	const goTo = (target: string) => {
+		onNext?.(target);
+		if (!onNext) {
+			if (target === "resume-preview") {
+				onComplete?.();
+			} else {
+				onBack?.();
+			}
+		}
+	};
+
 	useEffect(() => {
 		const interval = setInterval(() => {
-			setSpinnerIndex((i) => (i + 1) % spinnerFrames.length);
+			setSpinnerIndex((i: number) => (i + 1) % spinnerFrames.length);
 		}, 80);
 		return () => clearInterval(interval);
 	}, []);
 
-	// Progress simulation
 	useEffect(() => {
-		if (currentStep >= analysisSteps.length) {
-			setTimeout(onComplete, 500);
+		if (!state.pipelineJobId) {
+			setError("No active pipeline job.");
 			return;
 		}
 
-		const stepDuration = 600 + Math.random() * 400;
-		const step = analysisSteps[currentStep];
+		let disposed = false;
+		const stopPolling = () => {
+			if (pollIntervalRef.current) {
+				clearInterval(pollIntervalRef.current);
+				pollIntervalRef.current = null;
+			}
+		};
 
-		if (!step) return;
+		const pollStatus = async () => {
+			try {
+				const response = await api.getPipelineStatus();
+				if (disposed) {
+					return;
+				}
 
-		// Add log entry
-		setLogs((prev) => [
-			...prev,
-			`[${new Date().toLocaleTimeString()}] ${step.label}`,
-		]);
+				setPipelineStatus(response.status);
+				setPipelineStage(response.stage);
+				setPipelineTelemetry(response.telemetry);
+				setPipelineMessages(response.messages);
+				setResumeV3Draft(response.draft);
+				setResumeV3Output(response.output);
+				setLogs(response.messages.slice(-3));
 
-		const timer = setTimeout(() => {
-			setProgress(Math.round(((currentStep + 1) / analysisSteps.length) * 100));
-			setCurrentStep((s) => s + 1);
-		}, stepDuration);
+				const stageIndex =
+					response.stage === "FACTS"
+						? 1
+						: response.stage === "DRAFT"
+							? 2
+							: response.stage === "POLISH"
+								? 3
+								: 0;
 
-		return () => clearTimeout(timer);
-	}, [currentStep, onComplete]);
+				setCurrentStep(response.status === "complete" ? steps.length : stageIndex);
+
+				if (response.status === "complete") {
+					setProgress(100);
+				} else if (response.status === "draft_ready") {
+					setProgress(75);
+				} else if (
+					response.status === "error" ||
+					response.status === "cancelled" ||
+					response.status === "failed_resource_guard"
+				) {
+					setProgress(0);
+				} else {
+					const repoRatio =
+						(response.telemetry.repos_total ?? 0) > 0
+							? response.telemetry.repos_done / response.telemetry.repos_total
+							: 0;
+
+					setProgress(
+						stageIndex === 0
+							? Math.round(repoRatio * 25)
+							: stageIndex === 1
+								? 25 + Math.round(repoRatio * 25)
+								: stageIndex === 2
+									? analysisMode === "phase3"
+										? 75
+										: 70
+									: 90,
+					);
+				}
+
+				if (
+					response.status === "complete" &&
+					handledStatusRef.current !== "complete"
+				) {
+					stopPolling();
+					handledStatusRef.current = "complete";
+					goTo("resume-preview");
+					return;
+				}
+
+				if (
+					response.status === "draft_ready" &&
+					analysisMode === "phase1" &&
+					handledStatusRef.current !== "draft_ready"
+				) {
+					stopPolling();
+					handledStatusRef.current = "draft_ready";
+					goTo("draft-pause");
+					return;
+				}
+
+				if (
+					response.status === "error" ||
+					response.status === "cancelled" ||
+					response.status === "failed_resource_guard"
+				) {
+					stopPolling();
+					setError(
+						response.error ||
+							(response.status === "cancelled"
+								? "Pipeline cancelled."
+								: response.status === "failed_resource_guard"
+									? "Pipeline stopped because of resource limits."
+									: "Pipeline failed."),
+					);
+					return;
+				}
+
+				setError(null);
+			} catch (pollError) {
+				if (!disposed) {
+					setError(toErrorMessage(pollError));
+				}
+			}
+		};
+
+		void pollStatus();
+		pollIntervalRef.current = setInterval(() => {
+			void pollStatus();
+		}, 2000);
+
+		return () => {
+			disposed = true;
+			stopPolling();
+		};
+	}, [
+		analysisMode,
+		onNext,
+		onBack,
+		onComplete,
+		setPipelineMessages,
+		setPipelineStage,
+		setPipelineStatus,
+		setPipelineTelemetry,
+		setResumeV3Draft,
+		setResumeV3Output,
+		state.pipelineJobId,
+	]);
+
+	const cancelJob = async () => {
+		if (!state.pipelineJobId || isCancelling) {
+			return;
+		}
+
+		setIsCancelling(true);
+		setError(null);
+		try {
+			const response = await api.cancelPipeline();
+			setPipelineStatus(response.status);
+			setPipelineNotice("Pipeline cancelled.");
+			setError("Pipeline cancelled.");
+		} catch (cancelError) {
+			setError(toErrorMessage(cancelError));
+		} finally {
+			setIsCancelling(false);
+		}
+	};
+
+	useKeyboard((key) => {
+		if (key.name !== "escape") {
+			return;
+		}
+
+		if (
+			state.pipelineStatus === "queued" ||
+			state.pipelineStatus === "running" ||
+			state.pipelineStatus === "polishing"
+		) {
+			void cancelJob();
+			return;
+		}
+
+		if (
+			state.pipelineStatus === "error" ||
+			state.pipelineStatus === "cancelled" ||
+			state.pipelineStatus === "failed_resource_guard"
+		) {
+			goTo("project-list");
+		}
+	});
 
 	const progressBarWidth = 50;
 	const filledWidth = Math.round((progress / 100) * progressBarWidth);
@@ -63,7 +258,6 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 				description="Mining artifacts and generating insights..."
 			/>
 
-			{/* Main content */}
 			<box
 				flexGrow={1}
 				flexDirection="column"
@@ -71,18 +265,6 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 				justifyContent="center"
 				gap={3}
 			>
-				{/* ASCII Art Animation */}
-				{/* <box flexDirection="column" alignItems="center">
-          <text>
-            <span fg={theme.cyan}>
-              {"    "}╭─────────────────────────────╮{"\n"}
-              {"    "}│ {spinnerFrames[spinnerIndex]} Mining artifacts...     │{"\n"}
-              {"    "}╰─────────────────────────────╯
-            </span>
-          </text>
-        </box> */}
-
-				{/* Step checklist */}
 				<box
 					flexDirection="column"
 					border
@@ -91,9 +273,12 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 					padding={2}
 					width={50}
 				>
-					{analysisSteps.map((step, index) => {
+					{steps.map((step, index) => {
 						const isCompleted = index < currentStep;
-						const isCurrent = index === currentStep;
+						const isCurrent =
+							index === currentStep &&
+							!error &&
+							state.pipelineStatus !== "cancelled";
 
 						return (
 							<box key={step.id} flexDirection="row" gap={2}>
@@ -124,7 +309,6 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 					})}
 				</box>
 
-				{/* Progress bar */}
 				<box flexDirection="column" alignItems="center" gap={1}>
 					<text>
 						<span fg={theme.gold}>{progressBar}</span>
@@ -137,46 +321,52 @@ export function Analysis({ onComplete, onBack }: AnalysisProps) {
 					</text>
 				</box>
 
-				{/* Live log */}
-				{/* <box
-          flexDirection="column"
-          width={60}
-          height={5}
-          backgroundColor={theme.bgMedium}
-          padding={1}
-          border
-          borderStyle="single"
-          borderColor={theme.textDim}
-        >
-          <text>
-            <span fg={theme.textDim}>
-              <strong>Log:</strong>
-            </span>
-          </text>
-          {logs.slice(-3).map((log, i) => (
-            <text key={i}>
-              <span fg={theme.textDim}>{log}</span>
-            </text>
-          ))}
-        </box> */}
+				{logs.length ? (
+					<box
+						flexDirection="column"
+						width={60}
+						backgroundColor={theme.bgMedium}
+						padding={1}
+						border
+						borderStyle="single"
+						borderColor={theme.textDim}
+					>
+						<text>
+							<span fg={theme.textDim}>
+								<strong>Status</strong>
+							</span>
+						</text>
+						{logs.map((log: string, i: number) => (
+							<text key={`${i}-${log}`}>
+								<span fg={theme.textDim}>{log}</span>
+							</text>
+						))}
+					</box>
+				) : null}
 			</box>
 
-			{/* Demo Mode Banner */}
 			<box
 				height={3}
 				border
 				borderStyle="single"
-				borderColor={theme.error}
+				borderColor={error ? theme.error : theme.goldDim}
 				paddingLeft={2}
 				paddingRight={2}
 				paddingTop={1}
 				paddingBottom={1}
 			>
 				<text>
-					<span fg={theme.goldDark}>Demo Mode:</span>
-					<span fg={theme.textDim}> Press </span>
-					<span fg={theme.cyan}>Enter</span>
-					<span fg={theme.textDim}> to continue</span>
+					{error ? (
+						<span fg={theme.error}>{error}</span>
+					) : isCancelling ? (
+						<span fg={theme.warning}>Cancelling pipeline...</span>
+					) : (
+						<>
+							<span fg={theme.textDim}>Press </span>
+							<span fg={theme.cyan}>Esc</span>
+							<span fg={theme.textDim}> to cancel the pipeline</span>
+						</>
+					)}
 				</text>
 			</box>
 		</box>

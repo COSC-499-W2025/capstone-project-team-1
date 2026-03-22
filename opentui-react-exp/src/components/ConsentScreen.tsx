@@ -240,18 +240,18 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 	useKeyboard((key) => {
 		if (saving) return;
 
-		if (key.name === "left") {
-			setSelected((prev) => {
-				const idx = OPTIONS.indexOf(prev);
-				return OPTIONS[Math.max(0, idx - 1)];
-			});
-		}
-		if (key.name === "right") {
-			setSelected((prev) => {
-				const idx = OPTIONS.indexOf(prev);
-				return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)];
-			});
-		}
+			if (key.name === "left") {
+				setSelected((prev) => {
+					const idx = OPTIONS.indexOf(prev);
+					return OPTIONS[Math.max(0, idx - 1)] ?? prev;
+				});
+			}
+			if (key.name === "right") {
+				setSelected((prev) => {
+					const idx = OPTIONS.indexOf(prev);
+					return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)] ?? prev;
+				});
+			}
 		if (key.name === "return") {
 			setSaving(true);
 			api.updateConsent(selected).then(() => {
