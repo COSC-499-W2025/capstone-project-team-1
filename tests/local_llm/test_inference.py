@@ -6,12 +6,16 @@ import time
 from types import SimpleNamespace
 
 import pytest
+from pydantic import BaseModel
 
 from artifactminer.local_llm.runtime.errors import (
+    EmptyLLMResponseError,
     InferenceRequestError,
     InvalidLLMResponseError,
+    MalformedJSONResponseError,
+    SchemaValidationResponseError,
 )
-from artifactminer.local_llm.runtime.inference import query_llm_text
+from artifactminer.local_llm.runtime.inference import query_llm_json, query_llm_text
 from artifactminer.local_llm.models import RuntimeStatus
 
 
@@ -35,8 +39,32 @@ def _status(port: int = 11434) -> RuntimeStatus:
     )
 
 
+class _DemoPayload(BaseModel):
+    name: str
+    score: int
+
+
+def _patch_runtime_ready(
+    monkeypatch: pytest.MonkeyPatch, *, port: int = 11434, client: object
+) -> None:
+    monkeypatch.setattr(
+        "artifactminer.local_llm.runtime.inference.ensure_server",
+        lambda model: None,
+    )
+    monkeypatch.setattr(
+        "artifactminer.local_llm.runtime.inference.get_server_status",
+        lambda: _status(port=port),
+    )
+    monkeypatch.setattr(
+        "artifactminer.local_llm.runtime.inference._build_client",
+        lambda runtime_port: client,
+    )
+
+
 @pytest.mark.asyncio
-async def test_query_llm_text_success(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_query_llm_text_uses_model_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     async def fake_create(**kwargs):
         assert kwargs["model"] == "local"
         assert kwargs["messages"] == [{"role": "user", "content": "hello"}]
@@ -49,18 +77,7 @@ async def test_query_llm_text_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
     fake_client = FakeClient(fake_create)
 
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.ensure_server",
-        lambda model: None,
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.get_server_status",
-        lambda: _status(),
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference._build_client",
-        lambda port: fake_client,
-    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
 
     result = await query_llm_text("hello", model="qwen2.5-coder-3b-q4")
 
@@ -69,7 +86,46 @@ async def test_query_llm_text_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_query_llm_text_raises_for_runtime_not_ready(
+async def test_query_llm_text_supports_system_and_grammar_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_create(**kwargs):
+        assert kwargs["model"] == "local"
+        assert kwargs["messages"] == [
+            {"role": "system", "content": "you are helpful"},
+            {"role": "user", "content": "hello"},
+        ]
+        assert kwargs["temperature"] == 0.55
+        assert kwargs["max_tokens"] == 321
+        assert kwargs["extra_body"] == {
+            "top_p": 0.8,
+            "repetition_penalty": 1.07,
+            "grammar": 'root ::= "ok"',
+        }
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
+        )
+
+    fake_client = FakeClient(fake_create)
+    _patch_runtime_ready(monkeypatch, client=fake_client)
+
+    result = await query_llm_text(
+        "hello",
+        model="qwen2.5-coder-3b-q4",
+        system="you are helpful",
+        temperature=0.55,
+        max_tokens=321,
+        top_p=0.8,
+        repetition_penalty=1.07,
+        grammar='root ::= "ok"',
+    )
+
+    assert result == "ok"
+    assert fake_client.closed is True
+
+
+@pytest.mark.asyncio
+async def test_query_llm_text_raises_when_runtime_not_ready(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -101,18 +157,7 @@ async def test_query_llm_text_wraps_transport_failures(
 
     fake_client = FakeClient(fake_create)
 
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.ensure_server",
-        lambda model: None,
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.get_server_status",
-        lambda: _status(),
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference._build_client",
-        lambda port: fake_client,
-    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
 
     with pytest.raises(InferenceRequestError, match="RuntimeError: boom"):
         await query_llm_text("hello", model="qwen2.5-coder-3b-q4")
@@ -121,7 +166,7 @@ async def test_query_llm_text_wraps_transport_failures(
 
 
 @pytest.mark.asyncio
-async def test_query_llm_text_rejects_empty_content(
+async def test_query_llm_text_raises_empty_response_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_create(**kwargs):
@@ -131,27 +176,16 @@ async def test_query_llm_text_rejects_empty_content(
 
     fake_client = FakeClient(fake_create)
 
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.ensure_server",
-        lambda model: None,
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.get_server_status",
-        lambda: _status(port=8080),
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference._build_client",
-        lambda port: fake_client,
-    )
+    _patch_runtime_ready(monkeypatch, port=8080, client=fake_client)
 
-    with pytest.raises(InvalidLLMResponseError, match="empty text response"):
+    with pytest.raises(EmptyLLMResponseError, match="empty"):
         await query_llm_text("hello", model="qwen2.5-coder-3b-q4")
 
     assert fake_client.closed is True
 
 
 @pytest.mark.asyncio
-async def test_query_llm_text_rejects_malformed_response(
+async def test_query_llm_text_rejects_malformed_response_shape(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def fake_create(**kwargs):
@@ -159,18 +193,7 @@ async def test_query_llm_text_rejects_malformed_response(
 
     fake_client = FakeClient(fake_create)
 
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.ensure_server",
-        lambda model: None,
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference.get_server_status",
-        lambda: _status(),
-    )
-    monkeypatch.setattr(
-        "artifactminer.local_llm.runtime.inference._build_client",
-        lambda port: fake_client,
-    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
 
     with pytest.raises(InvalidLLMResponseError, match="include any choices"):
         await query_llm_text("hello", model="qwen2.5-coder-3b-q4")
@@ -229,3 +252,80 @@ async def test_query_llm_text_serializes_runtime_startup(
     assert max_active_ensure_calls == 1
     assert len(built_clients) == 2
     assert all(client.closed for client in built_clients)
+
+
+@pytest.mark.asyncio
+async def test_query_llm_json_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def fake_create(**kwargs):
+        assert kwargs["model"] == "local"
+        assert kwargs["messages"] == [
+            {"role": "system", "content": "return structured output"},
+            {"role": "user", "content": "classify this"},
+        ]
+        assert kwargs["temperature"] == 0.2
+        extra_body = kwargs["extra_body"]
+        assert extra_body["response_format"]["type"] == "json_schema"
+        schema = extra_body["response_format"]["json_schema"]["schema"]
+        assert "properties" in schema
+        assert "name" in schema["properties"]
+        assert "score" in schema["properties"]
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(content='{"name":"Ada","score":7}')
+                )
+            ]
+        )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
+
+    result = await query_llm_json(
+        "classify this",
+        _DemoPayload,
+        model="qwen2.5-coder-3b-q4",
+        system="return structured output",
+        temperature=0.2,
+    )
+
+    assert isinstance(result, _DemoPayload)
+    assert result.name == "Ada"
+    assert result.score == 7
+
+
+@pytest.mark.asyncio
+async def test_query_llm_json_raises_malformed_json_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_create(**kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content="{not json"))]
+        )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
+
+    with pytest.raises(MalformedJSONResponseError, match="JSON"):
+        await query_llm_json("classify this", _DemoPayload, model="qwen2.5-coder-3b-q4")
+
+
+@pytest.mark.asyncio
+async def test_query_llm_json_raises_schema_validation_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def fake_create(**kwargs):
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"name":"Ada"}'))]
+        )
+
+    fake_client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
+    )
+    _patch_runtime_ready(monkeypatch, client=fake_client)
+
+    with pytest.raises(SchemaValidationResponseError, match="schema"):
+        await query_llm_json("classify this", _DemoPayload, model="qwen2.5-coder-3b-q4")
