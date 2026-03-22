@@ -272,15 +272,21 @@ export function Analysis({
 		setIsCancelling(true);
 		setError(null);
 		try {
-			const resp = await api.cancelPipeline();
-			if (resp && (resp as any).ok) {
-				setPipelineStatus("cancelled");
+			const response = await api.cancelPipeline();
+			setPipelineStatus(response.status);
+
+			if (response.ok && response.status === "cancelled") {
 				setPipelineNotice("Pipeline cancelled.");
 				setError("Pipeline cancelled.");
-			} else {
-				// Respect backend: if cancellation failed, keep running state
-				setError("Cancellation failed. Pipeline is still running.");
+				return;
 			}
+
+			setPipelineNotice(null);
+			setError(
+				response.status === "cancelled"
+					? "Cancellation did not complete successfully."
+					: `Cancellation failed. Pipeline is still ${response.status}.`,
+			);
 		} catch (cancelError) {
 			setError(toErrorMessage(cancelError));
 		} finally {
