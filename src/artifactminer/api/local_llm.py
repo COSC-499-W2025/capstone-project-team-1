@@ -511,28 +511,38 @@ note that the data is initally returned with null/zero values
 its expected that a background worker would need to update the job as it processes. 
 """
 @router.get("/generation/status", response_model=GenerationStatusResponse)
-async def get_generation_status() -> GenerationStatusResponse:
-    """Get the current status of the active generation job.
+async def get_generation_status(job_id: str | None = None) -> GenerationStatusResponse:
+    """Get the current status of a generation job.
     
     Returns the real-time status of an in-flight generation, including
     current stage, progress metrics (telemetry), draft output, and errors.
     This endpoint supports polling-based monitoring of the generation pipeline.
 
+    Args:
+        job_id: Optional job ID returned by /generation/start. If not provided,
+                returns status of the most recent/active generation job.
+
     Returns:
-        GenerationStatusResponse with current job state, or 404 if no active generation
+        GenerationStatusResponse with current job state, or 404 if no job found
 
     Raises:
-        HTTPException: 404 if no active generation job exists
+        HTTPException: 404 if job not found
     """
     global _active_generation_id
 
     try:
-        # Check if there's an active generation
-        if not _active_generation_id or _active_generation_id not in _generation_jobs:
-            raise ValueError("No active generation job found")
+        # Determine which job to retrieve
+        target_job_id = job_id if job_id else _active_generation_id
+        
+        # Check if the target job exists
+        if not target_job_id or target_job_id not in _generation_jobs:
+            raise ValueError(
+                f"No generation job found" + 
+                (f" with ID: {target_job_id}" if target_job_id else "")
+            )
 
         # Retrieve the job state
-        job_data = _generation_jobs[_active_generation_id]
+        job_data = _generation_jobs[target_job_id]
 
         # Build response from stored job state
         # Initialize telemetry with defaults if not present
@@ -565,7 +575,7 @@ async def get_generation_status() -> GenerationStatusResponse:
         )
 
     except ValueError as e:
-        # No active generation is a 404
+        # No job found is a 404
         raise HTTPException(
             status_code=404,
             detail=str(e),

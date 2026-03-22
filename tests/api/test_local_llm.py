@@ -871,7 +871,7 @@ def test_get_generation_status_no_active_generation(client):
 
     assert response.status_code == 404
     detail = response.json()["detail"]
-    assert "no active generation" in detail.lower()
+    assert "no generation job found" in detail.lower()
 
 
 def test_get_generation_status_active_generation(client, tmp_path):
@@ -1196,4 +1196,63 @@ def test_generation_status_response_types(client, tmp_path):
     assert isinstance(tel["elapsed_seconds"], float)
     assert isinstance(tel["model_check_seconds"], float)
     assert isinstance(tel["selected_repos"], list)
+
+
+def test_generation_status_polling_contract_with_job_id(client, tmp_path):
+    """Test that polling contract works correctly with job_id parameter."""
+    # Create intake and start two jobs
+    zip_path = tmp_path / "test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo1/.git/config", "[core]")
+        zf.writestr("repo1/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("repo2/.git/config", "[core]")
+        zf.writestr("repo2/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post("/local-llm/context", json={"zip_path": str(zip_path)})
+    intake_id = intake_response.json()["intake_id"]
+
+    # Start first job
+    start1 = client.post(
+        "/local-llm/generation/start",
+        json={"intake_id": intake_id, "repo_ids": ["repo1"], "user_email": "test1@example.com"}
+    )
+    job_id1 = start1.json()["job_id"]
+    local_llm._generation_jobs[job_id1]["status"] = "running"
+
+    # Start second job
+    start2 = client.post(
+        "/local-llm/generation/start",
+        json={"intake_id": intake_id, "repo_ids": ["repo2"], "user_email": "test2@example.com"}
+    )
+    job_id2 = start2.json()["job_id"]
+    local_llm._generation_jobs[job_id2]["status"] = "draft_ready"
+
+    # Poll job 1 by ID
+    resp1 = client.get(f"/local-llm/generation/status?job_id={job_id1}")
+    assert resp1.status_code == 200
+    assert resp1.json()["status"] == "running"
+    assert resp1.json()["telemetry"]["selected_repos"] == ["repo1"]
+
+    # Poll job 2 by ID
+    resp2 = client.get(f"/local-llm/generation/status?job_id={job_id2}")
+    assert resp2.status_code == 200
+    assert resp2.json()["status"] == "draft_ready"
+    assert resp2.json()["telemetry"]["selected_repos"] == ["repo2"]
+
+    # Poll without job_id returns most recent (job 2)
+    resp_current = client.get("/local-llm/generation/status")
+    assert resp_current.status_code == 200
+    assert resp_current.json()["status"] == "draft_ready"
+
+
+def test_generation_status_invalid_job_id(client):
+    """Test 404 response when querying non-existent job_id."""
+    invalid_job_id = str(uuid.uuid4())
+    response = client.get(f"/local-llm/generation/status?job_id={invalid_job_id}")
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert "no generation job found" in detail.lower()
+    assert invalid_job_id in detail
+
 
