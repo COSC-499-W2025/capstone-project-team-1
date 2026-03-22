@@ -121,11 +121,7 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Identity"
-				title="Select Contributor"
-				description="Choose your detected git identity or enter an email manually."
-			/>
+			<TopBar title="Identity" />
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
 				<box
