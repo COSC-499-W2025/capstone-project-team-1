@@ -45,11 +45,12 @@ export function Analysis({
 	const [error, setError] = useState<string | null>(null);
 	const [isCancelling, setIsCancelling] = useState(false);
 	const handledStatusRef = useRef<string | null>(null);
+	const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const goTo = (target: string) => {
 		onNext?.(target);
 		if (!onNext) {
-			if (target === "preview") {
+			if (target === "resume-preview") {
 				onComplete?.();
 			} else {
 				onBack?.();
@@ -71,6 +72,12 @@ export function Analysis({
 		}
 
 		let disposed = false;
+		const stopPolling = () => {
+			if (pollIntervalRef.current) {
+				clearInterval(pollIntervalRef.current);
+				pollIntervalRef.current = null;
+			}
+		};
 
 		const pollStatus = async () => {
 			try {
@@ -131,8 +138,9 @@ export function Analysis({
 					response.status === "complete" &&
 					handledStatusRef.current !== "complete"
 				) {
+					stopPolling();
 					handledStatusRef.current = "complete";
-					goTo("preview");
+					goTo("resume-preview");
 					return;
 				}
 
@@ -141,6 +149,7 @@ export function Analysis({
 					analysisMode === "phase1" &&
 					handledStatusRef.current !== "draft_ready"
 				) {
+					stopPolling();
 					handledStatusRef.current = "draft_ready";
 					goTo("draft-pause");
 					return;
@@ -151,6 +160,7 @@ export function Analysis({
 					response.status === "cancelled" ||
 					response.status === "failed_resource_guard"
 				) {
+					stopPolling();
 					setError(
 						response.error ||
 							(response.status === "cancelled"
@@ -171,13 +181,13 @@ export function Analysis({
 		};
 
 		void pollStatus();
-		const interval = setInterval(() => {
+		pollIntervalRef.current = setInterval(() => {
 			void pollStatus();
 		}, 2000);
 
 		return () => {
 			disposed = true;
-			clearInterval(interval);
+			stopPolling();
 		};
 	}, [
 		analysisMode,

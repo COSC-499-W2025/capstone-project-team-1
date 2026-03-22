@@ -160,7 +160,7 @@ test("Analysis polls status, updates app state, and routes draft_ready to draft-
 	}
 });
 
-test("Analysis routes complete status to preview", async () => {
+test("Analysis routes complete status to resume-preview", async () => {
 	freezeIntervals();
 	const nextTargets: string[] = [];
 	let rendered: RenderedScreen | null = null;
@@ -204,9 +204,66 @@ test("Analysis routes complete status to preview", async () => {
 		});
 		await flushEffects(rendered);
 
-		expect(nextTargets).toEqual(["preview"]);
+		expect(nextTargets).toEqual(["resume-preview"]);
 		expect(harness.getContext().state.resumeV3Output).toEqual(sampleDraft);
 		expect(rendered.captureCharFrame()).toContain("100%");
+	} finally {
+		destroyRenderer(rendered);
+	}
+});
+
+test("Analysis stops polling once it reaches a terminal failure state", async () => {
+	const clearedIntervals: number[] = [];
+	let nextIntervalId = 0;
+	let rendered: RenderedScreen | null = null;
+
+	globalThis.setInterval = ((_: TimerHandler, __?: number) => {
+		nextIntervalId += 1;
+		return nextIntervalId;
+	}) as unknown as typeof setInterval;
+	globalThis.clearInterval = ((id: number) => {
+		clearedIntervals.push(id);
+	}) as unknown as typeof clearInterval;
+
+	api.getPipelineStatus = async () =>
+		({
+			status: "failed_resource_guard",
+			stage: "FACTS",
+			messages: ["Resource guard tripped."],
+			telemetry: {
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			},
+			draft: null,
+			output: null,
+			error: null,
+		}) satisfies PipelineStatusResponse;
+
+	const harness = createHarness();
+
+	try {
+		rendered = await testRender(harness.node, { width: 100, height: 32 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-428");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("FACTS");
+		});
+		await flushEffects(rendered);
+
+		expect(clearedIntervals).toContain(2);
+		expect(harness.getContext().state.pipelineStatus).toBe(
+			"failed_resource_guard",
+		);
 	} finally {
 		destroyRenderer(rendered);
 	}
