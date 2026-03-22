@@ -24,6 +24,7 @@
 		"@opentui/react": "^0.1.88",
 		"fdir": "^6.5.0",
 		"fuse.js": "^7.1.0",
+		"opentui-spinner": "^0.0.6",
 		"react": "^19.2.4",
 		"react-dom": "^19.2.4"
 	}
