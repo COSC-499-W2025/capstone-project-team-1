@@ -68,6 +68,14 @@ class ModelServerCrashedError(LocalLLMRuntimeError):
         super().__init__(f"llama-server exited unexpectedly{suffix}.")
 
 
+class InferenceRequestError(LocalLLMRuntimeError):
+    """Raised when an inference request cannot be completed."""
+
+    def __init__(self, message: str, *, model: str | None = None) -> None:
+        self.model = model
+        super().__init__(message)
+
+
 class InvalidLLMResponseError(LocalLLMRuntimeError):
     """Raised when the model response is empty or cannot be interpreted."""
 

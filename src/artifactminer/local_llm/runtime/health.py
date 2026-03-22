@@ -30,6 +30,17 @@ def _check_health(port: int, *, timeout: float = _PER_REQUEST_TIMEOUT) -> bool:
         return False
 
 
+def check_health(port: int, *, timeout: float = _PER_REQUEST_TIMEOUT) -> bool:
+    """Single-shot health probe for the llama-server on *port*.
+
+    Returns ``True`` if the server responds with HTTP 200 on ``/health``,
+    ``False`` otherwise.  Intended for lightweight status checks by sibling
+    runtime modules.
+    """
+
+    return _check_health(port, timeout=timeout)
+
+
 def poll_until_healthy(
     port: int,
     model: str,
