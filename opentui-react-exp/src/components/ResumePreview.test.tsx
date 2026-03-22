@@ -169,8 +169,8 @@ async function pressKeyboardShortcut(key: KeyboardEventLike) {
 	await act(async () => {
 		keyboardHandler?.(key);
 		await Promise.resolve();
-		await rendered?.renderOnce();
 	});
+	await rendered?.renderOnce();
 }
 
 afterEach(() => {
