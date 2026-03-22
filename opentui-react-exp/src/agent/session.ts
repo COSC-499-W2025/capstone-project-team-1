@@ -40,7 +40,7 @@ export interface ModelCheckResult {
 export type ResumeEvent =
 	| { type: "text"; delta: string }
 	| { type: "thinking"; delta: string }
-	| { type: "tool_start"; toolName: string }
+	| { type: "tool_start"; toolName: string; args: Record<string, unknown> }
 	| { type: "tool_end"; toolName: string; isError: boolean }
 	| { type: "agent_start" }
 	| { type: "agent_end" }
@@ -144,7 +144,7 @@ export async function createResumeSession(
 				}
 				break;
 			case "tool_execution_start":
-				onEvent({ type: "tool_start", toolName: event.toolName });
+				onEvent({ type: "tool_start", toolName: event.toolName, args: event.args ?? {} });
 				break;
 			case "tool_execution_end":
 				onEvent({ type: "tool_end", toolName: event.toolName, isError: event.isError });
