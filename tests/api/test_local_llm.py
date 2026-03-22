@@ -878,7 +878,8 @@ def test_generation_cancel_valid_request(client, tmp_path):
     data = response.json()
     assert data == {"ok": True, "status": "cancelled"}
     assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
-    assert local_llm._active_generation_id is None
+    # _active_generation_id is retained after cancel to support idempotent repeat calls
+    assert local_llm._active_generation_id == job_id
 
 
 def test_generation_cancel_no_active_job(client):
@@ -922,7 +923,7 @@ def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
     assert first_cancel.status_code == 200
     assert first_cancel.json() == {"ok": True, "status": "cancelled"}
     assert second_cancel.status_code == 200
-    assert second_cancel.json() == {"ok": False, "status": "cancelled"}
+    assert second_cancel.json() == {"ok": True, "status": "cancelled"}
 
 
 def test_generation_cancel_endpoint_in_openapi(client):

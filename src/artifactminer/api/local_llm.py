@@ -21,7 +21,7 @@ from zipfile import ZipFile, is_zipfile
 from ..helpers.zip_utils import safe_extract_zip
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from .local_llm_schemas import (
     CancellationResponse,
@@ -508,32 +508,37 @@ async def start_generation(
 
 
 @router.post("/generation/cancel", response_model=CancellationResponse)
-async def cancel_generation() -> CancellationResponse:
-    """Cancel the current active local generation job.
+async def cancel_generation(
+    job_id: str | None = Query(default=None, description="Job ID to cancel. Defaults to the current active job.")
+) -> CancellationResponse:
+    """Cancel a generation job by job_id, or the current active job if no job_id is provided.
 
-    This operation is idempotent. If there is no active generation job,
-    it returns a typed response with ok=False and status=cancelled.
+    This operation is idempotent. Cancelling an already-cancelled job returns
+    ok=True. If no matching job exists, returns ok=False.
 
     Returns:
         CancellationResponse describing the post-cancel state.
     """
     global _active_generation_id
 
-    # No active job to cancel.
-    if _active_generation_id is None:
+    # Resolve which job to target.
+    target_id = job_id if job_id is not None else _active_generation_id
+
+    # No job to cancel.
+    if target_id is None:
         return CancellationResponse(ok=False, status="cancelled")
 
-    active_job = _generation_jobs.get(_active_generation_id)
+    target_job = _generation_jobs.get(target_id)
 
-    # If active pointer is stale, clear it and report no-op cancellation.
-    if active_job is None:
-        _active_generation_id = None
+    # If the target job doesn't exist, clear stale active pointer if applicable.
+    if target_job is None:
+        if target_id == _active_generation_id:
+            _active_generation_id = None
         return CancellationResponse(ok=False, status="cancelled")
 
-    # Idempotent repeat-cancel behavior.
-    if active_job.get("status") == "cancelled":
+    # Idempotent: already cancelled — return success without side-effects.
+    if target_job.get("status") == "cancelled":
         return CancellationResponse(ok=True, status="cancelled")
 
-    active_job["status"] = "cancelled"
-    _active_generation_id = None
+    target_job["status"] = "cancelled"
     return CancellationResponse(ok=True, status="cancelled")
