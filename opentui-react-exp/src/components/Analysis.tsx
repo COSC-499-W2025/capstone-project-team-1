@@ -381,7 +381,8 @@ export function Analysis({
 				? theme.gold
 				: state.pipelineStatus === "complete"
 					? theme.success
-					: state.pipelineStatus === "error"
+					: state.pipelineStatus === "error" ||
+						  state.pipelineStatus === "failed_resource_guard"
 						? theme.error
 						: state.pipelineStatus === "cancelled"
 							? theme.warning
