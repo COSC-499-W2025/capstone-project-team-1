@@ -839,3 +839,99 @@ def test_generation_start_endpoint_in_openapi(client):
     assert "/local-llm/generation/start" in paths
     assert "post" in paths["/local-llm/generation/start"]
 
+
+# ============================================================================
+# Generation Cancel Tests
+# ============================================================================
+
+
+def test_generation_cancel_valid_request(client, tmp_path):
+    """Test successful cancellation of an active generation job."""
+    zip_path = tmp_path / "generation_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+    assert local_llm._active_generation_id == job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {"ok": True, "status": "cancelled"}
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    # _active_generation_id is retained after cancel to support idempotent repeat calls
+    assert local_llm._active_generation_id == job_id
+
+
+def test_generation_cancel_no_active_job(client):
+    """Test cancel behavior when no active generation job exists."""
+    local_llm._active_generation_id = None
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "status": "cancelled"}
+
+
+def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
+    """Test repeat cancel call behavior after an initial successful cancellation."""
+    zip_path = tmp_path / "repeat_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+
+    first_cancel = client.post("/local-llm/generation/cancel")
+    second_cancel = client.post("/local-llm/generation/cancel")
+
+    assert first_cancel.status_code == 200
+    assert first_cancel.json() == {"ok": True, "status": "cancelled"}
+    assert second_cancel.status_code == 200
+    assert second_cancel.json() == {"ok": True, "status": "cancelled"}
+
+
+def test_generation_cancel_endpoint_in_openapi(client):
+    """Verify POST /local-llm/generation/cancel appears in OpenAPI schema."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/generation/cancel" in paths
+    assert "post" in paths["/local-llm/generation/cancel"]
+
