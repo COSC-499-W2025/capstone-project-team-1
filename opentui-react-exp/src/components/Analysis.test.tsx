@@ -638,6 +638,7 @@ test("Analysis surfaces terminal errors and Escape returns to project-list", asy
 	}
 });
 
+
 test("Analysis surfaces failed_resource_guard as a terminal error and Escape returns to project-list", async () => {
 	freezeIntervals();
 	const nextTargets: string[] = [];
