@@ -1,16 +1,27 @@
 /**
  * Combined Snake game + generation progress screen.
- * Snake on the left, activity log on the right, 50/50 split.
+ * Snake on the left, humanized activity sidebar on the right.
+ *
+ * The activity sidebar uses a two-layer architecture:
+ * - Layer 1: Warm status message + Knight Rider spinner
+ * - Layer 2: Scrollable humanized activity log
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import "opentui-spinner/react";
 import { generateResume, type ResumeEvent } from "../../agent";
 import { api } from "../../api/endpoints";
 import { theme } from "../../types";
 import { useToast } from "../Toast";
 import { TopBar } from "../TopBar";
 import { SnakeGame } from "./SnakeGame";
-import { spinnerFrames } from "./shared";
+import { createFrames, createColors } from "./knight-rider-spinner";
+import {
+	humanizeToolCall,
+	inferPhase,
+	PHASE_LABELS,
+	type Phase as HumanPhase,
+} from "./humanize";
 
 interface SnakeWithProgressProps {
 	zipPath: string;
@@ -18,20 +29,31 @@ interface SnakeWithProgressProps {
 	onBack: () => void;
 }
 
-type Phase = "extracting" | "generating" | "done" | "error";
+type FlowPhase = "extracting" | "generating" | "done" | "error";
 
 interface ActivityEntry {
 	tool: string;
 	detail: string;
+	status: "done" | "active";
 }
 
-const MAX_ACTIVITY = 20;
+const MAX_ACTIVITY = 100;
 
-const TOOL_COLORS: Record<string, string> = {
-	bash: theme.cyan,
-	read: theme.gold,
-	grep: "#BB86FC",
-};
+// Knight Rider spinner config — gold theme
+const krFrames = createFrames({
+	color: theme.gold,
+	style: "blocks",
+	width: 10,
+	inactiveFactor: 0.6,
+	minAlpha: 0.3,
+});
+const krColors = createColors({
+	color: theme.gold,
+	style: "blocks",
+	width: 10,
+	inactiveFactor: 0.6,
+	minAlpha: 0.3,
+});
 
 export function SnakeWithProgress({
 	zipPath,
@@ -41,29 +63,19 @@ export function SnakeWithProgress({
 	const { width: termW, height: termH } = useTerminalDimensions();
 	const toast = useToast();
 
-	const [phase, setPhase] = useState<Phase>("extracting");
+	const [flowPhase, setFlowPhase] = useState<FlowPhase>("extracting");
 	const [error, setError] = useState<string | null>(null);
-	const [spinnerIndex, setSpinnerIndex] = useState(0);
-	const [currentTool, setCurrentTool] = useState<string | null>(null);
-	const [toolsUsed, setToolsUsed] = useState<string[]>([]);
 	const [activity, setActivity] = useState<ActivityEntry[]>([]);
 	const [showSnake, setShowSnake] = useState(false);
+	const [isStreamingText, setIsStreamingText] = useState(false);
+	const [hasNewActivity, setHasNewActivity] = useState(false);
 	const resultRef = useRef<string>("");
-	const phaseRef = useRef(phase);
-	phaseRef.current = phase;
-
-	// Spinner — stops when done
-	useEffect(() => {
-		if (phase === "done" || phase === "error") return;
-		const interval = setInterval(() => {
-			setSpinnerIndex((i) => (i + 1) % spinnerFrames.length);
-		}, 80);
-		return () => clearInterval(interval);
-	}, [phase]);
+	const phaseRef = useRef(flowPhase);
+	phaseRef.current = flowPhase;
 
 	// Toast when done
 	useEffect(() => {
-		if (phase === "done") {
+		if (flowPhase === "done") {
 			toast.show({
 				title: "Resume Ready!",
 				message: "Press Enter to view your resume",
@@ -71,11 +83,25 @@ export function SnakeWithProgress({
 				duration: 10000,
 			});
 		}
-	}, [phase]);
+	}, [flowPhase]);
 
-	function pushActivity(tool: string, detail: string) {
-		setActivity((prev) => [...prev, { tool, detail }].slice(-MAX_ACTIVITY));
+	function pushActivity(tool: string, detail: string, status: "done" | "active" = "active") {
+		setActivity((prev) => {
+			// Mark previous active entry as done
+			const updated = prev.map((e) =>
+				e.status === "active" ? { ...e, status: "done" as const } : e,
+			);
+			return [...updated, { tool, detail, status }].slice(-MAX_ACTIVITY);
+		});
+		setHasNewActivity(true);
 	}
+
+	// Infer the human-friendly phase from activity
+	const humanPhase: HumanPhase = useMemo(() => {
+		if (flowPhase === "done") return "done";
+		if (flowPhase === "extracting") return "exploring";
+		return inferPhase(activity, isStreamingText);
+	}, [flowPhase, activity, isStreamingText]);
 
 	// Generation logic
 	useEffect(() => {
@@ -86,21 +112,27 @@ export function SnakeWithProgress({
 			switch (event.type) {
 				case "text":
 					resultRef.current += event.delta;
+					if (!isStreamingText) setIsStreamingText(true);
 					break;
-				case "tool_start":
-					setCurrentTool(event.toolName);
-					setToolsUsed((prev) => prev.includes(event.toolName) ? prev : [...prev, event.toolName]);
-					pushActivity(event.toolName, `${event.toolName}...`);
+				case "tool_start": {
+					const detail = humanizeToolCall(event.toolName, event.args);
+					pushActivity(event.toolName, detail);
 					break;
+				}
 				case "tool_end":
-					setCurrentTool(null);
+					// Mark the latest entry as done
+					setActivity((prev) =>
+						prev.map((e) =>
+							e.status === "active" ? { ...e, status: "done" as const } : e,
+						),
+					);
 					break;
 				case "agent_end":
-					pushActivity("system", "Resume complete!");
-					setPhase("done");
+					pushActivity("system", "Your resume is ready!", "done");
+					setFlowPhase("done");
 					break;
 				case "error":
-					setPhase("error");
+					setFlowPhase("error");
 					setError(event.message);
 					break;
 			}
@@ -108,18 +140,18 @@ export function SnakeWithProgress({
 
 		(async () => {
 			try {
-				setPhase("extracting");
-				pushActivity("system", "Extracting ZIP archive...");
+				setFlowPhase("extracting");
+				pushActivity("system", "Unpacking your projects...");
 				const { extraction_path } = await api.extractLocal(zipPath);
 				if (cancelled) return;
-				pushActivity("system", "Extraction complete");
+				pushActivity("system", "Found your projects!", "done");
 
-				setPhase("generating");
-				pushActivity("system", "Starting AI agent...");
+				setFlowPhase("generating");
+				pushActivity("system", "Getting the AI started...");
 				await generateResume(extraction_path, onEvent);
 			} catch (err) {
 				if (cancelled) return;
-				setPhase("error");
+				setFlowPhase("error");
 				const msg = err instanceof Error ? err.message : String(err);
 				const isConnErr =
 					msg.includes("Unable to connect") ||
@@ -158,12 +190,9 @@ export function SnakeWithProgress({
 	// 50/50 split
 	const halfW = Math.floor(termW / 2);
 	const snakeW = Math.max(6, Math.floor((halfW - 4) / 4));
-	const snakeH = Math.max(4, Math.floor((termH - 8) / 2));
+	const snakeH = Math.max(4, Math.floor((termH - 14) / 2));
 
-	const visibleActivity = useMemo(
-		() => activity.slice(-(termH - 8)),
-		[activity, termH],
-	);
+	const isActive = flowPhase !== "done" && flowPhase !== "error";
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -217,7 +246,7 @@ export function SnakeWithProgress({
 								>
 									<text>
 										<span fg={theme.gold}>
-											<strong>Click here or press S to play!</strong>
+											<strong>LET'S PLAY!</strong>
 										</span>
 									</text>
 								</box>
@@ -231,60 +260,83 @@ export function SnakeWithProgress({
 					)}
 				</box>
 
-				{/* Right: Activity sidebar */}
+				{/* Right: Activity sidebar — two-layer architecture */}
 				<box
 					flexGrow={1}
 					flexBasis={0}
 					flexDirection="column"
 					borderLeft
 					borderColor={theme.goldDim}
-					paddingLeft={1}
-					paddingRight={1}
+					paddingLeft={2}
+					paddingRight={2}
 					paddingTop={1}
 				>
-					<box marginBottom={1}>
+					{/* Layer 1: Status + Knight Rider spinner */}
+					<box flexDirection="column" marginBottom={1}>
 						<text>
 							<span fg={theme.gold}>
-								<strong>Activity</strong>
+								<strong>{PHASE_LABELS[humanPhase]}</strong>
+							</span>
+						</text>
+						{isActive && (
+							<box marginTop={1}>
+								<spinner
+									frames={krFrames}
+									color={krColors}
+									interval={40}
+								/>
+							</box>
+						)}
+						{flowPhase === "done" && (
+							<text>
+								<span fg={theme.success}>
+									<strong>✓ Complete</strong>
+								</span>
+								<span fg={theme.textDim}> — press Enter to view</span>
+							</text>
+						)}
+					</box>
+
+					{/* Separator */}
+					<box marginBottom={1}>
+						<text>
+							<span fg={theme.goldDim}>
+								{"─".repeat(Math.max(1, halfW - 6))}
 							</span>
 						</text>
 					</box>
 
-					{visibleActivity.map((entry, i) => {
-						const isLatest = i === visibleActivity.length - 1;
-						const toolColor = TOOL_COLORS[entry.tool] ?? (entry.tool === "system" ? theme.textDim : theme.textSecondary);
-
-						return (
-							<text key={i}>
-								{isLatest && phase !== "done" ? (
-									<span fg={theme.cyan}>{spinnerFrames[spinnerIndex]} </span>
-								) : (
-									<span fg={theme.textDim}>{"  "}</span>
-								)}
-								{entry.tool !== "system" && (
-									<span fg={toolColor}>{entry.tool.padEnd(5)} </span>
-								)}
-								<span fg={isLatest ? theme.textSecondary : theme.textDim}>
-									{entry.detail.slice(0, halfW - 12)}
-								</span>
-							</text>
-						);
-					})}
-
-					{toolsUsed.length > 0 && (
-						<box marginTop={1}>
-							<text>
-								<span fg={theme.textDim}>Tools: </span>
-								{toolsUsed.map((t, i) => (
-									<span key={t} fg={t === currentTool ? theme.gold : theme.textDim}>
-										{t}{i < toolsUsed.length - 1 ? " " : ""}
+					{/* Layer 2: Scrollable humanized activity log */}
+					<scrollbox
+						flexGrow={1}
+						focused={false}
+					>
+						{activity.map((entry, i) => (
+							<box key={i} flexDirection="row" gap={1}>
+								<text>
+									{entry.status === "done" ? (
+										<span fg={theme.success}>✓</span>
+									) : (
+										<span fg={theme.cyan}>●</span>
+									)}
+								</text>
+								<text>
+									<span
+										fg={
+											entry.status === "active"
+												? theme.textPrimary
+												: theme.textDim
+										}
+									>
+										{entry.detail}
 									</span>
-								))}
-							</text>
-						</box>
-					)}
+								</text>
+							</box>
+						))}
+					</scrollbox>
 
-					{phase === "error" && error && (
+					{/* Error display */}
+					{flowPhase === "error" && error && (
 						<box border borderStyle="single" borderColor={theme.error} padding={1} marginTop={1}>
 							<text wrap selectable>
 								<span fg={theme.error}>{error}</span>
