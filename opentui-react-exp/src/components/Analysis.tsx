@@ -316,7 +316,13 @@ export function Analysis({
 				}
 
 				if (state.pipelineStatus === "cancelled") color = theme.warning;
-				if (state.pipelineStatus === "error" && active) color = theme.error;
+				if (
+					(state.pipelineStatus === "error" ||
+						state.pipelineStatus === "failed_resource_guard") &&
+					active
+				) {
+					color = theme.error;
+				}
 
 				return { stageName, marker, color };
 			}),
@@ -354,7 +360,8 @@ export function Analysis({
 				? theme.gold
 				: state.pipelineStatus === "complete"
 					? theme.success
-					: state.pipelineStatus === "error"
+					: state.pipelineStatus === "error" ||
+						  state.pipelineStatus === "failed_resource_guard"
 						? theme.error
 						: state.pipelineStatus === "cancelled"
 							? theme.warning

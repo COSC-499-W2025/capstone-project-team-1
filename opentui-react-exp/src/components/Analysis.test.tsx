@@ -505,3 +505,81 @@ test("Analysis surfaces terminal errors and Escape returns to project-list", asy
 		destroyRenderer(rendered);
 	}
 });
+
+test("Analysis surfaces failed_resource_guard as a terminal error and Escape returns to project-list", async () => {
+	freezeIntervals();
+	const nextTargets: string[] = [];
+	let rendered: RenderedScreen | null = null;
+
+	api.getPipelineStatus = async () =>
+		({
+			status: "failed_resource_guard",
+			stage: "DRAFT",
+			messages: ["Resource guard stopped the run."],
+			telemetry: {
+				stage: "DRAFT",
+				active_model: "llama3",
+				repos_total: 1,
+				repos_done: 0,
+				current_repo: "artifact-miner",
+				facts_total: 1,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 4,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1"],
+			},
+			draft: null,
+			output: null,
+			error: "Pipeline stopped because the resource guard was triggered.",
+		}) satisfies PipelineStatusResponse;
+
+	const harness = createHarness({
+		onNext: (target) => {
+			nextTargets.push(target);
+		},
+	});
+
+	try {
+		rendered = await testRender(harness.node, { width: 140, height: 40 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-429");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("DRAFT");
+			context.setPipelineTelemetry({
+				stage: "DRAFT",
+				active_model: "llama3",
+				repos_total: 1,
+				repos_done: 0,
+				current_repo: "artifact-miner",
+				facts_total: 1,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 4,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1"],
+			});
+			context.setPipelineMessages(["Resource guard stopped the run."]);
+		});
+		await flushEffects(rendered);
+
+		const frame = rendered.captureCharFrame();
+
+		expect(frame).toContain("Pipeline stopped because the resource guard was triggered.");
+		expect(frame).toContain("FAILED_RESOURCE_GUARD");
+
+		await act(async () => {
+			keyboardHandler?.({ name: "escape" });
+			await Promise.resolve();
+		});
+		await rendered.renderOnce();
+
+		expect(nextTargets).toEqual(["project-list"]);
+		expect(harness.getContext().state.pipelineStatus).toBe(
+			"failed_resource_guard",
+		);
+	} finally {
+		destroyRenderer(rendered);
+	}
+});
