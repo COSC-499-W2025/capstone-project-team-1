@@ -106,9 +106,7 @@ async def test_query_llm_text_supports_system_and_grammar_overrides(
             choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
         )
 
-    fake_client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=fake_create))
-    )
+    fake_client = FakeClient(fake_create)
     _patch_runtime_ready(monkeypatch, client=fake_client)
 
     result = await query_llm_text(
@@ -123,6 +121,7 @@ async def test_query_llm_text_supports_system_and_grammar_overrides(
     )
 
     assert result == "ok"
+    assert fake_client.closed is True
 
 
 @pytest.mark.asyncio
