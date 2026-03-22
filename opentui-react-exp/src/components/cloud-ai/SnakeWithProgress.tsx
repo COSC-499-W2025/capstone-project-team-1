@@ -39,21 +39,13 @@ interface ActivityEntry {
 
 const MAX_ACTIVITY = 100;
 
-// Knight Rider spinner config — gold theme
-const krFrames = createFrames({
+// Knight Rider spinner base config — width is set dynamically per render
+const KR_OPTIONS = {
 	color: theme.gold,
-	style: "blocks",
-	width: 10,
+	style: "blocks" as const,
 	inactiveFactor: 0.6,
 	minAlpha: 0.3,
-});
-const krColors = createColors({
-	color: theme.gold,
-	style: "blocks",
-	width: 10,
-	inactiveFactor: 0.6,
-	minAlpha: 0.3,
-});
+};
 
 export function SnakeWithProgress({
 	zipPath,
@@ -194,6 +186,16 @@ export function SnakeWithProgress({
 
 	const isActive = flowPhase !== "done" && flowPhase !== "error";
 
+	// Knight Rider spinner — full panel width (minus padding)
+	const spinnerWidth = Math.max(4, halfW - 6);
+	const krConfig = useMemo(
+		() => ({
+			frames: createFrames({ ...KR_OPTIONS, width: spinnerWidth }),
+			colors: createColors({ ...KR_OPTIONS, width: spinnerWidth }),
+		}),
+		[spinnerWidth],
+	);
+
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
@@ -271,22 +273,13 @@ export function SnakeWithProgress({
 					paddingRight={2}
 					paddingTop={1}
 				>
-					{/* Layer 1: Status + Knight Rider spinner */}
+					{/* Layer 1: Status + full-width Knight Rider spinner as divider */}
 					<box flexDirection="column" marginBottom={1}>
 						<text>
 							<span fg={theme.gold}>
 								<strong>{PHASE_LABELS[humanPhase]}</strong>
 							</span>
 						</text>
-						{isActive && (
-							<box marginTop={1}>
-								<spinner
-									frames={krFrames}
-									color={krColors}
-									interval={40}
-								/>
-							</box>
-						)}
 						{flowPhase === "done" && (
 							<text>
 								<span fg={theme.success}>
@@ -297,42 +290,58 @@ export function SnakeWithProgress({
 						)}
 					</box>
 
-					{/* Separator */}
+					{/* Full-width spinner divider */}
 					<box marginBottom={1}>
-						<text>
-							<span fg={theme.goldDim}>
-								{"─".repeat(Math.max(1, halfW - 6))}
-							</span>
-						</text>
+						{isActive ? (
+							<spinner
+								frames={krConfig.frames}
+								color={krConfig.colors}
+								interval={40}
+							/>
+						) : (
+							<text>
+								<span fg={theme.goldDim}>
+									{"─".repeat(Math.max(1, halfW - 6))}
+								</span>
+							</text>
+						)}
 					</box>
 
 					{/* Layer 2: Scrollable humanized activity log */}
 					<scrollbox
 						flexGrow={1}
+						flexShrink={1}
+						overflow="hidden"
 						focused={false}
 					>
-						{activity.map((entry, i) => (
-							<box key={i} flexDirection="row" gap={1}>
-								<text>
-									{entry.status === "done" ? (
-										<span fg={theme.success}>✓</span>
-									) : (
-										<span fg={theme.cyan}>●</span>
-									)}
-								</text>
-								<text>
-									<span
-										fg={
-											entry.status === "active"
-												? theme.textPrimary
-												: theme.textDim
-										}
-									>
-										{entry.detail}
-									</span>
-								</text>
-							</box>
-						))}
+						{activity.map((entry, i) => {
+							const maxLen = Math.max(10, halfW - 10);
+							const text = entry.detail.length > maxLen
+								? `${entry.detail.slice(0, maxLen - 3)}...`
+								: entry.detail;
+							return (
+								<box key={i} flexDirection="row" gap={1}>
+									<text>
+										{entry.status === "done" ? (
+											<span fg={theme.success}>✓</span>
+										) : (
+											<span fg={theme.cyan}>●</span>
+										)}
+									</text>
+									<text>
+										<span
+											fg={
+												entry.status === "active"
+													? theme.textPrimary
+													: theme.textDim
+											}
+										>
+											{text}
+										</span>
+									</text>
+								</box>
+							);
+						})}
 					</scrollbox>
 
 					{/* Error display */}
