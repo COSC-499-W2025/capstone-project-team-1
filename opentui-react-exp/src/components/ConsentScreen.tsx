@@ -190,34 +190,34 @@ const PANELS: PanelConfig[] = [
 	},
 	{
 		level: "cloud",
-		title: "Cloud AI",
-		subtitle: "uses ChatGPT",
-		description: "Uses your ChatGPT subscription via Codex. Best quality, no local model needed.",
+		title: "Cloud Agent",
+		subtitle: "uses Copilot models",
+		description: "Uses GitHub Copilot-backed models through the embedded agent flow. Best quality, no local model needed.",
 		sections: [
 			{
-				heading: "What Codex sees",
+				heading: "What the cloud agent sees",
 				headingColor: theme.cyan,
 				items: [
 					{ text: "· Your full project source code" },
 					{ text: "· Commit history & messages" },
 					{ text: "· README files & documentation" },
-					{ text: "Analyzed by OpenAI Codex.", color: theme.textDim },
+					{ text: "Analyzed by the PI agent using your authenticated cloud model.", color: theme.textDim },
 				],
 			},
 			{
 				heading: "Privacy",
 				headingColor: theme.gold,
 				items: [
-					{ text: "Code is sent to OpenAI servers." },
-					{ text: "Subject to OpenAI's data policy." },
-					{ text: "Uses your ChatGPT Plus/Pro plan.", color: theme.textDim },
+					{ text: "Code is sent to your cloud model provider." },
+					{ text: "Subject to your provider's data policy." },
+					{ text: "Current OpenTUI flow signs in with GitHub Copilot.", color: theme.textDim },
 				],
 			},
 		],
 		ratings: [
 			{ text: " + Best quality results", color: theme.success },
 			{ text: " + No local model download", color: theme.success },
-			{ text: " + Uses existing ChatGPT plan", color: theme.success },
+			{ text: " + Uses authenticated cloud models", color: theme.success },
 			{ text: " - Requires network", color: theme.warning },
 			{ text: " - Code leaves your device", color: theme.warning },
 		],
@@ -278,7 +278,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Consent"
-				description="Before we analyze your projects, please choose how you'd like your data to be processed. Each option below offers a different balance of privacy and quality. Your source code never leaves your machine regardless of which option you choose."
+				description="Before we analyze your projects, please choose how you'd like your data to be processed. Local Only and Local AI keep code on-device; the cloud option sends code to your authenticated provider for analysis."
 			/>
 
 			<box
