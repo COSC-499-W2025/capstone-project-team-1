@@ -73,7 +73,6 @@ export function SnakeWithProgress({
 	const [activity, setActivity] = useState<ActivityEntry[]>([]);
 	const [showSnake, setShowSnake] = useState(false);
 	const [isStreamingText, setIsStreamingText] = useState(false);
-	const [hasNewActivity, setHasNewActivity] = useState(false);
 	const [glowIndex, setGlowIndex] = useState(0);
 	const resultRef = useRef<DeveloperProfile | null>(null);
 	const phaseRef = useRef(flowPhase);
@@ -108,7 +107,6 @@ export function SnakeWithProgress({
 			);
 			return [...updated, { tool, detail, status }].slice(-MAX_ACTIVITY);
 		});
-		setHasNewActivity(true);
 	}
 
 	// Infer the human-friendly phase from activity
