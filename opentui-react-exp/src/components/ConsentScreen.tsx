@@ -59,6 +59,7 @@ function ConsentPanel({
 	return (
 		<box
 			flexGrow={1}
+			flexBasis={0}
 			flexDirection="column"
 			padding={2}
 			border
