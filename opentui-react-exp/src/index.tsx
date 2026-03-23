@@ -3,7 +3,7 @@ import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
-import { CloudFlow } from "./components/cloud-ai";
+import { CloudAuth, CloudFlow } from "./components/cloud-ai";
 import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
@@ -56,6 +56,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
 	],
+	"cloud-auth": [{ key: "Esc", label: "Back" }],
 	"cloud-generation": [{ key: "Esc", label: "Back" }],
 	"cloud-resume": [
 		{ key: "↑/↓", label: "Scroll" },
@@ -112,9 +113,13 @@ function App() {
 				// Consent wizard handles its own keyboard events
 				break;
 
+			case "cloud-auth":
+				// CloudAuth handles its own keyboard (Esc via CopilotLogin)
+				break;
+
 			case "file-upload":
 				if (key.name === "escape") {
-					setScreen("consent");
+					setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent");
 				}
 				break;
 
@@ -167,9 +172,17 @@ function App() {
 					<ConsentScreen
 						onContinue={(level?: ConsentLevel) => {
 							if (level) setConsentLevel(level);
-							setScreen("file-upload");
+							setScreen(level === "cloud" ? "cloud-auth" : "file-upload");
 						}}
 						onBack={() => setScreen("landing")}
+					/>
+				);
+
+			case "cloud-auth":
+				return (
+					<CloudAuth
+						onComplete={() => setScreen("file-upload")}
+						onBack={() => setScreen("consent")}
 					/>
 				);
 
@@ -184,7 +197,7 @@ function App() {
 								setScreen("project-list");
 							}
 						}}
-						onBack={() => setScreen("consent")}
+						onBack={() => setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")}
 					/>
 				);
 
