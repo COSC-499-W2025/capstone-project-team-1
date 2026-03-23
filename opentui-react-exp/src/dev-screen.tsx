@@ -21,8 +21,8 @@ function Harness() {
 				zipPath="/dev/null"
 				modelId="claude-haiku-4-5"
 				gitIdentity={null}
-				onComplete={(md) => {
-					console.log("Resume ready:", md.slice(0, 80));
+				onComplete={(profile) => {
+					console.log("Profile ready:", profile.developer_dna.archetype);
 					process.exit(0);
 				}}
 				onBack={() => process.exit(0)}

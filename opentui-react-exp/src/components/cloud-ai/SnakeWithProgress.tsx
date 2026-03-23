@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { generateResume, type ResumeEvent } from "../../agent";
 import { api } from "../../api/endpoints";
+import type { DeveloperProfile } from "../../api/types";
 import { theme } from "../../types";
 import { useToast } from "../Toast";
 import { TopBar } from "../TopBar";
@@ -31,7 +32,7 @@ interface SnakeWithProgressProps {
 	zipPath: string;
 	modelId: string;
 	gitIdentity: GitIdentity | null;
-	onComplete: (markdown: string) => void;
+	onComplete: (profile: DeveloperProfile) => void;
 	onBack: () => void;
 }
 
@@ -74,7 +75,7 @@ export function SnakeWithProgress({
 	const [isStreamingText, setIsStreamingText] = useState(false);
 	const [hasNewActivity, setHasNewActivity] = useState(false);
 	const [glowIndex, setGlowIndex] = useState(0);
-	const resultRef = useRef<string>("");
+	const resultRef = useRef<DeveloperProfile | null>(null);
 	const phaseRef = useRef(flowPhase);
 	phaseRef.current = flowPhase;
 
@@ -125,7 +126,6 @@ export function SnakeWithProgress({
 			if (cancelled) return;
 			switch (event.type) {
 				case "text":
-					resultRef.current += event.delta;
 					if (!isStreamingText) setIsStreamingText(true);
 					break;
 				case "tool_start": {
@@ -142,7 +142,7 @@ export function SnakeWithProgress({
 					);
 					break;
 				case "agent_end":
-					pushActivity("system", "Your resume is ready!", "done");
+					pushActivity("system", "Your developer profile is ready!", "done");
 					setFlowPhase("done");
 					break;
 				case "error":
@@ -162,7 +162,8 @@ export function SnakeWithProgress({
 
 				setFlowPhase("generating");
 				pushActivity("system", "Getting the AI started...");
-				await generateResume(extraction_path, onEvent, modelId, gitIdentity ?? undefined);
+				const profile = await generateResume(extraction_path, onEvent, modelId, gitIdentity ?? undefined);
+				resultRef.current = profile;
 			} catch (err) {
 				if (cancelled) return;
 				setFlowPhase("error");
@@ -192,7 +193,7 @@ export function SnakeWithProgress({
 				}
 				return;
 			}
-			if (phaseRef.current === "done" && key.name === "return") {
+			if (phaseRef.current === "done" && key.name === "return" && resultRef.current) {
 				onComplete(resultRef.current);
 			}
 			if (!showSnake && (key.name === "s" || key.name === "p")) {

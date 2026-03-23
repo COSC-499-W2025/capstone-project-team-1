@@ -4,6 +4,7 @@
  * Auth and model selection are handled earlier (CloudAuth screen),
  * so this component goes straight to generation via SnakeWithProgress.
  */
+import type { DeveloperProfile } from "../../api/types";
 import { SnakeWithProgress } from "./SnakeWithProgress";
 
 interface GitIdentity {
@@ -16,7 +17,7 @@ interface CloudFlowProps {
 	zipPath: string;
 	modelId: string;
 	gitIdentity: GitIdentity | null;
-	onComplete: (markdown: string) => void;
+	onComplete: (profile: DeveloperProfile) => void;
 	onBack: () => void;
 }
 

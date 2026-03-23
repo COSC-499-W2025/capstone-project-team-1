@@ -13,7 +13,7 @@ import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
 import { useSelectionCopy } from "./hooks/useSelectionCopy";
-import type { ConsentLevel } from "./api/types";
+import type { ConsentLevel, DeveloperProfile } from "./api/types";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
@@ -89,7 +89,7 @@ function App() {
 		name: string | null;
 		email: string;
 	} | null>(null);
-	const [cloudMarkdown, setCloudMarkdown] = useState("");
+	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(null);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 
@@ -255,8 +255,8 @@ function App() {
 						zipPath={filePath}
 						modelId={cloudModelId}
 						gitIdentity={cloudGitIdentity}
-						onComplete={(md) => {
-							setCloudMarkdown(md);
+						onComplete={(profile) => {
+							setCloudProfile(profile);
 							setScreen("cloud-resume");
 						}}
 						onBack={() => setScreen("file-upload")}
@@ -264,13 +264,13 @@ function App() {
 				);
 
 			case "cloud-resume":
-				return (
+				return cloudProfile ? (
 					<CloudResumePreview
-						markdown={cloudMarkdown}
+						profile={cloudProfile}
 						onBack={() => setScreen("cloud-generation")}
 						onRestart={() => setScreen("landing")}
 					/>
-				);
+				) : null;
 		}
 	};
 
