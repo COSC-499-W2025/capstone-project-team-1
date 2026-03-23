@@ -839,3 +839,179 @@ def test_generation_start_endpoint_in_openapi(client):
     assert "/local-llm/generation/start" in paths
     assert "post" in paths["/local-llm/generation/start"]
 
+
+# ============================================================================
+# Generation Cancel Tests
+# ============================================================================
+
+
+def test_generation_cancel_valid_request(client, tmp_path):
+    """Test successful cancellation of an active generation job."""
+    zip_path = tmp_path / "generation_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+    assert local_llm._active_generation_id == job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {"ok": True, "status": "cancelled"}
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_no_active_job(client):
+    """Test cancel behavior when no active generation job exists."""
+    local_llm._active_generation_id = None
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "status": "not_found"}
+
+
+def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
+    """Test repeat cancel call behavior after an initial successful cancellation."""
+    zip_path = tmp_path / "repeat_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+
+    first_cancel = client.post("/local-llm/generation/cancel")
+    second_cancel = client.post(f"/local-llm/generation/cancel?job_id={job_id}")
+
+    assert first_cancel.status_code == 200
+    assert first_cancel.json() == {"ok": True, "status": "cancelled"}
+    assert local_llm._active_generation_id is None
+    assert second_cancel.status_code == 200
+    assert second_cancel.json() == {"ok": True, "status": "cancelled"}
+
+
+def test_generation_cancel_stops_runtime_controls_and_hook(client, monkeypatch):
+    """Cancel should stop the async task, call stop_server, and invoke hook."""
+
+    class FakeTask:
+        def __init__(self):
+            self.cancel_called = False
+
+        def cancel(self):
+            self.cancel_called = True
+
+    stop_server_state = {"called": False}
+
+    def _fake_stop_server():
+        stop_server_state["called"] = True
+
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
+
+    hook_state = {"called": 0}
+
+    def _cancel_hook():
+        hook_state["called"] += 1
+
+    job_id = "runtime-job"
+    task = FakeTask()
+    local_llm._generation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+        "generation_task": task,
+    }
+    local_llm.register_generation_cancellation_hook(job_id, _cancel_hook)
+    local_llm._active_generation_id = job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "status": "cancelled"}
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert task.cancel_called is True
+    assert stop_server_state["called"] is True
+    assert hook_state["called"] == 1
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_missing_job_returns_not_found_and_clears_stale_active(client):
+    """Cancelling a stale active job ID should return not_found and clear the pointer."""
+    local_llm._active_generation_id = "stale-job"
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "status": "not_found"}
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_running_calls_stop_server(client, monkeypatch):
+    """Cancelling a running job should call stop_server to kill llama-server."""
+    stop_server_state = {"called": False}
+
+    def _fake_stop_server():
+        stop_server_state["called"] = True
+
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
+
+    job_id = "running-no-task"
+    local_llm._generation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+    }
+    local_llm._active_generation_id = job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "status": "cancelled"}
+    assert stop_server_state["called"] is True
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_endpoint_in_openapi(client):
+    """Verify POST /local-llm/generation/cancel appears in OpenAPI schema."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/generation/cancel" in paths
+    assert "post" in paths["/local-llm/generation/cancel"]
+
