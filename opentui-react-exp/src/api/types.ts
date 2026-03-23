@@ -290,6 +290,12 @@ export interface HiddenStrength {
 	why_it_matters: string;
 }
 
+export interface GrowthArea {
+	area: string;
+	observation: string;
+	suggestion: string;
+}
+
 export interface TalkingPoint {
 	topic: string;
 	story: string;
@@ -337,12 +343,14 @@ export interface ProjectCard {
 	what_it_says_about_you: string;
 	skills: ProjectSkillEvidence[];
 	standout: string;
+	next_level: string[];
 }
 
 export interface DeveloperProfile {
 	resume_markdown: string;
 	developer_dna: DeveloperDNA;
 	hidden_strengths: HiddenStrength[];
+	growth_areas: GrowthArea[];
 	talking_points: TalkingPoint[];
 	impact: Impact;
 	projects: ProjectCard[];
