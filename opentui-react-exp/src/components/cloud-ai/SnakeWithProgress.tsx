@@ -25,6 +25,7 @@ import {
 
 interface SnakeWithProgressProps {
 	zipPath: string;
+	modelId: string;
 	onComplete: (markdown: string) => void;
 	onBack: () => void;
 }
@@ -49,6 +50,7 @@ const KR_OPTIONS = {
 
 export function SnakeWithProgress({
 	zipPath,
+	modelId,
 	onComplete,
 	onBack,
 }: SnakeWithProgressProps) {
@@ -140,7 +142,7 @@ export function SnakeWithProgress({
 
 				setFlowPhase("generating");
 				pushActivity("system", "Getting the AI started...");
-				await generateResume(extraction_path, onEvent);
+				await generateResume(extraction_path, onEvent, modelId);
 			} catch (err) {
 				if (cancelled) return;
 				setFlowPhase("error");
