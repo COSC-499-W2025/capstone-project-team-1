@@ -192,9 +192,12 @@ export async function generateResume(
 
 	try {
 		await session.prompt(
-			"Explore all the code repositories in this directory and generate a professional resume based on what you find. Follow the output format in your instructions exactly.",
+			"Explore all the code repositories in this directory and generate a professional resume based on what you find. Your final response must contain ONLY the resume markdown — start with '# Resume' and include nothing else before it. No preamble, no thinking, no narration.",
 		);
-		return fullText;
+
+		// Safety net: strip any filler text before the actual resume
+		const resumeStart = fullText.indexOf("# Resume");
+		return resumeStart >= 0 ? fullText.slice(resumeStart) : fullText;
 	} finally {
 		dispose();
 	}

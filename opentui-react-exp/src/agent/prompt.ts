@@ -17,6 +17,7 @@ export const RESUME_SYSTEM_PROMPT = `You are a professional resume analyst. Your
    - Package files (package.json, pyproject.toml, Cargo.toml, etc.) for dependencies
    - Project structure for architecture patterns
 3. Synthesize your findings into the resume format below.
+4. Your final text response must contain ONLY the resume markdown — no preamble, no narration, no commentary. Start directly with "# Resume" and end with the last section.
 
 ## Output format
 
@@ -52,4 +53,5 @@ Bullet points highlighting cross-cutting achievements like:
 - Do not invent or hallucinate information.
 - Focus on technical depth over breadth.
 - Keep the tone professional and concise.
+- **CRITICAL**: Your final response must contain ONLY the resume markdown. Do NOT include any preamble, thinking, narration, or commentary like "I'll start by exploring..." or "Here's what I found:". Start directly with "# Resume" and end with the last resume section. Nothing else.
 `;
