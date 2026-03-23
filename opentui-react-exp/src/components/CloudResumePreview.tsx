@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import type {
 	DeveloperProfile,
+	GrowthArea,
 	HiddenStrength,
 	Impact,
 	ProjectCard,
@@ -227,6 +228,42 @@ function HiddenStrengthsSection({ strengths }: { strengths: HiddenStrength[] }) 
 	);
 }
 
+function GrowthAreasSection({ areas }: { areas: GrowthArea[] }) {
+	if (areas.length === 0) return null;
+	return (
+		<box flexDirection="column" marginTop={2}>
+			<text>
+				<span fg={theme.gold}>
+					<strong>Growth Areas</strong>
+				</span>
+			</text>
+			<box height={1} />
+			{areas.map((a, i) => (
+				<box key={i} flexDirection="column" marginBottom={1} paddingLeft={1}>
+					<text>
+						<span fg={theme.warning}>{"\u25b2 "}</span>
+						<span fg={theme.textPrimary}>
+							<strong>{a.area}</strong>
+						</span>
+					</text>
+					<box paddingLeft={2}>
+						<text>
+							<span fg={theme.textSecondary}>{a.observation}</span>
+						</text>
+					</box>
+					<box paddingLeft={2}>
+						<text>
+							<span fg={theme.cyan}>
+								<em>{a.suggestion}</em>
+							</span>
+						</text>
+					</box>
+				</box>
+			))}
+		</box>
+	);
+}
+
 function TalkingPointsSection({ points }: { points: TalkingPoint[] }) {
 	if (points.length === 0) return null;
 	return (
@@ -363,6 +400,7 @@ function InsightsTab({ profile }: { profile: DeveloperProfile }) {
 		<box flexDirection="column">
 			<DNACard dna={profile.developer_dna} />
 			<HiddenStrengthsSection strengths={profile.hidden_strengths} />
+			<GrowthAreasSection areas={profile.growth_areas} />
 			<TalkingPointsSection points={profile.talking_points} />
 			<ImpactSection impact={profile.impact} />
 		</box>
@@ -407,9 +445,22 @@ function ProjectCardView({ project }: { project: ProjectCard }) {
 			{project.standout && (
 				<box marginTop={1}>
 					<text>
-						<span fg={theme.gold}>{"\u2605 Standout: "}</span>
+						<span fg={theme.gold}>{"\ud83d\udc8e Standout: "}</span>
 						<span fg={theme.textSecondary}>{project.standout}</span>
 					</text>
+				</box>
+			)}
+
+			{project.next_level?.length > 0 && (
+				<box flexDirection="column" marginTop={1}>
+					<text>
+						<span fg={theme.warning}>{"\ud83d\ude80 Next level:"}</span>
+					</text>
+					{project.next_level.map((suggestion, i) => (
+						<text key={i}>
+							<span fg={theme.cyan}>{`  \u25b8 ${suggestion}`}</span>
+						</text>
+					))}
 				</box>
 			)}
 		</box>
