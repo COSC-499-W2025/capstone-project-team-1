@@ -24,6 +24,7 @@ from ..helpers.zip_utils import safe_extract_zip
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ..local_llm.runtime.process_manager import stop_server
 from .local_llm_schemas import (
     CancellationResponse,
     ContributorDiscoveryRequest,
@@ -60,99 +61,31 @@ def register_generation_cancellation_hook(job_id: str, cancel_hook: Callable[[],
 
 
 async def _stop_job_runtime(job_id: str, job: Dict) -> None:
-    """Best-effort stop for runtime controls attached to a generation job."""
+    """Stop all runtime controls attached to a generation job.
+
+    Cancels the async generation task (if any), shuts down the
+    llama-server process via the existing process manager, and
+    invokes any registered cancellation hooks.
+    """
     runtime_stopped = False
 
+    # Cancel the async generation task if one is attached.
     generation_task = job.get("generation_task")
     if generation_task is not None and hasattr(generation_task, "cancel"):
         generation_task.cancel()
         runtime_stopped = True
 
-    llama_server_process = job.get("llama_server_process")
-    if llama_server_process is not None:
-        poll_fn = getattr(llama_server_process, "poll", None)
-        is_running = True
-        if callable(poll_fn):
-            try:
-                is_running = poll_fn() is None
-            except Exception:
-                is_running = True
+    # Stop the llama-server process via the runtime process manager.
+    stop_server()
+    runtime_stopped = True
 
-        if is_running:
-            terminate_fn = getattr(llama_server_process, "terminate", None)
-            if callable(terminate_fn):
-                try:
-                    terminate_fn()
-                except Exception:
-                    kill_fn = getattr(llama_server_process, "kill", None)
-                    if callable(kill_fn):
-                        kill_fn()
-            runtime_stopped = True
-
+    # Invoke any registered cancellation hooks for this job.
     cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
     if callable(cancel_hook):
         maybe_awaitable = cancel_hook()
         if inspect.isawaitable(maybe_awaitable):
             await maybe_awaitable
         runtime_stopped = True
-
-    if not runtime_stopped:
-        runtime_stopped = _stop_ollama_runtime(job)
-
-    if job.get("status") == "running" and not runtime_stopped:
-        raise RuntimeError(
-            "Unable to stop running generation runtime. "
-            "No cancellable runtime handle was attached for this job."
-        )
-
-
-def _stop_ollama_runtime(job: Dict) -> bool:
-    """Try stopping active Ollama model(s) for this job.
-
-    Returns True when at least one stop command succeeds.
-    """
-    model_name = job.get("active_model")
-    models_to_stop: List[str] = []
-
-    if isinstance(model_name, str) and model_name.strip():
-        models_to_stop = [model_name.strip()]
-    else:
-        try:
-            ps_result = subprocess.run(
-                ["ollama", "ps"],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-        except (FileNotFoundError, subprocess.SubprocessError):
-            return False
-
-        if ps_result.returncode != 0:
-            return False
-
-        for line in ps_result.stdout.splitlines()[1:]:
-            line = line.strip()
-            if not line:
-                continue
-            model = line.split()[0]
-            if model:
-                models_to_stop.append(model)
-
-    stopped_any = False
-    for model in models_to_stop:
-        try:
-            stop_result = subprocess.run(
-                ["ollama", "stop", model],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            if stop_result.returncode == 0:
-                stopped_any = True
-        except (FileNotFoundError, subprocess.SubprocessError):
-            continue
-
-    return stopped_any
 
 
 class IntakeContext:

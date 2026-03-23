@@ -927,8 +927,8 @@ def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
     assert second_cancel.json() == {"ok": True, "status": "cancelled"}
 
 
-def test_generation_cancel_stops_runtime_controls_and_hook(client):
-    """Cancel should stop runtime task/process controls and invoke hook."""
+def test_generation_cancel_stops_runtime_controls_and_hook(client, monkeypatch):
+    """Cancel should stop the async task, call stop_server, and invoke hook."""
 
     class FakeTask:
         def __init__(self):
@@ -937,15 +937,12 @@ def test_generation_cancel_stops_runtime_controls_and_hook(client):
         def cancel(self):
             self.cancel_called = True
 
-    class FakeProcess:
-        def __init__(self):
-            self.terminate_called = False
+    stop_server_state = {"called": False}
 
-        def poll(self):
-            return None
+    def _fake_stop_server():
+        stop_server_state["called"] = True
 
-        def terminate(self):
-            self.terminate_called = True
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
 
     hook_state = {"called": 0}
 
@@ -954,12 +951,10 @@ def test_generation_cancel_stops_runtime_controls_and_hook(client):
 
     job_id = "runtime-job"
     task = FakeTask()
-    process = FakeProcess()
     local_llm._generation_jobs[job_id] = {
         "job_id": job_id,
         "status": "running",
         "generation_task": task,
-        "llama_server_process": process,
     }
     local_llm.register_generation_cancellation_hook(job_id, _cancel_hook)
     local_llm._active_generation_id = job_id
@@ -970,7 +965,7 @@ def test_generation_cancel_stops_runtime_controls_and_hook(client):
     assert response.json() == {"ok": True, "status": "cancelled"}
     assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
     assert task.cancel_called is True
-    assert process.terminate_called is True
+    assert stop_server_state["called"] is True
     assert hook_state["called"] == 1
     assert local_llm._active_generation_id is None
 
@@ -986,53 +981,27 @@ def test_generation_cancel_missing_job_returns_not_found_and_clears_stale_active
     assert local_llm._active_generation_id is None
 
 
-def test_generation_cancel_running_without_runtime_handles_returns_conflict(client):
-    """Running jobs should not report cancelled unless runtime stop is possible."""
-    job_id = "running-no-runtime"
+def test_generation_cancel_running_calls_stop_server(client, monkeypatch):
+    """Cancelling a running job should call stop_server to kill llama-server."""
+    stop_server_state = {"called": False}
+
+    def _fake_stop_server():
+        stop_server_state["called"] = True
+
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
+
+    job_id = "running-no-task"
     local_llm._generation_jobs[job_id] = {
         "job_id": job_id,
         "status": "running",
     }
     local_llm._active_generation_id = job_id
-
-    response = client.post("/local-llm/generation/cancel")
-
-    assert response.status_code == 409
-    detail = response.json()["detail"]
-    assert "unable to stop running generation runtime" in detail.lower()
-    assert local_llm._generation_jobs[job_id]["status"] == "running"
-    assert local_llm._active_generation_id == job_id
-
-
-def test_generation_cancel_running_uses_ollama_stop_fallback(client, monkeypatch):
-    """If no direct handles exist, Ollama stop fallback can satisfy cancellation."""
-    job_id = "running-ollama-fallback"
-    local_llm._generation_jobs[job_id] = {
-        "job_id": job_id,
-        "status": "running",
-        "active_model": "llama3.2:latest",
-    }
-    local_llm._active_generation_id = job_id
-
-    class _Result:
-        def __init__(self, returncode: int = 0, stdout: str = ""):
-            self.returncode = returncode
-            self.stdout = stdout
-
-    def _fake_run(cmd, capture_output, text, timeout):
-        assert capture_output is True
-        assert text is True
-        assert timeout == 5
-        if cmd == ["ollama", "stop", "llama3.2:latest"]:
-            return _Result(returncode=0)
-        return _Result(returncode=1)
-
-    monkeypatch.setattr(local_llm.subprocess, "run", _fake_run)
 
     response = client.post("/local-llm/generation/cancel")
 
     assert response.status_code == 200
     assert response.json() == {"ok": True, "status": "cancelled"}
+    assert stop_server_state["called"] is True
     assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
     assert local_llm._active_generation_id is None
 
