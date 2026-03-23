@@ -3,10 +3,11 @@ import { useKeyboard } from "@opentui/react";
 import { loginCopilot } from "../../agent";
 import { theme } from "../../types";
 import { TopBar } from "../TopBar";
+import { ModelList } from "./ModelList";
 import { openInBrowser, spinnerFrames } from "./shared";
 
 interface CopilotLoginProps {
-	onComplete: () => void;
+	onComplete: (modelId: string) => void;
 	onBack: () => void;
 }
 
@@ -15,16 +16,17 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 	const [deviceCode, setDeviceCode] = useState<string | null>(null);
 	const [loginProgress, setLoginProgress] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
+	const [loggedIn, setLoggedIn] = useState(false);
 	const [spinnerIndex, setSpinnerIndex] = useState(0);
 	const abortRef = useRef<AbortController | null>(null);
 
 	useEffect(() => {
-		if (error) return;
+		if (error || loggedIn) return;
 		const interval = setInterval(() => {
 			setSpinnerIndex((i) => (i + 1) % spinnerFrames.length);
 		}, 80);
 		return () => clearInterval(interval);
-	}, [error]);
+	}, [error, loggedIn]);
 
 	useEffect(() => {
 		const abortController = new AbortController();
@@ -45,7 +47,7 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 					onProgress: (message) => setLoginProgress(message),
 					signal: abortController.signal,
 				});
-				onComplete();
+				setLoggedIn(true);
 			} catch (err) {
 				if (abortController.signal.aborted) return;
 				setError(err instanceof Error ? err.message : String(err));
@@ -58,11 +60,30 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 	}, []);
 
 	useKeyboard((key) => {
+		// ModelList handles its own keyboard when logged in
+		if (loggedIn) return;
+
 		if (key.name === "escape") {
 			abortRef.current?.abort();
 			onBack();
 		}
 	});
+
+	if (loggedIn) {
+		return (
+			<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
+				<TopBar
+					title="GitHub Copilot Login"
+					description="Sign in with your GitHub account to use AI-powered resume generation."
+				/>
+				<ModelList
+					successMessage="✓ Successfully logged in to GitHub Copilot!"
+					onSelect={onComplete}
+					onBack={onBack}
+				/>
+			</box>
+		);
+	}
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
@@ -164,14 +185,6 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 						</span>
 					</text>
 				</box>
-			</box>
-
-			<box paddingLeft={2} paddingBottom={1}>
-				<text>
-					<span fg={theme.textDim}>
-						Press <span fg={theme.cyan}>Esc</span> to cancel
-					</span>
-				</text>
 			</box>
 		</box>
 	);
