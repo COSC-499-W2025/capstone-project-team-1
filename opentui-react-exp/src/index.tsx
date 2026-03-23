@@ -76,6 +76,11 @@ function App() {
 	const [filePath, setFilePath] = useState("");
 	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
 	const [cloudModelId, setCloudModelId] = useState("");
+	const [cloudGitIdentity, setCloudGitIdentity] = useState<{
+		login: string;
+		name: string | null;
+		email: string;
+	} | null>(null);
 	const [cloudMarkdown, setCloudMarkdown] = useState("");
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
@@ -186,8 +191,9 @@ function App() {
 			case "cloud-auth":
 				return (
 					<CloudAuth
-						onComplete={(modelId) => {
-							setCloudModelId(modelId);
+						onComplete={(result) => {
+							setCloudModelId(result.modelId);
+							setCloudGitIdentity(result.gitIdentity);
 							setScreen("file-upload");
 						}}
 						onBack={() => setScreen("consent")}
@@ -240,6 +246,7 @@ function App() {
 					<CloudFlow
 						zipPath={filePath}
 						modelId={cloudModelId}
+						gitIdentity={cloudGitIdentity}
 						onComplete={(md) => {
 							setCloudMarkdown(md);
 							setScreen("cloud-resume");

@@ -20,6 +20,7 @@ function Harness() {
 			<SnakeWithProgress
 				zipPath="/dev/null"
 				modelId="claude-haiku-4-5"
+				gitIdentity={null}
 				onComplete={(md) => {
 					console.log("Resume ready:", md.slice(0, 80));
 					process.exit(0);
