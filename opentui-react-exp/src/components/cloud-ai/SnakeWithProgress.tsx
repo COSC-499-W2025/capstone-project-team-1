@@ -8,14 +8,12 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import "opentui-spinner/react";
 import { generateResume, type ResumeEvent } from "../../agent";
 import { api } from "../../api/endpoints";
 import { theme } from "../../types";
 import { useToast } from "../Toast";
 import { TopBar } from "../TopBar";
 import { SnakeGame } from "./SnakeGame";
-import { createFrames, createColors } from "./knight-rider-spinner";
 import {
 	humanizeToolCall,
 	inferPhase,
@@ -47,13 +45,17 @@ interface ActivityEntry {
 
 const MAX_ACTIVITY = 100;
 
-// Knight Rider spinner base config — width is set dynamically per render
-const KR_OPTIONS = {
-	color: theme.gold,
-	style: "blocks" as const,
-	inactiveFactor: 0.6,
-	minAlpha: 0.3,
-};
+// Gold color cycle for pulsing glow on status text — wide range for visible pulse
+const glowColors = [
+	"#8B7500", // dim gold
+	"#B8960B",
+	"#DAB520",
+	"#FFD700", // bright gold
+	"#FFED66", // near-white gold
+	"#FFD700",
+	"#DAB520",
+	"#B8960B",
+];
 
 export function SnakeWithProgress({
 	zipPath,
@@ -71,9 +73,19 @@ export function SnakeWithProgress({
 	const [showSnake, setShowSnake] = useState(false);
 	const [isStreamingText, setIsStreamingText] = useState(false);
 	const [hasNewActivity, setHasNewActivity] = useState(false);
+	const [glowIndex, setGlowIndex] = useState(0);
 	const resultRef = useRef<string>("");
 	const phaseRef = useRef(flowPhase);
 	phaseRef.current = flowPhase;
+
+	// Pulsing glow on status text
+	useEffect(() => {
+		if (flowPhase === "done" || flowPhase === "error") return;
+		const interval = setInterval(() => {
+			setGlowIndex((i) => (i + 1) % glowColors.length);
+		}, 250);
+		return () => clearInterval(interval);
+	}, [flowPhase]);
 
 	// Toast when done
 	useEffect(() => {
@@ -196,16 +208,6 @@ export function SnakeWithProgress({
 
 	const isActive = flowPhase !== "done" && flowPhase !== "error";
 
-	// Knight Rider spinner — full panel width (minus padding)
-	const spinnerWidth = Math.max(4, halfW - 6);
-	const krConfig = useMemo(
-		() => ({
-			frames: createFrames({ ...KR_OPTIONS, width: spinnerWidth }),
-			colors: createColors({ ...KR_OPTIONS, width: spinnerWidth }),
-		}),
-		[spinnerWidth],
-	);
-
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
@@ -283,38 +285,31 @@ export function SnakeWithProgress({
 					paddingRight={2}
 					paddingTop={1}
 				>
-					{/* Layer 1: Status + full-width Knight Rider spinner as divider */}
+					{/* Layer 1: Glowing status label + divider */}
 					<box flexDirection="column" marginBottom={1}>
-						<text>
-							<span fg={theme.gold}>
-								<strong>{PHASE_LABELS[humanPhase]}</strong>
-							</span>
-						</text>
-						{flowPhase === "done" && (
+						{flowPhase === "done" ? (
 							<text>
 								<span fg={theme.success}>
 									<strong>✓ Complete</strong>
 								</span>
 								<span fg={theme.textDim}> — press Enter to view</span>
 							</text>
-						)}
-					</box>
-
-					{/* Full-width spinner divider */}
-					<box marginBottom={1}>
-						{isActive ? (
-							<spinner
-								frames={krConfig.frames}
-								color={krConfig.colors}
-								interval={40}
-							/>
 						) : (
 							<text>
-								<span fg={theme.goldDim}>
-									{"─".repeat(Math.max(1, halfW - 6))}
+								<span fg={isActive ? glowColors[glowIndex] : theme.gold}>
+									<strong>{PHASE_LABELS[humanPhase]}</strong>
 								</span>
 							</text>
 						)}
+					</box>
+
+					{/* Gold divider */}
+					<box marginBottom={1}>
+						<text>
+							<span fg={theme.goldDim}>
+								{"─".repeat(Math.max(1, halfW - 6))}
+							</span>
+						</text>
 					</box>
 
 					{/* Layer 2: Scrollable humanized activity log */}
