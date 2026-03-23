@@ -484,6 +484,82 @@ test("Analysis cancels the pipeline from Escape while active", async () => {
 	}
 });
 
+test("Analysis keeps the pipeline active when cancel returns ok=false", async () => {
+	freezeIntervals();
+	let cancelCount = 0;
+	let rendered: RenderedScreen | null = null;
+
+	api.getPipelineStatus = async () =>
+		({
+			status: "running",
+			stage: "FACTS",
+			messages: ["Collecting facts."],
+			telemetry: {
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			},
+			draft: null,
+			output: null,
+			error: null,
+		}) satisfies PipelineStatusResponse;
+
+	api.cancelPipeline = async () => {
+		cancelCount += 1;
+		return { ok: false, status: "running" };
+	};
+
+	const harness = createHarness();
+
+	try {
+		rendered = await testRender(harness.node, { width: 140, height: 40 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-429");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("FACTS");
+			context.setPipelineTelemetry({
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			});
+			context.setPipelineMessages(["Collecting facts."]);
+		});
+		await flushEffects(rendered);
+
+		await act(async () => {
+			keyboardHandler?.({ name: "escape" });
+			await Promise.resolve();
+		});
+		await rendered.renderOnce();
+
+		expect(cancelCount).toBe(1);
+		expect(harness.getContext().state.pipelineStatus).toBe("running");
+		expect(harness.getContext().state.pipelineNotice).toBeNull();
+		expect(rendered.captureCharFrame()).toContain(
+			"Cancellation failed. Pipeline is still running.",
+		);
+	} finally {
+		destroyRenderer(rendered);
+	}
+});
+
 test("Analysis surfaces terminal errors and Escape returns to project-list", async () => {
 	freezeIntervals();
 	const nextTargets: string[] = [];
