@@ -95,11 +95,7 @@ export function PipelineLaunchScreen({
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Launch"
-				title="Review and Start"
-				description="Enter starts the local pipeline job"
-			/>
+			<TopBar title="Launch" />
 
 			<box flexGrow={1} padding={2} justifyContent="center" alignItems="center">
 				<box
