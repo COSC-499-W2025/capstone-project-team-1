@@ -480,6 +480,7 @@ async def start_generation(
         _generation_jobs[job_id] = {
             "job_id": job_id,
             "status": "queued",
+            "stage": "ANALYZE",
             "intake_id": context.intake_id,
             "repo_ids": list(request.repo_ids),
             "user_email": str(request.user_email),
@@ -566,7 +567,7 @@ async def get_generation_status(job_id: str | None = None) -> GenerationStatusRe
 
         return GenerationStatusResponse(
             status=job_data.get("status", "queued"),
-            stage=telemetry.stage,
+            stage=job_data.get("stage", "ANALYZE"),
             messages=job_data.get("messages", []),
             telemetry=telemetry,
             draft=job_data.get("draft"),
