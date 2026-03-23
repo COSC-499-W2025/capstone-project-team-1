@@ -28,6 +28,7 @@ from .registry import resolve_model_descriptor
 _server_process: subprocess.Popen[bytes] | None = None
 _server_port: int | None = None
 _server_model: str | None = None
+_server_models_dir: Path | None = None
 
 _TERMINATE_TIMEOUT_SECONDS = 5
 _atexit_registered = False
@@ -53,10 +54,11 @@ def _pick_free_port() -> int:
 def _reset_state() -> None:
     """Clear all module-level process state."""
 
-    global _server_process, _server_port, _server_model  # noqa: PLW0603
+    global _server_process, _server_port, _server_model, _server_models_dir  # noqa: PLW0603
     _server_process = None
     _server_port = None
     _server_model = None
+    _server_models_dir = None
 
 
 def _is_process_alive() -> bool:
@@ -95,7 +97,9 @@ def start_server(
     the process exits before becoming healthy.
     """
 
-    global _server_process, _server_port, _server_model  # noqa: PLW0603
+    global _server_process, _server_port, _server_model, _server_models_dir  # noqa: PLW0603
+
+    models_dir = Path(models_dir)
 
     if _server_process is not None:
         raise LocalLLMRuntimeError(
@@ -128,6 +132,7 @@ def start_server(
     _server_process = proc
     _server_port = port
     _server_model = model
+    _server_models_dir = models_dir
     global _atexit_registered  # noqa: PLW0603
     if not _atexit_registered:
         atexit.register(stop_server)
@@ -177,6 +182,8 @@ def ensure_server(
       ``ModelServerCrashedError``.
     """
 
+    models_dir = Path(models_dir)
+
     if _server_process is None:
         start_server(model, models_dir=models_dir, timeout=timeout)
         return
@@ -185,7 +192,7 @@ def ensure_server(
     _detect_crash()
 
     # Same model, healthy → reuse
-    if _server_model == model:
+    if _server_model == model and _server_models_dir == models_dir:
         if _server_port is not None and check_health(_server_port):
             return
         restart_server(model, models_dir=models_dir, timeout=timeout)
@@ -203,6 +210,7 @@ def restart_server(
 ) -> None:
     """Stop the current server (if any) and start a fresh one."""
 
+    models_dir = Path(models_dir)
     stop_server()
     start_server(model, models_dir=models_dir, timeout=timeout)
 
@@ -215,6 +223,8 @@ def get_server_status() -> RuntimeStatus:
     when the process is alive.
     """
 
+    models_dir = _server_models_dir or DEFAULT_MODELS_DIR
+
     if _server_process is None:
         return RuntimeStatus(
             loaded_model=None,
@@ -222,7 +232,7 @@ def get_server_status() -> RuntimeStatus:
             server_port=None,
             is_running=False,
             is_healthy=False,
-            models_dir=DEFAULT_MODELS_DIR,
+            models_dir=models_dir,
         )
 
     running = _is_process_alive()
@@ -236,5 +246,5 @@ def get_server_status() -> RuntimeStatus:
         server_port=_server_port if running else None,
         is_running=running,
         is_healthy=healthy,
-        models_dir=DEFAULT_MODELS_DIR,
+        models_dir=models_dir,
     )

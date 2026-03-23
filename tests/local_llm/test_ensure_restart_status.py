@@ -10,6 +10,7 @@ import pytest
 
 from artifactminer.local_llm.models import ModelDescriptor, RuntimeStatus
 from artifactminer.local_llm.runtime import process_manager
+from artifactminer.local_llm.runtime.config import DEFAULT_MODELS_DIR
 from artifactminer.local_llm.runtime.errors import ModelServerCrashedError
 
 
@@ -52,7 +53,11 @@ def alt_descriptor(tmp_path: Path) -> ModelDescriptor:
     )
 
 
-def _inject_running_server(model: str = "stub-model", port: int = 9999) -> MagicMock:
+def _inject_running_server(
+    model: str = "stub-model",
+    port: int = 9999,
+    models_dir: Path = DEFAULT_MODELS_DIR,
+) -> MagicMock:
     """Simulate a healthy running server by setting module-level state."""
 
     mock_proc = MagicMock(spec=subprocess.Popen)
@@ -61,6 +66,7 @@ def _inject_running_server(model: str = "stub-model", port: int = 9999) -> Magic
     process_manager._server_process = mock_proc
     process_manager._server_port = port
     process_manager._server_model = model
+    process_manager._server_models_dir = models_dir
     return mock_proc
 
 
@@ -152,6 +158,7 @@ class TestEnsureServer:
 
         assert process_manager._server_process is mock_proc
         assert process_manager._server_model == "stub-model"
+        assert process_manager._server_models_dir == Path("/tmp")
 
     def test_reuses_healthy_server(self) -> None:
         """Returns immediately when the same model is already loaded."""
@@ -195,6 +202,45 @@ class TestEnsureServer:
         old_proc.terminate.assert_called_once()
         assert process_manager._server_process is new_proc
         assert process_manager._server_model == "stub-model"
+        assert process_manager._server_port == 8888
+
+    def test_restarts_same_model_when_models_dir_changes(
+        self, stub_descriptor: ModelDescriptor
+    ) -> None:
+        """Restarts when the same model is requested from a different directory."""
+
+        old_proc = _inject_running_server(
+            model="stub-model",
+            models_dir=DEFAULT_MODELS_DIR,
+        )
+        new_proc = MagicMock(spec=subprocess.Popen)
+        new_proc.pid = 67890
+        requested_models_dir = Path("/tmp/alternate-models")
+
+        with (
+            patch.object(process_manager, "check_health", return_value=True),
+            patch.object(
+                process_manager, "_find_llama_server", return_value="/bin/llama-server"
+            ),
+            patch.object(
+                process_manager,
+                "resolve_model_descriptor",
+                return_value=stub_descriptor,
+            ),
+            patch.object(process_manager, "_pick_free_port", return_value=8888),
+            patch("subprocess.Popen", return_value=new_proc),
+            patch.object(process_manager, "poll_until_healthy"),
+            patch("atexit.register"),
+        ):
+            process_manager.ensure_server(
+                "stub-model",
+                models_dir=requested_models_dir,
+            )
+
+        old_proc.terminate.assert_called_once()
+        assert process_manager._server_process is new_proc
+        assert process_manager._server_model == "stub-model"
+        assert process_manager._server_models_dir == requested_models_dir
         assert process_manager._server_port == 8888
 
     def test_restarts_for_different_model(
@@ -329,6 +375,7 @@ class TestGetServerStatus:
         assert status.loaded_model is None
         assert status.server_pid is None
         assert status.server_port is None
+        assert status.models_dir == DEFAULT_MODELS_DIR
 
     def test_running_healthy_status(self) -> None:
         """Returns full status when server is running and healthy."""
@@ -343,6 +390,7 @@ class TestGetServerStatus:
         assert status.loaded_model == "stub-model"
         assert status.server_pid == 12345
         assert status.server_port == 9999
+        assert status.models_dir == DEFAULT_MODELS_DIR
 
     def test_running_unhealthy_status(self) -> None:
         """Reports unhealthy when server is running but health check fails."""
@@ -355,10 +403,30 @@ class TestGetServerStatus:
         assert status.is_running is True
         assert status.is_healthy is False
 
+    def test_running_status_uses_active_models_dir(self) -> None:
+        """Reports the active runtime directory for custom model locations."""
+
+        custom_models_dir = Path("/tmp/custom-models")
+        _inject_running_server(
+            model="stub-model",
+            port=9999,
+            models_dir=custom_models_dir,
+        )
+
+        with patch.object(process_manager, "check_health", return_value=True):
+            status = process_manager.get_server_status()
+
+        assert status.models_dir == custom_models_dir
+
     def test_crashed_status(self) -> None:
         """Reports not running when the process has exited."""
 
-        mock_proc = _inject_running_server(model="stub-model", port=9999)
+        custom_models_dir = Path("/tmp/custom-models")
+        mock_proc = _inject_running_server(
+            model="stub-model",
+            port=9999,
+            models_dir=custom_models_dir,
+        )
         mock_proc.poll.return_value = 1
 
         status = process_manager.get_server_status()
@@ -369,3 +437,4 @@ class TestGetServerStatus:
         assert status.server_port is None
         # Model name preserved for debugging
         assert status.loaded_model == "stub-model"
+        assert status.models_dir == custom_models_dir
