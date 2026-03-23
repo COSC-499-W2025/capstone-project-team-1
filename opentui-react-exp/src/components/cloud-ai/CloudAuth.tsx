@@ -2,18 +2,18 @@
  * Auth gate + model picker for the cloud flow.
  *
  * Checks for existing credentials on mount:
- * - If already authenticated → shows success card + model picker
- * - If not authenticated → renders CopilotLogin (which shows model picker after login)
+ * - If already authenticated → fetches GitHub profile, shows success card + model picker
+ * - If not authenticated → renders CopilotLogin (which handles login + model picker)
  */
 import { useEffect, useState } from "react";
-import { checkAvailableModels } from "../../agent";
+import { checkAvailableModels, fetchGitHubUser, type GitHubUser } from "../../agent";
 import { theme } from "../../types";
 import { TopBar } from "../TopBar";
 import { CopilotLogin } from "./CopilotLogin";
-import { ModelList } from "./ModelList";
+import { ModelList, type ModelListResult } from "./ModelList";
 
 interface CloudAuthProps {
-	onComplete: (modelId: string) => void;
+	onComplete: (result: ModelListResult) => void;
 	onBack: () => void;
 }
 
@@ -21,12 +21,23 @@ type AuthState = "checking" | "needs-login" | "pick-model";
 
 export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 	const [state, setState] = useState<AuthState>("checking");
+	const [ghUser, setGhUser] = useState<GitHubUser | null>(null);
 
 	useEffect(() => {
 		(async () => {
 			try {
 				const result = await checkAvailableModels();
-				setState(result.available ? "pick-model" : "needs-login");
+				if (result.available) {
+					try {
+						const user = await fetchGitHubUser();
+						setGhUser(user);
+					} catch {
+						// Non-fatal
+					}
+					setState("pick-model");
+				} else {
+					setState("needs-login");
+				}
 			} catch {
 				setState("needs-login");
 			}
@@ -47,6 +58,7 @@ export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 			/>
 			<ModelList
 				successMessage="✓ Already logged in to GitHub Copilot"
+				user={ghUser}
 				onSelect={onComplete}
 				onBack={onBack}
 			/>
