@@ -1,6 +1,6 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { ConsentScreen } from "./components/ConsentScreen";
@@ -8,9 +8,20 @@ import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
 import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
+import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
+import type { Breadcrumb } from "./components/BottomBar";
+
+// Screens shown in breadcrumbs (in order)
+const BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
+	{ screen: "consent", label: "Consent" },
+	{ screen: "file-upload", label: "Upload" },
+	{ screen: "project-list", label: "Projects" },
+	{ screen: "analysis", label: "Analyze" },
+	{ screen: "resume-preview", label: "Resume" },
+];
 
 // Key actions for each screen
 const screenActions: Record<Screen, KeyAction[]> = {
@@ -23,11 +34,12 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Confirm" },
 		{ key: "Esc", label: "Back" },
 	],
+	"consent-policy": [{ key: "Esc", label: "Back" }],
 	"file-upload": [
 		{ key: "↑/↓", label: "Navigate" },
+		{ key: "←/→", label: "Browse" },
+		{ key: "/", label: "Search" },
 		{ key: "Enter", label: "Open/Select" },
-		{ key: "Backspace", label: "Up" },
-		{ key: "Ctrl+H", label: "Hidden" },
 		{ key: "Esc", label: "Back" },
 	],
 	"project-list": [
@@ -35,7 +47,25 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Analyze" },
 		{ key: "Esc", label: "Back" },
 	],
+	identity: [
+		{ key: "↑/↓", label: "Navigate" },
+		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
+	"pipeline-launch": [
+		{ key: "Enter", label: "Start" },
+		{ key: "Esc", label: "Back" },
+	],
 	analysis: [{ key: "", label: "Processing..." }],
+	"draft-pause": [
+		{ key: "Enter", label: "Continue" },
+		{ key: "Esc", label: "Back" },
+	],
+	feedback: [
+		{ key: "Tab", label: "Next Field" },
+		{ key: "Enter", label: "Submit" },
+		{ key: "Esc", label: "Cancel" },
+	],
 	"resume-preview": [
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
@@ -47,6 +77,25 @@ function App() {
 	const renderer = useRenderer();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
+	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
+	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
+
+	const navigateTo = (target: Screen) => {
+		setScreen(target);
+	};
+
+	useEffect(() => {
+		if (screen === "landing") {
+			setIsLandingIntroPhase(true);
+		} else {
+			setVisitedScreens((prev) => {
+				if (prev.has(screen)) return prev;
+				const next = new Set(prev);
+				next.add(screen);
+				return next;
+			});
+		}
+	}, [screen]);
 
 	// Global keyboard handler
 	useKeyboard((key) => {
@@ -67,6 +116,13 @@ function App() {
 
 			case "consent":
 				// Consent wizard handles its own keyboard events
+				break;
+
+			case "consent-policy":
+			case "identity":
+			case "pipeline-launch":
+			case "draft-pause":
+			case "feedback":
 				break;
 
 			case "file-upload":
@@ -100,7 +156,12 @@ function App() {
 	const renderScreen = () => {
 		switch (screen) {
 			case "landing":
-				return <Landing onGetStarted={() => setScreen("consent")} />;
+				return (
+					<Landing
+						onGetStarted={() => setScreen("consent")}
+						onIntroPhaseChange={setIsLandingIntroPhase}
+					/>
+				);
 
 			case "consent":
 				return (
@@ -148,16 +209,50 @@ function App() {
 						onRestart={() => setScreen("landing")}
 					/>
 				);
+
+			case "consent-policy":
+			case "identity":
+			case "pipeline-launch":
+			case "draft-pause":
+			case "feedback":
+				return null;
 		}
 	};
+
+	const screenForward: Record<string, { onForward?: () => void; forwardLabel?: string }> = {
+		"project-list": {
+			onForward: () => setScreen("analysis"),
+			forwardLabel: "Analyze",
+		},
+	};
+
+	const forward = screenForward[screen] ?? {};
+	const visibleActions =
+		screen === "landing" && isLandingIntroPhase ? [] : screenActions[screen];
+
+	const breadcrumbs: Breadcrumb[] | undefined =
+		screen === "landing"
+			? undefined
+			: BREADCRUMB_SCREENS.map(({ screen: s, label }) => ({
+					screen: s,
+					label,
+					visited: visitedScreens.has(s),
+				}));
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			{/* Main content area */}
 			<box flexGrow={1}>{renderScreen()}</box>
 
-			{/* Bottom bar with keyboard shortcuts */}
-			<BottomBar actions={screenActions[screen]} />
+			{/* Bottom bar */}
+			<BottomBar
+				actions={visibleActions}
+				breadcrumbs={breadcrumbs}
+				currentScreen={screen}
+				onNavigate={navigateTo}
+				onForward={forward.onForward}
+				forwardLabel={forward.forwardLabel}
+			/>
 		</box>
 	);
 }
@@ -165,6 +260,8 @@ function App() {
 const renderer = await createCliRenderer();
 createRoot(renderer).render(
 	<AppProvider>
-		<App />
-	</AppProvider>
+		<ToastProvider>
+			<App />
+		</ToastProvider>
+	</AppProvider>,
 );

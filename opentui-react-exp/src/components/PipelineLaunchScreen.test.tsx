@@ -206,7 +206,7 @@ test("PipelineLaunchScreen shows a validation error instead of launching with mi
 			status: 200,
 			headers: { "Content-Type": "application/json" },
 		});
-	}) as typeof fetch;
+	}) as unknown as typeof fetch;
 
 	await rendered.renderOnce();
 	await act(async () => {

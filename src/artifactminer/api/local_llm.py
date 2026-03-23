@@ -11,24 +11,29 @@ These endpoints support the full local generation pipeline as an alternative
 to cloud-based generation workflows.
 """
 
+import inspect
 import shutil
 import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List
 from zipfile import ZipFile, is_zipfile
 from ..helpers.zip_utils import safe_extract_zip
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
+from ..local_llm.runtime.process_manager import stop_server
 from .local_llm_schemas import (
+    CancellationResponse,
     ContributorDiscoveryRequest,
     ContributorDiscoveryResponse,
     ContributorIdentity,
     GenerationStartRequest,
     GenerationStartResponse,
+    GenerationStatusResponse,
+    GenerationTelemetry,
     IntakeCreateRequest,
     IntakeCreateResponse,
     PolishRequest,
@@ -51,6 +56,40 @@ _active_intakes: Dict[str, Dict] = {}
 # Maps job_id -> minimal generation request context
 _generation_jobs: Dict[str, Dict] = {}
 _active_generation_id: str | None = None
+_generation_cancel_hooks: Dict[str, Callable[[], Any]] = {}
+
+
+def register_generation_cancellation_hook(job_id: str, cancel_hook: Callable[[], Any]) -> None:
+    """Register optional runtime cancellation hook for a generation job."""
+    _generation_cancel_hooks[job_id] = cancel_hook
+
+
+async def _stop_job_runtime(job_id: str, job: Dict) -> None:
+    """Stop all runtime controls attached to a generation job.
+
+    Cancels the async generation task (if any), shuts down the
+    llama-server process via the existing process manager, and
+    invokes any registered cancellation hooks.
+    """
+    runtime_stopped = False
+
+    # Cancel the async generation task if one is attached.
+    generation_task = job.get("generation_task")
+    if generation_task is not None and hasattr(generation_task, "cancel"):
+        generation_task.cancel()
+        runtime_stopped = True
+
+    # Stop the llama-server process via the runtime process manager.
+    stop_server()
+    runtime_stopped = True
+
+    # Invoke any registered cancellation hooks for this job.
+    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
+    if callable(cancel_hook):
+        maybe_awaitable = cancel_hook()
+        if inspect.isawaitable(maybe_awaitable):
+            await maybe_awaitable
+        runtime_stopped = True
 
 
 class IntakeContext:
@@ -480,6 +519,7 @@ async def start_generation(
         _generation_jobs[job_id] = {
             "job_id": job_id,
             "status": "queued",
+            "stage": "ANALYZE",
             "intake_id": context.intake_id,
             "repo_ids": list(request.repo_ids),
             "user_email": str(request.user_email),
@@ -505,6 +545,136 @@ async def start_generation(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start generation: {str(e)}",
+        )
+
+
+@router.post("/generation/cancel", response_model=CancellationResponse)
+async def cancel_generation(
+    job_id: str | None = Query(default=None, description="Job ID to cancel. Defaults to the current active job.")
+) -> CancellationResponse:
+    """Cancel a generation job by job_id, or the current active job if no job_id is provided.
+
+    This operation is idempotent. Cancelling an already-cancelled job returns
+    ok=True. If no matching job exists, returns ok=False.
+
+    Returns:
+        CancellationResponse describing the post-cancel state.
+    """
+    global _active_generation_id
+
+    # Resolve which job to target.
+    target_id = job_id if job_id is not None else _active_generation_id
+
+    # No job to cancel.
+    if target_id is None:
+        return CancellationResponse(ok=False, status="not_found")
+
+    target_job = _generation_jobs.get(target_id)
+
+    # If the target job doesn't exist, clear stale active pointer if applicable.
+    if target_job is None:
+        if target_id == _active_generation_id:
+            _active_generation_id = None
+        return CancellationResponse(ok=False, status="not_found")
+
+    # Idempotent: already cancelled — return success without side-effects.
+    if target_job.get("status") == "cancelled":
+        if target_id == _active_generation_id:
+            _active_generation_id = None
+        return CancellationResponse(ok=True, status="cancelled")
+
+    try:
+        await _stop_job_runtime(target_id, target_job)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
+
+    target_job["status"] = "cancelled"
+    if target_id == _active_generation_id:
+        _active_generation_id = None
+    _generation_cancel_hooks.pop(target_id, None)
+    return CancellationResponse(ok=True, status="cancelled")
+"""
+note that the data is initally returned with null/zero values
+its expected that a background worker would need to update the job as it processes. 
+"""
+@router.get("/generation/status", response_model=GenerationStatusResponse)
+async def get_generation_status(job_id: str | None = None) -> GenerationStatusResponse:
+    """Get the current status of a generation job.
+    
+    Returns the real-time status of an in-flight generation, including
+    current stage, progress metrics (telemetry), draft output, and errors.
+    This endpoint supports polling-based monitoring of the generation pipeline.
+
+    Args:
+        job_id: Optional job ID returned by /generation/start. If not provided,
+                returns status of the most recent/active generation job.
+
+    Returns:
+        GenerationStatusResponse with current job state, or 404 if no job found
+
+    Raises:
+        HTTPException: 404 if job not found
+    """
+    global _active_generation_id
+
+    try:
+        # Determine which job to retrieve
+        target_job_id = job_id if job_id else _active_generation_id
+        
+        # Check if the target job exists
+        if not target_job_id or target_job_id not in _generation_jobs:
+            raise ValueError(
+                f"No generation job found" + 
+                (f" with ID: {target_job_id}" if target_job_id else "")
+            )
+
+        # Retrieve the job state
+        job_data = _generation_jobs[target_job_id]
+
+        # Build response from stored job state
+        # Initialize telemetry with defaults if not present
+        telemetry_data = job_data.get("telemetry", {})
+        if not telemetry_data:
+            telemetry_data = {
+                "stage": "ANALYZE",
+                "active_model": None,
+                "repos_total": len(job_data.get("repo_ids", [])),
+                "repos_done": 0,
+                "current_repo": None,
+                "facts_total": 0,
+                "draft_projects": 0,
+                "polished_projects": 0,
+                "elapsed_seconds": 0.0,
+                "model_check_seconds": 0.0,
+                "selected_repos": job_data.get("repo_ids", []),
+            }
+
+        telemetry = GenerationTelemetry(**telemetry_data)
+
+        return GenerationStatusResponse(
+            status=job_data.get("status", "queued"),
+            stage=job_data.get("stage", "ANALYZE"),
+            messages=job_data.get("messages", []),
+            telemetry=telemetry,
+            draft=job_data.get("draft"),
+            output=job_data.get("output"),
+            error=job_data.get("error"),
+        )
+
+    except ValueError as e:
+        # No job found is a 404
+        raise HTTPException(
+            status_code=404,
+            detail=str(e),
+        )
+
+    except Exception as e:
+        # Internal server error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve generation status: {str(e)}",
         )
 
 

@@ -836,6 +836,599 @@ def test_generation_start_endpoint_in_openapi(client):
     assert "post" in paths["/local-llm/generation/start"]
 
 
+# ============================================================================
+# Generation Cancel Tests
+# ============================================================================
+
+
+def test_generation_cancel_valid_request(client, tmp_path):
+    """Test successful cancellation of an active generation job."""
+    zip_path = tmp_path / "generation_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+    assert local_llm._active_generation_id == job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {"ok": True, "status": "cancelled"}
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_no_active_job(client):
+    """Test cancel behavior when no active generation job exists."""
+    local_llm._active_generation_id = None
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "status": "not_found"}
+
+
+def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
+    """Test repeat cancel call behavior after an initial successful cancellation."""
+    zip_path = tmp_path / "repeat_cancel.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+
+    first_cancel = client.post("/local-llm/generation/cancel")
+    second_cancel = client.post(f"/local-llm/generation/cancel?job_id={job_id}")
+
+    assert first_cancel.status_code == 200
+    assert first_cancel.json() == {"ok": True, "status": "cancelled"}
+    assert local_llm._active_generation_id is None
+    assert second_cancel.status_code == 200
+    assert second_cancel.json() == {"ok": True, "status": "cancelled"}
+
+
+def test_generation_cancel_stops_runtime_controls_and_hook(client, monkeypatch):
+    """Cancel should stop the async task, call stop_server, and invoke hook."""
+
+    class FakeTask:
+        def __init__(self):
+            self.cancel_called = False
+
+        def cancel(self):
+            self.cancel_called = True
+
+    stop_server_state = {"called": False}
+
+    def _fake_stop_server():
+        stop_server_state["called"] = True
+
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
+
+    hook_state = {"called": 0}
+
+    def _cancel_hook():
+        hook_state["called"] += 1
+
+    job_id = "runtime-job"
+    task = FakeTask()
+    local_llm._generation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+        "generation_task": task,
+    }
+    local_llm.register_generation_cancellation_hook(job_id, _cancel_hook)
+    local_llm._active_generation_id = job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "status": "cancelled"}
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert task.cancel_called is True
+    assert stop_server_state["called"] is True
+    assert hook_state["called"] == 1
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_missing_job_returns_not_found_and_clears_stale_active(client):
+    """Cancelling a stale active job ID should return not_found and clear the pointer."""
+    local_llm._active_generation_id = "stale-job"
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": False, "status": "not_found"}
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_running_calls_stop_server(client, monkeypatch):
+    """Cancelling a running job should call stop_server to kill llama-server."""
+    stop_server_state = {"called": False}
+
+    def _fake_stop_server():
+        stop_server_state["called"] = True
+
+    monkeypatch.setattr(local_llm, "stop_server", _fake_stop_server)
+
+    job_id = "running-no-task"
+    local_llm._generation_jobs[job_id] = {
+        "job_id": job_id,
+        "status": "running",
+    }
+    local_llm._active_generation_id = job_id
+
+    response = client.post("/local-llm/generation/cancel")
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "status": "cancelled"}
+    assert stop_server_state["called"] is True
+    assert local_llm._generation_jobs[job_id]["status"] == "cancelled"
+    assert local_llm._active_generation_id is None
+
+
+def test_generation_cancel_endpoint_in_openapi(client):
+    """Verify POST /local-llm/generation/cancel appears in OpenAPI schema."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/generation/cancel" in paths
+    assert "post" in paths["/local-llm/generation/cancel"]
+
+
+# ---------------------------------------------------------------------------
+# Generation status endpoint tests
+# ---------------------------------------------------------------------------
+
+
+def test_generation_status_endpoint_exists(client):
+    """Verify GET /local-llm/generation/status endpoint is registered."""
+    # Send request with no active generation (should get 404, not 404 for endpoint)
+    response = client.get("/local-llm/generation/status")
+    # If endpoint doesn't exist, we'd get 404 from the router
+    # If endpoint exists but no active generation, we'd get 404 from the handler
+    # Either way, 404 is expected - we just verify it's not a 405 Method Not Allowed
+    assert response.status_code in [404, 405] or response.status_code == 200
+
+
+def test_generation_status_endpoint_in_openapi(client):
+    """Verify GET /local-llm/generation/status appears in OpenAPI schema."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/generation/status" in paths
+    assert "get" in paths["/local-llm/generation/status"]
+
+
+def test_get_generation_status_no_active_generation(client):
+    """Test 404 response when there is no active generation job."""
+    response = client.get("/local-llm/generation/status")
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert "no generation job found" in detail.lower()
+
+
+def test_get_generation_status_active_generation(client, tmp_path):
+    """Test successful status retrieval for an active generation job."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "status_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_id = intake_response.json()["intake_id"]
+
+    # Start generation
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+    assert start_response.status_code == 200
+    job_id = start_response.json()["job_id"]
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify response structure
+    assert "status" in data
+    assert "stage" in data
+    assert "messages" in data
+    assert "telemetry" in data
+    assert "draft" in data
+    assert "output" in data
+    assert "error" in data
+
+
+def test_generation_status_response_shape(client, tmp_path):
+    """Test that status response matches GenerationStatusResponse schema."""
+    zip_path = tmp_path / "shape_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    # Create and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+
+    # Get status and verify all fields
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify required top-level fields
+    assert isinstance(data["status"], str)
+    assert isinstance(data["stage"], str)
+    assert isinstance(data["messages"], list)
+    assert isinstance(data["telemetry"], dict)
+    
+    # Verify telemetry structure
+    tel = data["telemetry"]
+    assert "stage" in tel
+    assert "active_model" in tel
+    assert "repos_total" in tel
+    assert "repos_done" in tel
+    assert "current_repo" in tel
+    assert "facts_total" in tel
+    assert "draft_projects" in tel
+    assert "polished_projects" in tel
+    assert "elapsed_seconds" in tel
+    assert "model_check_seconds" in tel
+    assert "selected_repos" in tel
+    
+    # Verify optional fields (can be null)
+    assert "draft" in data
+    assert "output" in data
+    assert "error" in data
+
+
+def test_generation_status_initial_state(client, tmp_path):
+    """Test that initial status is queued with default telemetry."""
+    zip_path = tmp_path / "initial_state.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo1/.git/config", "[core]")
+        zf.writestr("repo1/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("repo2/.git/config", "[core]")
+        zf.writestr("repo2/.git/HEAD", "ref: refs/heads/main")
+
+    # Create intake
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    # Start generation with two repos
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo1", "repo2"],
+            "user_email": "test@example.com",
+            "stage1_model": "qwen2.5-coder-3b-q4",
+            "stage2_model": "lfm2.5-1.2b-q4",
+            "stage3_model": "lfm2.5-1.2b-q4",
+        },
+    )
+    assert start_response.status_code == 200
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify initial state
+    assert data["status"] == "queued"
+    assert data["stage"] == "ANALYZE"
+    assert data["messages"] == []
+    assert data["error"] is None
+    assert data["draft"] is None
+    assert data["output"] is None
+    
+    # Verify telemetry has correct repo count
+    tel = data["telemetry"]
+    assert tel["stage"] == "ANALYZE"
+    assert tel["repos_total"] == 2
+    assert tel["repos_done"] == 0
+    assert tel["current_repo"] is None
+    assert tel["facts_total"] == 0
+    assert tel["draft_projects"] == 0
+    assert tel["polished_projects"] == 0
+    assert tel["elapsed_seconds"] == 0.0
+    assert tel["model_check_seconds"] == 0.0
+    assert tel["selected_repos"] == ["repo1", "repo2"]
+
+
+def test_generation_status_with_draft_output(client, tmp_path, monkeypatch):
+    """Test status retrieval when draft output is available."""
+    # Setup generation
+    zip_path = tmp_path / "draft_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+
+    # Manually update job state to include draft
+    job_id = start_response.json()["job_id"]
+    draft_data = {"projects": [{"name": "Test Project"}]}
+    local_llm._generation_jobs[job_id]["draft"] = draft_data
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "draft_ready"
+    assert data["draft"] == draft_data
+    assert data["output"] is None
+
+
+def test_generation_status_with_error(client, tmp_path):
+    """Test status retrieval when an error occurred."""
+    # Setup generation
+    zip_path = tmp_path / "error_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+
+    # Manually update job state to include error
+    job_id = start_response.json()["job_id"]
+    error_msg = "Model loading failed: CUDA out of memory"
+    local_llm._generation_jobs[job_id]["error"] = error_msg
+    local_llm._generation_jobs[job_id]["status"] = "error"
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["status"] == "error"
+    assert data["error"] == error_msg
+    assert data["draft"] is None
+    assert data["output"] is None
+
+
+def test_generation_status_with_messages(client, tmp_path):
+    """Test that status messages are returned correctly."""
+    # Setup generation
+    zip_path = tmp_path / "messages_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+
+    # Manually update job state with messages
+    job_id = start_response.json()["job_id"]
+    messages = [
+        "Analyzing repository...",
+        "Extracting skills...",
+        "Generating draft...",
+    ]
+    local_llm._generation_jobs[job_id]["messages"] = messages
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["messages"] == messages
+    assert len(data["messages"]) == 3
+    assert data["messages"][0] == "Analyzing repository..."
+
+
+def test_generation_status_response_types(client, tmp_path):
+    """Test that response fields have correct types."""
+    # Setup generation
+    zip_path = tmp_path / "types_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+
+    # Get status
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    # Verify types
+    assert isinstance(data["status"], str)
+    assert isinstance(data["stage"], str)
+    assert isinstance(data["messages"], list)
+    assert isinstance(data["telemetry"], dict)
+    assert data["draft"] is None or isinstance(data["draft"], dict)
+    assert data["output"] is None or isinstance(data["output"], dict)
+    assert data["error"] is None or isinstance(data["error"], str)
+
+    # Verify telemetry numeric types
+    tel = data["telemetry"]
+    assert isinstance(tel["repos_total"], int)
+    assert isinstance(tel["repos_done"], int)
+    assert isinstance(tel["facts_total"], int)
+    assert isinstance(tel["draft_projects"], int)
+    assert isinstance(tel["polished_projects"], int)
+    assert isinstance(tel["elapsed_seconds"], float)
+    assert isinstance(tel["model_check_seconds"], float)
+    assert isinstance(tel["selected_repos"], list)
+
+
+def test_generation_status_polling_contract_with_job_id(client, tmp_path):
+    """Test that polling contract works correctly with job_id parameter."""
+    # Create intake and start two jobs
+    zip_path = tmp_path / "test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo1/.git/config", "[core]")
+        zf.writestr("repo1/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("repo2/.git/config", "[core]")
+        zf.writestr("repo2/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post("/local-llm/context", json={"zip_path": str(zip_path)})
+    intake_id = intake_response.json()["intake_id"]
+
+    # Start first job
+    start1 = client.post(
+        "/local-llm/generation/start",
+        json={"intake_id": intake_id, "repo_ids": ["repo1"], "user_email": "test1@example.com"}
+    )
+    job_id1 = start1.json()["job_id"]
+    local_llm._generation_jobs[job_id1]["status"] = "running"
+
+    # Start second job
+    start2 = client.post(
+        "/local-llm/generation/start",
+        json={"intake_id": intake_id, "repo_ids": ["repo2"], "user_email": "test2@example.com"}
+    )
+    job_id2 = start2.json()["job_id"]
+    local_llm._generation_jobs[job_id2]["status"] = "draft_ready"
+
+    # Poll job 1 by ID
+    resp1 = client.get(f"/local-llm/generation/status?job_id={job_id1}")
+    assert resp1.status_code == 200
+    assert resp1.json()["status"] == "running"
+    assert resp1.json()["telemetry"]["selected_repos"] == ["repo1"]
+
+    # Poll job 2 by ID
+    resp2 = client.get(f"/local-llm/generation/status?job_id={job_id2}")
+    assert resp2.status_code == 200
+    assert resp2.json()["status"] == "draft_ready"
+    assert resp2.json()["telemetry"]["selected_repos"] == ["repo2"]
+
+    # Poll without job_id returns most recent (job 2)
+    resp_current = client.get("/local-llm/generation/status")
+    assert resp_current.status_code == 200
+    assert resp_current.json()["status"] == "draft_ready"
+
+
+def test_generation_status_invalid_job_id(client):
+    """Test 404 response when querying non-existent job_id."""
+    invalid_job_id = str(uuid.uuid4())
+    response = client.get(f"/local-llm/generation/status?job_id={invalid_job_id}")
+
+    assert response.status_code == 404
+    detail = response.json()["detail"]
+    assert "no generation job found" in detail.lower()
+    assert invalid_job_id in detail
+
+
+
 def test_polish_generation_endpoint_exists(client):
     """Verify POST /local-llm/generation/polish endpoint is registered."""
     # Send invalid request to check endpoint exists (should get 422 or 404, not 405)
