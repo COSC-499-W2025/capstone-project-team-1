@@ -31,19 +31,22 @@ export function ModelList({ successMessage, user, onSelect, onBack }: ModelListP
 	const [emailInput, setEmailInput] = useState(user?.email ?? "");
 	const [editingEmail, setEditingEmail] = useState(!hasAutoEmail);
 
+	const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
 	const handleConfirm = () => {
-		if (editingEmail && !hasAutoEmail) {
-			// They're still in the input but we allow confirm if they typed something
-			if (!emailInput.trim()) {
-				toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
-				return;
-			}
-			setEditingEmail(false);
-		}
-		if (!emailInput.trim()) {
+		const email = emailInput.trim();
+		if (!email) {
 			toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
 			setEditingEmail(true);
 			return;
+		}
+		if (!isValidEmail(email)) {
+			toast.show({ variant: "error", message: "Please enter a valid email address" });
+			setEditingEmail(true);
+			return;
+		}
+		if (editingEmail) {
+			setEditingEmail(false);
 		}
 		onSelect({
 			modelId: CLOUD_MODELS[selected]!.id,
@@ -67,8 +70,13 @@ export function ModelList({ successMessage, user, onSelect, onBack }: ModelListP
 					onBack();
 				}
 			} else if (key.name === "return") {
-				if (!emailInput.trim() && !hasAutoEmail) {
+				const email = emailInput.trim();
+				if (!email) {
 					toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
+					return;
+				}
+				if (!isValidEmail(email)) {
+					toast.show({ variant: "error", message: "Please enter a valid email address" });
 					return;
 				}
 				setEditingEmail(false);
