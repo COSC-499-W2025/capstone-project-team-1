@@ -19,7 +19,7 @@ import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
 
 // Screens shown in breadcrumbs (in order)
-const BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
+const LOCAL_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
 	{ screen: "file-upload", label: "Upload" },
 	{ screen: "project-list", label: "Projects" },
@@ -280,7 +280,7 @@ function App() {
 	const breadcrumbs: Breadcrumb[] | undefined =
 		screen === "landing"
 			? undefined
-			: BREADCRUMB_SCREENS.map(({ screen: s, label }) => ({
+			: LOCAL_BREADCRUMB_SCREENS.map(({ screen: s, label }) => ({
 					screen: s,
 					label,
 					visited: visitedScreens.has(s),
