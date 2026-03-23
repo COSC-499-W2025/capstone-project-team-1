@@ -27,6 +27,14 @@ const LOCAL_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "resume-preview", label: "Resume" },
 ];
 
+const CLOUD_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
+	{ screen: "consent", label: "Consent" },
+	{ screen: "cloud-auth", label: "Configure" },
+	{ screen: "file-upload", label: "Upload" },
+	{ screen: "cloud-generation", label: "Generate" },
+	{ screen: "cloud-resume", label: "Resume" },
+];
+
 // Key actions for each screen
 const screenActions: Record<Screen, KeyAction[]> = {
 	landing: [
@@ -277,10 +285,13 @@ function App() {
 	const visibleActions =
 		screen === "landing" && isLandingIntroPhase ? [] : screenActions[screen];
 
+	const activeBreadcrumbScreens =
+		consentLevel === "cloud" ? CLOUD_BREADCRUMB_SCREENS : LOCAL_BREADCRUMB_SCREENS;
+
 	const breadcrumbs: Breadcrumb[] | undefined =
 		screen === "landing"
 			? undefined
-			: LOCAL_BREADCRUMB_SCREENS.map(({ screen: s, label }) => ({
+			: activeBreadcrumbScreens.map(({ screen: s, label }) => ({
 					screen: s,
 					label,
 					visited: visitedScreens.has(s),
