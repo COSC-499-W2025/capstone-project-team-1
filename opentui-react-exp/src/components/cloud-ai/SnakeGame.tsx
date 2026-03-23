@@ -317,6 +317,7 @@ export function SnakeGame({
 		>
 			{scoreHeader}
 			{gridRows}
+			<box flexGrow={1} />
 			<box flexDirection="row" justifyContent="center" paddingLeft={1} paddingRight={1}>
 				<text>
 					<span fg={theme.textDim}>Arrow keys / WASD</span>
