@@ -16,7 +16,6 @@ interface SnakeGameProps {
 	width?: number;
 	height?: number;
 	tickMs?: number;
-	onScore?: (score: number) => void;
 }
 
 const OPPOSITE: Record<Dir, Dir> = { up: "down", down: "up", left: "right", right: "left" };
@@ -57,7 +56,6 @@ export function SnakeGame({
 	width: W = 20,
 	height: H = 12,
 	tickMs = 130,
-	onScore,
 }: SnakeGameProps) {
 	const cx = Math.floor(W / 2);
 	const cy = Math.floor(H / 2);
@@ -85,8 +83,6 @@ export function SnakeGame({
 	foodRef.current = food;
 	const scoreRef = useRef(score);
 	scoreRef.current = score;
-	const onScoreRef = useRef(onScore);
-	onScoreRef.current = onScore;
 
 	// Flash "GAME OVER" text when dead
 	useEffect(() => {
@@ -119,7 +115,6 @@ export function SnakeGame({
 		setScore(0);
 		scoreRef.current = 0;
 		setGameOver(false);
-		onScoreRef.current?.(0);
 	}, [makeInitSnake, W, H]);
 
 	// Single keyboard handler for both gameplay and restart
@@ -177,7 +172,6 @@ export function SnakeGame({
 				const newScore = scoreRef.current + 10;
 				setScore(newScore);
 				scoreRef.current = newScore;
-				onScoreRef.current?.(newScore);
 			}
 		}, effectiveTick);
 
@@ -200,7 +194,6 @@ export function SnakeGame({
 	const SHADE_LIGHT = "░".repeat(CELL_W);
 	const EMPTY = " ".repeat(CELL_W);
 	const foodKey = `${food.x},${food.y}`;
-	const gridW = W * CELL_W;
 
 	// Arcade-style score header — score glows on game over
 	const scoreColor = gameOver ? (flash ? "#FFFF00" : theme.gold) : theme.gold;
