@@ -1,31 +1,93 @@
 /**
- * Centered card with a success banner and vertical model radio list.
+ * Centered card with a success banner, user identity, and vertical model radio list.
  *
  * Shared between CopilotLogin (post-auth) and CloudAuth (already-authed).
  */
 import { useState } from "react";
 import { useKeyboard } from "@opentui/react";
+import type { GitHubUser } from "../../agent";
 import { theme } from "../../types";
+import { useToast } from "../Toast";
 import { CLOUD_MODELS, DEFAULT_MODEL_ID } from "./ModelPicker";
+
+export interface ModelListResult {
+	modelId: string;
+	gitIdentity: { login: string; name: string | null; email: string };
+}
 
 interface ModelListProps {
 	successMessage: string;
-	onSelect: (modelId: string) => void;
+	user: GitHubUser | null;
+	onSelect: (result: ModelListResult) => void;
 	onBack: () => void;
 }
 
-export function ModelList({ successMessage, onSelect, onBack }: ModelListProps) {
+export function ModelList({ successMessage, user, onSelect, onBack }: ModelListProps) {
+	const toast = useToast();
+	const hasAutoEmail = Boolean(user?.email);
 	const [selected, setSelected] = useState(
 		Math.max(0, CLOUD_MODELS.findIndex((m) => m.id === DEFAULT_MODEL_ID)),
 	);
+	const [emailInput, setEmailInput] = useState(user?.email ?? "");
+	const [editingEmail, setEditingEmail] = useState(!hasAutoEmail);
+
+	const handleConfirm = () => {
+		if (editingEmail && !hasAutoEmail) {
+			// They're still in the input but we allow confirm if they typed something
+			if (!emailInput.trim()) {
+				toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
+				return;
+			}
+			setEditingEmail(false);
+		}
+		if (!emailInput.trim()) {
+			toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
+			setEditingEmail(true);
+			return;
+		}
+		onSelect({
+			modelId: CLOUD_MODELS[selected]!.id,
+			gitIdentity: {
+				login: user?.login ?? "",
+				name: user?.name ?? null,
+				email: emailInput.trim(),
+			},
+		});
+	};
 
 	useKeyboard((key) => {
+		if (editingEmail) {
+			if (key.name === "escape") {
+				if (hasAutoEmail) {
+					// Revert to auto-detected email and exit editing
+					setEmailInput(user?.email ?? "");
+					setEditingEmail(false);
+				} else {
+					// No auto email — Esc goes back
+					onBack();
+				}
+			} else if (key.name === "return") {
+				if (!emailInput.trim() && !hasAutoEmail) {
+					toast.show({ variant: "error", message: "Please enter your GitHub email to continue" });
+					return;
+				}
+				setEditingEmail(false);
+			} else if (key.name === "backspace") {
+				setEmailInput((v) => v.slice(0, -1));
+			} else if (key.sequence && key.sequence.length === 1 && !key.ctrl && !key.meta) {
+				setEmailInput((v) => v + key.sequence);
+			}
+			return;
+		}
+
 		if (key.name === "up") {
 			setSelected((i) => Math.max(0, i - 1));
 		} else if (key.name === "down") {
 			setSelected((i) => Math.min(CLOUD_MODELS.length - 1, i + 1));
+		} else if (key.name === "e") {
+			setEditingEmail(true);
 		} else if (key.name === "return") {
-			onSelect(CLOUD_MODELS[selected]!.id);
+			handleConfirm();
 		} else if (key.name === "escape") {
 			onBack();
 		}
@@ -45,7 +107,7 @@ export function ModelList({ successMessage, onSelect, onBack }: ModelListProps) 
 				borderColor={theme.textDim}
 				padding={2}
 				gap={1}
-				width={55}
+				width={58}
 			>
 				{/* Success banner */}
 				<text>
@@ -53,6 +115,66 @@ export function ModelList({ successMessage, onSelect, onBack }: ModelListProps) 
 						<strong>{successMessage}</strong>
 					</span>
 				</text>
+
+				{/* User identity */}
+				{user && (
+					<box flexDirection="column" paddingTop={0}>
+						<text>
+							<span fg={theme.textSecondary}>
+								{"  "}Signed in as{" "}
+							</span>
+							<span fg={theme.gold}>
+								<strong>{user.login}</strong>
+							</span>
+							{user.name && (
+								<span fg={theme.textDim}> ({user.name})</span>
+							)}
+						</text>
+					</box>
+				)}
+
+				{/* Email section */}
+				<box flexDirection="column" paddingLeft={2} gap={0}>
+					{editingEmail ? (
+						<>
+							<text>
+								<span fg={theme.textSecondary}>
+									{hasAutoEmail ? "Email:" : "Enter your GitHub email:"}
+								</span>
+							</text>
+							<box
+								border
+								borderStyle="single"
+								borderColor={theme.cyan}
+								paddingLeft={1}
+								paddingRight={1}
+								width={40}
+							>
+								<text>
+									<span fg={theme.textPrimary}>
+										{emailInput || " "}
+									</span>
+									<span fg={theme.cyan}>_</span>
+								</text>
+							</box>
+						</>
+					) : (
+						<>
+							<text>
+								<span fg={theme.textDim}>{emailInput}</span>
+							</text>
+							<text>
+								<span fg={theme.textDim}>
+									Press{" "}
+								</span>
+								<span fg={theme.cyan}>e</span>
+								<span fg={theme.textDim}>
+									{" "}to change email
+								</span>
+							</text>
+						</>
+					)}
+				</box>
 
 				{/* Heading */}
 				<box paddingTop={1}>
@@ -79,7 +201,7 @@ export function ModelList({ successMessage, onSelect, onBack }: ModelListProps) 
 								paddingLeft={1}
 								paddingRight={1}
 								onMouseDown={() => setSelected(i)}
-								onMouseUp={() => onSelect(CLOUD_MODELS[i]!.id)}
+								onMouseUp={handleConfirm}
 							>
 								<text>
 									<span fg={bulletColor}>{bullet} </span>
@@ -105,7 +227,7 @@ export function ModelList({ successMessage, onSelect, onBack }: ModelListProps) 
 						backgroundColor="#1a1a00"
 						paddingLeft={2}
 						paddingRight={2}
-						onMouseDown={() => onSelect(CLOUD_MODELS[selected]!.id)}
+						onMouseDown={handleConfirm}
 					>
 						<text>
 							<span fg={theme.gold}>
