@@ -275,3 +275,75 @@ export interface PipelineCancelResponse {
 	ok: boolean;
 	status: PipelineJobStatus;
 }
+
+// ── Structured developer profile (cloud AI output) ──────────────
+
+export interface DeveloperDNA {
+	archetype: string;
+	description: string;
+	defining_traits: string[];
+}
+
+export interface HiddenStrength {
+	observation: string;
+	evidence: string;
+	why_it_matters: string;
+}
+
+export interface TalkingPoint {
+	topic: string;
+	story: string;
+}
+
+export interface CommitStats {
+	total: number;
+	avg_per_week: number;
+	most_active_period: string;
+	conventional_commits_pct: number;
+}
+
+export interface LanguageStat {
+	name: string;
+	file_count: number;
+	projects: string[];
+}
+
+export interface CollaborationStats {
+	branch_count: number;
+	merge_frequency: string;
+	workflow_style: string;
+}
+
+export interface ComplexityStats {
+	frameworks_used: number;
+	project_types: string[];
+	distinct_tools: string[];
+}
+
+export interface Impact {
+	commits: CommitStats;
+	languages: LanguageStat[];
+	collaboration: CollaborationStats;
+	complexity: ComplexityStats;
+}
+
+export interface ProjectSkillEvidence {
+	skill: string;
+	evidence: string;
+}
+
+export interface ProjectCard {
+	name: string;
+	what_it_says_about_you: string;
+	skills: ProjectSkillEvidence[];
+	standout: string;
+}
+
+export interface DeveloperProfile {
+	resume_markdown: string;
+	developer_dna: DeveloperDNA;
+	hidden_strengths: HiddenStrength[];
+	talking_points: TalkingPoint[];
+	impact: Impact;
+	projects: ProjectCard[];
+}
