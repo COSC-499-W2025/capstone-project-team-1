@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useKeyboard } from "@opentui/react";
-import { loginCopilot } from "../../agent";
+import { fetchGitHubUser, loginCopilot, type GitHubUser } from "../../agent";
 import { theme } from "../../types";
 import { TopBar } from "../TopBar";
-import { ModelList } from "./ModelList";
+import { ModelList, type ModelListResult } from "./ModelList";
 import { openInBrowser, spinnerFrames } from "./shared";
 
 interface CopilotLoginProps {
-	onComplete: (modelId: string) => void;
+	onComplete: (result: ModelListResult) => void;
 	onBack: () => void;
 }
 
@@ -17,6 +17,7 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 	const [loginProgress, setLoginProgress] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loggedIn, setLoggedIn] = useState(false);
+	const [ghUser, setGhUser] = useState<GitHubUser | null>(null);
 	const [spinnerIndex, setSpinnerIndex] = useState(0);
 	const abortRef = useRef<AbortController | null>(null);
 
@@ -47,6 +48,13 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 					onProgress: (message) => setLoginProgress(message),
 					signal: abortController.signal,
 				});
+				// Fetch user profile after successful login
+				try {
+					const user = await fetchGitHubUser();
+					setGhUser(user);
+				} catch {
+					// Non-fatal — proceed without user info
+				}
 				setLoggedIn(true);
 			} catch (err) {
 				if (abortController.signal.aborted) return;
@@ -78,6 +86,7 @@ export function CopilotLogin({ onComplete, onBack }: CopilotLoginProps) {
 				/>
 				<ModelList
 					successMessage="✓ Successfully logged in to GitHub Copilot!"
+					user={ghUser}
 					onSelect={onComplete}
 					onBack={onBack}
 				/>
