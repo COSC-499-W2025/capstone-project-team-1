@@ -40,6 +40,13 @@ Produce a single JSON object with this exact structure:
       "why_it_matters": "Why this is notable or unusual (e.g., 'Most developers don't differentiate error types this consistently')"
     }
   ],
+  "growth_areas": [
+    {
+      "area": "A skill or habit to improve (e.g., 'Test coverage depth')",
+      "observation": "What you noticed is missing or could be stronger (e.g., 'Tests cover happy paths but rarely edge cases or error scenarios')",
+      "suggestion": "A specific, actionable suggestion (e.g., 'Add boundary condition tests — empty inputs, large datasets, malformed data — to your existing test suites')"
+    }
+  ],
   "talking_points": [
     {
       "topic": "A short topic label (e.g., 'Hybrid architecture decisions')",
@@ -79,7 +86,10 @@ Produce a single JSON object with this exact structure:
         { "skill": "Python", "evidence": "FastAPI, SQLAlchemy ORM" },
         { "skill": "Testing", "evidence": "pytest with fixtures and factories" }
       ],
-      "standout": "The single most impressive or notable thing about this project. Be specific."
+      "standout": "The single most impressive or notable thing about this project. Be specific.",
+      "next_level": [
+        "1-2 specific, actionable suggestions for taking this project to the next level. E.g., 'Add integration tests for the API endpoints' or 'Extract the data layer into a reusable package'. Be concrete and relevant to the project."
+      ]
     }
   ]
 }
@@ -113,9 +123,11 @@ Bullet points highlighting cross-cutting achievements.
 - Do not invent or hallucinate information. If you cannot determine something, omit it or use reasonable defaults.
 - Focus on technical depth over breadth.
 - Hidden strengths should be genuinely surprising — things the developer might not realize about themselves.
+- Growth areas should be constructive and actionable — not generic advice like "write more tests" but specific to what you observed is missing or weak. Frame them as opportunities, not criticisms.
 - Talking points should be ready-to-use in interviews — specific, technical, and grounded in real code.
 - For the developer DNA archetype, choose something specific and meaningful, not generic like "Software Developer".
-- Include 3-5 hidden strengths and 3-5 talking points.
+- Include 3-5 hidden strengths, 3-5 growth areas, and 3-5 talking points.
+- Each project should have 1-2 next_level suggestions that are specific and achievable.
 - Keep the tone professional and insightful.
 - **CRITICAL**: Your final response must contain ONLY valid JSON. No preamble, no thinking, no narration, no markdown fences. Start with \`{\` and end with \`}\`.
 `;

@@ -321,6 +321,7 @@ function buildFallbackProfile(rawText: string): DeveloperProfile {
 			defining_traits: [],
 		},
 		hidden_strengths: [],
+		growth_areas: [],
 		talking_points: [],
 		impact: {
 			commits: { total: 0, avg_per_week: 0, most_active_period: "", conventional_commits_pct: 0 },
