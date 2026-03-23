@@ -93,11 +93,12 @@ export function isCopilotLoggedIn(): boolean {
 export async function createResumeSession(
 	cwd: string,
 	onEvent: (event: ResumeEvent) => void,
+	modelId?: string,
 ): Promise<{ session: AgentSession; dispose: () => void }> {
 	const authStorage = getAuthStorage();
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// Find the best available model — prefer Copilot models
+	// Find the best available model — prefer user-selected, then Copilot models
 	const available = modelRegistry.getAvailable();
 	if (available.length === 0) {
 		throw new Error(
@@ -105,8 +106,8 @@ export async function createResumeSession(
 		);
 	}
 
-	// Prefer a Copilot Claude model for best code analysis
 	const model =
+		(modelId ? available.find((m) => m.id === modelId || m.id.includes(modelId)) : undefined) ??
 		available.find((m) => m.provider === "github-copilot" && m.id.includes("sonnet")) ??
 		available.find((m) => m.provider === "github-copilot") ??
 		available[0];
@@ -173,10 +174,12 @@ export async function createResumeSession(
 export async function generateResume(
 	extractedDir: string,
 	onEvent: (event: ResumeEvent) => void,
+	modelId?: string,
 ): Promise<string> {
 	const { session, dispose } = await createResumeSession(
 		extractedDir,
 		onEvent,
+		modelId,
 	);
 
 	// Collect the full response text
