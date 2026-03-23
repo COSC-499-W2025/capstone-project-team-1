@@ -56,7 +56,11 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
 	],
-	"cloud-auth": [{ key: "Esc", label: "Back" }],
+	"cloud-auth": [
+		{ key: "↑/↓", label: "Navigate" },
+		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
 	"cloud-generation": [{ key: "Esc", label: "Back" }],
 	"cloud-resume": [
 		{ key: "↑/↓", label: "Scroll" },
@@ -71,6 +75,7 @@ function App() {
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
 	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
+	const [cloudModelId, setCloudModelId] = useState("");
 	const [cloudMarkdown, setCloudMarkdown] = useState("");
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
@@ -181,7 +186,10 @@ function App() {
 			case "cloud-auth":
 				return (
 					<CloudAuth
-						onComplete={() => setScreen("file-upload")}
+						onComplete={(modelId) => {
+							setCloudModelId(modelId);
+							setScreen("file-upload");
+						}}
 						onBack={() => setScreen("consent")}
 					/>
 				);
@@ -231,6 +239,7 @@ function App() {
 				return (
 					<CloudFlow
 						zipPath={filePath}
+						modelId={cloudModelId}
 						onComplete={(md) => {
 							setCloudMarkdown(md);
 							setScreen("cloud-resume");
