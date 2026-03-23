@@ -6,18 +6,26 @@
  */
 import { SnakeWithProgress } from "./SnakeWithProgress";
 
+interface GitIdentity {
+	login: string;
+	name: string | null;
+	email: string;
+}
+
 interface CloudFlowProps {
 	zipPath: string;
 	modelId: string;
+	gitIdentity: GitIdentity | null;
 	onComplete: (markdown: string) => void;
 	onBack: () => void;
 }
 
-export function CloudFlow({ zipPath, modelId, onComplete, onBack }: CloudFlowProps) {
+export function CloudFlow({ zipPath, modelId, gitIdentity, onComplete, onBack }: CloudFlowProps) {
 	return (
 		<SnakeWithProgress
 			zipPath={zipPath}
 			modelId={modelId}
+			gitIdentity={gitIdentity}
 			onComplete={onComplete}
 			onBack={onBack}
 		/>

@@ -23,9 +23,16 @@ import {
 	type Phase as HumanPhase,
 } from "./humanize";
 
+interface GitIdentity {
+	login: string;
+	name: string | null;
+	email: string;
+}
+
 interface SnakeWithProgressProps {
 	zipPath: string;
 	modelId: string;
+	gitIdentity: GitIdentity | null;
 	onComplete: (markdown: string) => void;
 	onBack: () => void;
 }
@@ -51,6 +58,7 @@ const KR_OPTIONS = {
 export function SnakeWithProgress({
 	zipPath,
 	modelId,
+	gitIdentity,
 	onComplete,
 	onBack,
 }: SnakeWithProgressProps) {
@@ -142,7 +150,7 @@ export function SnakeWithProgress({
 
 				setFlowPhase("generating");
 				pushActivity("system", "Getting the AI started...");
-				await generateResume(extraction_path, onEvent, modelId);
+				await generateResume(extraction_path, onEvent, modelId, gitIdentity ?? undefined);
 			} catch (err) {
 				if (cancelled) return;
 				setFlowPhase("error");
