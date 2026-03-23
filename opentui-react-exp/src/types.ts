@@ -10,6 +10,7 @@ export type Screen =
 	| "draft-pause"
 	| "feedback"
 	| "resume-preview"
+	| "cloud-auth"
 	| "cloud-generation"
 	| "cloud-resume";
 
