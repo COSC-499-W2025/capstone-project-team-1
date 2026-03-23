@@ -11,19 +11,22 @@ These endpoints support the full local generation pipeline as an alternative
 to cloud-based generation workflows.
 """
 
+import inspect
 import shutil
 import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List
 from zipfile import ZipFile, is_zipfile
 from ..helpers.zip_utils import safe_extract_zip
 
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
+from ..local_llm.runtime.process_manager import stop_server
 from .local_llm_schemas import (
+    CancellationResponse,
     ContributorDiscoveryRequest,
     ContributorDiscoveryResponse,
     ContributorIdentity,
@@ -51,6 +54,40 @@ _active_intakes: Dict[str, Dict] = {}
 # Maps job_id -> minimal generation request context
 _generation_jobs: Dict[str, Dict] = {}
 _active_generation_id: str | None = None
+_generation_cancel_hooks: Dict[str, Callable[[], Any]] = {}
+
+
+def register_generation_cancellation_hook(job_id: str, cancel_hook: Callable[[], Any]) -> None:
+    """Register optional runtime cancellation hook for a generation job."""
+    _generation_cancel_hooks[job_id] = cancel_hook
+
+
+async def _stop_job_runtime(job_id: str, job: Dict) -> None:
+    """Stop all runtime controls attached to a generation job.
+
+    Cancels the async generation task (if any), shuts down the
+    llama-server process via the existing process manager, and
+    invokes any registered cancellation hooks.
+    """
+    runtime_stopped = False
+
+    # Cancel the async generation task if one is attached.
+    generation_task = job.get("generation_task")
+    if generation_task is not None and hasattr(generation_task, "cancel"):
+        generation_task.cancel()
+        runtime_stopped = True
+
+    # Stop the llama-server process via the runtime process manager.
+    stop_server()
+    runtime_stopped = True
+
+    # Invoke any registered cancellation hooks for this job.
+    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
+    if callable(cancel_hook):
+        maybe_awaitable = cancel_hook()
+        if inspect.isawaitable(maybe_awaitable):
+            await maybe_awaitable
+        runtime_stopped = True
 
 
 class IntakeContext:
@@ -507,6 +544,55 @@ async def start_generation(
             status_code=500,
             detail=f"Failed to start generation: {str(e)}",
         )
+
+
+@router.post("/generation/cancel", response_model=CancellationResponse)
+async def cancel_generation(
+    job_id: str | None = Query(default=None, description="Job ID to cancel. Defaults to the current active job.")
+) -> CancellationResponse:
+    """Cancel a generation job by job_id, or the current active job if no job_id is provided.
+
+    This operation is idempotent. Cancelling an already-cancelled job returns
+    ok=True. If no matching job exists, returns ok=False.
+
+    Returns:
+        CancellationResponse describing the post-cancel state.
+    """
+    global _active_generation_id
+
+    # Resolve which job to target.
+    target_id = job_id if job_id is not None else _active_generation_id
+
+    # No job to cancel.
+    if target_id is None:
+        return CancellationResponse(ok=False, status="not_found")
+
+    target_job = _generation_jobs.get(target_id)
+
+    # If the target job doesn't exist, clear stale active pointer if applicable.
+    if target_job is None:
+        if target_id == _active_generation_id:
+            _active_generation_id = None
+        return CancellationResponse(ok=False, status="not_found")
+
+    # Idempotent: already cancelled — return success without side-effects.
+    if target_job.get("status") == "cancelled":
+        if target_id == _active_generation_id:
+            _active_generation_id = None
+        return CancellationResponse(ok=True, status="cancelled")
+
+    try:
+        await _stop_job_runtime(target_id, target_job)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
+
+    target_job["status"] = "cancelled"
+    if target_id == _active_generation_id:
+        _active_generation_id = None
+    _generation_cancel_hooks.pop(target_id, None)
+    return CancellationResponse(ok=True, status="cancelled")
 """
 note that the data is initally returned with null/zero values
 its expected that a background worker would need to update the job as it processes. 

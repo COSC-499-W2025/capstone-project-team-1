@@ -67,6 +67,13 @@ PipelineStage = Literal["ANALYZE", "FACTS", "DRAFT", "POLISH"]
 - POLISH: Refinement and customization of output
 """
 
+CancellationStatus = Literal["cancelled", "not_found"]
+"""Cancellation endpoint terminal status.
+
+- cancelled: Target job existed and is now cancelled
+- not_found: No target job could be resolved or found
+"""
+
 
 # ---------------------------------------------------------------------------
 # Intake creation
@@ -298,4 +305,4 @@ class CancellationResponse(BaseModel):
     """Response confirming job cancellation."""
 
     ok: bool = Field(description="Success indicator")
-    status: PipelineJobStatus = Field(description="Final job status after cancel")
+    status: CancellationStatus = Field(description="Final cancellation status")
