@@ -18,6 +18,7 @@ import {
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import type { OAuthLoginCallbacks } from "@mariozechner/pi-ai";
+import type { DeveloperProfile } from "../api/types";
 import { RESUME_SYSTEM_PROMPT } from "./prompt";
 
 // Shared auth storage instance — persists across the session
@@ -251,7 +252,7 @@ export async function generateResume(
 	onEvent: (event: ResumeEvent) => void,
 	modelId?: string,
 	gitIdentity?: GitIdentity,
-): Promise<string> {
+): Promise<DeveloperProfile> {
 	const { session, dispose } = await createResumeSession(
 		extractedDir,
 		onEvent,
@@ -277,13 +278,56 @@ export async function generateResume(
 
 	try {
 		await session.prompt(
-			`Explore all the code repositories in this directory and generate a professional resume based on what you find.${identityContext} Your final response must contain ONLY the resume markdown — start with '# Resume' and include nothing else before it. No preamble, no thinking, no narration.`,
+			`Explore all the code repositories in this directory and generate a comprehensive developer profile as structured JSON.${identityContext} Your final response must contain ONLY valid JSON — start with '{' and end with '}'. No preamble, no thinking, no narration, no markdown fences.`,
 		);
 
-		// Safety net: strip any filler text before the actual resume
-		const resumeStart = fullText.indexOf("# Resume");
-		return resumeStart >= 0 ? fullText.slice(resumeStart) : fullText;
+		// Extract JSON from the response — find the outermost { ... }
+		const jsonStart = fullText.indexOf("{");
+		const jsonEnd = fullText.lastIndexOf("}");
+		if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart) {
+			throw new Error("LLM did not return valid JSON. Raw response saved as resume markdown.");
+		}
+
+		const jsonStr = fullText.slice(jsonStart, jsonEnd + 1);
+		const parsed = JSON.parse(jsonStr) as DeveloperProfile;
+
+		// Validate required fields exist
+		if (!parsed.resume_markdown || !parsed.developer_dna || !parsed.projects) {
+			throw new Error("LLM returned incomplete profile — missing required fields.");
+		}
+
+		return parsed;
+	} catch (err) {
+		// Fallback: if JSON parsing fails, wrap the raw text as a markdown-only profile
+		if (err instanceof SyntaxError) {
+			return buildFallbackProfile(fullText);
+		}
+		throw err;
 	} finally {
 		dispose();
 	}
+}
+
+/** Build a minimal DeveloperProfile from raw markdown when JSON parsing fails. */
+function buildFallbackProfile(rawText: string): DeveloperProfile {
+	const resumeStart = rawText.indexOf("# Resume");
+	const markdown = resumeStart >= 0 ? rawText.slice(resumeStart) : rawText;
+
+	return {
+		resume_markdown: markdown,
+		developer_dna: {
+			archetype: "Developer",
+			description: "Profile generated from your code repositories.",
+			defining_traits: [],
+		},
+		hidden_strengths: [],
+		talking_points: [],
+		impact: {
+			commits: { total: 0, avg_per_week: 0, most_active_period: "", conventional_commits_pct: 0 },
+			languages: [],
+			collaboration: { branch_count: 0, merge_frequency: "", workflow_style: "" },
+			complexity: { frameworks_used: 0, project_types: [], distinct_tools: [] },
+		},
+		projects: [],
+	};
 }
