@@ -36,6 +36,8 @@ from .local_llm_schemas import (
     GenerationTelemetry,
     IntakeCreateRequest,
     IntakeCreateResponse,
+    PolishRequest,
+    PolishResponse,
     RepositoryCandidate,
 )
 
@@ -673,4 +675,89 @@ async def get_generation_status(job_id: str | None = None) -> GenerationStatusRe
         raise HTTPException(
             status_code=500,
             detail=f"Failed to retrieve generation status: {str(e)}",
+        )
+
+
+@router.post("/generation/polish", response_model=PolishResponse)
+async def polish_generation(
+    request: PolishRequest,
+) -> PolishResponse:
+    """Request polish/refinement of the draft output with user feedback.
+
+    Validates that a generation job exists in draft_ready or complete state,
+    validates that the user has provided feedback, and transitions the job
+    to polishing state. Actual runtime execution is out of scope.
+
+    Args:
+        request: PolishRequest with feedback (general_notes, tone, additions, removals)
+
+    Returns:
+        PolishResponse confirming the polish operation was initiated
+
+    Raises:
+        HTTPException: 404 if no active generation job, 409 if job state is invalid,
+                      422 if no feedback provided, 500 on internal error
+    """
+    global _active_generation_id
+
+    try:
+        # Get the active generation job
+        job_id = _active_generation_id
+        if not job_id or job_id not in _generation_jobs:
+            raise ValueError(
+                "No active generation found. Start generation first."
+            )
+
+        job = _generation_jobs[job_id]
+
+        # Validate job status is in a state where polish is allowed
+        if job["status"] not in {"draft_ready", "complete"}:
+            raise ValueError(
+                f"Pipeline must be in draft_ready or complete state to polish, "
+                f"but is currently in '{job['status']}' state"
+            )
+
+        # Normalize and validate feedback fields
+        normalized_notes = str(request.general_notes or "").strip()
+        normalized_tone = str(request.tone or "").strip()
+        normalized_additions = [
+            str(item).strip() for item in request.additions if str(item).strip()
+        ]
+        normalized_removals = [
+            str(item).strip() for item in request.removals if str(item).strip()
+        ]
+
+        # Validate that at least one feedback field is provided
+        if not (
+            normalized_notes
+            or normalized_tone
+            or normalized_additions
+            or normalized_removals
+        ):
+            raise ValueError(
+                "No feedback provided. Add General Notes, Tone, Additions, "
+                "or Removals before starting polish."
+            )
+
+        # Update job status to polishing
+        job["status"] = "polishing"
+
+        return PolishResponse(ok=True, status="polishing")
+
+    except ValueError as e:
+        error_msg = str(e)
+        if "no active generation" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        elif "pipeline must be in" in error_msg.lower():
+            raise HTTPException(status_code=409, detail=error_msg)
+        elif "no feedback provided" in error_msg.lower():
+            raise HTTPException(status_code=422, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    except Exception as e:
+        # Internal server error
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to process polish request: {str(e)}",
         )
