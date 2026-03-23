@@ -154,7 +154,7 @@ function App() {
 				break;
 
 			case "cloud-generation":
-				// CloudGeneration handles its own keyboard
+				// CloudFlow handles its own keyboard
 				break;
 
 			case "cloud-resume":
