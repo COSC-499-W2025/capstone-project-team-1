@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import { useKeyboard } from "@opentui/react";
 import type {
 	DeveloperProfile,
 	HiddenStrength,
@@ -440,6 +441,15 @@ export function CloudResumePreview({
 	onRestart,
 }: CloudResumePreviewProps) {
 	const [activeTab, setActiveTab] = useState<Tab>("insights");
+
+	const TAB_KEYS: Record<string, Tab> = { "1": "insights", "2": "projects", "3": "resume" };
+
+	useKeyboard(
+		useCallback((key: { name: string }) => {
+			const tab = TAB_KEYS[key.name];
+			if (tab) setActiveTab(tab);
+		}, []),
+	);
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
