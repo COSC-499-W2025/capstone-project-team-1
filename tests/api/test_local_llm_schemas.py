@@ -353,9 +353,14 @@ class TestCancellationResponse:
         assert resp.ok is True
         assert resp.status == "cancelled"
 
-    def test_failed_cancel(self):
-        resp = CancellationResponse(ok=False, status="running")
+    def test_not_found_cancel(self):
+        resp = CancellationResponse(ok=False, status="not_found")
         assert resp.ok is False
+        assert resp.status == "not_found"
+
+    def test_rejects_non_cancellation_status(self):
+        with pytest.raises(ValidationError):
+            CancellationResponse(ok=False, status="running")
 
 
 class TestWorkflowIntegration:

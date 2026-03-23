@@ -11,12 +11,13 @@ These endpoints support the full local generation pipeline as an alternative
 to cloud-based generation workflows.
 """
 
+import inspect
 import shutil
 import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, List
 from zipfile import ZipFile, is_zipfile
 from ..helpers.zip_utils import safe_extract_zip
 
@@ -50,6 +51,108 @@ _active_intakes: Dict[str, Dict] = {}
 # Maps job_id -> minimal generation request context
 _generation_jobs: Dict[str, Dict] = {}
 _active_generation_id: str | None = None
+_generation_cancel_hooks: Dict[str, Callable[[], Any]] = {}
+
+
+def register_generation_cancellation_hook(job_id: str, cancel_hook: Callable[[], Any]) -> None:
+    """Register optional runtime cancellation hook for a generation job."""
+    _generation_cancel_hooks[job_id] = cancel_hook
+
+
+async def _stop_job_runtime(job_id: str, job: Dict) -> None:
+    """Best-effort stop for runtime controls attached to a generation job."""
+    runtime_stopped = False
+
+    generation_task = job.get("generation_task")
+    if generation_task is not None and hasattr(generation_task, "cancel"):
+        generation_task.cancel()
+        runtime_stopped = True
+
+    llama_server_process = job.get("llama_server_process")
+    if llama_server_process is not None:
+        poll_fn = getattr(llama_server_process, "poll", None)
+        is_running = True
+        if callable(poll_fn):
+            try:
+                is_running = poll_fn() is None
+            except Exception:
+                is_running = True
+
+        if is_running:
+            terminate_fn = getattr(llama_server_process, "terminate", None)
+            if callable(terminate_fn):
+                try:
+                    terminate_fn()
+                except Exception:
+                    kill_fn = getattr(llama_server_process, "kill", None)
+                    if callable(kill_fn):
+                        kill_fn()
+            runtime_stopped = True
+
+    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
+    if callable(cancel_hook):
+        maybe_awaitable = cancel_hook()
+        if inspect.isawaitable(maybe_awaitable):
+            await maybe_awaitable
+        runtime_stopped = True
+
+    if not runtime_stopped:
+        runtime_stopped = _stop_ollama_runtime(job)
+
+    if job.get("status") == "running" and not runtime_stopped:
+        raise RuntimeError(
+            "Unable to stop running generation runtime. "
+            "No cancellable runtime handle was attached for this job."
+        )
+
+
+def _stop_ollama_runtime(job: Dict) -> bool:
+    """Try stopping active Ollama model(s) for this job.
+
+    Returns True when at least one stop command succeeds.
+    """
+    model_name = job.get("active_model")
+    models_to_stop: List[str] = []
+
+    if isinstance(model_name, str) and model_name.strip():
+        models_to_stop = [model_name.strip()]
+    else:
+        try:
+            ps_result = subprocess.run(
+                ["ollama", "ps"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except (FileNotFoundError, subprocess.SubprocessError):
+            return False
+
+        if ps_result.returncode != 0:
+            return False
+
+        for line in ps_result.stdout.splitlines()[1:]:
+            line = line.strip()
+            if not line:
+                continue
+            model = line.split()[0]
+            if model:
+                models_to_stop.append(model)
+
+    stopped_any = False
+    for model in models_to_stop:
+        try:
+            stop_result = subprocess.run(
+                ["ollama", "stop", model],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if stop_result.returncode == 0:
+                stopped_any = True
+        except (FileNotFoundError, subprocess.SubprocessError):
+            continue
+
+    return stopped_any
 
 
 class IntakeContext:
@@ -526,7 +629,7 @@ async def cancel_generation(
 
     # No job to cancel.
     if target_id is None:
-        return CancellationResponse(ok=False, status="cancelled")
+        return CancellationResponse(ok=False, status="not_found")
 
     target_job = _generation_jobs.get(target_id)
 
@@ -534,11 +637,23 @@ async def cancel_generation(
     if target_job is None:
         if target_id == _active_generation_id:
             _active_generation_id = None
-        return CancellationResponse(ok=False, status="cancelled")
+        return CancellationResponse(ok=False, status="not_found")
 
     # Idempotent: already cancelled — return success without side-effects.
     if target_job.get("status") == "cancelled":
+        if target_id == _active_generation_id:
+            _active_generation_id = None
         return CancellationResponse(ok=True, status="cancelled")
 
+    try:
+        await _stop_job_runtime(target_id, target_job)
+    except RuntimeError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
+
     target_job["status"] = "cancelled"
+    if target_id == _active_generation_id:
+        _active_generation_id = None
+    _generation_cancel_hooks.pop(target_id, None)
     return CancellationResponse(ok=True, status="cancelled")
