@@ -46,7 +46,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
     useEffect(() => {
         if (scanStatus !== "scanning") return;
         const interval = setInterval(() => {
-            setScanProgress((p) => (p + 1) % 30);
+            setScanProgress((p) => Math.min(p + 1, 30));
         }, 80);
         return () => clearInterval(interval);
     }, [scanStatus]);
