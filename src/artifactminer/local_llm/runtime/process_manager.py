@@ -8,6 +8,7 @@ import socket
 import subprocess
 from pathlib import Path
 
+from ..models import RuntimeStatus
 from .config import (
     DEFAULT_MODEL_NAME,
     DEFAULT_MODELS_DIR,
@@ -21,7 +22,7 @@ from .errors import (
     ModelServerCrashedError,
     ModelStartupTimeoutError,
 )
-from .health import poll_until_healthy
+from .health import check_health, poll_until_healthy
 from .registry import resolve_model_descriptor
 
 _server_process: subprocess.Popen[bytes] | None = None
@@ -56,6 +57,28 @@ def _reset_state() -> None:
     _server_process = None
     _server_port = None
     _server_model = None
+
+
+def _is_process_alive() -> bool:
+    """Return True if the managed process exists and has not exited."""
+
+    return _server_process is not None and _server_process.poll() is None
+
+
+def _detect_crash() -> None:
+    """Raise ``ModelServerCrashedError`` if the managed process exited unexpectedly.
+
+    Does nothing when no server has been started or when the process is
+    still alive.
+    """
+
+    if _server_process is None:
+        return
+    if _server_process.poll() is not None:
+        exit_code = _server_process.returncode
+        model = _server_model
+        _reset_state()
+        raise ModelServerCrashedError(model=model, exit_code=exit_code)
 
 
 def start_server(
@@ -136,3 +159,82 @@ def stop_server() -> None:
         _server_process.wait()
 
     _reset_state()
+
+
+def ensure_server(
+    model: str = DEFAULT_MODEL_NAME,
+    *,
+    models_dir: Path = DEFAULT_MODELS_DIR,
+    timeout: float = DEFAULT_STARTUP_TIMEOUT_SECONDS,
+) -> None:
+    """Ensure a llama-server is running with the requested model.
+
+    * If the same model is already loaded and the process is alive, returns
+      immediately (reuse).
+    * If a different model is loaded, the current server is stopped and a
+      new one is started (restart).
+    * If the previously started server has crashed, raises
+      ``ModelServerCrashedError``.
+    """
+
+    if _server_process is None:
+        start_server(model, models_dir=models_dir, timeout=timeout)
+        return
+
+    # Process exited unexpectedly → crash
+    _detect_crash()
+
+    # Same model, healthy → reuse
+    if _server_model == model:
+        if _server_port is not None and check_health(_server_port):
+            return
+        restart_server(model, models_dir=models_dir, timeout=timeout)
+        return
+
+    # Different model requested → restart
+    restart_server(model, models_dir=models_dir, timeout=timeout)
+
+
+def restart_server(
+    model: str = DEFAULT_MODEL_NAME,
+    *,
+    models_dir: Path = DEFAULT_MODELS_DIR,
+    timeout: float = DEFAULT_STARTUP_TIMEOUT_SECONDS,
+) -> None:
+    """Stop the current server (if any) and start a fresh one."""
+
+    stop_server()
+    start_server(model, models_dir=models_dir, timeout=timeout)
+
+
+def get_server_status() -> RuntimeStatus:
+    """Return the current runtime state as a ``RuntimeStatus`` snapshot.
+
+    The snapshot is safe to serialize or pass to higher layers without
+    exposing subprocess internals.  Performs a single-shot health check
+    when the process is alive.
+    """
+
+    if _server_process is None:
+        return RuntimeStatus(
+            loaded_model=None,
+            server_pid=None,
+            server_port=None,
+            is_running=False,
+            is_healthy=False,
+            models_dir=DEFAULT_MODELS_DIR,
+        )
+
+    running = _is_process_alive()
+    healthy = False
+    if running and _server_port is not None:
+        healthy = check_health(_server_port)
+
+    return RuntimeStatus(
+        loaded_model=_server_model,
+        server_pid=_server_process.pid if running else None,
+        server_port=_server_port if running else None,
+        is_running=running,
+        is_healthy=healthy,
+        models_dir=DEFAULT_MODELS_DIR,
+    )
