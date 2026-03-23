@@ -283,7 +283,7 @@ test("Analysis renders pipeline panels with repo progress and current activity",
 	}
 });
 
-test("Analysis routes complete status to preview", async () => {
+test("Analysis routes complete status to resume-preview", async () => {
 	freezeIntervals();
 	const nextTargets: string[] = [];
 	let rendered: RenderedScreen | null = null;
@@ -341,12 +341,68 @@ test("Analysis routes complete status to preview", async () => {
 		});
 		await flushEffects(rendered);
 
+		expect(nextTargets).toEqual(["resume-preview"]);
 		const frame = rendered.captureCharFrame();
-
-		expect(nextTargets).toEqual(["preview"]);
 		expect(harness.getContext().state.resumeV3Output).toEqual(sampleDraft);
 		expect(frame).toContain("✓ Polish    -  Apply feedback");
 		expect(frame).toContain("COMPLETE");
+	} finally {
+		destroyRenderer(rendered);
+	}
+});
+
+test("Analysis stops polling once it reaches a terminal failure state", async () => {
+	const clearedIntervals: number[] = [];
+	let nextIntervalId = 0;
+	let rendered: RenderedScreen | null = null;
+
+	globalThis.setInterval = ((_: TimerHandler, __?: number) => {
+		nextIntervalId += 1;
+		return nextIntervalId;
+	}) as unknown as typeof setInterval;
+	globalThis.clearInterval = ((id: number) => {
+		clearedIntervals.push(id);
+	}) as unknown as typeof clearInterval;
+
+	api.getPipelineStatus = async () =>
+		({
+			status: "failed_resource_guard",
+			stage: "FACTS",
+			messages: ["Resource guard tripped."],
+			telemetry: {
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			},
+			draft: null,
+			output: null,
+			error: null,
+		}) satisfies PipelineStatusResponse;
+
+	const harness = createHarness();
+
+	try {
+		rendered = await testRender(harness.node, { width: 100, height: 32 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-428");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("FACTS");
+		});
+		await flushEffects(rendered);
+
+		expect(clearedIntervals).toContain(2);
+		expect(harness.getContext().state.pipelineStatus).toBe(
+			"failed_resource_guard",
+		);
 	} finally {
 		destroyRenderer(rendered);
 	}
@@ -423,6 +479,82 @@ test("Analysis cancels the pipeline from Escape while active", async () => {
 			"Pipeline cancelled.",
 		);
 		expect(rendered.captureCharFrame()).toContain("Pipeline cancelled.");
+	} finally {
+		destroyRenderer(rendered);
+	}
+});
+
+test("Analysis keeps the pipeline active when cancel returns ok=false", async () => {
+	freezeIntervals();
+	let cancelCount = 0;
+	let rendered: RenderedScreen | null = null;
+
+	api.getPipelineStatus = async () =>
+		({
+			status: "running",
+			stage: "FACTS",
+			messages: ["Collecting facts."],
+			telemetry: {
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			},
+			draft: null,
+			output: null,
+			error: null,
+		}) satisfies PipelineStatusResponse;
+
+	api.cancelPipeline = async () => {
+		cancelCount += 1;
+		return { ok: false, status: "running" };
+	};
+
+	const harness = createHarness();
+
+	try {
+		rendered = await testRender(harness.node, { width: 140, height: 40 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-429");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("FACTS");
+			context.setPipelineTelemetry({
+				stage: "FACTS",
+				active_model: "llama3",
+				repos_total: 2,
+				repos_done: 1,
+				current_repo: "artifact-miner",
+				facts_total: 6,
+				draft_projects: 0,
+				polished_projects: 0,
+				elapsed_seconds: 9,
+				model_check_seconds: 1,
+				selected_repos: ["repo-1", "repo-2"],
+			});
+			context.setPipelineMessages(["Collecting facts."]);
+		});
+		await flushEffects(rendered);
+
+		await act(async () => {
+			keyboardHandler?.({ name: "escape" });
+			await Promise.resolve();
+		});
+		await rendered.renderOnce();
+
+		expect(cancelCount).toBe(1);
+		expect(harness.getContext().state.pipelineStatus).toBe("running");
+		expect(harness.getContext().state.pipelineNotice).toBeNull();
+		expect(rendered.captureCharFrame()).toContain(
+			"Cancellation failed. Pipeline is still running.",
+		);
 	} finally {
 		destroyRenderer(rendered);
 	}
