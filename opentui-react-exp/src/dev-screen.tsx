@@ -19,6 +19,7 @@ function Harness() {
 		<box flexGrow={1} flexDirection="column">
 			<SnakeWithProgress
 				zipPath="/dev/null"
+				modelId="claude-haiku-4-5"
 				onComplete={(md) => {
 					console.log("Resume ready:", md.slice(0, 80));
 					process.exit(0);
