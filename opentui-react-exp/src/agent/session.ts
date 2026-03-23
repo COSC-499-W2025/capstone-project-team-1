@@ -83,6 +83,74 @@ export function isCopilotLoggedIn(): boolean {
 	return getAuthStorage().hasAuth("github-copilot");
 }
 
+/** GitHub user profile fetched from the API. */
+export interface GitHubUser {
+	login: string;
+	name: string | null;
+	email: string | null;
+}
+
+/**
+ * Fetch the authenticated user's GitHub profile.
+ *
+ * Uses the OAuth refresh token (ghu_* format) which has `read:user` scope.
+ */
+export async function fetchGitHubUser(): Promise<GitHubUser> {
+	const authStorage = getAuthStorage();
+	const cred = authStorage.get("github-copilot");
+	if (!cred || cred.type !== "oauth") {
+		throw new Error("Not logged in to GitHub Copilot");
+	}
+
+	const token = (cred as { refresh?: string }).refresh;
+	if (!token) {
+		throw new Error("No GitHub token available");
+	}
+
+	const resp = await fetch("https://api.github.com/user", {
+		headers: {
+			Authorization: `token ${token}`,
+			Accept: "application/vnd.github+json",
+		},
+	});
+
+	if (!resp.ok) {
+		throw new Error(`GitHub API error: ${resp.status}`);
+	}
+
+	const data = (await resp.json()) as { login: string; name?: string; email?: string };
+	let email = data.email ?? null;
+
+	// Email is null when set to private — try /user/emails as fallback
+	if (!email) {
+		try {
+			const emailResp = await fetch("https://api.github.com/user/emails", {
+				headers: {
+					Authorization: `token ${token}`,
+					Accept: "application/vnd.github+json",
+				},
+			});
+			if (emailResp.ok) {
+				const emails = (await emailResp.json()) as Array<{
+					email: string;
+					primary: boolean;
+					verified: boolean;
+				}>;
+				const primary = emails.find((e) => e.primary && e.verified);
+				email = primary?.email ?? emails[0]?.email ?? null;
+			}
+		} catch {
+			// Non-fatal — user can enter email manually
+		}
+	}
+
+	return {
+		login: data.login,
+		name: data.name ?? null,
+		email,
+	};
+}
+
 /**
  * Create a Pi Agent session configured for resume generation.
  *
@@ -171,10 +239,18 @@ export async function createResumeSession(
  * Creates a session, sends the analysis prompt, and returns
  * the generated resume markdown. Events are streamed via onEvent.
  */
+/** Git identity for attributing contributions in collaborative projects. */
+export interface GitIdentity {
+	login: string;
+	name: string | null;
+	email: string;
+}
+
 export async function generateResume(
 	extractedDir: string,
 	onEvent: (event: ResumeEvent) => void,
 	modelId?: string,
+	gitIdentity?: GitIdentity,
 ): Promise<string> {
 	const { session, dispose } = await createResumeSession(
 		extractedDir,
@@ -193,9 +269,15 @@ export async function generateResume(
 		}
 	});
 
+	// Build the prompt with user identity context
+	let identityContext = "";
+	if (gitIdentity?.email) {
+		identityContext = `\n\nIMPORTANT: The user's email is ${gitIdentity.email}. You are creating a resume for this user. Some projects may be collaborative — use git log and git blame to identify commits and code authored by this email. Focus only on their contributions, not the entire project.`;
+	}
+
 	try {
 		await session.prompt(
-			"Explore all the code repositories in this directory and generate a professional resume based on what you find. Your final response must contain ONLY the resume markdown — start with '# Resume' and include nothing else before it. No preamble, no thinking, no narration.",
+			`Explore all the code repositories in this directory and generate a professional resume based on what you find.${identityContext} Your final response must contain ONLY the resume markdown — start with '# Resume' and include nothing else before it. No preamble, no thinking, no narration.`,
 		);
 
 		// Safety net: strip any filler text before the actual resume
