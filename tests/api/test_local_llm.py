@@ -99,489 +99,6 @@ def test_create_intake_with_multiple_repos(client, tmp_path):
     assert repo_names == sorted(repo_names)
 
 
-def test_polish_generation_endpoint_exists(client):
-    """Verify POST /local-llm/generation/polish endpoint is registered."""
-    # Send invalid request to check endpoint exists (should get 422 or 404, not 405)
-    response = client.post("/local-llm/generation/polish", json={})
-    # 422 means endpoint exists but validation failed
-    # 404 is also acceptable (no active job)
-    # 405 would mean endpoint doesn't exist
-    assert response.status_code in {404, 422}
-
-
-def test_polish_generation_with_no_active_job(client):
-    """Test polish request fails gracefully when no generation job is active."""
-    response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please make it more professional",
-            "tone": "professional",
-            "additions": [],
-            "removals": [],
-        }
-    )
-    
-    # Should return 404 when no active generation
-    assert response.status_code == 404
-    data = response.json()
-    assert "No active generation found" in data["detail"]
-
-
-def test_polish_generation_with_valid_feedback(client, tmp_path):
-    """Test valid polish request with all feedback fields."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    assert intake_response.status_code == 200
-    intake_id = intake_response.json()["intake_id"]
-
-    # Start generation to move to draft_ready state
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    assert gen_response.status_code == 200
-    job_id = gen_response.json()["job_id"]
-
-    # Manually update job status to draft_ready for testing
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Now test polish with valid feedback
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please make it more professional",
-            "tone": "professional",
-            "additions": ["Added project X", "Added skill Y"],
-            "removals": ["Remove outdated section"],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-    assert data["status"] == "polishing"
-
-
-def test_polish_generation_with_only_general_notes(client, tmp_path):
-    """Test polish request with only general_notes feedback field."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with only general_notes
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please enhance the technical skills section",
-            "tone": "",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-    assert data["status"] == "polishing"
-
-
-def test_polish_generation_with_only_tone(client, tmp_path):
-    """Test polish request with only tone feedback field."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with only tone
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "",
-            "tone": "casual and friendly",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-    assert data["status"] == "polishing"
-
-
-def test_polish_generation_with_only_additions(client, tmp_path):
-    """Test polish request with only additions feedback field."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with only additions
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "",
-            "tone": "",
-            "additions": ["Volunteer experience at local community center", "Speaking at tech conferences"],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-
-
-def test_polish_generation_with_only_removals(client, tmp_path):
-    """Test polish request with only removals feedback field."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with only removals
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "",
-            "tone": "",
-            "additions": [],
-            "removals": ["Old job title", "Outdated skills"],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-
-
-def test_polish_generation_with_no_feedback(client, tmp_path):
-    """Test polish request fails when no feedback is provided."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with no feedback at all
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "",
-            "tone": "",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 422
-    data = polish_response.json()
-    assert "No feedback provided" in data["detail"]
-
-
-def test_polish_generation_with_whitespace_only_feedback(client, tmp_path):
-    """Test polish request fails when feedback fields contain only whitespace."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to draft_ready
-    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
-
-    # Test polish with only whitespace
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "   \t\n  ",
-            "tone": "  ",
-            "additions": ["  ", "    \t"],
-            "removals": ["\n", "  \n  "],
-        }
-    )
-
-    assert polish_response.status_code == 422
-    data = polish_response.json()
-    assert "No feedback provided" in data["detail"]
-
-
-def test_polish_generation_with_queued_status(client, tmp_path):
-    """Test polish request fails when job is in queued state."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-
-    # Job status is "queued" by default - don't change it
-
-    # Test polish when job is still queued
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please enhance it",
-            "tone": "professional",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 409
-    data = polish_response.json()
-    assert "draft_ready or complete state" in data["detail"]
-
-
-def test_polish_generation_with_running_status(client, tmp_path):
-    """Test polish request fails when job is in running state."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to running
-    local_llm._generation_jobs[job_id]["status"] = "running"
-
-    # Test polish when job is running
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please enhance it",
-            "tone": "professional",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 409
-    data = polish_response.json()
-    assert "draft_ready or complete state" in data["detail"]
-
-
-def test_polish_generation_with_complete_status(client, tmp_path):
-    """Test polish request succeeds when job is in complete state."""
-    # Setup: Create intake and start generation
-    zip_path = tmp_path / "test_repo.zip"
-    with ZipFile(zip_path, 'w') as zf:
-        zf.writestr("test-repo/.git/config", "[core]")
-        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
-        zf.writestr("test-repo/README.md", "# Test")
-
-    # Create intake and start generation
-    intake_response = client.post(
-        "/local-llm/context",
-        json={"zip_path": str(zip_path)}
-    )
-    intake_id = intake_response.json()["intake_id"]
-
-    gen_response = client.post(
-        "/local-llm/generation/start",
-        json={
-            "intake_id": intake_id,
-            "repo_ids": ["test-repo"],
-            "user_email": "test@example.com",
-        }
-    )
-    job_id = gen_response.json()["job_id"]
-
-    # Update job status to complete
-    local_llm._generation_jobs[job_id]["status"] = "complete"
-
-    # Test polish when job is complete
-    polish_response = client.post(
-        "/local-llm/generation/polish",
-        json={
-            "general_notes": "Please refine the summary",
-            "tone": "professional",
-            "additions": [],
-            "removals": [],
-        }
-    )
-
-    assert polish_response.status_code == 200
-    data = polish_response.json()
-    assert data["ok"] is True
-    assert data["status"] == "polishing"
-
-
 def test_create_intake_with_empty_zip(client, tmp_path):
     """Test intake creation with ZIP containing no repositories."""
     zip_path = tmp_path / "empty.zip"
@@ -1318,3 +835,394 @@ def test_generation_start_endpoint_in_openapi(client):
     assert "/local-llm/generation/start" in paths
     assert "post" in paths["/local-llm/generation/start"]
 
+
+def test_polish_generation_endpoint_exists(client):
+    """Verify POST /local-llm/generation/polish endpoint is registered."""
+    # Send invalid request to check endpoint exists (should get 422 or 404, not 405)
+    response = client.post("/local-llm/generation/polish", json={})
+    # 422 means endpoint exists but validation failed
+    # 404 is also acceptable (no active job)
+    # 405 would mean endpoint doesn't exist
+    assert response.status_code in {404, 422}
+
+
+def test_polish_generation_with_no_active_job(client):
+    """Test polish request fails gracefully when no generation job is active."""
+    response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "Please make it more professional",
+            "tone": "professional",
+            "additions": [],
+            "removals": [],
+        }
+    )
+    
+    # Should return 404 when no active generation
+    assert response.status_code == 404
+    data = response.json()
+    assert "No active generation found" in data["detail"]
+
+
+def test_polish_generation_with_valid_feedback(client, tmp_path):
+    """Test valid polish request with all feedback fields."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_id = intake_response.json()["intake_id"]
+
+    # Start generation to move to draft_ready state
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    assert gen_response.status_code == 200
+    job_id = gen_response.json()["job_id"]
+
+    # Manually update job status to draft_ready for testing
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Now test polish with valid feedback
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "Please make it more professional",
+            "tone": "professional",
+            "additions": ["Added project X", "Added skill Y"],
+            "removals": ["Remove outdated section"],
+        }
+    )
+
+    assert polish_response.status_code == 200
+    data = polish_response.json()
+    assert data["ok"] is True
+    assert data["status"] == "polishing"
+
+
+def test_polish_generation_with_only_general_notes(client, tmp_path):
+    """Test polish request with only general_notes feedback field."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with only general_notes
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "Please enhance the technical skills section",
+            "tone": "",
+            "additions": [],
+            "removals": [],
+        }
+    )
+
+    assert polish_response.status_code == 200
+    data = polish_response.json()
+    assert data["ok"] is True
+    assert data["status"] == "polishing"
+
+
+def test_polish_generation_with_only_tone(client, tmp_path):
+    """Test polish request with only tone feedback field."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with only tone
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "",
+            "tone": "casual and friendly",
+            "additions": [],
+            "removals": [],
+        }
+    )
+
+    assert polish_response.status_code == 200
+    data = polish_response.json()
+    assert data["ok"] is True
+    assert data["status"] == "polishing"
+
+
+def test_polish_generation_with_only_additions(client, tmp_path):
+    """Test polish request with only additions feedback field."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with only additions
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "",
+            "tone": "",
+            "additions": ["Volunteer experience at local community center", "Speaking at tech conferences"],
+            "removals": [],
+        }
+    )
+
+    assert polish_response.status_code == 200
+    data = polish_response.json()
+    assert data["ok"] is True
+
+
+def test_polish_generation_with_only_removals(client, tmp_path):
+    """Test polish request with only removals feedback field."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with only removals
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "",
+            "tone": "",
+            "additions": [],
+            "removals": ["Old job title", "Outdated skills"],
+        }
+    )
+
+    assert polish_response.status_code == 200
+    data = polish_response.json()
+    assert data["ok"] is True
+
+
+def test_polish_generation_with_no_feedback(client, tmp_path):
+    """Test polish request fails when no feedback is provided."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with no feedback at all
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "",
+            "tone": "",
+            "additions": [],
+            "removals": [],
+        }
+    )
+
+    assert polish_response.status_code == 422
+    data = polish_response.json()
+    assert "No feedback provided" in data["detail"]
+
+
+def test_polish_generation_with_whitespace_only_feedback(client, tmp_path):
+    """Test polish request fails when feedback fields contain only whitespace."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+    job_id = gen_response.json()["job_id"]
+
+    # Update job status to draft_ready
+    local_llm._generation_jobs[job_id]["status"] = "draft_ready"
+
+    # Test polish with only whitespace
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "   \t\n  ",
+            "tone": "  ",
+            "additions": ["  ", "    \t"],
+            "removals": ["\n", "  \n  "],
+        }
+    )
+
+    assert polish_response.status_code == 422
+    data = polish_response.json()
+    assert "No feedback provided" in data["detail"]
+
+
+def test_polish_generation_with_queued_status(client, tmp_path):
+    """Test polish request fails when job is in queued state."""
+    # Setup: Create intake and start generation
+    zip_path = tmp_path / "test_repo.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("test-repo/.git/config", "[core]")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test")
+
+    # Create intake and start generation
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    gen_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["test-repo"],
+            "user_email": "test@example.com",
+        }
+    )
+
+    # Job status is "queued" by default - don't change it
+
+    # Test polish when job is still queued
+    polish_response = client.post(
+        "/local-llm/generation/polish",
+        json={
+            "general_notes": "Please enhance it",
+            "tone": "professional",
+            "additions": [],
+            "removals": [],
+        }
+    )
+
+    assert polish_response.status_code == 409
+    data = polish_response.json()
+    assert "draft_ready or complete state" in data["detail"]
