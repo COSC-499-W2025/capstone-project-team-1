@@ -9,7 +9,7 @@ export type SearchableEntry = DirEntry | (ZipFile & { type: "zip" });
 
 export type SearchOptions = {
 	threshold?: number; // 0 = exact, 1 = match anything (default: 0.4)
-	keys?: string[];    // Fields to search (default: ["name", "fullPath"])
+	keys?: string[]; // Fields to search (default: ["name", "fullPath"])
 };
 
 // ============================================================================
@@ -21,7 +21,7 @@ export type SearchOptions = {
  */
 export function createSearchIndex(
 	entries: SearchableEntry[],
-	options: SearchOptions = {}
+	options: SearchOptions = {},
 ): Fuse<SearchableEntry> {
 	const { threshold = 0.4, keys = ["name", "fullPath"] } = options;
 
@@ -39,7 +39,7 @@ export function createSearchIndex(
 export function filterEntries(
 	entries: SearchableEntry[],
 	query: string,
-	options: SearchOptions = {}
+	options: SearchOptions = {},
 ): SearchableEntry[] {
 	if (!query.trim()) {
 		return entries;
@@ -47,7 +47,7 @@ export function filterEntries(
 
 	const fuse = createSearchIndex(
 		entries.filter((e) => !("isParent" in e && e.isParent)),
-		options
+		options,
 	);
 
 	const results = fuse.search(query);

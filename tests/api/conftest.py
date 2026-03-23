@@ -43,6 +43,7 @@ def client():
     local_llm._active_intakes.clear()
     local_llm._generation_jobs.clear()
     local_llm._active_generation_id = None
+    local_llm._generation_cancel_hooks.clear()
     
     yield TestClient(app)
     
@@ -55,6 +56,7 @@ def client():
     local_llm._active_intakes.clear()
     local_llm._generation_jobs.clear()
     local_llm._active_generation_id = None
+    local_llm._generation_cancel_hooks.clear()
     
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

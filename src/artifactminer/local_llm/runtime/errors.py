@@ -68,9 +68,43 @@ class ModelServerCrashedError(LocalLLMRuntimeError):
         super().__init__(f"llama-server exited unexpectedly{suffix}.")
 
 
+class InferenceRequestError(LocalLLMRuntimeError):
+    """Raised when an inference request cannot be completed."""
+
+    def __init__(self, message: str, *, model: str | None = None) -> None:
+        self.model = model
+        super().__init__(message)
+
+
 class InvalidLLMResponseError(LocalLLMRuntimeError):
     """Raised when the model response is empty or cannot be interpreted."""
 
     def __init__(self, message: str, raw_response: str | None = None) -> None:
         self.raw_response = raw_response
         super().__init__(message)
+
+
+class EmptyLLMResponseError(InvalidLLMResponseError):
+    """Raised when the model returns an empty content payload."""
+
+    pass
+
+
+class MalformedJSONResponseError(InvalidLLMResponseError):
+    """Raised when the model response is not valid JSON."""
+
+    pass
+
+
+class SchemaValidationResponseError(InvalidLLMResponseError):
+    """Raised when parsed JSON does not satisfy the requested schema/type."""
+
+    def __init__(
+        self,
+        message: str,
+        raw_response: str | None = None,
+        *,
+        validation_error: Exception | None = None,
+    ) -> None:
+        self.validation_error = validation_error
+        super().__init__(message, raw_response=raw_response)
