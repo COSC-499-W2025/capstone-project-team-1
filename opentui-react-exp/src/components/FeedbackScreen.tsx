@@ -107,11 +107,7 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				step="Feedback"
-				title="Refine Before Stage 3"
-				description="Set tone and notes, then run local polish"
-			/>
+			<TopBar title="Feedback" />
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
 				<box

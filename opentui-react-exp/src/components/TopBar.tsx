@@ -1,39 +1,27 @@
 import { theme } from "../types";
 
 interface TopBarProps {
-	step: string;
 	title: string;
 	description?: string;
 }
 
-export function TopBar({ step, title, description }: TopBarProps) {
+export function TopBar({ title, description }: TopBarProps) {
 	return (
-		<box
-			width="100%"
-			flexDirection="column"
-			paddingTop={1}
-			paddingBottom={1}
-			backgroundColor={theme.bgDark}
-		>
-			<box width="100%" flexDirection="row" justifyContent="center">
+		<box width="100%" flexDirection="column" gap={1} backgroundColor={theme.bgDark}>
+			<box flexDirection="row" justifyContent="center" paddingTop={1}>
 				<text>
 					<span fg={theme.gold}>
-						<strong>{step}</strong>
-					</span>
-					<span fg={theme.textDim}>{" | "}</span>
-					<span fg={theme.textPrimary}>
 						<strong>{title}</strong>
 					</span>
 				</text>
 			</box>
-
-			{description && (
-				<box width="100%" flexDirection="row" justifyContent="center">
+			{description ? (
+				<box paddingLeft={4} paddingRight={4} paddingBottom={2} alignItems="center">
 					<text>
-						<span fg={theme.textDim}>{description}</span>
+						<span fg={theme.textSecondary}>{description}</span>
 					</text>
 				</box>
-			)}
+			) : null}
 		</box>
 	);
 }
