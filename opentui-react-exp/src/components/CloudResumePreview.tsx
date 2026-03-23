@@ -458,36 +458,68 @@ export function CloudResumePreview({
 				description="Your AI-generated developer profile — switch tabs to explore your resume, insights, and project analysis."
 			/>
 
-			{/* Tab bar */}
-			<tab-select
-				focused
-				options={TABS}
-				onChange={(_idx: number, opt: { value?: Tab } | null) => {
-					if (opt?.value) setActiveTab(opt.value);
-				}}
-				showUnderline
-				showDescription={false}
-				backgroundColor={theme.bgDark}
-				textColor={theme.textDim}
-				focusedTextColor={theme.gold}
-				selectedTextColor={theme.gold}
-				focusedBackgroundColor={theme.bgMedium}
-				selectedBackgroundColor={theme.bgDark}
-			/>
+			<box flexGrow={1} flexDirection="row">
+				{/* Sidebar navigation */}
+				<box
+					flexDirection="column"
+					paddingTop={1}
+					paddingLeft={2}
+					paddingRight={2}
+					paddingBottom={1}
+					gap={2}
+					border
+					borderStyle="rounded"
+					borderColor={theme.goldDim}
+					width={22}
+				>
+					{TABS.map((tab, idx) => {
+						const isActive = tab.value === activeTab;
+						return (
+							<box
+								key={tab.value}
+								flexDirection="column"
+								onMouseDown={() => setActiveTab(tab.value)}
+							>
+								<text>
+									<span fg={isActive ? theme.gold : theme.bgDark}>
+										{isActive ? "\ud83d\udc49 " : "   "}
+									</span>
+									<span fg={isActive ? theme.gold : theme.textDim}>
+										{isActive ? <strong>{tab.name}</strong> : tab.name}
+									</span>
+								</text>
+								<text>
+									<span fg={theme.textDim}>
+										{`   ${String(idx + 1)}`}
+									</span>
+								</text>
+							</box>
+						);
+					})}
+				</box>
 
-			{/* Tab content */}
-			<scrollbox
-				flexGrow={1}
-				style={{
-					rootOptions: { backgroundColor: theme.bgDark },
-					wrapperOptions: { flexGrow: 1 },
-					viewportOptions: { padding: 2 },
-				}}
-			>
-				{activeTab === "resume" && <ResumeTab markdown={profile.resume_markdown} />}
-				{activeTab === "insights" && <InsightsTab profile={profile} />}
-				{activeTab === "projects" && <ProjectsTab projects={profile.projects} />}
-			</scrollbox>
+				{/* Content area */}
+				<box
+					flexGrow={1}
+					border
+					borderStyle="rounded"
+					borderColor={theme.goldDim}
+				>
+					<scrollbox
+						focused
+						flexGrow={1}
+						style={{
+							rootOptions: { backgroundColor: theme.bgDark },
+							wrapperOptions: { flexGrow: 1 },
+							viewportOptions: { padding: 2 },
+						}}
+					>
+						{activeTab === "resume" && <ResumeTab markdown={profile.resume_markdown} />}
+						{activeTab === "insights" && <InsightsTab profile={profile} />}
+						{activeTab === "projects" && <ProjectsTab projects={profile.projects} />}
+					</scrollbox>
+				</box>
+			</box>
 		</box>
 	);
 }
