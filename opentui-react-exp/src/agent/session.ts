@@ -10,10 +10,10 @@ import {
 	type AgentSession,
 	type AgentSessionEvent,
 	createAgentSession,
-	createBashTool,
+	createExtensionRuntime,
 	createReadOnlyTools,
-	DefaultResourceLoader,
 	ModelRegistry,
+	type ResourceLoader,
 	SessionManager,
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
@@ -28,6 +28,25 @@ function getAuthStorage(): AuthStorage {
 		_authStorage = AuthStorage.create();
 	}
 	return _authStorage;
+}
+
+function createPromptOnlyResourceLoader(): ResourceLoader {
+	return {
+		getExtensions: () => ({
+			extensions: [],
+			errors: [],
+			runtime: createExtensionRuntime(),
+		}),
+		getSkills: () => ({ skills: [], diagnostics: [] }),
+		getPrompts: () => ({ prompts: [], diagnostics: [] }),
+		getThemes: () => ({ themes: [], diagnostics: [] }),
+		getAgentsFiles: () => ({ agentsFiles: [] }),
+		getSystemPrompt: () => RESUME_SYSTEM_PROMPT,
+		getAppendSystemPrompt: () => [],
+		getPathMetadata: () => new Map(),
+		extendResources: () => {},
+		reload: async () => {},
+	};
 }
 
 /** Result of checking available API keys / models. */
@@ -181,18 +200,15 @@ export async function createResumeSession(
 		available.find((m) => m.provider === "github-copilot") ??
 		available[0];
 
-	// Custom resource loader with resume system prompt
-	const loader = new DefaultResourceLoader({
-		cwd,
-		systemPromptOverride: () => RESUME_SYSTEM_PROMPT,
-	});
+	// Only provide the custom system prompt. Do not scan project resources.
+	const loader = createPromptOnlyResourceLoader();
 	await loader.reload();
 
 	const { session } = await createAgentSession({
 		cwd,
 		model,
 		thinkingLevel: "off",
-		tools: [...createReadOnlyTools(cwd), createBashTool(cwd)],
+		tools: createReadOnlyTools(cwd),
 		resourceLoader: loader,
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
