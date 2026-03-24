@@ -262,17 +262,64 @@ export interface GitIdentity {
 	email: string;
 }
 
+export interface GenerateResumeOptions {
+	signal?: AbortSignal;
+}
+
+function createAbortError(): Error {
+	const error = new Error("Resume generation was aborted.");
+	error.name = "AbortError";
+	return error;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+	if (signal?.aborted) {
+		throw createAbortError();
+	}
+}
+
 export async function generateResume(
 	extractedDir: string,
 	onEvent: (event: ResumeEvent) => void,
 	modelId?: string,
 	gitIdentity?: GitIdentity,
+	options?: GenerateResumeOptions,
 ): Promise<DeveloperProfile> {
+	const signal = options?.signal;
+	throwIfAborted(signal);
+
 	const { session, dispose } = await createResumeSession(
 		extractedDir,
 		onEvent,
 		modelId,
 	);
+	let removeAbortListener: (() => void) | undefined;
+	let abortPromise: Promise<void> | undefined;
+
+	const abortSession = (): Promise<void> => {
+		if (!abortPromise) {
+			abortPromise = session.abort();
+		}
+		return abortPromise;
+	};
+
+	const generationAborted = signal
+		? new Promise<never>((_, reject) => {
+			if (signal.aborted) {
+				void abortSession();
+				reject(createAbortError());
+				return;
+			}
+
+			const onAbort = () => {
+				void abortSession();
+				reject(createAbortError());
+			};
+
+			signal.addEventListener("abort", onAbort, { once: true });
+			removeAbortListener = () => signal.removeEventListener("abort", onAbort);
+		})
+		: undefined;
 
 	// Collect the full response text
 	let fullText = "";
@@ -292,26 +339,33 @@ export async function generateResume(
 	}
 
 	try {
-		await session.prompt(
-			`Explore all the code repositories in this directory and generate a comprehensive developer profile as structured JSON.${identityContext} Your final response must contain ONLY valid JSON — start with '{' and end with '}'. No preamble, no thinking, no narration, no markdown fences.`,
-		);
+		const runGeneration = async (): Promise<DeveloperProfile> => {
+			await session.prompt(
+				`Explore all the code repositories in this directory and generate a comprehensive developer profile as structured JSON.${identityContext} Your final response must contain ONLY valid JSON — start with '{' and end with '}'. No preamble, no thinking, no narration, no markdown fences.`,
+			);
+			throwIfAborted(signal);
 
-		// Extract JSON from the response — find the outermost { ... }
-		const jsonStart = fullText.indexOf("{");
-		const jsonEnd = fullText.lastIndexOf("}");
-		if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart) {
-			throw new Error("LLM did not return valid JSON. Raw response saved as resume markdown.");
-		}
+			// Extract JSON from the response — find the outermost { ... }
+			const jsonStart = fullText.indexOf("{");
+			const jsonEnd = fullText.lastIndexOf("}");
+			if (jsonStart < 0 || jsonEnd < 0 || jsonEnd <= jsonStart) {
+				throw new Error("LLM did not return valid JSON. Raw response saved as resume markdown.");
+			}
 
-		const jsonStr = fullText.slice(jsonStart, jsonEnd + 1);
-		const parsed = JSON.parse(jsonStr) as DeveloperProfile;
+			const jsonStr = fullText.slice(jsonStart, jsonEnd + 1);
+			const parsed = JSON.parse(jsonStr) as DeveloperProfile;
 
-		// Validate required fields exist
-		if (!parsed.resume_markdown || !parsed.developer_dna || !parsed.projects) {
-			throw new Error("LLM returned incomplete profile — missing required fields.");
-		}
+			// Validate required fields exist
+			if (!parsed.resume_markdown || !parsed.developer_dna || !parsed.projects) {
+				throw new Error("LLM returned incomplete profile — missing required fields.");
+			}
 
-		return parsed;
+			return parsed;
+		};
+
+		return generationAborted
+			? await Promise.race([runGeneration(), generationAborted])
+			: await runGeneration();
 	} catch (err) {
 		// Fallback: if JSON parsing fails, wrap the raw text as a markdown-only profile
 		if (err instanceof SyntaxError) {
@@ -319,6 +373,10 @@ export async function generateResume(
 		}
 		throw err;
 	} finally {
+		removeAbortListener?.();
+		if (abortPromise) {
+			await abortPromise.catch(() => {});
+		}
 		dispose();
 	}
 }

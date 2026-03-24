@@ -119,6 +119,7 @@ export function SnakeWithProgress({
 	// Generation logic
 	useEffect(() => {
 		let cancelled = false;
+		const abortController = new AbortController();
 
 		const onEvent = (event: ResumeEvent) => {
 			if (cancelled) return;
@@ -160,10 +161,17 @@ export function SnakeWithProgress({
 
 				setFlowPhase("generating");
 				pushActivity("system", "Getting the AI started...");
-				const profile = await generateResume(extraction_path, onEvent, modelId, gitIdentity ?? undefined);
+				const profile = await generateResume(
+					extraction_path,
+					onEvent,
+					modelId,
+					gitIdentity ?? undefined,
+					{ signal: abortController.signal },
+				);
 				resultRef.current = profile;
 			} catch (err) {
 				if (cancelled) return;
+				if (err instanceof Error && err.name === "AbortError") return;
 				setFlowPhase("error");
 				const msg = err instanceof Error ? err.message : String(err);
 				const isConnErr =
@@ -178,7 +186,10 @@ export function SnakeWithProgress({
 			}
 		})();
 
-		return () => { cancelled = true; };
+		return () => {
+			cancelled = true;
+			abortController.abort();
+		};
 	}, [zipPath]);
 
 	useKeyboard(
