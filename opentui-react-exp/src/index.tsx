@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { CloudAuth, CloudFlow } from "./components/cloud-ai";
+import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
@@ -295,8 +296,13 @@ function App() {
 				);
 
 			case "cloud-resume":
-				// Placeholder — CloudResumePreview added in PR 4
-				return null;
+				return cloudProfile ? (
+					<CloudResumePreview
+						profile={cloudProfile}
+						onBack={() => setScreen("cloud-generation")}
+						onRestart={() => setScreen("landing")}
+					/>
+				) : null;
 
 			case "consent-policy":
 			case "identity":
