@@ -13,19 +13,18 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.11",
-		"@types/bun": "latest",
-		"@types/react": "^19.2.2",
-		"@types/react-dom": "^19.2.2"
+		"@types/bun": "latest"
 	},
 	"peerDependencies": {
 		"typescript": "^5"
 	},
 	"dependencies": {
-		"@opentui/core": "^0.1.72",
-		"@opentui/react": "^0.1.72",
+		"@mariozechner/pi-coding-agent": "^0.60.0",
+		"@opentui/core": "^0.1.88",
+		"@opentui/react": "^0.1.88",
 		"fdir": "^6.5.0",
 		"fuse.js": "^7.1.0",
-		"react": "^19.2.4",
+"react": "^19.2.4",
 		"react-dom": "^19.2.4"
 	}
 }

@@ -6,6 +6,7 @@ import type {
 	ConsentResponse,
 	DeleteResponse,
 	DirectoriesResponse,
+	ExtractLocalResponse,
 	PipelineCancelResponse,
 	PipelineContributorsRequest,
 	PipelineContributorsResponse,
@@ -98,4 +99,7 @@ export const api = {
 		client.post("/local-llm/generation/polish", request),
 	cancelPipeline: (): Promise<PipelineCancelResponse> =>
 		client.post("/local-llm/generation/cancel"),
+
+	extractLocal: (zipPath: string): Promise<ExtractLocalResponse> =>
+		client.post("/zip/extract-local", { zip_path: zipPath }),
 };
