@@ -3,6 +3,7 @@ import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
+import { CloudAuth } from "./components/cloud-ai";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
@@ -10,17 +11,26 @@ import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
+import type { ConsentLevel } from "./api/types";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
 
 // Screens shown in breadcrumbs (in order)
-const BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
+const LOCAL_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
 	{ screen: "file-upload", label: "Upload" },
 	{ screen: "project-list", label: "Projects" },
 	{ screen: "analysis", label: "Analyze" },
 	{ screen: "resume-preview", label: "Resume" },
+];
+
+const CLOUD_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
+	{ screen: "consent", label: "Consent" },
+	{ screen: "cloud-auth", label: "Configure" },
+	{ screen: "file-upload", label: "Upload" },
+	{ screen: "cloud-generation", label: "Generate" },
+	{ screen: "cloud-resume", label: "Resume" },
 ];
 
 // Key actions for each screen
@@ -71,12 +81,31 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
 	],
+	"cloud-auth": [
+		{ key: "↑/↓", label: "Navigate" },
+		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
+	"cloud-generation": [{ key: "Esc", label: "Back" }],
+	"cloud-resume": [
+		{ key: "1/2/3", label: "Switch Tab" },
+		{ key: "↑/↓", label: "Scroll" },
+		{ key: "r", label: "Restart" },
+		{ key: "Esc", label: "Exit" },
+	],
 };
 
 function App() {
 	const renderer = useRenderer();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
+	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
+	const [cloudModelId, setCloudModelId] = useState("");
+	const [cloudGitIdentity, setCloudGitIdentity] = useState<{
+		login: string;
+		name: string | null;
+		email: string;
+	} | null>(null);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 
@@ -118,6 +147,10 @@ function App() {
 				// Consent wizard handles its own keyboard events
 				break;
 
+			case "cloud-auth":
+				// CloudAuth handles its own keyboard (Esc via CopilotLogin)
+				break;
+
 			case "consent-policy":
 			case "identity":
 			case "pipeline-launch":
@@ -127,7 +160,7 @@ function App() {
 
 			case "file-upload":
 				if (key.name === "escape") {
-					setScreen("consent");
+					setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent");
 				}
 				break;
 
@@ -150,6 +183,18 @@ function App() {
 					renderer.destroy();
 				}
 				break;
+
+			case "cloud-generation":
+				// CloudFlow handles its own keyboard
+				break;
+
+			case "cloud-resume":
+				if (key.name === "r") {
+					setScreen("landing");
+				} else if (key.name === "escape") {
+					renderer.destroy();
+				}
+				break;
 		}
 	});
 
@@ -166,10 +211,23 @@ function App() {
 			case "consent":
 				return (
 					<ConsentScreen
-						onContinue={() => {
-							setScreen("file-upload");
+						onContinue={(level?: ConsentLevel) => {
+							if (level) setConsentLevel(level);
+							setScreen(level === "cloud" ? "cloud-auth" : "file-upload");
 						}}
 						onBack={() => setScreen("landing")}
+					/>
+				);
+
+			case "cloud-auth":
+				return (
+					<CloudAuth
+						onComplete={(result) => {
+							setCloudModelId(result.modelId);
+							setCloudGitIdentity(result.gitIdentity);
+							setScreen("file-upload");
+						}}
+						onBack={() => setScreen("consent")}
 					/>
 				);
 
@@ -178,9 +236,13 @@ function App() {
 					<FileUpload
 						onSubmit={(path) => {
 							setFilePath(path);
-							setScreen("project-list");
+							if (consentLevel === "cloud") {
+								setScreen("cloud-generation");
+							} else {
+								setScreen("project-list");
+							}
 						}}
-						onBack={() => setScreen("consent")}
+						onBack={() => setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")}
 					/>
 				);
 
@@ -210,6 +272,14 @@ function App() {
 					/>
 				);
 
+			case "cloud-generation":
+				// Placeholder — CloudFlow added in PR 3
+				return null;
+
+			case "cloud-resume":
+				// Placeholder — CloudResumePreview added in PR 4
+				return null;
+
 			case "consent-policy":
 			case "identity":
 			case "pipeline-launch":
@@ -230,10 +300,13 @@ function App() {
 	const visibleActions =
 		screen === "landing" && isLandingIntroPhase ? [] : screenActions[screen];
 
+	const activeBreadcrumbScreens =
+		consentLevel === "cloud" ? CLOUD_BREADCRUMB_SCREENS : LOCAL_BREADCRUMB_SCREENS;
+
 	const breadcrumbs: Breadcrumb[] | undefined =
 		screen === "landing"
 			? undefined
-			: BREADCRUMB_SCREENS.map(({ screen: s, label }) => ({
+			: activeBreadcrumbScreens.map(({ screen: s, label }) => ({
 					screen: s,
 					label,
 					visited: visitedScreens.has(s),

@@ -9,7 +9,10 @@ export type Screen =
 	| "analysis"
 	| "draft-pause"
 	| "feedback"
-	| "resume-preview";
+	| "resume-preview"
+	| "cloud-auth"
+	| "cloud-generation"
+	| "cloud-resume";
 
 export type AnalysisMode = "phase1" | "phase3";
 
