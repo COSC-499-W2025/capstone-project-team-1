@@ -27,7 +27,7 @@ export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 		(async () => {
 			try {
 				const result = await checkAvailableModels();
-				if (result.available) {
+				if (result.hasCopilot) {
 					try {
 						const user = await fetchGitHubUser();
 						setGhUser(user);
