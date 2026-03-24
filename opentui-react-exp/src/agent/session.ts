@@ -196,7 +196,6 @@ export async function createResumeSession(
 		resourceLoader: loader,
 		sessionManager: SessionManager.inMemory(),
 		settingsManager: SettingsManager.inMemory({
-			compaction: { enabled: false },
 			retry: { enabled: true, maxRetries: 2 },
 		}),
 		authStorage,
