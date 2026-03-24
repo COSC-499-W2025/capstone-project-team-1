@@ -13,13 +13,6 @@ import {
     type SearchableEntry,
 } from "../utils";
 
-interface FileUploadProps {
-    onSubmit: (path: string) => void | Promise<void>;
-    onBack: () => void;
-    /** Root path to scan for ZIPs. Defaults to homedir() */
-    scanRoot?: string;
-}
-
 type ScanStatus = "idle" | "scanning" | "complete" | "error";
 
 interface Column {
@@ -53,7 +46,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
     useEffect(() => {
         if (scanStatus !== "scanning") return;
         const interval = setInterval(() => {
-            setScanProgress((p) => (p + 1) % 30);
+            setScanProgress((p) => Math.min(p + 1, 30));
         }, 80);
         return () => clearInterval(interval);
     }, [scanStatus]);
@@ -182,24 +175,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
             return;
         }
         if (isSearchFocused) {
-            // Navigate search results with arrow keys / Enter
-            if (searchQuery && searchResults.length > 0) {
-                if (key.name === "up") {
-                    setSearchSelectedIndex((i) => Math.max(0, i - 1));
-                    return;
-                }
-                if (key.name === "down") {
-                    setSearchSelectedIndex((i) =>
-                        Math.min(searchResults.length - 1, i + 1),
-                    );
-                    return;
-                }
-                if (key.name === "return") {
-                    onSubmit(searchResults[searchSelectedIndex].fullPath);
-                    return;
-                }
-            }
-            // Let the input handle everything else
+            // Only intercept Escape — let the input handle everything else
             return;
         }
 

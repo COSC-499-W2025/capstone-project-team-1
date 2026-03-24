@@ -3,7 +3,7 @@ import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useState } from "react";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
-import { CloudAuth } from "./components/cloud-ai";
+import { CloudAuth, CloudFlow } from "./components/cloud-ai";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
@@ -11,7 +11,8 @@ import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider } from "./context/AppContext";
-import type { ConsentLevel } from "./api/types";
+import { useSelectionCopy } from "./hooks/useSelectionCopy";
+import type { ConsentLevel, DeveloperProfile } from "./api/types";
 import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
@@ -97,6 +98,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 
 function App() {
 	const renderer = useRenderer();
+	useSelectionCopy();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
 	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
@@ -106,6 +108,7 @@ function App() {
 		name: string | null;
 		email: string;
 	} | null>(null);
+	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(null);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 
@@ -272,8 +275,18 @@ function App() {
 				);
 
 			case "cloud-generation":
-				// Placeholder — CloudFlow added in PR 3
-				return null;
+				return (
+					<CloudFlow
+						zipPath={filePath}
+						modelId={cloudModelId}
+						gitIdentity={cloudGitIdentity}
+						onComplete={(profile) => {
+							setCloudProfile(profile);
+							setScreen("cloud-resume");
+						}}
+						onBack={() => setScreen("file-upload")}
+					/>
+				);
 
 			case "cloud-resume":
 				// Placeholder — CloudResumePreview added in PR 4
