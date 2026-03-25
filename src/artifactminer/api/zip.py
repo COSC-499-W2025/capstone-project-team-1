@@ -134,31 +134,31 @@ async def extract_local_zip(
     body: ExtractLocalRequest,
     db: Session = Depends(get_db),
 ) -> ExtractLocalResponse:
-    """Extract a local ZIP file and return the absolute extraction path.
+    """Extract a previously uploaded ZIP and return the absolute extraction path.
 
-    Used by the Pi Agent integration: the TUI passes a local ZIP path,
-    and this endpoint extracts it so the agent can explore the contents.
+    Used by the Pi Agent integration after the ZIP has been uploaded
+    through the standard upload flow.
     """
-    zip_path = Path(body.zip_path)
+    uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == body.zip_id).first()
+    if not uploaded_zip:
+        raise HTTPException(
+            status_code=404, detail=f"ZIP file with id={body.zip_id} not found"
+        )
+
+    zip_path = Path(uploaded_zip.path)
     if not zip_path.exists():
-        raise HTTPException(status_code=404, detail=f"ZIP file not found: {body.zip_path}")
-    if not zip_path.suffix == ".zip":
+        raise HTTPException(
+            status_code=404, detail=f"ZIP file not found on disk: {uploaded_zip.path}"
+        )
+    if zip_path.suffix != ".zip":
         raise HTTPException(status_code=422, detail="Only ZIP files are allowed.")
 
-    # Create an UploadedZip record (reuse existing path, no copy needed)
-    uploaded_zip = UploadedZip(
-        filename=zip_path.name,
-        path=str(zip_path),
-        portfolio_id=str(uuid.uuid4()),
-    )
-    db.add(uploaded_zip)
+    extraction_path = extract_zip_to_persistent_location(str(zip_path), uploaded_zip.id)
+    uploaded_zip.extraction_path = str(extraction_path.resolve())
     db.commit()
     db.refresh(uploaded_zip)
 
-    extraction_path = extract_zip_to_persistent_location(str(zip_path), uploaded_zip.id)
-
     return ExtractLocalResponse(
         zip_id=uploaded_zip.id,
-        extraction_path=str(extraction_path.resolve()),
+        extraction_path=uploaded_zip.extraction_path,
     )
-
