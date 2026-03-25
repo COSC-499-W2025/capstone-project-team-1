@@ -1,9 +1,9 @@
 import { expect, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
-import { act } from "react";
+import { act, type ReactNode } from "react";
 import { BottomBar } from "./BottomBar";
 
-async function renderBottomBar(node: JSX.Element) {
+async function renderBottomBar(node: ReactNode) {
 	const rendered = await testRender(node, { width: 100, height: 3 });
 
 	await act(async () => {

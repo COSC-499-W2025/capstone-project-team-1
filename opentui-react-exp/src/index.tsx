@@ -158,7 +158,7 @@ function App() {
 			case "landing":
 				return (
 					<Landing
-						onGetStarted={() => setScreen("consent")}
+						onReady={() => setScreen("consent")}
 						onIntroPhaseChange={setIsLandingIntroPhase}
 					/>
 				);
@@ -219,7 +219,10 @@ function App() {
 		}
 	};
 
-	const screenForward: Record<string, { onForward?: () => void; forwardLabel?: string }> = {
+	const screenForward: Record<
+		string,
+		{ onForward?: () => void; forwardLabel?: string }
+	> = {
 		"project-list": {
 			onForward: () => setScreen("analysis"),
 			forwardLabel: "Analyze",
