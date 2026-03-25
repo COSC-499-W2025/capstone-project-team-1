@@ -16,18 +16,26 @@ interface BottomBarProps {
 	forwardLabel?: string;
 }
 
-export function BottomBar({ actions, breadcrumbs, currentScreen, onNavigate, onForward, forwardLabel = "Continue" }: BottomBarProps) {
+export function BottomBar({
+	actions,
+	breadcrumbs,
+	currentScreen,
+	onNavigate,
+	onForward,
+	forwardLabel = "Continue",
+}: BottomBarProps) {
 	return (
 		<box
 			width="100%"
 			flexDirection="row"
+			justifyContent="space-between"
 			alignItems="center"
 			paddingLeft={2}
 			paddingRight={2}
-			height={1}
+			paddingTop={1}
+			paddingBottom={1}
 			backgroundColor={theme.bgDark}
 		>
-			{/* Left: breadcrumbs */}
 			<box flexDirection="row" alignItems="center">
 				{breadcrumbs?.map((crumb, i) => {
 					const isCurrent = crumb.screen === currentScreen;
@@ -40,9 +48,11 @@ export function BottomBar({ actions, breadcrumbs, currentScreen, onNavigate, onF
 
 					return (
 						<box key={crumb.screen} flexDirection="row">
-							{/* biome-ignore lint/a11y/noStaticElementInteractions: breadcrumb nav */}
 							<box
-								onMouseDown={canClick ? () => onNavigate?.(crumb.screen) : undefined}
+								// biome-ignore lint/a11y/noStaticElementInteractions: breadcrumb nav
+								onMouseDown={
+									canClick ? () => onNavigate?.(crumb.screen) : undefined
+								}
 							>
 								<text>
 									<span fg={color}>
@@ -60,13 +70,13 @@ export function BottomBar({ actions, breadcrumbs, currentScreen, onNavigate, onF
 				})}
 			</box>
 
-			{/* Spacer */}
-			<box flexGrow={1} />
-
-			{/* Right: keyboard shortcuts + forward button */}
-			<box flexDirection="row" alignItems="center" gap={3}>
-				{actions.map((action, index) => (
-					<box key={index} flexDirection="row" gap={1}>
+			<box flexDirection="row" alignItems="center" gap={4}>
+				{actions.map((action) => (
+					<box
+						key={`${action.key}-${action.label}`}
+						flexDirection="row"
+						gap={1}
+					>
 						<text>
 							<span fg={theme.goldDark}>{action.key}</span>
 						</text>
@@ -78,7 +88,10 @@ export function BottomBar({ actions, breadcrumbs, currentScreen, onNavigate, onF
 				{onForward ? (
 					<box onMouseDown={onForward}>
 						<text>
-							<span fg={theme.gold}>{forwardLabel}{" ›"}</span>
+							<span fg={theme.gold}>
+								{forwardLabel}
+								{" ›"}
+							</span>
 						</text>
 					</box>
 				) : null}

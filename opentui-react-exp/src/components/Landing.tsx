@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { theme } from "../types";
 
 interface LandingProps {
-	onGetStarted: () => void;
+	onReady?: () => void;
 	onIntroPhaseChange?: (isIntroPhase: boolean) => void;
 }
 
@@ -38,7 +38,7 @@ const glowColors = [
 	"#FFDF33",
 ];
 
-export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
+export function Landing({ onReady, onIntroPhaseChange }: LandingProps) {
 	// Typewriter title state
 	const [titleText, setTitleText] = useState("");
 	const [titlePhase, setTitlePhase] = useState<"typing" | "pause" | "deleting">(
@@ -162,58 +162,43 @@ export function Landing({ onGetStarted, onIntroPhaseChange }: LandingProps) {
 	};
 
 	return (
-		<box
-			flexGrow={1}
-			flexDirection="column"
-			backgroundColor="#000000"
-			position="relative"
-		>
-			{/* Wandering mascot appears after intro */}
+		<box flexGrow={1} flexDirection="column" backgroundColor="#000000">
 			<box
 				flexGrow={1}
 				flexDirection="column"
 				alignItems="center"
 				justifyContent="center"
-				gap={2}
+				gap={3}
 			>
-				{/* Title Section with typewriter effect */}
 				<box
 					flexDirection="column"
 					alignItems="center"
 					justifyContent="center"
 					gap={1}
-					height={9}
+					height={8}
 				>
 					<box flexDirection="row" alignItems="flex-end" gap={1}>
 						{renderTitle()}
 					</box>
 				</box>
 
-				{/* Get Started Button with pulsing glow */}
 				{enableCtaRipple ? (
 					<box
-						flexDirection="column"
-						alignItems="center"
-						gap={1}
+						// biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes act as clickable terminal widgets.
+						border
+						borderStyle="rounded"
+						borderColor={glowColors[glowIndex]}
+						backgroundColor="#000000"
+						paddingLeft={2}
+						paddingRight={2}
+						paddingTop={0}
+						paddingBottom={0}
 						style={{ opacity: ctaOpacity }}
-						zIndex={1}
+						onMouseDown={onReady}
 					>
-						{/* biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI boxes act as clickable terminal widgets. */}
-						<box
-							border
-							borderStyle="rounded"
-							borderColor={glowColors[glowIndex]}
-							backgroundColor="#1a1a00"
-							paddingLeft={4}
-							paddingRight={4}
-							paddingTop={1}
-							paddingBottom={1}
-							onMouseDown={onGetStarted}
-						>
-							<text>
-								<strong>{renderCtaText()}</strong>
-							</text>
-						</box>
+						<text>
+							<strong>{renderCtaText()}</strong>
+						</text>
 					</box>
 				) : null}
 			</box>

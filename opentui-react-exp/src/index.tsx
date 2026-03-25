@@ -211,7 +211,7 @@ function App() {
 			case "landing":
 				return (
 					<Landing
-						onGetStarted={() => setScreen("consent")}
+						onReady={() => setScreen("consent")}
 						onIntroPhaseChange={setIsLandingIntroPhase}
 					/>
 				);
