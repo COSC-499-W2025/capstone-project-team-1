@@ -100,6 +100,6 @@ export const api = {
 	cancelPipeline: (): Promise<PipelineCancelResponse> =>
 		client.post("/local-llm/generation/cancel"),
 
-	extractLocal: (zipPath: string): Promise<ExtractLocalResponse> =>
-		client.post("/zip/extract-local", { zip_path: zipPath }),
+	extractLocal: (zipId: number): Promise<ExtractLocalResponse> =>
+		client.post("/zip/extract-local", { zip_id: zipId }),
 };

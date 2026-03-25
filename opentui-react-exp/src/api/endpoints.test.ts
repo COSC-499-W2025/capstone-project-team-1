@@ -39,6 +39,17 @@ test("createPipelineIntake sends POST /local-llm/context with zip_path", async (
 	expect(fetchCalls[0]?.options?.body).toBe(JSON.stringify({ zip_path: "/tmp/repo.zip" }));
 });
 
+test("extractLocal sends POST /zip/extract-local with zip_id", async () => {
+	installMockFetch({ zip_id: 7, extraction_path: "/tmp/extracted/7" });
+
+	await api.extractLocal(7);
+
+	expect(fetchCalls).toHaveLength(1);
+	expect(fetchCalls[0]?.url).toBe("http://127.0.0.1:8000/zip/extract-local");
+	expect(fetchCalls[0]?.options?.method).toBe("POST");
+	expect(fetchCalls[0]?.options?.body).toBe(JSON.stringify({ zip_id: 7 }));
+});
+
 test("getPipelineContributors posts the request payload unchanged", async () => {
 	installMockFetch({ contributors: [] });
 	const request = { repo_ids: ["repo-1", "repo-2"] };
