@@ -92,4 +92,5 @@ projects/
 .ruff_cache
 .kit/
 .opencode
+.worktrees/
 node_modules/

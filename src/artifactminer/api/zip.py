@@ -16,6 +16,8 @@ from .schemas import (
     DirectoriesResponse,
     PortfolioResponse,
     PortfolioZipItem,
+    ExtractLocalRequest,
+    ExtractLocalResponse,
 )
 from ..db import UploadedZip, get_db
 
@@ -126,3 +128,37 @@ async def get_directories(
         cleanedfilespath=file_value_list
     )
 
+
+@router.post("/extract-local", response_model=ExtractLocalResponse)
+async def extract_local_zip(
+    body: ExtractLocalRequest,
+    db: Session = Depends(get_db),
+) -> ExtractLocalResponse:
+    """Extract a previously uploaded ZIP and return the absolute extraction path.
+
+    Used by the Pi Agent integration after the ZIP has been uploaded
+    through the standard upload flow.
+    """
+    uploaded_zip = db.query(UploadedZip).filter(UploadedZip.id == body.zip_id).first()
+    if not uploaded_zip:
+        raise HTTPException(
+            status_code=404, detail=f"ZIP file with id={body.zip_id} not found"
+        )
+
+    zip_path = Path(uploaded_zip.path)
+    if not zip_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"ZIP file not found on disk: {uploaded_zip.path}"
+        )
+    if zip_path.suffix != ".zip":
+        raise HTTPException(status_code=422, detail="Only ZIP files are allowed.")
+
+    extraction_path = extract_zip_to_persistent_location(str(zip_path), uploaded_zip.id)
+    uploaded_zip.extraction_path = str(extraction_path.resolve())
+    db.commit()
+    db.refresh(uploaded_zip)
+
+    return ExtractLocalResponse(
+        zip_id=uploaded_zip.id,
+        extraction_path=uploaded_zip.extraction_path,
+    )
