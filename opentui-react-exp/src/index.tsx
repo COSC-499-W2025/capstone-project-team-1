@@ -185,7 +185,10 @@ function App() {
 				break;
 
 			case "cloud-generation":
-				// CloudFlow handles its own keyboard
+				// CloudFlow added in PR 3 — escape back to file-upload in the meantime
+				if (key.name === "escape") {
+					setScreen("file-upload");
+				}
 				break;
 
 			case "cloud-resume":
@@ -236,11 +239,7 @@ function App() {
 					<FileUpload
 						onSubmit={(path) => {
 							setFilePath(path);
-							if (consentLevel === "cloud") {
-								setScreen("cloud-generation");
-							} else {
-								setScreen("project-list");
-							}
+							setScreen("project-list");
 						}}
 						onBack={() => setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")}
 					/>
