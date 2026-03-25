@@ -31,7 +31,7 @@ Produce a single JSON object with this exact structure:
   "developer_dna": {
     "archetype": "A 1-3 word developer archetype (e.g., 'Systems Architect', 'Full-Stack Builder', 'Data Pipeline Engineer', 'UI Craftsperson')",
     "description": "2-3 sentences describing what kind of developer they are, written in second person ('You build...'). Ground this in specific patterns you observed in their code.",
-    "defining_traits": ["3-5 defining traits observed in their code, e.g., 'Modular code organization', 'Test-first development', 'API-first design']
+    "defining_traits": ["3-5 defining traits observed in their code, e.g., 'Modular code organization', 'Test-first development', 'API-first design'"]
   },
   "hidden_strengths": [
     {
