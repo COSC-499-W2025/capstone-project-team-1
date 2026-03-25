@@ -169,7 +169,7 @@ class DirectoriesResponse(BaseModel):
 class ExtractLocalRequest(BaseModel):
     """Request to extract a previously uploaded ZIP for agent consumption."""
 
-    zip_id: int = Field(description="ID of the uploaded ZIP record.")
+    zip_id: int = Field(description="ID of the uploaded ZIP record to extract.")
 
 
 class ExtractLocalResponse(BaseModel):
