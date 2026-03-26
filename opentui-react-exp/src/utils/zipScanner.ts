@@ -146,25 +146,27 @@ export function getChildDirsWithZips(
 ): DirEntry[] {
 	const childDirs = new Map<string, number>();
 
+	// Normalize paths to use forward slashes so logic is platform-agnostic
+	const normalize = (p: string) => p.replace(/\\/g, "/");
+	const normCurrent = normalize(currentPath);
+	const pathWithSep = normCurrent.endsWith("/") ? normCurrent : normCurrent + "/";
+
 	for (const zip of zips) {
-		// Ensure path ends with separator but don't double it (handles root "/" correctly)
-		const pathWithSep = currentPath.endsWith(sep)
-			? currentPath
-			: currentPath + sep;
+		const normParent = normalize(zip.parentDir);
 
 		// Skip if not under current path (must be actual child, not just string prefix)
-		if (!zip.parentDir.startsWith(pathWithSep)) continue;
+		if (!normParent.startsWith(pathWithSep)) continue;
 		// Skip if directly in current dir
-		if (zip.parentDir === currentPath) continue;
+		if (normParent === normCurrent) continue;
 
 		// Get the immediate child directory (slice from the end of pathWithSep)
-		const relativePath = zip.parentDir.slice(pathWithSep.length);
-		const parts = relativePath.split(sep).filter(Boolean);
+		const relativePath = normParent.slice(pathWithSep.length);
+		const parts = relativePath.split("/").filter(Boolean);
 		if (parts.length === 0) continue;
 
 		const childDir = parts[0];
 		if (!childDir) continue;
-		const fullChildPath = join(currentPath, childDir);
+		const fullChildPath = `${normCurrent}/${childDir}`;
 
 		childDirs.set(fullChildPath, (childDirs.get(fullChildPath) || 0) + 1);
 	}
