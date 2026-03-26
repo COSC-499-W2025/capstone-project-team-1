@@ -2,6 +2,7 @@ import { expect, test } from "bun:test";
 import {
 	buildEntries,
 	getChildDirsWithZips,
+	getZipsInDir,
 	type ZipFile,
 } from "./zipScanner";
 
@@ -47,4 +48,18 @@ test("buildEntries does not expose hidden directories in the browser list", () =
 			zipCount: 2,
 		},
 	]);
+});
+
+test("getZipsInDir matches parent directories across slash styles", () => {
+	const windowsZips: ZipFile[] = [
+		{
+			name: "visible.zip",
+			fullPath: "C:\\workspace\\projects\\visible.zip",
+			parentDir: "C:\\workspace\\projects",
+		},
+	];
+
+	expect(getZipsInDir(windowsZips, "C:/workspace/projects")).toEqual(
+		windowsZips,
+	);
 });

@@ -108,7 +108,9 @@ function App() {
 		name: string | null;
 		email: string;
 	} | null>(null);
-	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(null);
+	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(
+		null,
+	);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 
@@ -242,9 +244,13 @@ function App() {
 					<FileUpload
 						onSubmit={(path) => {
 							setFilePath(path);
-							setScreen("project-list");
+							setScreen(
+								consentLevel === "cloud" ? "cloud-generation" : "project-list",
+							);
 						}}
-						onBack={() => setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")}
+						onBack={() =>
+							setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")
+						}
 					/>
 				);
 
@@ -301,7 +307,10 @@ function App() {
 		}
 	};
 
-	const screenForward: Record<string, { onForward?: () => void; forwardLabel?: string }> = {
+	const screenForward: Record<
+		string,
+		{ onForward?: () => void; forwardLabel?: string }
+	> = {
 		"project-list": {
 			onForward: () => setScreen("analysis"),
 			forwardLabel: "Analyze",
@@ -313,7 +322,9 @@ function App() {
 		screen === "landing" && isLandingIntroPhase ? [] : screenActions[screen];
 
 	const activeBreadcrumbScreens =
-		consentLevel === "cloud" ? CLOUD_BREADCRUMB_SCREENS : LOCAL_BREADCRUMB_SCREENS;
+		consentLevel === "cloud"
+			? CLOUD_BREADCRUMB_SCREENS
+			: LOCAL_BREADCRUMB_SCREENS;
 
 	const breadcrumbs: Breadcrumb[] | undefined =
 		screen === "landing"

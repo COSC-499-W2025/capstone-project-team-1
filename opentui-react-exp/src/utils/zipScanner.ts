@@ -1,6 +1,6 @@
 import { fdir } from "fdir";
 import { stat } from "node:fs/promises";
-import { dirname, basename, join, sep } from "node:path";
+import { dirname, basename, sep } from "node:path";
 
 // ============================================================================
 // Types
@@ -29,6 +29,14 @@ export type ScanResult = {
 	zips: ZipFile[];
 	error?: string;
 };
+
+function normalizePathForComparison(path: string): string {
+	const normalized = path.replace(/\\/g, "/");
+	if (normalized.length > 1 && normalized.endsWith("/")) {
+		return normalized.slice(0, -1);
+	}
+	return normalized;
+}
 
 // ============================================================================
 // Default exclusions
@@ -134,7 +142,10 @@ export function buildDirsWithZips(
  * Gets ZIPs directly in a specific directory
  */
 export function getZipsInDir(zips: ZipFile[], dirPath: string): ZipFile[] {
-	return zips.filter((zip) => zip.parentDir === dirPath);
+	const normalizedDirPath = normalizePathForComparison(dirPath);
+	return zips.filter(
+		(zip) => normalizePathForComparison(zip.parentDir) === normalizedDirPath,
+	);
 }
 
 /**
@@ -146,13 +157,11 @@ export function getChildDirsWithZips(
 ): DirEntry[] {
 	const childDirs = new Map<string, number>();
 
-	// Normalize paths to use forward slashes so logic is platform-agnostic
-	const normalize = (p: string) => p.replace(/\\/g, "/");
-	const normCurrent = normalize(currentPath);
-	const pathWithSep = normCurrent.endsWith("/") ? normCurrent : normCurrent + "/";
+	const normCurrent = normalizePathForComparison(currentPath);
+	const pathWithSep = normCurrent === "/" ? "/" : `${normCurrent}/`;
 
 	for (const zip of zips) {
-		const normParent = normalize(zip.parentDir);
+		const normParent = normalizePathForComparison(zip.parentDir);
 
 		// Skip if not under current path (must be actual child, not just string prefix)
 		if (!normParent.startsWith(pathWithSep)) continue;
@@ -166,7 +175,8 @@ export function getChildDirsWithZips(
 
 		const childDir = parts[0];
 		if (!childDir) continue;
-		const fullChildPath = `${normCurrent}/${childDir}`;
+		const fullChildPath =
+			normCurrent === "/" ? `/${childDir}` : `${normCurrent}/${childDir}`;
 
 		childDirs.set(fullChildPath, (childDirs.get(fullChildPath) || 0) + 1);
 	}

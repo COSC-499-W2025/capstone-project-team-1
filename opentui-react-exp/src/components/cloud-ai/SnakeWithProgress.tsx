@@ -6,6 +6,7 @@
  * - Layer 1: Warm status message + Knight Rider spinner
  * - Layer 2: Scrollable humanized activity log
  */
+import { readFile } from "node:fs/promises";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { generateResume, type ResumeEvent } from "../../agent";
@@ -99,7 +100,11 @@ export function SnakeWithProgress({
 		}
 	}, [flowPhase]);
 
-	function pushActivity(tool: string, detail: string, status: "done" | "active" = "active") {
+	function pushActivity(
+		tool: string,
+		detail: string,
+		status: "done" | "active" = "active",
+	) {
 		setActivity((prev) => {
 			// Mark previous active entry as done
 			const updated = prev.map((e) =>
@@ -154,8 +159,14 @@ export function SnakeWithProgress({
 		(async () => {
 			try {
 				setFlowPhase("extracting");
+				pushActivity("system", "Uploading your archive...");
+				const archiveBuffer = await readFile(zipPath);
+				const archiveArrayBuffer = Uint8Array.from(archiveBuffer).buffer;
+				const upload = await api.uploadZip(new Blob([archiveArrayBuffer]));
+				if (cancelled) return;
+				pushActivity("system", "Archive uploaded.", "done");
 				pushActivity("system", "Unpacking your projects...");
-				const { extraction_path } = await api.extractLocal(zipPath);
+				const { extraction_path } = await api.extractLocal(upload.zip_id);
 				if (cancelled) return;
 				pushActivity("system", "Found your projects!", "done");
 
@@ -190,25 +201,32 @@ export function SnakeWithProgress({
 			cancelled = true;
 			abortController.abort();
 		};
-	}, [zipPath]);
+	}, [gitIdentity, modelId, zipPath]);
 
 	useKeyboard(
-		useCallback((key: { name: string }) => {
-			if (key.name === "escape") {
-				if (showSnake) {
-					setShowSnake(false);
-				} else {
-					onBack();
+		useCallback(
+			(key: { name: string }) => {
+				if (key.name === "escape") {
+					if (showSnake) {
+						setShowSnake(false);
+					} else {
+						onBack();
+					}
+					return;
 				}
-				return;
-			}
-			if (phaseRef.current === "done" && key.name === "return" && resultRef.current) {
-				onComplete(resultRef.current);
-			}
-			if (!showSnake && (key.name === "s" || key.name === "p")) {
-				setShowSnake(true);
-			}
-		}, [showSnake, onBack, onComplete]),
+				if (
+					phaseRef.current === "done" &&
+					key.name === "return" &&
+					resultRef.current
+				) {
+					onComplete(resultRef.current);
+				}
+				if (!showSnake && (key.name === "s" || key.name === "p")) {
+					setShowSnake(true);
+				}
+			},
+			[showSnake, onBack, onComplete],
+		),
 	);
 
 	// 50/50 split
@@ -242,7 +260,9 @@ export function SnakeWithProgress({
 							{Array.from({ length: snakeH * 2 }, (_, i) => (
 								<text key={i}>
 									<span fg="#222222">
-										{(i % 2 === 0 ? " ·" : "  ").repeat(snakeW).slice(0, snakeW * 4)}
+										{(i % 2 === 0 ? " ·" : "  ")
+											.repeat(snakeW)
+											.slice(0, snakeW * 4)}
 									</span>
 								</text>
 							))}
@@ -289,7 +309,7 @@ export function SnakeWithProgress({
 					flexGrow={1}
 					flexBasis={0}
 					flexDirection="column"
-					borderLeft
+					border={["left"]}
 					borderColor={theme.goldDim}
 					paddingLeft={2}
 					paddingRight={2}
@@ -331,9 +351,10 @@ export function SnakeWithProgress({
 					>
 						{activity.map((entry, i) => {
 							const maxLen = Math.max(10, halfW - 10);
-							const text = entry.detail.length > maxLen
-								? `${entry.detail.slice(0, maxLen - 3)}...`
-								: entry.detail;
+							const text =
+								entry.detail.length > maxLen
+									? `${entry.detail.slice(0, maxLen - 3)}...`
+									: entry.detail;
 							return (
 								<box key={i} flexDirection="row" gap={1}>
 									<text>
@@ -361,8 +382,14 @@ export function SnakeWithProgress({
 
 					{/* Error display */}
 					{flowPhase === "error" && error && (
-						<box border borderStyle="single" borderColor={theme.error} padding={1} marginTop={1}>
-							<text wrap selectable>
+						<box
+							border
+							borderStyle="single"
+							borderColor={theme.error}
+							padding={1}
+							marginTop={1}
+						>
+							<text selectable>
 								<span fg={theme.error}>{error}</span>
 							</text>
 						</box>
