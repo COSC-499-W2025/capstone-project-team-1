@@ -3,10 +3,14 @@
  *
  * Checks for existing credentials on mount:
  * - If already authenticated → fetches GitHub profile, shows success card + model picker
- * - If not authenticated → renders CopilotLogin (which handles login + model picker)
+ * - If not authenticated → renders CopilotLogin until auth succeeds, then shows model picker
  */
 import { useEffect, useState } from "react";
-import { checkAvailableModels, fetchGitHubUser, type GitHubUser } from "../../agent";
+import {
+	checkAvailableModels,
+	fetchGitHubUser,
+	type GitHubUser,
+} from "../../agent";
 import { theme } from "../../types";
 import { TopBar } from "../TopBar";
 import { CopilotLogin } from "./CopilotLogin";
@@ -47,7 +51,15 @@ export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 	if (state === "checking") return null;
 
 	if (state === "needs-login") {
-		return <CopilotLogin onComplete={onComplete} onBack={onBack} />;
+		return (
+			<CopilotLogin
+				onLoginSuccess={(user) => {
+					setGhUser(user);
+					setState("pick-model");
+				}}
+				onBack={onBack}
+			/>
+		);
 	}
 
 	return (
