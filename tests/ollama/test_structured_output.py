@@ -57,7 +57,7 @@ def _available_models() -> List[str]:
     available = {m.model for m in ollama_list().models}
     missing = [m for m in OLLAMA_MODELS if m not in available]
     if missing:
-        pytest.skip(f"Missing Ollama models: {', '.join(missing)}")
+        pytest.skip(f"Missing Ollama models: {', '.join(missing)}", allow_module_level=True)
     return list(OLLAMA_MODELS)
 
 
