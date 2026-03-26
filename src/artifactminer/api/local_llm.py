@@ -385,7 +385,8 @@ async def create_intake(
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=str(e))
         else:
-            raise HTTPException(status_code=400, detail=str(e))
+            # Map other client-provided input errors to 422 Unprocessable Entity
+            raise HTTPException(status_code=422, detail=str(e))
     
     except Exception as e:
         # Internal server error
@@ -456,7 +457,8 @@ async def discover_contributors(
         elif "invalid repository ids" in error_msg.lower():
             raise HTTPException(status_code=422, detail=error_msg)
         else:
-            raise HTTPException(status_code=400, detail=error_msg)
+            # Default for other client errors is 422
+            raise HTTPException(status_code=422, detail=error_msg)
     
     except Exception as e:
         # Internal server error
@@ -538,7 +540,8 @@ async def start_generation(
         elif "invalid repository ids" in error_msg.lower():
             raise HTTPException(status_code=422, detail=error_msg)
         else:
-            raise HTTPException(status_code=400, detail=error_msg)
+            # Treat other validation/client errors as 422 Unprocessable Entity
+            raise HTTPException(status_code=422, detail=error_msg)
 
     except Exception as e:
         # Internal server error
@@ -753,7 +756,8 @@ async def polish_generation(
         elif "no feedback provided" in error_msg.lower():
             raise HTTPException(status_code=422, detail=error_msg)
         else:
-            raise HTTPException(status_code=400, detail=error_msg)
+            # Default to 422 for other client-provided validation errors
+            raise HTTPException(status_code=422, detail=error_msg)
 
     except Exception as e:
         # Internal server error

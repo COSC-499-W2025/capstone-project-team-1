@@ -113,7 +113,7 @@ def test_create_intake_with_empty_zip(client, tmp_path):
         json={"zip_path": str(zip_path)}
     )
     
-    assert response.status_code == 400
+    assert response.status_code == 422
     detail = response.json()["detail"]
     assert "no git repositories" in detail.lower()
 
@@ -161,7 +161,7 @@ def test_create_intake_invalid_zip(client, tmp_path):
         json={"zip_path": str(invalid_file)}
     )
     
-    assert response.status_code == 400
+    assert response.status_code == 422
     detail = response.json()["detail"]
     assert "invalid" in detail.lower()
 
@@ -177,7 +177,7 @@ def test_create_intake_corrupted_zip(client, tmp_path):
         json={"zip_path": str(corrupted_zip)}
     )
     
-    assert response.status_code == 400
+    assert response.status_code == 422
     detail = response.json()["detail"]
     assert "invalid" in detail.lower() or "failed" in detail.lower()
 
