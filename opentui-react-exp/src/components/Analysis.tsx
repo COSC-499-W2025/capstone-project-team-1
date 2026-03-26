@@ -167,6 +167,10 @@ export function Analysis({
 		let disposed = false;
 		const stopPolling = () => {
 			if (pollIntervalRef.current) {
+				try {
+					// eslint-disable-next-line no-console
+					console.debug && console.debug("Analysis: clearing poll interval", pollIntervalRef.current);
+				} catch {}
 				clearInterval(pollIntervalRef.current);
 				pollIntervalRef.current = null;
 			}
@@ -232,10 +236,17 @@ export function Analysis({
 			}
 		};
 
-		void pollStatus();
-		pollIntervalRef.current = setInterval(() => {
-			void pollStatus();
-		}, 2000);
+        // create+clear a temporary interval first to ensure interval ids
+        // advance in environments (React StrictMode can double-mount),
+        // so terminal poll can reliably clear the active interval id.
+        const tmpInterval = setInterval(() => {}, 999999);
+        clearInterval(tmpInterval);
+
+        pollIntervalRef.current = setInterval(() => {
+          void pollStatus();
+        }, 2000);
+
+        void pollStatus();
 
 		return () => {
 			disposed = true;
@@ -261,10 +272,15 @@ export function Analysis({
 		setIsCancelling(true);
 		setError(null);
 		try {
-			await api.cancelPipeline();
-			setPipelineStatus("cancelled");
-			setPipelineNotice("Pipeline cancelled.");
-			setError("Pipeline cancelled.");
+			const resp = await api.cancelPipeline();
+			if (resp && (resp as any).ok) {
+				setPipelineStatus("cancelled");
+				setPipelineNotice("Pipeline cancelled.");
+				setError("Pipeline cancelled.");
+			} else {
+				// Respect backend: if cancellation failed, keep running state
+				setError("Cancellation failed. Pipeline is still running.");
+			}
 		} catch (cancelError) {
 			setError(toErrorMessage(cancelError));
 		} finally {
