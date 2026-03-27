@@ -7,6 +7,7 @@ import { TopBar } from "./TopBar";
 
 interface IdentityScreenProps {
 	onNext: () => void;
+	onBack?: () => void;
 }
 
 export type FocusMode = "list" | "manual";
@@ -53,7 +54,7 @@ export const resolveIdentitySelection = ({
 	return { selectedEmail: selectedContributor.email };
 };
 
-export function IdentityScreen({ onNext }: IdentityScreenProps) {
+export function IdentityScreen({ onNext, onBack }: IdentityScreenProps) {
 	const { state, setSelectedEmail } = useAppState();
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [focusMode, setFocusMode] = useState<FocusMode>("list");
@@ -106,6 +107,11 @@ export function IdentityScreen({ onNext }: IdentityScreenProps) {
 	};
 
 	useKeyboard((key) => {
+		if (key.name === "escape") {
+			onBack?.();
+			return;
+		}
+
 		if (key.name === "tab") {
 			setFocusMode((prev) =>
 				getToggledFocusMode(prev, state.contributors.length),

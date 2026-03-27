@@ -9,6 +9,7 @@ export interface Breadcrumb {
 
 interface BottomBarProps {
 	actions: KeyAction[];
+	hint?: string;
 	breadcrumbs?: Breadcrumb[];
 	currentScreen?: Screen;
 	onNavigate?: (screen: Screen) => void;
@@ -18,6 +19,7 @@ interface BottomBarProps {
 
 export function BottomBar({
 	actions,
+	hint,
 	breadcrumbs,
 	currentScreen,
 	onNavigate,
@@ -70,13 +72,17 @@ export function BottomBar({
 				})}
 			</box>
 
-			<box flexDirection="row" alignItems="center" gap={4}>
+			<box flexGrow={1} paddingLeft={breadcrumbs?.length ? 2 : 0} paddingRight={2}>
+				{hint ? (
+					<text>
+						<span fg={theme.textDim}>{hint}</span>
+					</text>
+				) : null}
+			</box>
+
+			<box flexDirection="row" alignItems="center" gap={3}>
 				{actions.map((action) => (
-					<box
-						key={`${action.key}-${action.label}`}
-						flexDirection="row"
-						gap={1}
-					>
+					<box key={`${action.key}-${action.label}`} flexDirection="row" gap={1}>
 						<text>
 							<span fg={theme.goldDark}>{action.key}</span>
 						</text>
@@ -86,6 +92,7 @@ export function BottomBar({
 					</box>
 				))}
 				{onForward ? (
+					/* biome-ignore lint/a11y/noStaticElementInteractions: footer CTA */
 					<box onMouseDown={onForward}>
 						<text>
 							<span fg={theme.gold}>
