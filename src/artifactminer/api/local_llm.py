@@ -589,7 +589,10 @@ async def cancel_generation(
     try:
         await _stop_job_runtime(target_id, target_job)
     except RuntimeError as e:
-        raise HTTPException(status_code=409, detail=str(e))
+        # Unexpected runtime failure while stopping job runtime should be
+        # treated as an internal server error (500) so callers know this
+        # was a server-side failure rather than a client conflict.
+        raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
 
