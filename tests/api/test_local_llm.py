@@ -883,8 +883,8 @@ def test_generation_cancel_no_active_job(client):
 
     response = client.post("/local-llm/generation/cancel")
 
-    assert response.status_code == 200
-    assert response.json() == {"ok": False, "status": "not_found"}
+    assert response.status_code == 404
+    assert "no active generation job found" in response.json()["detail"].lower()
 
 
 def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
@@ -972,8 +972,8 @@ def test_generation_cancel_missing_job_returns_not_found_and_clears_stale_active
 
     response = client.post("/local-llm/generation/cancel")
 
-    assert response.status_code == 200
-    assert response.json() == {"ok": False, "status": "not_found"}
+    assert response.status_code == 404
+    assert "no generation job found" in response.json()["detail"].lower()
     assert local_llm._active_generation_id is None
 
 

@@ -558,7 +558,7 @@ async def cancel_generation(
     """Cancel a generation job by job_id, or the current active job if no job_id is provided.
 
     This operation is idempotent. Cancelling an already-cancelled job returns
-    ok=True. If no matching job exists, returns ok=False.
+    ok=True. If no matching job exists, returns 404.
 
     Returns:
         CancellationResponse describing the post-cancel state.
@@ -570,7 +570,7 @@ async def cancel_generation(
 
     # No job to cancel.
     if target_id is None:
-        return CancellationResponse(ok=False, status="not_found")
+        raise HTTPException(status_code=404, detail="No active generation job found")
 
     target_job = _generation_jobs.get(target_id)
 
@@ -578,7 +578,7 @@ async def cancel_generation(
     if target_job is None:
         if target_id == _active_generation_id:
             _active_generation_id = None
-        return CancellationResponse(ok=False, status="not_found")
+        raise HTTPException(status_code=404, detail=f"No generation job found with ID: {target_id}")
 
     # Idempotent: already cancelled — return success without side-effects.
     if target_job.get("status") == "cancelled":
