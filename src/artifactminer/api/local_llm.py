@@ -219,10 +219,10 @@ def _discover_repos_in_zip(zip_path: str) -> tuple[List[RepositoryCandidate], st
         # (it's already cleaned up by the inner exception handler)
         raise
     except Exception as e:
-        # Clean up on unexpected errors
+        # Clean up on unexpected errors and surface as runtime error
         if Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
-        raise ValueError(f"Failed to discover repositories: {str(e)}")
+        raise RuntimeError(f"Failed to discover repositories: {str(e)}")
     
     return sorted(candidates, key=lambda x: x.name), temp_extracted_dir
 
@@ -302,11 +302,11 @@ def _discover_contributors_in_repos(
                     contrib["name"] = name
         
         except subprocess.TimeoutExpired:
-            # Timeout is an error - repo may be corrupted or too large
-            raise ValueError(f"Git operation timed out for {repo_path}")
+            # Timeout is an internal/runtime error (may indicate heavy repo or environment issue)
+            raise RuntimeError(f"Git operation timed out for {repo_path}")
         except Exception as e:
-            # All other errors should be surfaced - don't silently skip repos
-            raise ValueError(f"Failed to analyze git repository {repo_path}: {str(e)}")
+            # All other unexpected errors should be surfaced as runtime errors
+            raise RuntimeError(f"Failed to analyze git repository {repo_path}: {str(e)}")
     
     # Convert to ContributorIdentity objects
     identities = []
