@@ -24,7 +24,6 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
 )
 from artifactminer.helpers.project_ranker import rank_projects
 from artifactminer.helpers.zip_utils import safe_extract_zip
-from artifactminer.RepositoryIntelligence.repo_intelligence_AI import set_user_consent
 import pytest
 
 
@@ -48,9 +47,6 @@ async def test_full_pipeline_zip_to_summaries():
         db.query(UserAnswer).delete()
         db.commit()
         
-        set_user_consent("full")  # Disable LLM calls for testing
-
-
         # 1. Insert user config (email)
         test_email = "shlok10@student.ubc.ca"
         user_answer = UserAnswer(question_id=1, answer_text=test_email)
