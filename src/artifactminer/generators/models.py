@@ -29,3 +29,12 @@ def proficiency_to_level(proficiency: Optional[float]) -> ExpertiseLevel:
     if proficiency >= 0.25:
         return ExpertiseLevel.Intermediate
     return ExpertiseLevel.Beginner
+
+
+def aggregate_skill_proficiency(proficiencies: list[Optional[float]]) -> float:
+    """Aggregate a list of proficiencies by taking the max of non-None values.
+
+    Returns 0.0 when the input is empty or all values are None.
+    """
+    non_none = [p for p in proficiencies if p is not None]
+    return float(max(non_none)) if non_none else 0.0
