@@ -1,13 +1,10 @@
-#The main goal of this file is to achieve full file analysis given a path to a file
-# This would mean being able to analyze a PDF for example for any essential information 
-# that could be used in a resume. Primarily done using already made AI analysis functions, but
-# also using basic string matching in order to comply with non-AI file analysis.
+#The main goal of this file is to achieve full file analysis given a path to a file.
+#This remains a lightweight static-analysis path and does not call the Local LLM
+#or Cloud Agent flows.
 
 
-from git import List, Tuple
+from typing import List, Tuple
 from pypdf import PdfReader
-
-from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, getLLMResponse
 #CRAWLER INTEGRATION
 async def get_crawler_file_contents(file_values : List[Tuple[str, str, str]]) -> List[str]:
     
@@ -56,31 +53,15 @@ async def analyze_pdf(file_path):
     if is_resume:
         print(f"Detected resume in: {file_path}")
     
-    if user_allows_llm():
-        # Customize prompt based on whether it's a resume
-        if is_resume:
-            prompt = (
-                "Analyze the following resume PDF and extract key information. "
-                "Focus on: work experience, education, technical skills, projects, and achievements. "
-                "Format the output in a structured way suitable for portfolio analysis:\n\n"
-            )
-        else:
-            prompt = "Analyze the following PDF file and extract key information relevant for a resume:\n\n"
-        
-        prompt += text
-        response = await getLLMResponse(prompt)
-        return response
-    else:
-        print("User has not consented to LLM usage. Performing basic analysis.")
-        
-        # Basic non-LLM analysis
-        if is_resume:
-            return {
-                "type": "resume",
-                "file_path": file_path,
-                "detected_keywords": [kw for kw in resume_keywords if kw in text.lower()],
-                "text_preview": text[:500] + "..." if len(text) > 500 else text
-            }
+    print("Performing basic static PDF analysis.")
+
+    if is_resume:
+        return {
+            "type": "resume",
+            "file_path": file_path,
+            "detected_keywords": [kw for kw in resume_keywords if kw in text.lower()],
+            "text_preview": text[:500] + "..." if len(text) > 500 else text
+        }
    
     return f"Basic analysis of PDF file at {file_path} completed."
 
@@ -136,26 +117,7 @@ async def analyze_markdown(file_path):
     if is_resume:
         print(f"Detected resume-style Markdown in: {file_path}")
 
-    # LLM path
-    if user_allows_llm():
-        if is_resume:
-            prompt = (
-                "Summarize the following resume written in Markdown and extract key information. "
-                "Focus on: work experience, education, technical skills, projects, and achievements. "
-                "Format the output in a structured way suitable for portfolio analysis:\n\n"
-            )
-        else:
-            prompt = (
-                "Analyze the following Markdown file and extract structured key information. "
-                "Respect headings, bullet lists, and code blocks in your interpretation:\n\n"
-            )
-
-        prompt += text
-        response = await getLLMResponse(prompt)
-        return response
-
-    # Non-LLM basic analysis (string format)
-    print("User has not consented to LLM usage. Performing basic Markdown analysis.")
+    print("Performing basic static Markdown analysis.")
 
     preview = text[:500] + "..." if len(text) > 500 else text
 
