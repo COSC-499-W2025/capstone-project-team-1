@@ -57,6 +57,36 @@ def test_openapi_exposes_all_local_llm_routes(client):
             ), f"Missing method {m} for path {path} in OpenAPI"
 
 
+def test_openai_route_removed_from_public_api_surface(client):
+    """Verify that /openai route is no longer part of the public API surface.
+    
+    This test ensures the migration from cloud-based /openai endpoint to
+    local /local-llm/* routes is complete. The /openai route should not be
+    mounted or exposed in the OpenAPI specification.
+    
+    Acceptance criteria for task 446: Remove /openai from public API surface.
+    """
+    resp = client.get("/openapi.json")
+    assert resp.status_code == 200
+    spec = resp.json()
+    assert "paths" in spec
+
+    paths = spec["paths"]
+
+    # Verify /openai is NOT in the API surface
+    assert "/openai" not in paths, (
+        "POST /openai should be removed from public API surface. "
+        "Migration to /local-llm/* routes should be complete."
+    )
+
+    # Verify /openai/* sub-paths are also not present
+    for path in list(paths.keys()):
+        if path.startswith("/openai"):
+            raise AssertionError(
+                f"Found {path} in API surface. All /openai/* routes should be removed."
+            )
+
+
 def test_intake_start_status_and_cancel_flow_returns_schema_shapes(client):
     # 1) Create intake from a fake git ZIP
     zip_path = make_fake_git_zip()
