@@ -6,7 +6,7 @@ import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ConsentScreenProps {
-	onContinue: () => void;
+	onContinue: (level?: ConsentLevel) => void;
 	onBack: () => void;
 }
 
@@ -59,6 +59,7 @@ function ConsentPanel({
 	return (
 		<box
 			flexGrow={1}
+			flexBasis={0}
 			flexDirection="column"
 			padding={2}
 			border
@@ -192,37 +193,43 @@ const PANELS: PanelConfig[] = [
 	},
 	{
 		level: "cloud",
-		title: "Cloud AI",
-		subtitle: "coming soon",
+		title: "Cloud Agent",
+		subtitle: "uses Copilot models",
 		description:
-			"Static analysis plus a cloud model. Best quality, no local storage needed.",
+			"Uses GitHub Copilot-backed models through the embedded agent flow. Best quality, no local model needed.",
 		sections: [
 			{
-				heading: "What gets sent",
+				heading: "What the cloud agent sees",
 				headingColor: theme.cyan,
 				items: [
-					{ text: "· File & technology names" },
-					{ text: "· Commit messages" },
-					{ text: "· Summaries & metrics" },
-					{ text: "Sent to an external AI service.", color: theme.textDim },
+					{ text: "· Your full project source code" },
+					{ text: "· Commit history & messages" },
+					{ text: "· README files & documentation" },
+					{
+						text: "Analyzed by the PI agent using your authenticated cloud model.",
+						color: theme.textDim,
+					},
 				],
 			},
 			{
 				heading: "Privacy",
 				headingColor: theme.gold,
 				items: [
-					{ text: "Metadata leaves your device." },
-					{ text: "Subject to provider's data policy." },
-					{ text: "Raw source code is never sent.", color: theme.textDim },
+					{ text: "Code is sent to your cloud model provider." },
+					{ text: "Subject to your provider's data policy." },
+					{
+						text: "Current OpenTUI flow signs in with GitHub Copilot.",
+						color: theme.textDim,
+					},
 				],
 			},
 		],
 		ratings: [
 			{ text: " + Best quality results", color: theme.success },
-			{ text: " + No local setup or storage", color: theme.success },
-			{ text: " ~ Not yet available", color: theme.warning },
+			{ text: " + No local model download", color: theme.success },
+			{ text: " + Uses authenticated cloud models", color: theme.success },
 			{ text: " - Requires network", color: theme.warning },
-			{ text: " - Data leaves device", color: theme.warning },
+			{ text: " - Code leaves your device", color: theme.warning },
 		],
 	},
 ];
@@ -242,7 +249,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		api
 			.updateConsent(selected)
 			.then(() => {
-				onContinue();
+				onContinue(selected);
 			})
 			.catch(() => {
 				setSaving(false);
@@ -297,7 +304,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Consent"
-				description="Before we analyze your projects, please choose how you'd like your data to be processed. Each option below offers a different balance of privacy and quality. Your source code never leaves your machine regardless of which option you choose."
+				description="Before we analyze your projects, please choose how you'd like your data to be processed. Local Only and Local AI keep code on-device; the cloud option sends code to your authenticated provider for analysis."
 			/>
 
 			<box

@@ -53,7 +53,7 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 	useEffect(() => {
 		if (scanStatus !== "scanning") return;
 		const interval = setInterval(() => {
-			setScanProgress((p) => (p + 1) % 30);
+			setScanProgress((p) => Math.min(p + 1, 30));
 		}, 80);
 		return () => clearInterval(interval);
 	}, [scanStatus]);
@@ -187,27 +187,26 @@ export function FileUpload({ onSubmit, onBack, scanRoot }: FileUploadProps) {
 			return;
 		}
 		if (isSearchFocused) {
-			// Navigate search results with arrow keys / Enter
 			if (searchQuery && searchResults.length > 0) {
-				if (key.name === "up") {
+				if (key.name === "up" || key.name === "k") {
 					setSearchSelectedIndex((i) => Math.max(0, i - 1));
 					return;
 				}
-				if (key.name === "down") {
+				if (key.name === "down" || key.name === "j") {
 					setSearchSelectedIndex((i) =>
 						Math.min(searchResults.length - 1, i + 1),
 					);
 					return;
 				}
 				if (key.name === "return") {
-					const selectedResult = searchResults[searchSelectedIndex];
-					if (selectedResult) {
-						onSubmit(selectedResult.fullPath);
+					const selected = searchResults[searchSelectedIndex];
+					if (selected) {
+						onSubmit(selected.fullPath);
 					}
 					return;
 				}
 			}
-			// Let the input handle everything else
+			// Let the input handle text entry while preserving search navigation shortcuts
 			return;
 		}
 
