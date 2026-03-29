@@ -92,7 +92,7 @@ export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
 						padding={2}
 						width={60}
 					>
-						<text wrap selectable>
+						<text selectable>
 							<span fg={theme.error}>{error}</span>
 						</text>
 					</box>
@@ -159,7 +159,7 @@ export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
 					padding={1}
 					width={55}
 				>
-					<text wrap>
+					<text>
 						<span fg={theme.textDim}>
 							Students with GitHub Education get free access to Copilot, which
 							includes Claude and GPT models at no cost.
