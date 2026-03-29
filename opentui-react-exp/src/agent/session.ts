@@ -5,10 +5,11 @@
  * code repositories and generates a structured resume.
  * Supports GitHub Copilot auth (device flow) for students.
  */
+import type { OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import {
-	AuthStorage,
 	type AgentSession,
 	type AgentSessionEvent,
+	AuthStorage,
 	createAgentSession,
 	createExtensionRuntime,
 	createReadOnlyTools,
@@ -17,8 +18,11 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import type { OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import type { DeveloperProfile } from "../api/types";
+import {
+	buildFallbackProfile,
+	normalizeDeveloperProfile,
+} from "./profileNormalization";
 import { RESUME_SYSTEM_PROMPT } from "./prompt";
 
 // Shared auth storage instance — persists across the session
@@ -353,14 +357,8 @@ export async function generateResume(
 			}
 
 			const jsonStr = fullText.slice(jsonStart, jsonEnd + 1);
-			const parsed = JSON.parse(jsonStr) as DeveloperProfile;
-
-			// Validate required fields exist
-			if (!parsed.resume_markdown || !parsed.developer_dna || !parsed.projects) {
-				throw new Error("LLM returned incomplete profile — missing required fields.");
-			}
-
-			return parsed;
+			const parsed = JSON.parse(jsonStr) as unknown;
+			return normalizeDeveloperProfile(parsed, fullText);
 		};
 
 		return generationAborted
@@ -379,29 +377,4 @@ export async function generateResume(
 		}
 		dispose();
 	}
-}
-
-/** Build a minimal DeveloperProfile from raw markdown when JSON parsing fails. */
-function buildFallbackProfile(rawText: string): DeveloperProfile {
-	const resumeStart = rawText.indexOf("# Resume");
-	const markdown = resumeStart >= 0 ? rawText.slice(resumeStart) : rawText;
-
-	return {
-		resume_markdown: markdown,
-		developer_dna: {
-			archetype: "Developer",
-			description: "Profile generated from your code repositories.",
-			defining_traits: [],
-		},
-		hidden_strengths: [],
-		growth_areas: [],
-		talking_points: [],
-		impact: {
-			commits: { total: 0, avg_per_week: 0, most_active_period: "", conventional_commits_pct: 0 },
-			languages: [],
-			collaboration: { branch_count: 0, merge_frequency: "", workflow_style: "" },
-			complexity: { frameworks_used: 0, project_types: [], distinct_tools: [] },
-		},
-		projects: [],
-	};
 }
