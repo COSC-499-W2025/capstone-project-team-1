@@ -166,6 +166,21 @@ class DirectoriesResponse(BaseModel):
     )
 
 
+class ExtractLocalRequest(BaseModel):
+    """Request to extract a previously uploaded ZIP for agent consumption."""
+
+    zip_id: int = Field(description="ID of the uploaded ZIP record.")
+
+
+class ExtractLocalResponse(BaseModel):
+    """Response with the absolute extraction directory path."""
+
+    zip_id: int = Field(description="ID of the uploaded ZIP record.")
+    extraction_path: str = Field(
+        description="Absolute path to the extracted directory."
+    )
+
+
 class ProjectResponse(BaseModel):
     """Response shape for project listing."""
 
