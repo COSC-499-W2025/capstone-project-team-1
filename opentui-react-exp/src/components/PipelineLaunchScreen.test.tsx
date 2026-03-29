@@ -178,8 +178,8 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 				repo_ids: ["repo-1"],
 				user_email: "dev@example.com",
 				stage1_model: "qwen2.5-coder-3b-q4",
-				stage2_model: "lfm2.5-1.2b-bf16",
-				stage3_model: "lfm2.5-1.2b-bf16",
+				stage2_model: "lfm2.5-1.2b-q8",
+				stage3_model: "lfm2.5-1.2b-q8",
 			}),
 		},
 	]);

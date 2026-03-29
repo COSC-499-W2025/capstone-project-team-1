@@ -1,23 +1,48 @@
 import { useKeyboard } from "@opentui/react";
-import { useState } from "react";
-import { mockProjects } from "../data/mockProjects";
+import { useEffect, useMemo, useState } from "react";
 import { type Project, theme } from "../types";
-import { ClickableList } from "../utils/mouse";
 import { TopBar } from "./TopBar";
 
 interface ProjectListProps {
 	projects: Project[];
-	onContinue: () => void;
+	initialSelectedIds?: string[];
+	onContinue: (selectedProjectIds: string[]) => void;
 	onBack: () => void;
 }
 
 export function ProjectList({
 	projects,
+	initialSelectedIds = [],
 	onContinue,
 	onBack,
 }: ProjectListProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
+	const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
+	const [error, setError] = useState<string | null>(null);
 	const selectedProject = projects[selectedIndex];
+	const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+
+	useEffect(() => {
+		setSelectedIds(initialSelectedIds);
+	}, [initialSelectedIds]);
+
+	const toggleProjectSelection = (projectId: string) => {
+		setSelectedIds((current) => {
+			if (current.includes(projectId)) {
+				return current.filter((id) => id !== projectId);
+			}
+			return [...current, projectId];
+		});
+		setError(null);
+	};
+
+	const continueWithSelection = () => {
+		if (!selectedIds.length) {
+			setError("Select at least one repository to continue.");
+			return;
+		}
+		onContinue(selectedIds);
+	};
 
 	useKeyboard((key) => {
 		if (key.name === "up" || key.name === "k") {
@@ -26,8 +51,13 @@ export function ProjectList({
 		if (key.name === "down" || key.name === "j") {
 			setSelectedIndex((i) => Math.min(projects.length - 1, i + 1));
 		}
+		if (key.name === "space") {
+			if (selectedProject) {
+				toggleProjectSelection(selectedProject.id);
+			}
+		}
 		if (key.name === "return") {
-			onContinue();
+			continueWithSelection();
 		}
 		if (key.name === "escape") {
 			onBack();
@@ -60,21 +90,41 @@ export function ProjectList({
 							</span>
 						</text>
 					</box>
-
-					<ClickableList
-						items={projects.map((p) => ({
-							id: p.id,
-							label: p.name,
-							description: `${p.language} · ${p.commits} commits`,
-						}))}
-						selectedId={selectedProject?.id ?? null}
-						onSelect={(_id, index) => setSelectedIndex(index)}
-						height={16}
-						selectedTextColor={theme.gold}
-						selectedRowBg={theme.bgMedium}
-						evenRowBg={theme.bgDark}
-						oddRowBg="#111111"
-					/>
+					<scrollbox height={16} focused>
+						{projects.map((project, index) => {
+							const isCursor = project.id === selectedProject?.id;
+							const isSelected = selectedIdSet.has(project.id);
+							return (
+								<box
+									key={project.id}
+									backgroundColor={
+										isCursor
+											? theme.bgMedium
+											: index % 2 === 0
+												? theme.bgDark
+												: "#111111"
+									}
+									paddingLeft={1}
+									paddingRight={1}
+									onMouseDown={() => {
+										setSelectedIndex(index);
+										toggleProjectSelection(project.id);
+									}}
+								>
+									<text>
+										<span fg={isCursor ? theme.gold : theme.textSecondary}>
+											{isCursor ? ">" : " "}{" "}
+											{isSelected ? "[x]" : "[ ]"} {project.name}
+										</span>
+										<span fg={theme.textDim}>
+											{" "}
+											{project.language} · {project.commits} commits
+										</span>
+									</text>
+								</box>
+							);
+						})}
+					</scrollbox>
 				</box>
 
 				{/* Right panel: Project details */}
@@ -86,6 +136,19 @@ export function ProjectList({
 								<text>
 									<span fg={theme.gold}>
 										<strong>{selectedProject.name}</strong>
+									</span>
+								</text>
+								<text>
+									<span
+										fg={
+											selectedIdSet.has(selectedProject.id)
+												? theme.success
+												: theme.warning
+										}
+									>
+										{selectedIdSet.has(selectedProject.id)
+											? "Selected for analysis"
+											: "Not selected yet"}
 									</span>
 								</text>
 								<text>
@@ -164,23 +227,33 @@ export function ProjectList({
 				</box>
 			</box>
 
-			{/* Demo Mode Banner */}
+			{/* Footer guidance */}
 			<box
-				height={3}
+				height={4}
 				border
 				borderStyle="single"
-				borderColor={theme.error}
+				borderColor={error ? theme.error : theme.goldDim}
 				paddingLeft={2}
 				paddingRight={2}
 				paddingTop={1}
 				paddingBottom={1}
+				flexDirection="column"
 			>
 				<text>
-					<span fg={theme.goldDark}>Demo Mode:</span>
+					<span fg={theme.goldDark}>Selected:</span>
 					<span fg={theme.textDim}> Press </span>
+					<span fg={theme.cyan}>Space</span>
+					<span fg={theme.textDim}> to toggle repos, </span>
 					<span fg={theme.cyan}>Enter</span>
-					<span fg={theme.textDim}> to continue</span>
+					<span fg={theme.textDim}> to continue with </span>
+					<span fg={theme.gold}>{selectedIds.length}</span>
+					<span fg={theme.textDim}> selected repo(s)</span>
 				</text>
+				{error ? (
+					<text>
+						<span fg={theme.error}>{error}</span>
+					</text>
+				) : null}
 			</box>
 		</box>
 	);

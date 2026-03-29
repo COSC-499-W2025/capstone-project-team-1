@@ -1,29 +1,36 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "./api/endpoints";
 import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { CloudAuth, CloudFlow } from "./components/cloud-ai";
 import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
+import { DraftPauseScreen } from "./components/DraftPauseScreen";
 import { FileUpload } from "./components/FileUpload";
+import { IdentityScreen } from "./components/IdentityScreen";
 import { Landing } from "./components/Landing";
+import { PipelineLaunchScreen } from "./components/PipelineLaunchScreen";
 import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
-import { AppProvider } from "./context/AppContext";
+import { AppProvider, useAppState } from "./context/AppContext";
 import { useSelectionCopy } from "./hooks/useSelectionCopy";
 import type { ConsentLevel, DeveloperProfile } from "./api/types";
-import { mockProjects, mockResumeData } from "./data/mockProjects";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
+import { toErrorMessage } from "./utils";
 
 // Screens shown in breadcrumbs (in order)
 const LOCAL_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
 	{ screen: "file-upload", label: "Upload" },
 	{ screen: "project-list", label: "Projects" },
-	{ screen: "analysis", label: "Analyze" },
+	{ screen: "identity", label: "Identity" },
+	{ screen: "pipeline-launch", label: "Launch" },
+	{ screen: "analysis", label: "Pipeline" },
+	{ screen: "draft-pause", label: "Draft" },
 	{ screen: "resume-preview", label: "Resume" },
 ];
 
@@ -56,7 +63,8 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	],
 	"project-list": [
 		{ key: "↑/↓", label: "Navigate" },
-		{ key: "Enter", label: "Analyze" },
+		{ key: "Space", label: "Toggle" },
+		{ key: "Enter", label: "Continue" },
 		{ key: "Esc", label: "Back" },
 	],
 	identity: [
@@ -100,6 +108,18 @@ const screenActions: Record<Screen, KeyAction[]> = {
 function App() {
 	const renderer = useRenderer();
 	useSelectionCopy();
+	const {
+		state,
+		reset,
+		resetRunState,
+		setContributors,
+		setDetectedRepos,
+		setIntakeId,
+		setPipelineNotice,
+		setSelectedEmail,
+		setSelectedRepoIds,
+		setZipPath: setContextZipPath,
+	} = useAppState();
 	const [screen, setScreen] = useState<Screen>("landing");
 	const [filePath, setFilePath] = useState("");
 	const [consentLevel, setConsentLevel] = useState<ConsentLevel>("local-llm");
@@ -114,9 +134,75 @@ function App() {
 	);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
+	const [localFlowError, setLocalFlowError] = useState<string | null>(null);
+
+	const localProjects = useMemo(
+		() =>
+			state.detectedRepos.map((repo) => ({
+				id: repo.id,
+				name: repo.name,
+				language: "Local repo",
+				description: repo.rel_path,
+				technologies: [],
+				commits: 0,
+				files: 0,
+				lastUpdated: "Ready for analysis",
+			})),
+		[state.detectedRepos],
+	);
 
 	const navigateTo = (target: Screen) => {
 		setScreen(target);
+	};
+
+	const resetLocalFlow = () => {
+		reset();
+		setFilePath("");
+		setLocalFlowError(null);
+		setScreen("landing");
+	};
+
+	const loadLocalPipelineContext = async (path: string) => {
+		setLocalFlowError(null);
+		setFilePath(path);
+		setContextZipPath(path);
+		setPipelineNotice(null);
+		resetRunState();
+		setSelectedEmail(null);
+		setContributors([]);
+
+		try {
+			const intake = await api.createPipelineIntake(path);
+			setIntakeId(intake.intake_id);
+			setDetectedRepos(intake.repos);
+			setSelectedRepoIds([]);
+			setContributors([]);
+
+			setScreen("project-list");
+		} catch (error) {
+			setLocalFlowError(toErrorMessage(error));
+		}
+	};
+
+	const continueFromProjectSelection = async (selectedProjectIds: string[]) => {
+		setLocalFlowError(null);
+		setSelectedRepoIds(selectedProjectIds);
+		setSelectedEmail(null);
+
+		try {
+			const contributors = selectedProjectIds.length
+				? (
+						await api.getPipelineContributors({
+							repo_ids: selectedProjectIds,
+						})
+					).contributors
+				: [];
+			setContributors(contributors);
+			setScreen("identity");
+		} catch (error) {
+			setContributors([]);
+			setLocalFlowError(toErrorMessage(error));
+		}
 	};
 
 	useEffect(() => {
@@ -171,23 +257,12 @@ function App() {
 				break;
 
 			case "project-list":
-				if (key.name === "return") {
-					setScreen("analysis");
-				} else if (key.name === "escape") {
-					setScreen("file-upload");
-				}
-				break;
-
-			case "analysis":
-				// No keyboard actions during analysis
 				break;
 
 			case "resume-preview":
-				if (key.name === "r") {
-					setScreen("landing");
-				} else if (key.name === "escape") {
-					renderer.destroy();
-				}
+				break;
+
+			case "analysis":
 				break;
 
 			case "cloud-generation":
@@ -243,12 +318,11 @@ function App() {
 			case "file-upload":
 				return (
 					<FileUpload
-						onSubmit={(path) => {
-							setFilePath(path);
-							setScreen(
-								consentLevel === "cloud" ? "cloud-generation" : "project-list",
-							);
-						}}
+						onSubmit={(path) =>
+							consentLevel === "cloud"
+								? (setFilePath(path), setScreen("cloud-generation"))
+								: loadLocalPipelineContext(path)
+						}
 						onBack={() =>
 							setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")
 						}
@@ -258,26 +332,52 @@ function App() {
 			case "project-list":
 				return (
 					<ProjectList
-						projects={mockProjects}
-						onContinue={() => setScreen("analysis")}
+						projects={localProjects}
+						initialSelectedIds={state.selectedRepoIds}
+						onContinue={(selectedProjectIds) =>
+							void continueFromProjectSelection(selectedProjectIds)
+						}
 						onBack={() => setScreen("file-upload")}
+					/>
+				);
+
+			case "identity":
+				return (
+					<IdentityScreen
+						onNext={() => setScreen("pipeline-launch")}
+					/>
+				);
+
+			case "pipeline-launch":
+				return (
+					<PipelineLaunchScreen
+						onStarted={() => setScreen("analysis")}
+						onBack={() => setScreen("identity")}
 					/>
 				);
 
 			case "analysis":
 				return (
 					<Analysis
+						onNext={(target) => setScreen(target as Screen)}
 						onComplete={() => setScreen("resume-preview")}
 						onBack={() => setScreen("project-list")}
+					/>
+				);
+
+			case "draft-pause":
+				return (
+					<DraftPauseScreen
+						onNext={(target) => setScreen(target as Screen)}
 					/>
 				);
 
 			case "resume-preview":
 				return (
 					<ResumePreview
-						data={mockResumeData}
 						onBack={() => setScreen("analysis")}
-						onRestart={() => setScreen("landing")}
+						onPolishAgain={() => setScreen("draft-pause")}
+						onRestart={resetLocalFlow}
 					/>
 				);
 
@@ -304,11 +404,8 @@ function App() {
 					/>
 				) : null;
 
-			case "consent-policy":
-			case "identity":
-			case "pipeline-launch":
-			case "draft-pause":
 			case "feedback":
+			case "consent-policy":
 				return null;
 		}
 	};
@@ -316,12 +413,7 @@ function App() {
 	const screenForward: Record<
 		string,
 		{ onForward?: () => void; forwardLabel?: string }
-	> = {
-		"project-list": {
-			onForward: () => setScreen("analysis"),
-			forwardLabel: "Analyze",
-		},
-	};
+	> = {};
 
 	const forward = screenForward[screen] ?? {};
 	const visibleActions =
@@ -345,6 +437,14 @@ function App() {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			{/* Main content area */}
 			<box flexGrow={1}>{renderScreen()}</box>
+
+			{localFlowError ? (
+				<box paddingLeft={2} paddingRight={2} paddingBottom={1}>
+					<text>
+						<span fg={theme.error}>{localFlowError}</span>
+					</text>
+				</box>
+			) : null}
 
 			{/* Bottom bar */}
 			<BottomBar
