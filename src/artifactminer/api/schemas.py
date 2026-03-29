@@ -313,6 +313,9 @@ class SkillChronologyItem(BaseModel):
     category: str | None = Field(
         default=None, description="Skill category (e.g., 'Programming Languages')."
     )
+    level: str | None = Field(
+        default=None, description="Derived expertise level for this item."
+    )
 
 
 class SkillResponse(BaseModel):
@@ -325,6 +328,9 @@ class SkillResponse(BaseModel):
     category: str | None = None
     project_count: int | None = Field(
         default=None, description="Number of projects using this skill."
+    )
+    level: str | None = Field(
+        default=None, description="Aggregated expertise level across projects."
     )
 
 
