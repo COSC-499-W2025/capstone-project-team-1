@@ -2,17 +2,15 @@ import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api/endpoints";
-import { Analysis } from "./components/Analysis";
 import { BottomBar } from "./components/BottomBar";
 import { CloudAuth, CloudFlow } from "./components/cloud-ai";
+import { SnakeWithProgress } from "./components/cloud-ai/SnakeWithProgress";
 import { CloudResumePreview } from "./components/CloudResumePreview";
+import { ConfigureScreen } from "./components/ConfigureScreen";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { DraftPauseScreen } from "./components/DraftPauseScreen";
 import { FileUpload } from "./components/FileUpload";
-import { IdentityScreen } from "./components/IdentityScreen";
 import { Landing } from "./components/Landing";
-import { PipelineLaunchScreen } from "./components/PipelineLaunchScreen";
-import { ProjectList } from "./components/ProjectList";
 import { ResumePreview } from "./components/ResumePreview";
 import { ToastProvider } from "./components/Toast";
 import { AppProvider, useAppState } from "./context/AppContext";
@@ -26,18 +24,17 @@ import { toErrorMessage } from "./utils";
 const LOCAL_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
 	{ screen: "file-upload", label: "Upload" },
-	{ screen: "project-list", label: "Projects" },
-	{ screen: "identity", label: "Identity" },
-	{ screen: "pipeline-launch", label: "Launch" },
-	{ screen: "analysis", label: "Pipeline" },
+	{ screen: "configure", label: "Configure" },
+	{ screen: "analysis", label: "Generate" },
 	{ screen: "draft-pause", label: "Draft" },
 	{ screen: "resume-preview", label: "Resume" },
 ];
 
 const CLOUD_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
-	{ screen: "cloud-auth", label: "Configure" },
+	// cloud-auth is a transparent gate (skips if already logged in)
 	{ screen: "file-upload", label: "Upload" },
+	{ screen: "configure", label: "Configure" },
 	{ screen: "cloud-generation", label: "Generate" },
 	{ screen: "cloud-resume", label: "Resume" },
 ];
@@ -61,9 +58,17 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Enter", label: "Open/Select" },
 		{ key: "Esc", label: "Back" },
 	],
-	"project-list": [
-		{ key: "↑/↓", label: "Navigate" },
+	configure: [
+		{ key: "Tab", label: "Switch Panel" },
 		{ key: "Space", label: "Toggle" },
+		{ key: "a/d", label: "All/None" },
+		{ key: "Enter", label: "Confirm" },
+		{ key: "Esc", label: "Back" },
+	],
+	"project-list": [
+		{ key: "↑/↓/←/→", label: "Navigate" },
+		{ key: "Space", label: "Toggle" },
+		{ key: "a/d", label: "All/None" },
 		{ key: "Enter", label: "Continue" },
 		{ key: "Esc", label: "Back" },
 	],
@@ -92,8 +97,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Esc", label: "Exit" },
 	],
 	"cloud-auth": [
-		{ key: "↑/↓", label: "Navigate" },
-		{ key: "Enter", label: "Confirm" },
+		// Only shown when user needs to log in (CopilotLogin handles keyboard)
 		{ key: "Esc", label: "Back" },
 	],
 	"cloud-generation": [{ key: "Esc", label: "Back" }],
@@ -118,6 +122,8 @@ function App() {
 		setPipelineNotice,
 		setSelectedEmail,
 		setSelectedRepoIds,
+		setResumeV3Draft,
+		setResumeV3Output,
 		setZipPath: setContextZipPath,
 	} = useAppState();
 	const [screen, setScreen] = useState<Screen>("landing");
@@ -178,29 +184,8 @@ function App() {
 			setSelectedRepoIds([]);
 			setContributors([]);
 
-			setScreen("project-list");
+			setScreen("configure");
 		} catch (error) {
-			setLocalFlowError(toErrorMessage(error));
-		}
-	};
-
-	const continueFromProjectSelection = async (selectedProjectIds: string[]) => {
-		setLocalFlowError(null);
-		setSelectedRepoIds(selectedProjectIds);
-		setSelectedEmail(null);
-
-		try {
-			const contributors = selectedProjectIds.length
-				? (
-						await api.getPipelineContributors({
-							repo_ids: selectedProjectIds,
-						})
-					).contributors
-				: [];
-			setContributors(contributors);
-			setScreen("identity");
-		} catch (error) {
-			setContributors([]);
 			setLocalFlowError(toErrorMessage(error));
 		}
 	};
@@ -254,6 +239,10 @@ function App() {
 				if (key.name === "escape") {
 					setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent");
 				}
+				break;
+
+			case "configure":
+				// ConfigureScreen handles its own keyboard events
 				break;
 
 			case "project-list":
@@ -318,50 +307,69 @@ function App() {
 			case "file-upload":
 				return (
 					<FileUpload
-						onSubmit={(path) =>
-							consentLevel === "cloud"
-								? (setFilePath(path), setScreen("cloud-generation"))
-								: loadLocalPipelineContext(path)
-						}
+						onSubmit={(path) => loadLocalPipelineContext(path)}
 						onBack={() =>
 							setScreen(consentLevel === "cloud" ? "cloud-auth" : "consent")
 						}
 					/>
 				);
 
-			case "project-list":
+			case "configure":
 				return (
-					<ProjectList
+					<ConfigureScreen
+						consentLevel={consentLevel}
 						projects={localProjects}
 						initialSelectedIds={state.selectedRepoIds}
-						onContinue={(selectedProjectIds) =>
-							void continueFromProjectSelection(selectedProjectIds)
+						initialEmail={
+							state.selectedEmail ??
+							cloudGitIdentity?.email ??
+							""
 						}
+						cloudLogin={cloudGitIdentity?.login}
+						cloudName={cloudGitIdentity?.name}
+						onContinue={(result) => {
+							setSelectedRepoIds(result.selectedProjectIds);
+							setSelectedEmail(result.email);
+
+							if (consentLevel === "cloud" && result.modelId) {
+								setCloudModelId(result.modelId);
+								setCloudGitIdentity({
+									login: cloudGitIdentity?.login ?? "",
+									name: cloudGitIdentity?.name ?? null,
+									email: result.email,
+								});
+								setScreen("cloud-generation");
+							} else {
+								setScreen("analysis");
+							}
+						}}
 						onBack={() => setScreen("file-upload")}
 					/>
 				);
 
+			case "project-list":
 			case "identity":
-				return (
-					<IdentityScreen
-						onNext={() => setScreen("pipeline-launch")}
-					/>
-				);
+				// Legacy — redirect to configure
+				return null;
 
 			case "pipeline-launch":
-				return (
-					<PipelineLaunchScreen
-						onStarted={() => setScreen("analysis")}
-						onBack={() => setScreen("identity")}
-					/>
-				);
-
+				// Legacy — falls through to analysis
 			case "analysis":
 				return (
-					<Analysis
-						onNext={(target) => setScreen(target as Screen)}
-						onComplete={() => setScreen("resume-preview")}
-						onBack={() => setScreen("project-list")}
+					<SnakeWithProgress
+						mode="local"
+						intakeId={state.intakeId ?? ""}
+						repoIds={state.selectedRepoIds}
+						userEmail={state.selectedEmail ?? ""}
+						onDraftReady={(draft) => {
+							setResumeV3Draft(draft);
+							setScreen("draft-pause");
+						}}
+						onComplete={(output) => {
+							setResumeV3Output(output);
+							setScreen("resume-preview");
+						}}
+						onBack={() => setScreen("configure")}
 					/>
 				);
 
@@ -375,7 +383,7 @@ function App() {
 			case "resume-preview":
 				return (
 					<ResumePreview
-						onBack={() => setScreen("analysis")}
+						onBack={() => setScreen("configure")}
 						onPolishAgain={() => setScreen("draft-pause")}
 						onRestart={resetLocalFlow}
 					/>
@@ -391,7 +399,7 @@ function App() {
 							setCloudProfile(profile);
 							setScreen("cloud-resume");
 						}}
-						onBack={() => setScreen("file-upload")}
+						onBack={() => setScreen("configure")}
 					/>
 				);
 

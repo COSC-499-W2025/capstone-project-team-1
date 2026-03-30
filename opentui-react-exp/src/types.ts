@@ -3,6 +3,7 @@ export type Screen =
 	| "consent"
 	| "consent-policy"
 	| "file-upload"
+	| "configure"
 	| "project-list"
 	| "identity"
 	| "pipeline-launch"
