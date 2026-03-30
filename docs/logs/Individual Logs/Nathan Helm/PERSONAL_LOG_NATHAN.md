@@ -360,4 +360,69 @@ I really appreciate the strong sense of teamwork within the group and how everyo
 
 **Next Week** 
 
-This upcoming week we will continue follow migration issues for milestone 3.
+This upcoming week we will continue follow migration issues for milestone 
+
+<hr>
+
+<h1>PERSONAL LOG-- 29/03/2026</h1>
+
+![weekly](Image/Mar29.png)
+
+<h3> Schedule</h3>
+
+- Monday: Milestone presentations
+
+- Wednsday: No class
+
+- Sunday: reviewed tasks, created video demo. 
+
+
+
+# Coding Tasks
+
+Pull Requests:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/527
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/530 
+
+
+
+
+# Testing Tasks
+
+These are the tests I made for my PRs: 
+
+- test_openapi_exposes_all_local_llm_routes
+- test_openai_route_removed_from_public_api_surface
+- test_intake_start_status_and_cancel_flow_returns_schema_shapes
+- test_context_returns_404_for_missing_zip
+- test_list_education_empty
+- test_create_education
+- test_create_education_minimal
+- test_get_education
+- test_get_education_not_found
+- test_update_education
+- test_update_education_wrong_portfolio
+- test_delete_education
+- test_delete_education_wrong_portfolio
+- test_list_education_by_portfolio
+
+# Reviews
+
+Here are my pr reviews:
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523
+
+- https://github.com/COSC-499-W2025/capstone-project-team-1/pull/524
+
+
+
+**Reflection & Team Dynamic**
+
+Working with this group has reinforced the value of collective effort. Our culture of constructive feedback on PRs directly translates to productivity without bottlenecks. I'm energized by my current assignments and have clarity around my role and objectives.
+
+**Next Week** 
+
+Finish all changes for milestone 3. 
+
