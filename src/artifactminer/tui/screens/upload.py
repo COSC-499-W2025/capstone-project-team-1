@@ -121,6 +121,7 @@ class UploadScreen(Screen[None]):
                 self.app.push_screen(AnalyzingScreen(self.app.current_zip_id))
             else:
                 status.update("Waiting for a file...")
+                field.value = ""
             field.focus()
 
         await self.app.push_screen(ListContentsScreen(dirs), callback=handle_selection)

@@ -5,15 +5,21 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
+from collections import Counter
+import subprocess
 import git
 from sqlalchemy import inspect, or_
 from artifactminer.db.database import SessionLocal
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import isGitRepo, Pathish
 from artifactminer.RepositoryIntelligence.activity_classifier import classify_commit_activities 
-from artifactminer.RepositoryIntelligence.repo_intelligence_AI import user_allows_llm, createSummaryFromUserAdditions, saveUserIntelligenceSummary, group_additions_into_blocks
 from email_validator import validate_email, EmailNotValidError
 from sqlalchemy.orm import Session
-from artifactminer.db.models import RepoStat, UserRepoStat, UserAnswer
+from artifactminer.db.models import (
+    RepoStat,
+    UserRepoStat,
+    UserAnswer,
+    UserAIntelligenceSummary,
+)
 from pathlib import Path as PathLib
 
 @dataclass
@@ -23,10 +29,55 @@ class UserRepoStats:
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
+    daily_commits: Optional[dict[str, int]] = None
     userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
     commitActivities: Optional[dict] = None # New field to store activity breakdown
     user_role: Optional[str] = None
+
+
+def get_daily_commit_counts(repo_path: Pathish, user_email: str) -> dict[str, int]:
+    """Return per-day commit counts for a user in a git repository.
+
+    Uses `git log --author=<email> --format=%Y-%m-%d` so the output is already
+    normalized to calendar days. Any git error, timeout, invalid input, or empty
+    result returns an empty mapping.
+    """
+    if not user_email:
+        return {}
+
+    try:
+        validated = validate_email(user_email, check_deliverability=False)
+        email_norm = validated.normalized
+    except EmailNotValidError:
+        return {}
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                f"--author={email_norm}",
+                "--format=%Y-%m-%d",
+            ],
+            cwd=Path(repo_path),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return {}
+    except Exception:
+        return {}
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return {}
+
+    counts = Counter(
+        line.strip() for line in result.stdout.splitlines() if line.strip()
+    )
+    return dict(sorted(counts.items()))
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -67,6 +118,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=total_commits,
+        daily_commits=None,
         userStatspercentages=userStatspercentages,
         commitFrequency=commitFrequency,
         commitActivities=commitActivities
@@ -189,6 +241,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
+            daily_commits=stats.daily_commits,
             userStatspercentages=stats.userStatspercentages,
             commitFrequency=stats.commitFrequency,
             activity_breakdown=stats.commitActivities,
@@ -207,15 +260,28 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
         if own_session:
             db.close()
 
+
+def saveUserIntelligenceSummary(repo_path: str, user_email: str, summary_text: str):
+    db = SessionLocal()
+    try:
+        user_summary = UserAIntelligenceSummary(
+            repo_path=repo_path,
+            user_email=user_email,
+            summary_text=summary_text,
+        )
+        db.add(user_summary)
+        db.commit()
+        db.refresh(user_summary)
+    finally:
+        db.close()
+
 async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str = None) -> list[dict]:
     """
     Summarize the top-ranked repositories for the current user.
 
     Expected flow (called by Nathan's orchestrator):
     - Shlok's ranking code has already set RepoStat.ranking_score.
-    - We pick the top 3, check consent, and either:
-      * use LLM summaries from diffs, or
-      * fall back to a simple template.
+    - We pick the top 3 and generate lightweight static summaries.
     - We persist results into UserAIntelligenceSummary.
     
     Note: Processes all repos concurrently for maximum performance.
@@ -289,28 +355,6 @@ async def generate_summaries_for_ranked(db: Session, top=3, extraction_path: str
                 f"User served as {role_text} on {repo.project_name} "
                 f"and contributed {pct:.1f}% using {languages_text}."
             )
-
-        # If we have consent + a valid email, try the LLM-based summary instead
-        if user_allows_llm() and user_email:
-            try:
-                # Ensure path is absolute for git operations
-                repo_path_absolute = str(Path(repo.project_path).resolve())
-                additions = collect_user_additions(
-                    repo_path=repo_path_absolute,
-                    user_email=user_email,
-                )
-                if additions:
-                    grouped = group_additions_into_blocks(additions, max_chars_per_block=1000, max_blocks=1)
-                    ai_summary = await createSummaryFromUserAdditions(grouped)
-                    print("\n AI Summary Generated for", repo.project_name, ":", ai_summary)
-                    summary_text += " AI summary: " + ai_summary
-            except Exception as e:
-                # Log the actual error for debugging
-                print(f"ERROR generating AI summary for {repo.project_name}: {type(e).__name__}: {e}")
-                import traceback
-                traceback.print_exc()
-                # Fail soft: keep the fallback template summary
-                pass
 
         # Persist into UserAIntelligenceSummary
         saveUserIntelligenceSummary(

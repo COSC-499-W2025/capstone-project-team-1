@@ -166,6 +166,21 @@ class DirectoriesResponse(BaseModel):
     )
 
 
+class ExtractLocalRequest(BaseModel):
+    """Request to extract a previously uploaded ZIP for agent consumption."""
+
+    zip_id: int = Field(description="ID of the uploaded ZIP record to extract.")
+
+
+class ExtractLocalResponse(BaseModel):
+    """Response with the absolute extraction directory path."""
+
+    zip_id: int = Field(description="ID of the uploaded ZIP record.")
+    extraction_path: str = Field(
+        description="Absolute path to the extracted directory."
+    )
+
+
 class ProjectResponse(BaseModel):
     """Response shape for project listing."""
 
@@ -363,6 +378,36 @@ class SummaryResponse(BaseModel):
     user_email: str
     summary_text: str
     generated_at: datetime
+
+
+class ActivityHeatmapDateRange(BaseModel):
+    """Date bounds for a user's aggregated commit heatmap."""
+
+    start: _dt.date | None = Field(
+        default=None, description="Earliest date with recorded activity."
+    )
+    end: _dt.date | None = Field(
+        default=None, description="Latest date with recorded activity."
+    )
+
+
+class ActivityHeatmapResponse(BaseModel):
+    """Aggregated commit counts for the portfolio activity heatmap."""
+
+    daily_activity: dict[str, int] = Field(
+        default_factory=dict,
+        description="Map of YYYY-MM-DD strings to commit counts.",
+    )
+    total_days_active: int = Field(
+        description="Number of distinct days with at least one commit."
+    )
+    max_daily_commits: int = Field(
+        description="Highest commit count observed for a single day."
+    )
+    date_range: ActivityHeatmapDateRange = Field(
+        default_factory=ActivityHeatmapDateRange,
+        description="Inclusive date range for the returned activity data.",
+    )
 
 
 class DeleteResponse(BaseModel):
@@ -722,3 +767,62 @@ class CustomRanking(BaseModel):
         description="Custom ranking position (lower value = higher rank).",
         ge=1,
     )
+
+
+# ---------------------------------------------------------------------------
+# Education and Awards
+# ---------------------------------------------------------------------------
+
+
+class EducationCreateRequest(BaseModel):
+    """Request payload for creating education entry."""
+
+    institution: str = Field(min_length=1, description="Name of institution")
+    degree: str = Field(min_length=1, description="Degree (e.g., Bachelor, Master)")
+    field_of_study: Optional[str] = Field(None, description="Field of study")
+    start_date: _dt.date = Field(description="Start date (YYYY-MM-DD)")
+    end_date: Optional[_dt.date] = Field(None, description="End date (YYYY-MM-DD)")
+    gpa: Optional[str] = Field(None, description="GPA (e.g., 3.8)")
+    honors: Optional[str] = Field(None, description="Honors (e.g., Magna Cum Laude)")
+
+
+class EducationResponse(BaseModel):
+    """Response shape for education entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    portfolio_id: str
+    institution: str
+    degree: str
+    field_of_study: Optional[str]
+    start_date: _dt.date
+    end_date: Optional[_dt.date]
+    gpa: Optional[str]
+    honors: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AwardCreateRequest(BaseModel):
+    """Request payload for creating award entry."""
+
+    title: str = Field(min_length=1, description="Award title")
+    issuer: str = Field(min_length=1, description="Awarding organization")
+    date: _dt.date = Field(description="Date awarded (YYYY-MM-DD)")
+    description: Optional[str] = Field(None, description="Award description")
+
+
+class AwardResponse(BaseModel):
+    """Response shape for award entry."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    portfolio_id: str
+    title: str
+    issuer: str
+    date: _dt.date
+    description: Optional[str]
+    created_at: datetime
+    updated_at: datetime

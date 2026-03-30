@@ -3,13 +3,19 @@ export type Screen =
 	| "consent"
 	| "consent-policy"
 	| "file-upload"
+	| "configure"
 	| "project-list"
 	| "identity"
 	| "pipeline-launch"
 	| "analysis"
+	| "polishing"
 	| "draft-pause"
 	| "feedback"
-	| "resume-preview";
+	| "resume-preview"
+	| "education-awards"
+	| "cloud-auth"
+	| "cloud-generation"
+	| "cloud-resume";
 
 export type AnalysisMode = "phase1" | "phase3";
 

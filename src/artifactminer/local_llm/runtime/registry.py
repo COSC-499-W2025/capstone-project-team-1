@@ -11,10 +11,17 @@ from .errors import ModelNotFoundError
 
 
 # This is the single source of truth for the team-approved local models.
-# The runtime only supports the model names defined here, and each one resolves
-# to a single expected GGUF file in ~/.artifactminer/models.
+# The runtime only supports the model names defined here. Most aliases resolve
+# to one expected GGUF file, but some models accept equivalent downloaded
+# filenames so builders do not have to redownload the same weights.
 _SUPPORTED_MODELS = MappingProxyType(
     {
+        "qwen3.5-2b-q4": ModelDescriptor(
+            name="qwen3.5-2b-q4",
+            filename="Qwen3.5-2B-Q4_K_M.gguf",
+            repo_url="https://huggingface.co/Qwen/Qwen3.5-2B",
+            context_window=20480,
+        ),
         "qwen3.5-4b-q4": ModelDescriptor(
             name="qwen3.5-4b-q4",
             filename="Qwen3.5-4B-Q4_K_M.gguf",
@@ -33,6 +40,17 @@ _SUPPORTED_MODELS = MappingProxyType(
             repo_url="https://huggingface.co/LiquidAI/LFM2.5-1.2B-Instruct-GGUF?show_file_info=LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
             context_window=32768,
         ),
+        "lfm2.5-1.2b-q8": ModelDescriptor(
+            name="lfm2.5-1.2b-q8",
+            filename="LFM2.5-1.2B-Instruct-Q8_0.gguf",
+            context_window=32768,
+        ),
+    }
+)
+
+_ALTERNATE_FILENAMES = MappingProxyType(
+    {
+        "qwen2.5-coder-3b-q4": ("qwen2.5-coder-3b-instruct-q4_0.gguf",),
     }
 )
 
@@ -65,8 +83,8 @@ def list_available_models(
     available: list[ModelDescriptor] = []
     for model_name in sorted(_SUPPORTED_MODELS):
         descriptor = _SUPPORTED_MODELS[model_name]
-        resolved_path = models_dir / _require_filename(model_name, descriptor)
-        if resolved_path.is_file():
+        resolved_path = _resolve_existing_path(model_name, descriptor, models_dir)
+        if resolved_path is not None:
             available.append(descriptor.model_copy(update={"path": resolved_path}))
     return available
 
@@ -80,9 +98,9 @@ def resolve_model_descriptor(
         raise _build_unsupported_model_error(model, models_dir)
 
     descriptor = _SUPPORTED_MODELS[model]
-    resolved_path = models_dir / _require_filename(model, descriptor)
-    if not resolved_path.is_file():
-        raise _build_missing_model_error(model, resolved_path, models_dir)
+    resolved_path = _resolve_existing_path(model, descriptor, models_dir)
+    if resolved_path is None:
+        raise _build_missing_model_error(model, descriptor, models_dir)
     return descriptor.model_copy(update={"path": resolved_path})
 
 
@@ -103,6 +121,22 @@ def _require_filename(model_name: str, descriptor: ModelDescriptor) -> str:
     return descriptor.filename
 
 
+def _candidate_filenames(model_name: str, descriptor: ModelDescriptor) -> tuple[str, ...]:
+    primary_filename = _require_filename(model_name, descriptor)
+    alternate_filenames = _ALTERNATE_FILENAMES.get(model_name, ())
+    return (primary_filename, *alternate_filenames)
+
+
+def _resolve_existing_path(
+    model_name: str, descriptor: ModelDescriptor, models_dir: Path
+) -> Path | None:
+    for filename in _candidate_filenames(model_name, descriptor):
+        candidate_path = models_dir / filename
+        if candidate_path.is_file():
+            return candidate_path
+    return None
+
+
 def _build_unsupported_model_error(
     model: str, models_dir: Path
 ) -> ModelNotFoundError:
@@ -116,15 +150,20 @@ def _build_unsupported_model_error(
 
 
 def _build_missing_model_error(
-    model: str, searched_path: Path, models_dir: Path
+    model: str, descriptor: ModelDescriptor, models_dir: Path
 ) -> ModelNotFoundError:
     # The registry raises one typed error with enough context for callers or UIs
     # to explain what was checked and how the user can recover.
+    searched_paths = [
+        models_dir / filename for filename in _candidate_filenames(model, descriptor)
+    ]
     supported_models = ", ".join(sorted(_SUPPORTED_MODELS))
+    expected_files = ", ".join(path.name for path in searched_paths)
     message = (
-        f"Model '{model}' was not found at {searched_path}. "
+        f"Model '{model}' was not found at {searched_paths[0]}. "
         f"Checked local models in {models_dir}. "
+        f"Accepted GGUF filenames: {expected_files}. "
         f"Supported model names: {supported_models}. "
         "Install the expected GGUF file into that directory."
     )
-    return ModelNotFoundError(model, searched_path, message=message)
+    return ModelNotFoundError(model, searched_paths[0], message=message)

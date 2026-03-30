@@ -23,6 +23,7 @@ def test_getUserRepoStats():
     assert isinstance(stats.first_commit, (type(None), datetime))
     assert isinstance(stats.last_commit, (type(None), datetime))
     assert isinstance(stats.total_commits, (type(None), int))
+    assert isinstance(stats.daily_commits, (type(None), dict))
     assert isinstance(stats.userStatspercentages, (type(None), float))
     assert isinstance(stats.commitFrequency, (type(None), float))
     print(f"UserRepoStats: {stats}")

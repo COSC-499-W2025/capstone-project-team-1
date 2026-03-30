@@ -1,14 +1,25 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { testRender } from "@opentui/react/test-utils";
 import { act, useEffect } from "react";
 import type { PipelineContributorIdentity } from "../api/types";
 import { AppProvider, useAppState } from "../context/AppContext";
-import {
+
+type KeyboardEventLike = { name: string; sequence?: string; shift?: boolean };
+
+let keyboardHandler: ((key: KeyboardEventLike) => void) | null = null;
+
+mock.module("@opentui/react", () => ({
+	useKeyboard: (handler: (key: KeyboardEventLike) => void) => {
+		keyboardHandler = handler;
+	},
+}));
+
+const {
 	formatContributorName,
 	getToggledFocusMode,
 	IdentityScreen,
 	resolveIdentitySelection,
-} from "./IdentityScreen";
+} = await import("./IdentityScreen");
 
 const contributorsFixture: PipelineContributorIdentity[] = [
 	{
@@ -37,9 +48,31 @@ function SeedIdentityState({ contributors }: { contributors: PipelineContributor
 	return null;
 }
 
+async function pressKeyboardShortcut(
+	view: Awaited<ReturnType<typeof testRender>>,
+	key: KeyboardEventLike,
+) {
+	if (!keyboardHandler) {
+		throw new Error("IdentityScreen keyboard handler was not registered");
+	}
+
+	await act(async () => {
+		keyboardHandler?.(key);
+		await Promise.resolve();
+		await view.renderOnce();
+	});
+}
+
+afterEach(() => {
+	keyboardHandler = null;
+});
+
 describe("IdentityScreen helpers", () => {
 	test("formats contributor metadata for rendering", () => {
-		const contributor = contributorsFixture[0]!;
+		const contributor = contributorsFixture[0];
+		if (!contributor) {
+			throw new Error("Missing contributor fixture");
+		}
 		expect(formatContributorName(contributor)).toBe("First Dev");
 		expect(formatContributorName({
 			...contributor,
@@ -97,6 +130,35 @@ describe("IdentityScreen rendering", () => {
 		expect(frame).toContain("Detected Contributors");
 		expect(frame).toContain("First Dev <first@example.com>");
 		expect(frame).toContain("Manual Email Entry");
+
+		await act(async () => {
+			view.renderer.destroy();
+		});
+	});
+
+	test("calls onBack when Escape is pressed", async () => {
+		let backCount = 0;
+		const view = await testRender(
+			<AppProvider>
+				<SeedIdentityState contributors={contributorsFixture} />
+				<IdentityScreen
+					onNext={() => {}}
+					onBack={() => {
+						backCount += 1;
+					}}
+				/>
+			</AppProvider>,
+			{ width: 120, height: 40 },
+		);
+
+		await act(async () => {
+			await view.renderOnce();
+		});
+
+		await pressKeyboardShortcut(view, { name: "escape" });
+
+		expect(backCount).toBe(1);
+		expect(view.captureCharFrame()).toContain("Detected Contributors");
 
 		await act(async () => {
 			view.renderer.destroy();

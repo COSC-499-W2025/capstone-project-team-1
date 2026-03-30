@@ -176,17 +176,17 @@ class GenerationStartRequest(BaseModel):
         description="User email for attribution and identification"
     )
     stage1_model: str = Field(
-        default="qwen2.5-coder-3b-q4",
+        default="qwen3.5-2b-q4",
         min_length=1,
         description="Model for analysis stage",
     )
     stage2_model: str = Field(
-        default="lfm2.5-1.2b-q4",
+        default="qwen3.5-2b-q4",
         min_length=1,
-        description="Model for facts extraction stage",
+        description="Model for resume draft stage",
     )
     stage3_model: str = Field(
-        default="lfm2.5-1.2b-q4",
+        default="qwen3.5-2b-q4",
         min_length=1,
         description="Model for polish/refinement stage",
     )

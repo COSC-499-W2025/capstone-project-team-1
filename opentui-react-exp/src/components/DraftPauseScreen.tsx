@@ -4,6 +4,8 @@ import { api } from "../api/endpoints";
 import { useAppState } from "../context/AppContext";
 import { theme } from "../types";
 import { resumeToSections, toErrorMessage } from "../utils";
+import { MarkdownBlock } from "./MarkdownBlock";
+import { useToast } from "./Toast";
 import { TopBar } from "./TopBar";
 
 interface DraftPauseScreenProps {
@@ -32,6 +34,7 @@ function getSectionShortcutIndex(
 
 export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 	const { state, setPipelineNotice, setPipelineStatus } = useAppState();
+	const toast = useToast();
 	const [selectedSection, setSelectedSection] = useState(0);
 	const [focusArea, setFocusArea] = useState<"content" | "feedback">("content");
 	const [focusedField, setFocusedField] = useState(0);
@@ -41,7 +44,6 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 	const [removalsText, setRemovalsText] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isCancelling, setIsCancelling] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	const sections = useMemo(
 		() => resumeToSections(state.resumeV3Draft),
@@ -50,15 +52,15 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 
 	const submitFeedback = async () => {
 		if (!state.pipelineJobId) {
-			setError("No active pipeline job.");
+			toast.show({ variant: "error", message: "No active pipeline job." });
 			return;
 		}
 		if (isSubmitting || isCancelling) {
 			return;
 		}
 
-		setError(null);
 		setIsSubmitting(true);
+		toast.show({ variant: "info", message: "Submitting feedback...", duration: 3000 });
 		try {
 			await api.polishPipeline({
 				general_notes: generalNotes.trim(),
@@ -66,9 +68,9 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 				additions: parseList(additionsText),
 				removals: parseList(removalsText),
 			});
-			onNext("analysis");
+			onNext("polishing");
 		} catch (submitError) {
-			setError(toErrorMessage(submitError));
+			toast.show({ variant: "error", message: toErrorMessage(submitError), duration: 0 });
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -76,7 +78,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 
 	const cancelJob = async () => {
 		if (!state.pipelineJobId) {
-			setError("No active pipeline job to cancel.");
+			toast.show({ variant: "error", message: "No active pipeline job to cancel." });
 			return;
 		}
 		if (isCancelling || isSubmitting) {
@@ -84,14 +86,15 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 		}
 
 		setIsCancelling(true);
-		setError(null);
+		toast.show({ variant: "info", message: "Cancelling pipeline...", duration: 3000 });
 		try {
 			await api.cancelPipeline();
 			setPipelineStatus("cancelled");
 			setPipelineNotice("Pipeline cancelled at draft pause.");
+			toast.show({ variant: "warning", title: "Cancelled", message: "Pipeline was cancelled." });
 			onNext("project-list");
 		} catch (cancelError) {
-			setError(toErrorMessage(cancelError));
+			toast.show({ variant: "error", message: toErrorMessage(cancelError), duration: 0 });
 		} finally {
 			setIsCancelling(false);
 		}
@@ -174,7 +177,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 									index === selectedSection ? theme.gold : theme.textSecondary
 								}
 							>
-								{index === selectedSection ? "▶ " : "  "}
+								{index === selectedSection ? "👉 " : "   "}
 								{index + 1}. {section.tocLabel}
 							</span>
 						</text>
@@ -199,11 +202,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 							viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 						}}
 					>
-						{current.lines.map((line, index) => (
-							<text key={`${current.id}-${index}`}>
-								<span fg={theme.textSecondary}>{line || " "}</span>
-							</text>
-						))}
+						<MarkdownBlock content={current.lines.join("\n")} />
 					</scrollbox>
 				</box>
 
@@ -256,32 +255,6 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 						</span>
 					</text>
 				</box>
-			</box>
-
-			<box
-				paddingLeft={2}
-				paddingRight={2}
-				paddingBottom={1}
-				flexDirection="column"
-				gap={1}
-			>
-				{isSubmitting ? (
-					<text>
-						<span fg={theme.cyan}>
-							Submitting feedback and starting Stage 3...
-						</span>
-					</text>
-				) : null}
-				{isCancelling ? (
-					<text>
-						<span fg={theme.warning}>Cancelling pipeline...</span>
-					</text>
-				) : null}
-				{error ? (
-					<text>
-						<span fg={theme.error}>{error}</span>
-					</text>
-				) : null}
 			</box>
 		</box>
 	);

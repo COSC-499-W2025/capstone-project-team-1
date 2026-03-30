@@ -1,6 +1,6 @@
 import { fdir } from "fdir";
 import { stat } from "node:fs/promises";
-import { dirname, basename, join, sep } from "node:path";
+import { dirname, basename, sep } from "node:path";
 
 // ============================================================================
 // Types
@@ -29,6 +29,14 @@ export type ScanResult = {
 	zips: ZipFile[];
 	error?: string;
 };
+
+function normalizePathForComparison(path: string): string {
+	const normalized = path.replace(/\\/g, "/");
+	if (normalized.length > 1 && normalized.endsWith("/")) {
+		return normalized.slice(0, -1);
+	}
+	return normalized;
+}
 
 // ============================================================================
 // Default exclusions
@@ -134,7 +142,10 @@ export function buildDirsWithZips(
  * Gets ZIPs directly in a specific directory
  */
 export function getZipsInDir(zips: ZipFile[], dirPath: string): ZipFile[] {
-	return zips.filter((zip) => zip.parentDir === dirPath);
+	const normalizedDirPath = normalizePathForComparison(dirPath);
+	return zips.filter(
+		(zip) => normalizePathForComparison(zip.parentDir) === normalizedDirPath,
+	);
 }
 
 /**
@@ -146,25 +157,26 @@ export function getChildDirsWithZips(
 ): DirEntry[] {
 	const childDirs = new Map<string, number>();
 
+	const normCurrent = normalizePathForComparison(currentPath);
+	const pathWithSep = normCurrent === "/" ? "/" : `${normCurrent}/`;
+
 	for (const zip of zips) {
-		// Ensure path ends with separator but don't double it (handles root "/" correctly)
-		const pathWithSep = currentPath.endsWith(sep)
-			? currentPath
-			: currentPath + sep;
+		const normParent = normalizePathForComparison(zip.parentDir);
 
 		// Skip if not under current path (must be actual child, not just string prefix)
-		if (!zip.parentDir.startsWith(pathWithSep)) continue;
+		if (!normParent.startsWith(pathWithSep)) continue;
 		// Skip if directly in current dir
-		if (zip.parentDir === currentPath) continue;
+		if (normParent === normCurrent) continue;
 
 		// Get the immediate child directory (slice from the end of pathWithSep)
-		const relativePath = zip.parentDir.slice(pathWithSep.length);
-		const parts = relativePath.split(sep).filter(Boolean);
+		const relativePath = normParent.slice(pathWithSep.length);
+		const parts = relativePath.split("/").filter(Boolean);
 		if (parts.length === 0) continue;
 
 		const childDir = parts[0];
 		if (!childDir) continue;
-		const fullChildPath = join(currentPath, childDir);
+		const fullChildPath =
+			normCurrent === "/" ? `/${childDir}` : `${normCurrent}/${childDir}`;
 
 		childDirs.set(fullChildPath, (childDirs.get(fullChildPath) || 0) + 1);
 	}

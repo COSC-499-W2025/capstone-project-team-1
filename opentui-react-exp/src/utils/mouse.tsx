@@ -1,6 +1,22 @@
+import type { BoxProps } from "@opentui/react";
 import type { ReactNode } from "react";
 
-interface ClickableBoxProps {
+interface ClickableBoxProps
+	extends Pick<
+		BoxProps,
+		| "flexGrow"
+		| "flexDirection"
+		| "padding"
+		| "paddingLeft"
+		| "paddingRight"
+		| "paddingTop"
+		| "paddingBottom"
+		| "gap"
+		| "width"
+		| "height"
+		| "justifyContent"
+		| "alignItems"
+	> {
 	onClick: () => void;
 	children: ReactNode;
 	/** Whether this item is currently selected/active */
@@ -16,20 +32,7 @@ interface ClickableBoxProps {
 	/** Show a border (defaults to true) */
 	border?: boolean;
 	/** Border style */
-	borderStyle?: "single" | "double" | "rounded" | "bold";
-	/** Additional box layout props */
-	flexGrow?: number;
-	flexDirection?: "row" | "column";
-	padding?: number;
-	paddingLeft?: number;
-	paddingRight?: number;
-	paddingTop?: number;
-	paddingBottom?: number;
-	gap?: number;
-	width?: number | string;
-	height?: number | string;
-	justifyContent?: string;
-	alignItems?: string;
+	borderStyle?: "single" | "double" | "rounded";
 }
 
 /**
