@@ -11,13 +11,7 @@ from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Label, Static
 
 from ..api import ApiClient
-from ..helpers import (
-    build_summaries_lookup,
-    export_to_json,
-    export_to_text,
-    group_by_project,
-    open_file_in_browser,
-)
+from ..helpers import export_to_json, export_to_text, group_by_project, build_summaries_lookup
 
 
 class ResumeScreen(Screen[None]):
@@ -60,7 +54,6 @@ class ResumeScreen(Screen[None]):
                     yield VerticalScroll(id="resume-content")
                     yield Label("Loading...", id="resume-status")
                     with Horizontal(id="resume-actions"):
-                        yield Button("Open Portfolio HTML", id="open-portfolio-btn", variant="success")
                         yield Button("Export JSON", id="export-json-btn", variant="primary")
                         yield Button("Export Text", id="export-text-btn", variant="primary")
                     with Horizontal(id="nav-actions"):
@@ -155,30 +148,6 @@ class ResumeScreen(Screen[None]):
                 self.app.notify(f"Exported to {path.name}", title="Export Complete", timeout=5)
             except Exception as e:
                 self._update_status(f"Export failed: {e}", error=True)
-        elif button_id == "open-portfolio-btn":
-            portfolio_id = getattr(self.app, "current_portfolio_id", None)
-            if not portfolio_id:
-                self._update_status("No portfolio is available yet. Upload and analyze a ZIP first.", error=True)
-                return
-            try:
-                client = ApiClient()
-                response = await client.generate_portfolio_html(portfolio_id)
-                output_path = response["path"]
-                open_file_in_browser(output_path)
-                self._update_status("Opened portfolio HTML in browser.", success=True)
-                self.app.notify(
-                    f"Opened {output_path}",
-                    title="Portfolio Ready",
-                    timeout=5,
-                )
-            except httpx.ConnectError:
-                self._update_status("Connection error.", error=True)
-            except httpx.TimeoutException:
-                self._update_status("Timeout error.", error=True)
-            except httpx.HTTPStatusError as e:
-                self._update_status(f"HTTP {e.response.status_code} error.", error=True)
-            except Exception as e:
-                self._update_status(f"Error: {e}", error=True)
         elif button_id in ("projects-btn", "skills-btn"):
             self.app.notify("This feature is coming soon!", title="Not Available", timeout=5)
 

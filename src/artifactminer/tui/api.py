@@ -37,14 +37,6 @@ class ApiClient:
         resp.raise_for_status()
         return resp.json()
 
-    async def generate_portfolio_html(self, portfolio_id: str) -> dict[str, Any]:
-        """POST /generate/portfolio and return the generated artifact payload."""
-        url = f"{self.base_url}/generate/portfolio"
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(url, json={"portfolio_id": portfolio_id})
-        resp.raise_for_status()
-        return resp.json()
-
     async def get_resume_items(self, project_id: int | None = None) -> list[dict[str, Any]]:
         """GET /resume with optional project_id filter."""
         url = f"{self.base_url}/resume"
