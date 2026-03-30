@@ -4,6 +4,7 @@ import { api } from "../api/endpoints";
 import { useAppState } from "../context/AppContext";
 import { theme } from "../types";
 import { resumeToSections, toErrorMessage } from "../utils";
+import { MarkdownBlock } from "./MarkdownBlock";
 import { useToast } from "./Toast";
 import { TopBar } from "./TopBar";
 
@@ -201,11 +202,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 							viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 						}}
 					>
-						{current.lines.map((line, index) => (
-							<text key={`${current.id}-${index}`}>
-								<span fg={theme.textSecondary}>{line || " "}</span>
-							</text>
-						))}
+						<MarkdownBlock content={current.lines.join("\n")} />
 					</scrollbox>
 				</box>
 
