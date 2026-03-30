@@ -1,64 +1,107 @@
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useMemo, useState } from "react";
-import { type Project, theme } from "../types";
+import type { PipelineRepoCandidate } from "../api/types";
+import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ProjectListProps {
-	projects: Project[];
-	initialSelectedIds?: string[];
-	onContinue: (selectedProjectIds: string[]) => void;
+	repos: PipelineRepoCandidate[];
+	selectedRepoIds: string[];
+	onChangeSelection: (repoIds: string[]) => void;
+	onContinue: () => void;
 	onBack: () => void;
+	notice?: string | null;
 }
 
 export function ProjectList({
-	projects,
-	initialSelectedIds = [],
+	repos,
+	selectedRepoIds,
+	onChangeSelection,
 	onContinue,
 	onBack,
+	notice,
 }: ProjectListProps) {
 	const [selectedIndex, setSelectedIndex] = useState(0);
-	const [selectedIds, setSelectedIds] = useState<string[]>(initialSelectedIds);
-	const [error, setError] = useState<string | null>(null);
-	const selectedProject = projects[selectedIndex];
-	const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+	const [message, setMessage] = useState<string | null>(null);
 
 	useEffect(() => {
-		setSelectedIds(initialSelectedIds);
-	}, [initialSelectedIds]);
+		if (selectedIndex >= repos.length) {
+			setSelectedIndex(Math.max(0, repos.length - 1));
+		}
+	}, [repos.length, selectedIndex]);
 
-	const toggleProjectSelection = (projectId: string) => {
-		setSelectedIds((current) => {
-			if (current.includes(projectId)) {
-				return current.filter((id) => id !== projectId);
-			}
-			return [...current, projectId];
-		});
-		setError(null);
+	const selectedSet = useMemo(
+		() => new Set(selectedRepoIds),
+		[selectedRepoIds],
+	);
+
+	const selectedRepos = useMemo(
+		() => repos.filter((repo) => selectedSet.has(repo.id)),
+		[repos, selectedSet],
+	);
+
+	const currentRepo = repos[selectedIndex];
+
+	const clearMessage = () => {
+		setMessage(null);
 	};
 
-	const continueWithSelection = () => {
-		if (!selectedIds.length) {
-			setError("Select at least one repository to continue.");
+	const toggleCurrent = () => {
+		if (!currentRepo) {
 			return;
 		}
-		onContinue(selectedIds);
+
+		const next = new Set(selectedRepoIds);
+		if (next.has(currentRepo.id)) {
+			next.delete(currentRepo.id);
+		} else {
+			next.add(currentRepo.id);
+		}
+
+		onChangeSelection(Array.from(next));
+		clearMessage();
+	};
+
+	const selectAll = () => {
+		onChangeSelection(repos.map((repo) => repo.id));
+		clearMessage();
+	};
+
+	const clearAll = () => {
+		onChangeSelection([]);
+		clearMessage();
+	};
+
+	const continueIfValid = () => {
+		if (!selectedRepoIds.length) {
+			setMessage("Select at least one repository before continuing.");
+			return;
+		}
+
+		onContinue();
 	};
 
 	useKeyboard((key) => {
-		if (key.name === "up" || key.name === "k") {
-			setSelectedIndex((i) => Math.max(0, i - 1));
-		}
-		if (key.name === "down" || key.name === "j") {
-			setSelectedIndex((i) => Math.min(projects.length - 1, i + 1));
-		}
 		if (key.name === "space") {
-			if (selectedProject) {
-				toggleProjectSelection(selectedProject.id);
-			}
+			toggleCurrent();
+			return;
 		}
-		if (key.name === "return") {
-			continueWithSelection();
+
+		if (key.name === "a") {
+			selectAll();
+			return;
 		}
+
+		if (key.name === "n") {
+			clearAll();
+			return;
+		}
+
+		if (key.name === "return" || key.name === "enter") {
+			continueIfValid();
+			return;
+		}
+
 		if (key.name === "escape") {
 			onBack();
 		}
@@ -66,192 +109,127 @@ export function ProjectList({
 
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar title="Projects" />
+			<TopBar
+				title="Select Repositories"
+				description="Multi-select the repos you want to include in this run."
+			/>
 
-			{/* Split view */}
-			<box flexGrow={1} flexDirection="row">
-				{/* Left panel: Project list */}
+			<box flexGrow={1} flexDirection="row" padding={1} gap={1}>
 				<box
-					width={45}
-					flexDirection="column"
+					width={56}
 					border
-					borderStyle="single"
+					borderStyle="rounded"
 					borderColor={theme.goldDim}
+					flexDirection="column"
 				>
-					<box
-						paddingLeft={1}
-						paddingTop={1}
-						paddingBottom={1}
-						backgroundColor={theme.bgMedium}
-					>
+					<box padding={1} backgroundColor={theme.bgMedium}>
 						<text>
 							<span fg={theme.cyan}>
-								<strong>Projects</strong>
+								<strong>Detected Repositories ({repos.length})</strong>
 							</span>
 						</text>
 					</box>
-					<scrollbox height={16} focused>
-						{projects.map((project, index) => {
-							const isCursor = project.id === selectedProject?.id;
-							const isSelected = selectedIdSet.has(project.id);
-							return (
-								<box
-									key={project.id}
-									backgroundColor={
-										isCursor
-											? theme.bgMedium
-											: index % 2 === 0
-												? theme.bgDark
-												: "#111111"
-									}
-									paddingLeft={1}
-									paddingRight={1}
-									onMouseDown={() => {
-										setSelectedIndex(index);
-										toggleProjectSelection(project.id);
-									}}
-								>
-									<text>
-										<span fg={isCursor ? theme.gold : theme.textSecondary}>
-											{isCursor ? ">" : " "}{" "}
-											{isSelected ? "[x]" : "[ ]"} {project.name}
-										</span>
-										<span fg={theme.textDim}>
-											{" "}
-											{project.language} · {project.commits} commits
-										</span>
-									</text>
-								</box>
-							);
-						})}
-					</scrollbox>
+
+					{repos.length ? (
+						<select
+							options={repos.map((repo) => ({
+								name: `${selectedSet.has(repo.id) ? "[x]" : "[ ]"} ${repo.name}`,
+								description: repo.rel_path,
+								value: repo.id,
+							}))}
+							onChange={(index) => setSelectedIndex(index)}
+							selectedIndex={selectedIndex}
+							focused
+							height={18}
+							showScrollIndicator
+							itemSpacing={0}
+							showDescription={false}
+						/>
+					) : (
+						<box padding={1}>
+							<text>
+								<span fg={theme.warning}>
+									No repositories were detected in this upload.
+								</span>
+							</text>
+						</box>
+					)}
 				</box>
 
-				{/* Right panel: Project details */}
-				<box flexGrow={1} flexDirection="column" padding={2} gap={2}>
-					{selectedProject && (
-						<>
-							{/* Project name */}
-							<box flexDirection="column" gap={1}>
-								<text>
-									<span fg={theme.gold}>
-										<strong>{selectedProject.name}</strong>
-									</span>
-								</text>
-								<text>
-									<span
-										fg={
-											selectedIdSet.has(selectedProject.id)
-												? theme.success
-												: theme.warning
-										}
-									>
-										{selectedIdSet.has(selectedProject.id)
-											? "Selected for analysis"
-											: "Not selected yet"}
-									</span>
-								</text>
-								<text>
-									<span fg={theme.textSecondary}>
-										{selectedProject.description}
-									</span>
-								</text>
-							</box>
+				<box
+					flexGrow={1}
+					border
+					borderStyle="rounded"
+					borderColor={theme.cyanDim}
+					padding={2}
+					gap={1}
+				>
+					<text>
+						<span fg={theme.gold}>
+							<strong>Selection Summary</strong>
+						</span>
+					</text>
 
-							{/* Stats */}
-							<box flexDirection="row" gap={4}>
-								<box flexDirection="column">
-									<text>
-										<span fg={theme.textDim}>Language</span>
-									</text>
-									<text>
-										<span fg={theme.cyan}>
-											<strong>{selectedProject.language}</strong>
-										</span>
-									</text>
-								</box>
-								<box flexDirection="column">
-									<text>
-										<span fg={theme.textDim}>Commits</span>
-									</text>
-									<text>
-										<span fg={theme.cyan}>
-											<strong>{selectedProject.commits}</strong>
-										</span>
-									</text>
-								</box>
-								<box flexDirection="column">
-									<text>
-										<span fg={theme.textDim}>Files</span>
-									</text>
-									<text>
-										<span fg={theme.cyan}>
-											<strong>{selectedProject.files}</strong>
-										</span>
-									</text>
-								</box>
-								<box flexDirection="column">
-									<text>
-										<span fg={theme.textDim}>Updated</span>
-									</text>
-									<text>
-										<span fg={theme.cyan}>
-											<strong>{selectedProject.lastUpdated}</strong>
-										</span>
-									</text>
-								</box>
-							</box>
+					<text>
+						<span fg={theme.textSecondary}>
+							Selected {selectedRepoIds.length} of {repos.length} repositories.
+						</span>
+					</text>
 
-							{/* Technologies */}
-							<box flexDirection="column" gap={1}>
-								<text>
-									<span fg={theme.textDim}>Technologies</span>
+					{currentRepo ? (
+						<box marginTop={1} flexDirection="column" gap={1}>
+							<text>
+								<span fg={theme.textDim}>Current Repository</span>
+							</text>
+							<text>
+								<span fg={theme.cyan}>{currentRepo.name}</span>
+							</text>
+							<text>
+								<span fg={theme.textSecondary}>{currentRepo.rel_path}</span>
+							</text>
+						</box>
+					) : null}
+
+					<box marginTop={1} flexDirection="column" gap={1}>
+						<text>
+							<span fg={theme.textDim}>Selected Repositories</span>
+						</text>
+						{selectedRepos.length ? (
+							selectedRepos.slice(0, 8).map((repo) => (
+								<text key={repo.id}>
+									<span fg={theme.textSecondary}>- {repo.name}</span>
 								</text>
-								<box flexDirection="row" gap={1} flexWrap="wrap">
-									{selectedProject.technologies.map((tech, i) => (
-										<box
-											key={i}
-											backgroundColor={theme.cyanDim}
-											paddingLeft={1}
-											paddingRight={1}
-										>
-											<text>
-												<span fg={theme.textPrimary}>{tech}</span>
-											</text>
-										</box>
-									))}
-								</box>
-							</box>
-						</>
-					)}
+							))
+						) : (
+							<text>
+								<span fg={theme.warning}>No repositories selected yet.</span>
+							</text>
+						)}
+					</box>
 				</box>
 			</box>
 
-			{/* Footer guidance */}
 			<box
-				height={4}
-				border
-				borderStyle="single"
-				borderColor={error ? theme.error : theme.goldDim}
 				paddingLeft={2}
 				paddingRight={2}
-				paddingTop={1}
 				paddingBottom={1}
 				flexDirection="column"
+				gap={1}
 			>
 				<text>
-					<span fg={theme.goldDark}>Selected:</span>
-					<span fg={theme.textDim}> Press </span>
-					<span fg={theme.cyan}>Space</span>
-					<span fg={theme.textDim}> to toggle repos, </span>
-					<span fg={theme.cyan}>Enter</span>
-					<span fg={theme.textDim}> to continue with </span>
-					<span fg={theme.gold}>{selectedIds.length}</span>
-					<span fg={theme.textDim}> selected repo(s)</span>
+					<span fg={theme.textDim}>
+						Space toggles • A selects all • N clears • Enter continues • Esc
+						goes back
+					</span>
 				</text>
-				{error ? (
+				{notice ? (
 					<text>
-						<span fg={theme.error}>{error}</span>
+						<span fg={theme.warning}>{notice}</span>
+					</text>
+				) : null}
+				{message ? (
+					<text>
+						<span fg={theme.error}>{message}</span>
 					</text>
 				) : null}
 			</box>
