@@ -39,7 +39,9 @@ def test_upload_zip_succeeds_and_directories_available(client, tmp_path, monkeyp
         ),
     )
 
-    files = {"file": ("artifact.zip", b"fake-bytes", "application/zip")}
+    zip_path = Path(__file__).resolve().parents[1] / "data" / "mock_projects.zip"
+    with zip_path.open("rb") as f:
+        files = {"file": ("artifact.zip", f.read(), "application/zip")}
     response = client.post("/zip/upload", files=files)
 
     assert response.status_code == 200

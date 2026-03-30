@@ -380,6 +380,36 @@ class SummaryResponse(BaseModel):
     generated_at: datetime
 
 
+class ActivityHeatmapDateRange(BaseModel):
+    """Date bounds for a user's aggregated commit heatmap."""
+
+    start: _dt.date | None = Field(
+        default=None, description="Earliest date with recorded activity."
+    )
+    end: _dt.date | None = Field(
+        default=None, description="Latest date with recorded activity."
+    )
+
+
+class ActivityHeatmapResponse(BaseModel):
+    """Aggregated commit counts for the portfolio activity heatmap."""
+
+    daily_activity: dict[str, int] = Field(
+        default_factory=dict,
+        description="Map of YYYY-MM-DD strings to commit counts.",
+    )
+    total_days_active: int = Field(
+        description="Number of distinct days with at least one commit."
+    )
+    max_daily_commits: int = Field(
+        description="Highest commit count observed for a single day."
+    )
+    date_range: ActivityHeatmapDateRange = Field(
+        default_factory=ActivityHeatmapDateRange,
+        description="Inclusive date range for the returned activity data.",
+    )
+
+
 class DeleteResponse(BaseModel):
     """Response shape for delete operations."""
 

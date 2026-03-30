@@ -19,6 +19,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
 )
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     getUserRepoStats,
+    get_daily_commit_counts,
     saveUserRepoStats,
     generate_summaries_for_ranked
 )
@@ -88,6 +89,7 @@ async def test_full_pipeline_zip_to_summaries():
             saveRepoStats(repo_stats)
 
             user_stats = getUserRepoStats(str(repo), test_email)
+            user_stats.daily_commits = get_daily_commit_counts(str(repo), test_email)
             saveUserRepoStats(user_stats)
 
         # 6. Rank repos (using existing helper)
@@ -111,6 +113,10 @@ async def test_full_pipeline_zip_to_summaries():
         # 9. Assert summaries created
         assert len(summaries) > 0
         assert len(summaries) <= 3
+
+        stored_user_stats = db.query(UserRepoStat).all()
+        assert stored_user_stats
+        assert any(stat.daily_commits for stat in stored_user_stats)
 
         # Also verify DB persisted entries
         stored = db.query(UserAIntelligenceSummary).all()
