@@ -82,6 +82,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Esc", label: "Back" },
 	],
 	analysis: [{ key: "", label: "Processing..." }],
+	polishing: [{ key: "", label: "Processing..." }],
 	"draft-pause": [
 		{ key: "Enter", label: "Continue" },
 		{ key: "Esc", label: "Back" },
@@ -373,6 +374,26 @@ function App() {
 					/>
 				);
 
+			case "polishing":
+				return (
+					<SnakeWithProgress
+						mode="local"
+						intakeId={state.intakeId ?? ""}
+						repoIds={state.selectedRepoIds}
+						userEmail={state.selectedEmail ?? ""}
+						pollOnly
+						onDraftReady={(draft) => {
+							setResumeV3Draft(draft);
+							setScreen("draft-pause");
+						}}
+						onComplete={(output) => {
+							setResumeV3Output(output);
+							setScreen("resume-preview");
+						}}
+						onBack={() => setScreen("draft-pause")}
+					/>
+				);
+
 			case "draft-pause":
 				return (
 					<DraftPauseScreen
@@ -459,7 +480,7 @@ function App() {
 			<BottomBar
 				actions={visibleActions}
 				breadcrumbs={breadcrumbs}
-				currentScreen={screen}
+				currentScreen={screen === "polishing" ? "analysis" : screen}
 				onNavigate={navigateTo}
 				onForward={forward.onForward}
 				forwardLabel={forward.forwardLabel}

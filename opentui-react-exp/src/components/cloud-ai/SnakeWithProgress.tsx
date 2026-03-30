@@ -20,6 +20,7 @@ import type {
 	PipelineStatusResponse,
 	ResumeV3Output,
 } from "../../api/types";
+import { useAppState } from "../../context/AppContext";
 import { theme } from "../../types";
 import { toErrorMessage } from "../../utils";
 import { useToast } from "../Toast";
@@ -142,6 +143,8 @@ interface LocalModeProps {
 	intakeId: string;
 	repoIds: string[];
 	userEmail: string;
+	/** When true, skip startPipeline and just poll for status (used after polish). */
+	pollOnly?: boolean;
 	onDraftReady: (draft: ResumeV3Output) => void;
 	onComplete: (output: ResumeV3Output) => void;
 	onBack: () => void;
@@ -154,6 +157,7 @@ type SnakeWithProgressProps = CloudModeProps | LocalModeProps;
 export function SnakeWithProgress(props: SnakeWithProgressProps) {
 	const { width: termW, height: termH } = useTerminalDimensions();
 	const toast = useToast();
+	const { setPipelineJobId } = useAppState();
 
 	const [flowPhase, setFlowPhase] = useState<FlowPhase>("extracting");
 	const [activity, setActivity] = useState<ActivityEntry[]>([]);
@@ -482,24 +486,33 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 			}
 		};
 
-		// Start the pipeline
+		// Start the pipeline (or just poll if resuming after polish)
+		const isPollOnly = props.mode === "local" && (props as LocalModeProps).pollOnly;
 		(async () => {
 			try {
-				setFlowPhase("extracting");
-				pushActivity("system", "Starting local AI pipeline...");
+				if (isPollOnly) {
+					pushActivity("system", "Polishing your resume...");
+					setFlowPhase("generating");
+				} else {
+					setFlowPhase("extracting");
+					pushActivity("system", "Starting local AI pipeline...");
 
-				const response = await api.startPipeline({
-					intake_id: props.intakeId,
-					repo_ids: props.repoIds,
-					user_email: props.userEmail,
-					stage1_model: DEFAULT_STAGE1_MODEL,
-					stage2_model: DEFAULT_STAGE2_MODEL,
-					stage3_model: DEFAULT_STAGE3_MODEL,
-				});
+					const response = await api.startPipeline({
+						intake_id: props.intakeId,
+						repo_ids: props.repoIds,
+						user_email: props.userEmail,
+						stage1_model: DEFAULT_STAGE1_MODEL,
+						stage2_model: DEFAULT_STAGE2_MODEL,
+						stage3_model: DEFAULT_STAGE3_MODEL,
+					});
 
-				if (disposed) return;
-				pushActivity("system", "Pipeline started!", "done");
-				setFlowPhase("generating");
+					if (disposed) return;
+					if (response.job_id) {
+						setPipelineJobId(response.job_id);
+					}
+					pushActivity("system", "Pipeline started!", "done");
+					setFlowPhase("generating");
+				}
 
 				// Begin polling
 				pollInterval = setInterval(() => {

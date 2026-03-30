@@ -8,6 +8,7 @@ export type Screen =
 	| "identity"
 	| "pipeline-launch"
 	| "analysis"
+	| "polishing"
 	| "draft-pause"
 	| "feedback"
 	| "resume-preview"

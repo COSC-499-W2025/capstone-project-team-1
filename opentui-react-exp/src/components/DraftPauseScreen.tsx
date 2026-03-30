@@ -68,7 +68,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 				additions: parseList(additionsText),
 				removals: parseList(removalsText),
 			});
-			onNext("analysis");
+			onNext("polishing");
 		} catch (submitError) {
 			toast.show({ variant: "error", message: toErrorMessage(submitError), duration: 0 });
 		} finally {
