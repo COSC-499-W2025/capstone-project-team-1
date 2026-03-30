@@ -2,6 +2,47 @@ Term 2 Week 1: [Week 15 (Jan 5 - Jan 11)](Week_15.md)
 Term 2 Week 2: [Week 16 (Jan 12 - Jan 18)](Week_16.md)
 
 ---
+## Term 2 Week 11 and 12: Mar 16- Mar 29
+**My Code Contributions For Week 11**:
+
+This week I closed out the remaining Local LLM Runtime issues and shipped a major TUI overhaul to make the app mouse-friendly.
+
+1. Worked on [Issue 454](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/454) — [PR #493](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/493) extends the process manager with server reuse, model-switch restart, crash detection, and a runtime status snapshot. Callers like the public client and TUI can now use managed server lifecycle without touching inference.
+2. Worked on [Issue 455](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/455) — [PR #495](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/495) adds a shared async text inference helper (`query_llm_text`) to the runtime layer and re-exports it from the runtime package surface.
+3. [PR #499](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/499) is a large TUI overhaul (~1200 lines) that rewrites the file browser as a Miller-columns layout with mouse support, adds a toast notification system with slide-in animation, a typewriter landing screen with CTA ripple, and reusable click utilities (`ClickableBox`, `ClickableList`). This makes the TUI mouse-first and much more intuitive for non-technical users.
+
+**Reviewing Team's PRs for Week 11**:
+
+1. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/494) as he refactored the FileUpload component and fixed utils/config issues in the OpenTUI migration. Requested changes which Stavan addressed, then approved.
+2. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/501) as he added structured JSON and grammar-constrained inference (Local LLM Runtime 07). Approved.
+3. Reviewed [Evan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/502) as he added a cancellation endpoint for active generation jobs. Requested changes which Evan addressed, then approved.
+4. Reviewed [Ahmad's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/503) as he wired the analysis polling flow in OpenTUI. Approved.
+5. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/507) as he added the Milestone 3 HTML generation plan document. Approved.
+
+**My Code Contributions For Week 12**:
+
+This was a huge week — I shipped both the PI Agent cloud-tier resume generation (4 stacked PRs) and closed out the remaining local LLM pipeline work (3 PRs). The local LLM pipeline is fully done and the cloud generation path via the PI Agent SDK is end-to-end functional.
+
+1. [PR #517](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/517) adds the PI Agent backend foundation — the core agent session lifecycle, system prompt template, and `DeveloperProfile` type contract for cloud-tier resume generation.
+2. [PR #518](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/518) adds the cloud auth, model selection, and consent flow — 6 new UI components (`CloudAuth`, `CopilotLogin`, `ModelList`, `ModelPicker`, `SnakeGame`, `shared.ts`) forming the consent → device code login → model selection pipeline.
+3. [PR #519](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/519) adds the cloud generation flow with a real-time progress experience combining the snake game with status message formatting and `AbortSignal` plumbing for clean cancellation.
+4. [PR #520](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/520) adds the cloud resume preview — a 3-tab developer profile viewer (Insights, Projects, Resume) with keyboard navigation, scroll, and sidebar.
+5. Worked on [Issue 457](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/457) — [PR #525](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/525) adds a thin `artifactminer.local_llm.client` facade over the runtime internals so application code has one stable import surface for model availability checks, runtime status/unload, and async text/JSON querying.
+6. Worked on [Issue 458](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/458) — [PR #526](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/526) removes the obsolete repo-intelligence AI path from static analysis, cleaning up legacy code that is no longer needed with the new local LLM pipeline.
+7. Worked on [Issue 459](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/459) — [PR #528](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/528) is the capstone PR that replaces the stub `local_llm.py` implementation with a real in-process pipeline, adds the modular `local_llm/generation/` package, and wires the OpenTUI local flow end-to-end. The local LLM pipeline is all done now.
+
+**Reviewing Team's PRs for Week 12**:
+
+1. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/513) as he added the polish endpoint for Issue #442. Approved.
+2. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/514) as he merged dev changes into main. Approved.
+3. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/516) as he rewrote ResumePreview for pipeline output. Approved, but later reverted in [PR #515](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/515).
+4. Reviewed [Ahmad's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/521) as he ported OpenTUI polish updates. Approved.
+5. Reviewed [Evan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/522) as he normalized the local LLM HTTP error contracts for Issue #444. Requested changes which Evan addressed, then approved.
+6. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523) as he rewrote the root navigation in the OpenTUI migration. Approved.
+7. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/527) as he removed the OpenAI dependency and updated surface docs for Issue #446. Approved.
+
+![T2Week11](T2Week11.png)
+
 ## Term 2 Week 10: Mar 9- Mar 15
 **My Code Contributions For Week 10**:
 
