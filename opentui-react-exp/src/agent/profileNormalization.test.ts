@@ -129,3 +129,99 @@ test("buildFallbackProfile uses the resume section when present", () => {
 	expect(profile.developer_dna.archetype).toBe("Developer");
 	expect(profile.impact.commits.total).toBe(0);
 });
+
+test("normalizeDeveloperProfile accepts common camelCase aliases from cloud models", () => {
+	const profile = normalizeDeveloperProfile({
+		resumeMarkdown: "# Resume\n\nCloud output",
+		developerDNA: {
+			archetype: "Systems Builder",
+			description: "You ship pragmatic systems.",
+			definingTraits: ["API design", "Testing"],
+		},
+		hiddenStrengths: [
+			{
+				observation: "You design for failure",
+				evidence: "Defensive handling across services",
+				whyItMatters: "Improves reliability",
+			},
+		],
+		growthAreas: [
+			{
+				area: "Observability",
+				observation: "Limited traces",
+				suggestion: "Add structured tracing",
+			},
+		],
+		talkingPoints: [
+			{ topic: "Tradeoffs", story: "I chose a simple boundary first." },
+		],
+		impact: {
+			commits: {
+				total: 42,
+				avgPerWeek: 6,
+				mostActivePeriod: "Jan-Mar 2026",
+				conventionalCommitsPct: 75,
+			},
+			languages: [
+				{ name: "TypeScript", fileCount: 12, projects: ["ui"] },
+			],
+			collaboration: {
+				branchCount: 3,
+				mergeFrequency: "weekly",
+				workflowStyle: "feature branches",
+			},
+			complexity: {
+				frameworksUsed: 2,
+				projectTypes: ["TUI"],
+				distinctTools: ["SQLite"],
+			},
+		},
+		projects: [
+			{
+				name: "artifactminer",
+				whatItSaysAboutYou: "You build end-to-end tools.",
+				skills: [{ skill: "TypeScript", evidence: "OpenTUI app" }],
+				standout: "Cross-surface integration",
+				nextLevel: ["Add profile persistence"],
+			},
+		],
+	});
+
+	expect(profile.resume_markdown).toBe("# Resume\n\nCloud output");
+	expect(profile.developer_dna).toEqual({
+		archetype: "Systems Builder",
+		description: "You ship pragmatic systems.",
+		defining_traits: ["API design", "Testing"],
+	});
+	expect(profile.hidden_strengths[0]?.why_it_matters).toBe("Improves reliability");
+	expect(profile.growth_areas[0]?.area).toBe("Observability");
+	expect(profile.talking_points[0]?.topic).toBe("Tradeoffs");
+	expect(profile.impact.commits).toEqual({
+		total: 42,
+		avg_per_week: 6,
+		most_active_period: "Jan-Mar 2026",
+		conventional_commits_pct: 75,
+	});
+	expect(profile.impact.languages).toEqual([
+		{ name: "TypeScript", file_count: 12, projects: ["ui"] },
+	]);
+	expect(profile.impact.collaboration).toEqual({
+		branch_count: 3,
+		merge_frequency: "weekly",
+		workflow_style: "feature branches",
+	});
+	expect(profile.impact.complexity).toEqual({
+		frameworks_used: 2,
+		project_types: ["TUI"],
+		distinct_tools: ["SQLite"],
+	});
+	expect(profile.projects).toEqual([
+		{
+			name: "artifactminer",
+			what_it_says_about_you: "You build end-to-end tools.",
+			skills: [{ skill: "TypeScript", evidence: "OpenTUI app" }],
+			standout: "Cross-surface integration",
+			next_level: ["Add profile persistence"],
+		},
+	]);
+});

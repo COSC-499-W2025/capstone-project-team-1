@@ -23,6 +23,15 @@ function asRecord(value: unknown): JsonRecord | null {
 	return value as JsonRecord;
 }
 
+function pick(record: JsonRecord, ...keys: string[]): unknown {
+	for (const key of keys) {
+		if (key in record) {
+			return record[key];
+		}
+	}
+	return undefined;
+}
+
 function asString(value: unknown, fallback = ""): string {
 	return typeof value === "string" ? value : fallback;
 }
@@ -63,32 +72,36 @@ function normalizeDeveloperDNA(
 	}
 
 	return {
-		archetype: asString(record.archetype, fallback.archetype),
-		description: asString(record.description, fallback.description),
-		defining_traits: asStringArray(record.defining_traits),
+		archetype: asString(pick(record, "archetype"), fallback.archetype),
+		description: asString(pick(record, "description"), fallback.description),
+		defining_traits: asStringArray(
+			pick(record, "defining_traits", "definingTraits"),
+		),
 	};
 }
 
 function normalizeHiddenStrength(value: JsonRecord): HiddenStrength {
 	return {
-		observation: asString(value.observation),
-		evidence: asString(value.evidence),
-		why_it_matters: asString(value.why_it_matters),
+		observation: asString(pick(value, "observation")),
+		evidence: asString(pick(value, "evidence")),
+		why_it_matters: asString(
+			pick(value, "why_it_matters", "whyItMatters"),
+		),
 	};
 }
 
 function normalizeGrowthArea(value: JsonRecord): GrowthArea {
 	return {
-		area: asString(value.area),
-		observation: asString(value.observation),
-		suggestion: asString(value.suggestion),
+		area: asString(pick(value, "area")),
+		observation: asString(pick(value, "observation")),
+		suggestion: asString(pick(value, "suggestion")),
 	};
 }
 
 function normalizeTalkingPoint(value: JsonRecord): TalkingPoint {
 	return {
-		topic: asString(value.topic),
-		story: asString(value.story),
+		topic: asString(pick(value, "topic")),
+		story: asString(pick(value, "story")),
 	};
 }
 
@@ -102,14 +115,17 @@ function normalizeCommitStats(
 	}
 
 	return {
-		total: asNumber(record.total, fallback.total),
-		avg_per_week: asNumber(record.avg_per_week, fallback.avg_per_week),
+		total: asNumber(pick(record, "total"), fallback.total),
+		avg_per_week: asNumber(
+			pick(record, "avg_per_week", "avgPerWeek"),
+			fallback.avg_per_week,
+		),
 		most_active_period: asString(
-			record.most_active_period,
+			pick(record, "most_active_period", "mostActivePeriod"),
 			fallback.most_active_period,
 		),
 		conventional_commits_pct: asNumber(
-			record.conventional_commits_pct,
+			pick(record, "conventional_commits_pct", "conventionalCommitsPct"),
 			fallback.conventional_commits_pct,
 		),
 	};
@@ -117,9 +133,9 @@ function normalizeCommitStats(
 
 function normalizeLanguageStat(value: JsonRecord): LanguageStat {
 	return {
-		name: asString(value.name),
-		file_count: asNumber(value.file_count),
-		projects: asStringArray(value.projects),
+		name: asString(pick(value, "name")),
+		file_count: asNumber(pick(value, "file_count", "fileCount")),
+		projects: asStringArray(pick(value, "projects")),
 	};
 }
 
@@ -133,9 +149,18 @@ function normalizeCollaborationStats(
 	}
 
 	return {
-		branch_count: asNumber(record.branch_count, fallback.branch_count),
-		merge_frequency: asString(record.merge_frequency, fallback.merge_frequency),
-		workflow_style: asString(record.workflow_style, fallback.workflow_style),
+		branch_count: asNumber(
+			pick(record, "branch_count", "branchCount"),
+			fallback.branch_count,
+		),
+		merge_frequency: asString(
+			pick(record, "merge_frequency", "mergeFrequency"),
+			fallback.merge_frequency,
+		),
+		workflow_style: asString(
+			pick(record, "workflow_style", "workflowStyle"),
+			fallback.workflow_style,
+		),
 	};
 }
 
@@ -149,9 +174,16 @@ function normalizeComplexityStats(
 	}
 
 	return {
-		frameworks_used: asNumber(record.frameworks_used, fallback.frameworks_used),
-		project_types: asStringArray(record.project_types),
-		distinct_tools: asStringArray(record.distinct_tools),
+		frameworks_used: asNumber(
+			pick(record, "frameworks_used", "frameworksUsed"),
+			fallback.frameworks_used,
+		),
+		project_types: asStringArray(
+			pick(record, "project_types", "projectTypes"),
+		),
+		distinct_tools: asStringArray(
+			pick(record, "distinct_tools", "distinctTools"),
+		),
 	};
 }
 
@@ -162,14 +194,17 @@ function normalizeImpact(value: unknown, fallback: Impact): Impact {
 	}
 
 	return {
-		commits: normalizeCommitStats(record.commits, fallback.commits),
-		languages: normalizeArray(record.languages, normalizeLanguageStat),
+		commits: normalizeCommitStats(pick(record, "commits"), fallback.commits),
+		languages: normalizeArray(
+			pick(record, "languages"),
+			normalizeLanguageStat,
+		),
 		collaboration: normalizeCollaborationStats(
-			record.collaboration,
+			pick(record, "collaboration"),
 			fallback.collaboration,
 		),
 		complexity: normalizeComplexityStats(
-			record.complexity,
+			pick(record, "complexity"),
 			fallback.complexity,
 		),
 	};
@@ -179,18 +214,23 @@ function normalizeProjectSkillEvidence(
 	value: JsonRecord,
 ): ProjectSkillEvidence {
 	return {
-		skill: asString(value.skill),
-		evidence: asString(value.evidence),
+		skill: asString(pick(value, "skill")),
+		evidence: asString(pick(value, "evidence")),
 	};
 }
 
 function normalizeProjectCard(value: JsonRecord): ProjectCard {
 	return {
-		name: asString(value.name),
-		what_it_says_about_you: asString(value.what_it_says_about_you),
-		skills: normalizeArray(value.skills, normalizeProjectSkillEvidence),
-		standout: asString(value.standout),
-		next_level: asStringArray(value.next_level),
+		name: asString(pick(value, "name")),
+		what_it_says_about_you: asString(
+			pick(value, "what_it_says_about_you", "whatItSaysAboutYou"),
+		),
+		skills: normalizeArray(
+			pick(value, "skills"),
+			normalizeProjectSkillEvidence,
+		),
+		standout: asString(pick(value, "standout")),
+		next_level: asStringArray(pick(value, "next_level", "nextLevel")),
 	};
 }
 
@@ -238,21 +278,27 @@ export function normalizeDeveloperProfile(
 	}
 
 	return {
-		resume_markdown: asString(record.resume_markdown, fallback.resume_markdown),
+		resume_markdown: asString(
+			pick(record, "resume_markdown", "resumeMarkdown"),
+			fallback.resume_markdown,
+		),
 		developer_dna: normalizeDeveloperDNA(
-			record.developer_dna,
+			pick(record, "developer_dna", "developerDNA"),
 			fallback.developer_dna,
 		),
 		hidden_strengths: normalizeArray(
-			record.hidden_strengths,
+			pick(record, "hidden_strengths", "hiddenStrengths"),
 			normalizeHiddenStrength,
 		),
-		growth_areas: normalizeArray(record.growth_areas, normalizeGrowthArea),
+		growth_areas: normalizeArray(
+			pick(record, "growth_areas", "growthAreas"),
+			normalizeGrowthArea,
+		),
 		talking_points: normalizeArray(
-			record.talking_points,
+			pick(record, "talking_points", "talkingPoints"),
 			normalizeTalkingPoint,
 		),
-		impact: normalizeImpact(record.impact, fallback.impact),
-		projects: normalizeArray(record.projects, normalizeProjectCard),
+		impact: normalizeImpact(pick(record, "impact"), fallback.impact),
+		projects: normalizeArray(pick(record, "projects"), normalizeProjectCard),
 	};
 }
