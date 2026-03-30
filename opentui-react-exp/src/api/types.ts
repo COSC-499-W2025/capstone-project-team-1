@@ -4,12 +4,6 @@ export type ConsentLevel =
 	| "local-llm"
 	| "cloud";
 
-// Legacy generation responses may still use pre-PR1a consent labels.
-export type AnalysisConsentLevel =
-	| ConsentLevel
-	| "no_llm"
-	| "full";
-
 export interface ConsentResponse {
 	consent_level: ConsentLevel;
 	accepted_at: string | null;
@@ -46,6 +40,11 @@ export interface DirectoriesResponse {
 	filename: string;
 	directories: string[];
 	cleanedfilespath: string[];
+}
+
+export interface ExtractLocalResponse {
+	zip_id: number;
+	extraction_path: string;
 }
 
 export interface ProjectTimelineItem {
@@ -122,7 +121,7 @@ export interface AnalysisResponse {
 	repos_analyzed: RepoAnalysisResult[];
 	rankings: RankingResult[];
 	summaries: SummaryResult[];
-	consent_level: AnalysisConsentLevel;
+	consent_level: ConsentLevel;
 	user_email: string;
 }
 
@@ -269,4 +268,128 @@ export interface PipelinePolishResponse {
 export interface PipelineCancelResponse {
 	ok: boolean;
 	status: PipelineJobStatus;
+}
+
+// ── Education & Awards types ──────────────────────────────────────
+
+export interface Education {
+	id: number;
+	portfolio_id: string;
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface EducationCreateRequest {
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+}
+
+export interface Award {
+	id: number;
+	portfolio_id: string;
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface AwardCreateRequest {
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
+}
+
+// ── Structured developer profile (cloud AI output) ──────────────
+
+export interface DeveloperDNA {
+	archetype: string;
+	description: string;
+	defining_traits: string[];
+}
+
+export interface HiddenStrength {
+	observation: string;
+	evidence: string;
+	why_it_matters: string;
+}
+
+export interface GrowthArea {
+	area: string;
+	observation: string;
+	suggestion: string;
+}
+
+export interface TalkingPoint {
+	topic: string;
+	story: string;
+}
+
+export interface CommitStats {
+	total: number;
+	avg_per_week: number;
+	most_active_period: string;
+	conventional_commits_pct: number;
+}
+
+export interface LanguageStat {
+	name: string;
+	file_count: number;
+	projects: string[];
+}
+
+export interface CollaborationStats {
+	branch_count: number;
+	merge_frequency: string;
+	workflow_style: string;
+}
+
+export interface ComplexityStats {
+	frameworks_used: number;
+	project_types: string[];
+	distinct_tools: string[];
+}
+
+export interface Impact {
+	commits: CommitStats;
+	languages: LanguageStat[];
+	collaboration: CollaborationStats;
+	complexity: ComplexityStats;
+}
+
+export interface ProjectSkillEvidence {
+	skill: string;
+	evidence: string;
+}
+
+export interface ProjectCard {
+	name: string;
+	what_it_says_about_you: string;
+	skills: ProjectSkillEvidence[];
+	standout: string;
+	next_level: string[];
+}
+
+export interface DeveloperProfile {
+	resume_markdown: string;
+	developer_dna: DeveloperDNA;
+	hidden_strengths: HiddenStrength[];
+	growth_areas: GrowthArea[];
+	talking_points: TalkingPoint[];
+	impact: Impact;
+	projects: ProjectCard[];
 }

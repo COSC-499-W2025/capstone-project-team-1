@@ -6,11 +6,11 @@ import { theme } from "../types";
 import { TopBar } from "./TopBar";
 
 interface ConsentScreenProps {
-	onContinue: () => void;
+	onContinue: (level?: ConsentLevel) => void;
 	onBack: () => void;
 }
 
-const OPTIONS: ConsentLevel[] = ["local", "local-llm", "cloud"];
+const OPTIONS: ConsentLevel[] = ["local-llm", "cloud"];
 
 // ── ConsentPanel ──────────────────────────────────────────────────────────────
 
@@ -59,6 +59,7 @@ function ConsentPanel({
 	return (
 		<box
 			flexGrow={1}
+			flexBasis={0}
 			flexDirection="column"
 			padding={2}
 			border
@@ -72,7 +73,7 @@ function ConsentPanel({
 				<span fg={titleColor}>
 					<strong>{title}</strong>
 				</span>
-				<span fg={theme.textDim}>  · {subtitle}</span>
+				<span fg={theme.textDim}> · {subtitle}</span>
 			</text>
 
 			<text>
@@ -107,48 +108,15 @@ function ConsentPanel({
 
 // ── Panel data ────────────────────────────────────────────────────────────────
 
-type PanelConfig = Omit<ConsentPanelProps, "selected">;
+type PanelConfig = Omit<ConsentPanelProps, "selected" | "onSelect">;
 
 const PANELS: PanelConfig[] = [
-	{
-		level: "local",
-		title: "Local Only",
-		subtitle: "pattern-based",
-		description: "Reads your repos using static rules. No AI model needed or involved.",
-		sections: [
-			{
-				heading: "What we read",
-				headingColor: theme.cyan,
-				items: [
-					{ text: "· File & folder names" },
-					{ text: "· Language detection" },
-					{ text: "· Commit count & dates" },
-					{ text: "· Framework fingerprints" },
-				],
-			},
-			{
-				heading: "Privacy",
-				headingColor: theme.gold,
-				items: [
-					{ text: "No model required." },
-					{ text: "Zero network calls." },
-					{ text: "Nothing ever leaves your machine.", color: theme.textDim },
-				],
-			},
-		],
-		ratings: [
-			{ text: " + Complete privacy", color: theme.success },
-			{ text: " + No setup required", color: theme.success },
-			{ text: " + Works instantly", color: theme.success },
-			{ text: " - No AI narratives", color: theme.warning },
-			{ text: " - Basic skill detection", color: theme.warning },
-		],
-	},
 	{
 		level: "local-llm",
 		title: "Local AI",
 		subtitle: "recommended",
-		description: "Static analysis plus a small model that runs entirely on your device.",
+		description:
+			"Static analysis plus a small model that runs entirely on your device.",
 		sections: [
 			{
 				heading: "What we read",
@@ -190,36 +158,43 @@ const PANELS: PanelConfig[] = [
 	},
 	{
 		level: "cloud",
-		title: "Cloud AI",
-		subtitle: "coming soon",
-		description: "Static analysis plus a cloud model. Best quality, no local storage needed.",
+		title: "Cloud Agent",
+		subtitle: "uses Copilot models",
+		description:
+			"Uses GitHub Copilot-backed models through the embedded agent flow. Best quality, no local model needed.",
 		sections: [
 			{
-				heading: "What gets sent",
+				heading: "What the cloud agent sees",
 				headingColor: theme.cyan,
 				items: [
-					{ text: "· File & technology names" },
-					{ text: "· Commit messages" },
-					{ text: "· Summaries & metrics" },
-					{ text: "Sent to an external AI service.", color: theme.textDim },
+					{ text: "· Your full project source code" },
+					{ text: "· Commit history & messages" },
+					{ text: "· README files & documentation" },
+					{
+						text: "Analyzed by the PI agent using your authenticated cloud model.",
+						color: theme.textDim,
+					},
 				],
 			},
 			{
 				heading: "Privacy",
 				headingColor: theme.gold,
 				items: [
-					{ text: "Metadata leaves your device." },
-					{ text: "Subject to provider's data policy." },
-					{ text: "Raw source code is never sent.", color: theme.textDim },
+					{ text: "Code is sent to your cloud model provider." },
+					{ text: "Subject to your provider's data policy." },
+					{
+						text: "Current OpenTUI flow signs in with GitHub Copilot.",
+						color: theme.textDim,
+					},
 				],
 			},
 		],
 		ratings: [
 			{ text: " + Best quality results", color: theme.success },
-			{ text: " + No local setup or storage", color: theme.success },
-			{ text: " ~ Not yet available", color: theme.warning },
+			{ text: " + No local model download", color: theme.success },
+			{ text: " + Uses authenticated cloud models", color: theme.success },
 			{ text: " - Requires network", color: theme.warning },
-			{ text: " - Data leaves device", color: theme.warning },
+			{ text: " - Code leaves your device", color: theme.warning },
 		],
 	},
 ];
@@ -231,40 +206,57 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 	const [saving, setSaving] = useState(false);
 
 	const handleConfirm = () => {
-		if (saving) return;
+		if (saving) {
+			return;
+		}
+
 		setSaving(true);
-		api.updateConsent(selected).then(() => {
-			onContinue();
-		}).catch(() => {
-			setSaving(false);
-		});
+		api
+			.updateConsent(selected)
+			.then(() => {
+				onContinue(selected);
+			})
+			.catch(() => {
+				setSaving(false);
+			});
 	};
 
 	useEffect(() => {
 		let ignore = false;
-		api.getConsent().then((resp) => {
-			if (!ignore && resp.consent_level !== "none") {
-				setSelected(resp.consent_level);
-			}
-		}).catch((err) => { console.error("Failed to load consent:", err); });
-		return () => { ignore = true; };
+
+		api
+			.getConsent()
+			.then((resp) => {
+				if (!ignore && resp.consent_level !== "none") {
+					setSelected(resp.consent_level);
+				}
+			})
+			.catch((err) => {
+				console.error("Failed to load consent:", err);
+			});
+
+		return () => {
+			ignore = true;
+		};
 	}, []);
 
 	useKeyboard((key) => {
-		if (saving) return;
+		if (saving) {
+			return;
+		}
 
-			if (key.name === "left") {
-				setSelected((prev) => {
-					const idx = OPTIONS.indexOf(prev);
-					return OPTIONS[Math.max(0, idx - 1)] ?? prev;
-				});
-			}
-			if (key.name === "right") {
-				setSelected((prev) => {
-					const idx = OPTIONS.indexOf(prev);
-					return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)] ?? prev;
-				});
-			}
+		if (key.name === "left") {
+			setSelected((prev) => {
+				const idx = OPTIONS.indexOf(prev);
+				return OPTIONS[Math.max(0, idx - 1)] ?? prev;
+			});
+		}
+		if (key.name === "right") {
+			setSelected((prev) => {
+				const idx = OPTIONS.indexOf(prev);
+				return OPTIONS[Math.min(OPTIONS.length - 1, idx + 1)] ?? prev;
+			});
+		}
 		if (key.name === "return") {
 			handleConfirm();
 		}
@@ -277,7 +269,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Consent"
-				description="Before we analyze your projects, please choose how you'd like your data to be processed. Each option below offers a different balance of privacy and quality. Your source code never leaves your machine regardless of which option you choose."
+				description="Before we analyze your projects, please choose how you'd like your data to be processed. Local AI keeps code entirely on-device; the cloud option sends code to your authenticated provider for analysis."
 			/>
 
 			<box

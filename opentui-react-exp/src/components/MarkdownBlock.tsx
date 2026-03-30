@@ -1,0 +1,149 @@
+import type React from "react";
+import { theme } from "../types";
+
+interface MdBlock {
+	type: "h1" | "h2" | "h3" | "hr" | "paragraph" | "bullet" | "blockquote" | "blank";
+	text: string;
+}
+
+export function parseMarkdown(raw: string): MdBlock[] {
+	const blocks: MdBlock[] = [];
+	for (const line of raw.split("\n")) {
+		if (line.startsWith("### ")) {
+			blocks.push({ type: "h3", text: line.slice(4) });
+		} else if (line.startsWith("## ")) {
+			blocks.push({ type: "h2", text: line.slice(3) });
+		} else if (line.startsWith("# ")) {
+			blocks.push({ type: "h1", text: line.slice(2) });
+		} else if (line.startsWith("- ") || line.startsWith("* ")) {
+			blocks.push({ type: "bullet", text: line.slice(2) });
+		} else if (line.startsWith("> ")) {
+			blocks.push({ type: "blockquote", text: line.slice(2) });
+		} else if (line.trim() === "---" || line.trim() === "___") {
+			blocks.push({ type: "hr", text: "" });
+		} else if (line.trim() === "") {
+			blocks.push({ type: "blank", text: "" });
+		} else {
+			blocks.push({ type: "paragraph", text: line });
+		}
+	}
+	return blocks;
+}
+
+export function InlineText({ text }: { text: string }) {
+	// biome-ignore lint/suspicious/noExplicitAny: JSX elements
+	const parts: any[] = [];
+	const pattern = /\*\*(.+?)\*\*|`(.+?)`/g;
+	let last = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = pattern.exec(text)) !== null) {
+		if (match.index > last) {
+			parts.push(
+				<span key={`t${last}`} fg={theme.textSecondary}>
+					{text.slice(last, match.index)}
+				</span>,
+			);
+		}
+		if (match[1] !== undefined) {
+			parts.push(
+				<span key={`b${match.index}`} fg={theme.textPrimary}>
+					<strong>{match[1]}</strong>
+				</span>,
+			);
+		} else if (match[2] !== undefined) {
+			parts.push(
+				<span key={`c${match.index}`} fg={theme.gold}>
+					{match[2]}
+				</span>,
+			);
+		}
+		last = match.index + match[0].length;
+	}
+	if (last < text.length) {
+		parts.push(
+			<span key={`t${last}`} fg={theme.textSecondary}>
+				{text.slice(last)}
+			</span>,
+		);
+	}
+
+	return <text>{parts}</text>;
+}
+
+export function MarkdownBlock({ content }: { content: string }) {
+	const blocks = parseMarkdown(content);
+	return (
+		<box flexDirection="column" gap={0}>
+			{blocks.map((block, i) => {
+				switch (block.type) {
+					case "h1":
+						return (
+							<box key={i} paddingBottom={1}>
+								<text>
+									<span fg={theme.gold}>
+										<strong>{block.text}</strong>
+									</span>
+								</text>
+							</box>
+						);
+					case "h2":
+						return (
+							<box key={i} paddingTop={1}>
+								<text>
+									<span fg={theme.cyan}>
+										<strong>{block.text}</strong>
+									</span>
+								</text>
+							</box>
+						);
+					case "h3":
+						return (
+							<box key={i} paddingTop={1}>
+								<text>
+									<span fg={theme.cyan}>{block.text}</span>
+								</text>
+							</box>
+						);
+					case "bullet":
+						return (
+							<box key={i} paddingLeft={2} flexDirection="row">
+								<text>
+									<span fg={theme.textDim}>{"• "}</span>
+								</text>
+								<InlineText text={block.text} />
+							</box>
+						);
+					case "blockquote":
+						return (
+							<box key={i} paddingLeft={2}>
+								<text>
+									<span fg={theme.textDim}>
+										<em>{block.text}</em>
+									</span>
+								</text>
+							</box>
+						);
+					case "hr":
+						return (
+							<box key={i} paddingTop={1} paddingBottom={1}>
+								<text>
+									<span fg={theme.goldDim}>
+										{"────────────────────────────────"}
+									</span>
+								</text>
+							</box>
+						);
+					case "blank":
+						return <box key={i} height={1} />;
+					case "paragraph":
+						return (
+							<box key={i}>
+								<InlineText text={block.text} />
+							</box>
+						);
+				}
+			})}
+		</box>
+	);
+}
