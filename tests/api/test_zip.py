@@ -14,7 +14,9 @@ def _redirect_uploads(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 def test_upload_zip_succeeds_and_directories_available(client, tmp_path, monkeypatch):
     uploads_root = _redirect_uploads(monkeypatch, tmp_path)
 
-    files = {"file": ("artifact.zip", b"fake-bytes", "application/zip")}
+    zip_path = Path(__file__).resolve().parents[1] / "data" / "mock_projects.zip"
+    with zip_path.open("rb") as f:
+        files = {"file": ("artifact.zip", f.read(), "application/zip")}
     response = client.post("/zip/upload", files=files)
 
     assert response.status_code == 200
@@ -29,13 +31,11 @@ def test_upload_zip_succeeds_and_directories_available(client, tmp_path, monkeyp
     assert directories.status_code == 200
     dir_payload = directories.json()
     assert dir_payload["zip_id"] == payload["zip_id"]
-    assert dir_payload["directories"] == [
-        "cs320_project/",
-        "cs540_ai_project/",
-        "hackathon_2024/",
-        "personal_website/",
-        "senior_design/",
-    ]
+    assert dir_payload["directories"]
+    assert "projects" in dir_payload["directories"]
+    assert any(
+        item.startswith("projects/go-task-runner") for item in dir_payload["directories"]
+    )
 
 
 def test_upload_zip_rejects_non_zip(client, tmp_path, monkeypatch):

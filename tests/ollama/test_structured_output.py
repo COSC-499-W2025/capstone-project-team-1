@@ -54,10 +54,13 @@ def _build_prompt() -> str:
 
 
 def _available_models() -> List[str]:
-    available = {m.model for m in ollama_list().models}
+    try:
+        available = {m.model for m in ollama_list().models}
+    except Exception as exc:
+        pytest.skip(f"Ollama unavailable: {exc}", allow_module_level=True)
     missing = [m for m in OLLAMA_MODELS if m not in available]
     if missing:
-        pytest.skip(f"Missing Ollama models: {', '.join(missing)}")
+        pytest.skip(f"Missing Ollama models: {', '.join(missing)}", allow_module_level=True)
     return list(OLLAMA_MODELS)
 
 

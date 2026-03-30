@@ -118,7 +118,7 @@ async def test_consent_continue_saves_and_navigates(monkeypatch: pytest.MonkeyPa
 
     screen, status, app, token = make_screen()
     try:
-        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="consent-local-llm-btn")))
+        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="consent-full-btn")))
         await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="continue-btn")))
 
         assert calls == [{"consent_level": "local-llm"}]

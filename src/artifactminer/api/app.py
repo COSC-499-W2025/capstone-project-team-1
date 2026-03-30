@@ -43,6 +43,7 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
 )
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     getUserRepoStats,
+    get_daily_commit_counts,
     saveUserRepoStats,
 )
 from .retrieval import router as retrieval_router
@@ -187,6 +188,7 @@ def create_app() -> FastAPI:
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
         repo_path: str,
+        user_email: str | None = None,
         db: Session = Depends(get_db),
     ):
         """
@@ -195,17 +197,19 @@ def create_app() -> FastAPI:
         Both saves are performed in a single transaction for atomicity.
         """
         try:
-            email_answer = (
-                db.query(UserAnswer)
-                .filter(UserAnswer.question_id == 1)
-                .order_by(UserAnswer.answered_at.desc())
-                .first()
-            )
+            if not user_email:
+                email_answer = (
+                    db.query(UserAnswer)
+                    .filter(UserAnswer.question_id == 1)
+                    .order_by(UserAnswer.answered_at.desc())
+                    .first()
+                )
 
-            user_email = email_answer.answer_text.strip() if email_answer else None
+                user_email = email_answer.answer_text.strip() if email_answer else None
 
             repo_stats = getRepoStats(repo_path)
             user_stats = getUserRepoStats(repo_path, user_email)
+            user_stats.daily_commits = get_daily_commit_counts(repo_path, user_email)
 
             # Save both within the same transaction
             saveRepoStats(repo_stats, db=db)

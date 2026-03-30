@@ -4,7 +4,7 @@ These endpoints serve data for the final portfolio/resume generation.
 All are GET-only with no side effects (write operations moved to resume.py).
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
@@ -14,6 +14,7 @@ from sqlalchemy import or_, func
 from collections import defaultdict
 
 from .schemas import (
+    ActivityHeatmapResponse,
     SkillChronologyItem,
     SkillResponse,
     ResumeItemResponse,
@@ -33,6 +34,31 @@ from ..db import (
 
 
 router = APIRouter(tags=["retrieval"])
+
+
+def _aggregate_daily_commits(
+    rows: list[dict[str, int] | None],
+) -> tuple[dict[str, int], int, int, date | None, date | None]:
+    """Aggregate daily commit maps from multiple UserRepoStat rows."""
+    aggregated: dict[str, int] = defaultdict(int)
+
+    for daily_commits in rows:
+        if not daily_commits:
+            continue
+        for day, count in daily_commits.items():
+            try:
+                aggregated[day] += int(count)
+            except (TypeError, ValueError):
+                continue
+
+    daily_activity = dict(sorted(aggregated.items()))
+    if not daily_activity:
+        return {}, 0, 0, None, None
+
+    start = date.fromisoformat(next(iter(daily_activity)))
+    end = date.fromisoformat(next(reversed(daily_activity)))
+    max_daily_commits = max(daily_activity.values()) if daily_activity else 0
+    return daily_activity, len(daily_activity), max_daily_commits, start, end
 
 
 @router.get("/skills", response_model=List[SkillResponse])
@@ -339,3 +365,28 @@ async def get_AI_summaries(
         )
         for s in summaries_query
     ]
+
+
+@router.get("/activity/heatmap", response_model=ActivityHeatmapResponse)
+async def get_activity_heatmap(
+    user_email: str = Query(
+        ...,
+        description=(
+            "User email for the portfolio heatmap view. The current schema stores "
+            "per-repo activity in UserRepoStat rows."
+        ),
+    ),
+    db: Session = Depends(get_db),
+    ) -> ActivityHeatmapResponse:
+    """Aggregate per-day commit counts across all stored user repo stats."""
+    _ = user_email
+    rows = [row.daily_commits for row in db.query(UserRepoStat).filter(UserRepoStat.daily_commits.isnot(None)).all()]
+    daily_activity, total_days_active, max_daily_commits, start, end = (
+        _aggregate_daily_commits(rows)
+    )
+    return ActivityHeatmapResponse(
+        daily_activity=daily_activity,
+        total_days_active=total_days_active,
+        max_daily_commits=max_daily_commits,
+        date_range={"start": start, "end": end},
+    )
