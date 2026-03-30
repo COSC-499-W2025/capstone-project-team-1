@@ -11,6 +11,7 @@ import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConsentScreen } from "./components/ConsentScreen";
 import { DraftPauseScreen } from "./components/DraftPauseScreen";
 import { FeedbackScreen } from "./components/FeedbackScreen";
+import { EducationAwardsScreen } from "./components/EducationAwardsScreen";
 import { FileUpload } from "./components/FileUpload";
 import { IdentityScreen } from "./components/IdentityScreen";
 import { Landing } from "./components/Landing";
@@ -29,6 +30,7 @@ const LOCAL_LLM_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "file-upload", label: "Upload" },
 	{ screen: "project-list", label: "Repos" },
 	{ screen: "identity", label: "Identity" },
+	{ screen: "education-awards", label: "Education/Awards" },
 	{ screen: "pipeline-launch", label: "Launch" },
 	{ screen: "analysis", label: "Analyze" },
 	{ screen: "resume-preview", label: "Resume" },
@@ -60,6 +62,8 @@ function screenHint(screen: Screen, consentLevel: ConsentLevel): string {
 			return "Pick the repositories to include in this run";
 		case "identity":
 			return "Choose the contributor identity that represents your work";
+		case "education-awards":
+			return "Add the education and awards details that cannot be inferred from your repos";
 		case "pipeline-launch":
 			return "Review your repo and identity selections before starting";
 		case "analysis":
@@ -127,6 +131,16 @@ function screenActions(screen: Screen, consentLevel: ConsentLevel): KeyAction[] 
 				{ key: "↑/↓", label: "Navigate" },
 				{ key: "Tab", label: "Manual" },
 				{ key: "Enter", label: "Confirm" },
+				{ key: "Esc", label: "Back" },
+			];
+		case "education-awards":
+			return [
+				{ key: "↑/↓", label: "Navigate" },
+				{ key: "←/→", label: "Switch" },
+				{ key: "N", label: "Add" },
+				{ key: "E", label: "Edit" },
+				{ key: "Del", label: "Remove" },
+				{ key: "Enter", label: "Continue" },
 				{ key: "Esc", label: "Back" },
 			];
 		case "pipeline-launch":
@@ -498,8 +512,16 @@ function App() {
 			case "identity":
 				return (
 					<IdentityScreen
-						onNext={() => setScreen("pipeline-launch")}
+						onNext={() => setScreen("education-awards")}
 						onBack={() => setScreen("project-list")}
+					/>
+				);
+			case "education-awards":
+				return (
+					<EducationAwardsScreen
+						onNext={(target) =>
+							setScreen(target === "analysis" ? "pipeline-launch" : (target as Screen))
+						}
 					/>
 				);
 			case "pipeline-launch":

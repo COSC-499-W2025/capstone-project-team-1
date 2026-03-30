@@ -270,6 +270,50 @@ export interface PipelineCancelResponse {
 	status: PipelineJobStatus;
 }
 
+// ── Education & Awards types ──────────────────────────────────────
+
+export interface Education {
+	id: number;
+	portfolio_id: string;
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface EducationCreateRequest {
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+}
+
+export interface Award {
+	id: number;
+	portfolio_id: string;
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface AwardCreateRequest {
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
+}
+
 // ── Structured developer profile (cloud AI output) ──────────────
 
 export interface DeveloperDNA {
