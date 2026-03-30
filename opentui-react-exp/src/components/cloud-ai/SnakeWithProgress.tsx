@@ -6,8 +6,10 @@
  * - Cloud mode: uploads zip, extracts, runs generateResume() streaming events
  * - Local mode: starts the local pipeline, polls for status, translates messages
  */
-import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { generateResume, type ResumeEvent } from "../../agent";
@@ -124,6 +126,7 @@ interface CloudModeProps {
 	zipPath: string;
 	modelId: string;
 	gitIdentity: GitIdentity | null;
+	selectedRepoPaths: string[];
 	onComplete: (profile: DeveloperProfile) => void;
 	onBack: () => void;
 }
@@ -271,17 +274,19 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 			}
 		};
 
+		let filteredDir: string | null = null;
+
 		(async () => {
 			try {
 				setFlowPhase("extracting");
 				pushActivity("system", "Reading archive...");
 				const archiveBuffer = await readFile(props.zipPath);
 				if (cancelled) return;
-				
+
 				const sizeMb = (archiveBuffer.length / (1024 * 1024)).toFixed(1);
 				pushActivity("system", `Archive loaded (${sizeMb} MB)`, "done");
 				pushActivity("system", "Uploading to server...");
-				
+
 				// Convert Buffer to Uint8Array for Blob compatibility
 				const zipFilename = basename(props.zipPath);
 				const uint8Array = new Uint8Array(archiveBuffer);
@@ -299,10 +304,36 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				if (cancelled) return;
 				pushActivity("system", "Found your projects!", "done");
 
+				// Hard isolation: create a temp directory with symlinks
+				// to only the user-selected repos so the agent cannot
+				// see unselected repositories.
+				let agentCwd = extraction_path;
+				const hasRootRepo = props.selectedRepoPaths.includes(".");
+				if (props.selectedRepoPaths.length > 0 && !hasRootRepo) {
+					pushActivity("system", "Preparing selected projects...");
+					filteredDir = mkdtempSync(join(tmpdir(), "am-cloud-"));
+					for (const relPath of props.selectedRepoPaths) {
+						const src = join(extraction_path, relPath);
+						const dest = join(filteredDir, relPath);
+						// Support nested rel_paths (e.g. "subdir/project")
+						const parentParts = relPath.split("/").slice(0, -1);
+						if (parentParts.length > 0) {
+							await mkdir(join(filteredDir, ...parentParts), { recursive: true });
+						}
+						await symlink(src, dest, "dir");
+					}
+					agentCwd = filteredDir;
+					pushActivity(
+						"system",
+						`Scoped to ${props.selectedRepoPaths.length} selected project${props.selectedRepoPaths.length === 1 ? "" : "s"}.`,
+						"done",
+					);
+				}
+
 				setFlowPhase("generating");
 				pushActivity("system", "Getting the AI started...");
 				const profile = await generateResume(
-					extraction_path,
+					agentCwd,
 					onEvent,
 					props.modelId,
 					props.gitIdentity ?? undefined,
@@ -326,14 +357,23 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 						: msg,
 					duration: 0,
 				});
+			} finally {
+				// Clean up the filtered symlink directory
+				if (filteredDir) {
+					rm(filteredDir, { recursive: true, force: true }).catch(() => {});
+				}
 			}
 		})();
 
 		return () => {
 			cancelled = true;
 			abortController.abort();
+			// Also clean up on unmount if still around
+			if (filteredDir) {
+				rm(filteredDir, { recursive: true, force: true }).catch(() => {});
+			}
 		};
-	}, [props.mode === "cloud" ? props.gitIdentity : null, props.mode === "cloud" ? props.modelId : null, props.mode === "cloud" ? props.zipPath : null, props.mode]);
+	}, [props.mode === "cloud" ? props.gitIdentity : null, props.mode === "cloud" ? props.modelId : null, props.mode === "cloud" ? props.zipPath : null, props.mode === "cloud" ? props.selectedRepoPaths : null, props.mode]);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// LOCAL MODE — start pipeline + poll for status
@@ -678,7 +718,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 										<strong>✓ Complete</strong>
 									</span>
 									<span fg={theme.textDim}>
-										{" "}— press Enter to view
+										{" - press Enter to view"}
 									</span>
 								</text>
 							) : (

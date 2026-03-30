@@ -27,6 +27,7 @@ export function BottomBar({
 	return (
 		<box
 			width="100%"
+			height={3}
 			flexDirection="row"
 			justifyContent="space-between"
 			alignItems="center"
@@ -35,8 +36,11 @@ export function BottomBar({
 			paddingTop={1}
 			paddingBottom={1}
 			backgroundColor={theme.bgDark}
+			overflow="hidden"
+			flexShrink={0}
 		>
-			<box flexDirection="row" alignItems="center">
+			{/* Breadcrumbs — bottom left */}
+			<box flexDirection="row" alignItems="center" flexShrink={1} overflow="hidden">
 				{breadcrumbs?.map((crumb, i) => {
 					const isCurrent = crumb.screen === currentScreen;
 					const canClick = crumb.visited && !isCurrent;
@@ -60,9 +64,9 @@ export function BottomBar({
 									</span>
 								</text>
 							</box>
-							{i < breadcrumbs.length - 1 ? (
+							{i < (breadcrumbs?.length ?? 0) - 1 ? (
 								<text>
-									<span fg={theme.textDim}>{" › "}</span>
+									<span fg={theme.textDim}>{" > "}</span>
 								</text>
 							) : null}
 						</box>
@@ -70,7 +74,8 @@ export function BottomBar({
 				})}
 			</box>
 
-			<box flexDirection="row" alignItems="center" gap={4}>
+			{/* Key actions — bottom right */}
+			<box flexDirection="row" alignItems="center" gap={4} flexShrink={0}>
 				{actions.map((action) => (
 					<box
 						key={`${action.key}-${action.label}`}
@@ -90,7 +95,7 @@ export function BottomBar({
 						<text>
 							<span fg={theme.gold}>
 								{forwardLabel}
-								{" ›"}
+								{" >"}
 							</span>
 						</text>
 					</box>

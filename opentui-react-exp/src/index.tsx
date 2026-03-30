@@ -395,6 +395,7 @@ function App() {
 						zipPath={filePath}
 						modelId={cloudModelId}
 						gitIdentity={cloudGitIdentity}
+						selectedRepoPaths={state.selectedRepoIds}
 						onComplete={(profile) => {
 							setCloudProfile(profile);
 							setScreen("cloud-resume");

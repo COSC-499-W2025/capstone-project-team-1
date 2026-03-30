@@ -22,6 +22,7 @@ function Harness() {
 				zipPath="/dev/null"
 				modelId="claude-haiku-4-5"
 				gitIdentity={null}
+				selectedRepoPaths={[]}
 				onComplete={(profile) => {
 					console.log("Profile ready:", profile.developer_dna.archetype);
 					process.exit(0);
