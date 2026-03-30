@@ -49,6 +49,7 @@ from ..RepositoryIntelligence.repo_intelligence_main import (
     isGitRepo,
 )
 from ..RepositoryIntelligence.repo_intelligence_user import (
+    get_daily_commit_counts,
     getUserRepoStats,
     saveUserRepoStats,
     collect_user_additions,
@@ -404,6 +405,7 @@ async def analyze_zip(
 
             try:
                 user_stats = getUserRepoStats(repo_path, user_email)
+                user_stats.daily_commits = get_daily_commit_counts(repo_path, user_email)
                 saveUserRepoStats(user_stats, db=db)
                 user_contribution_pct = user_stats.userStatspercentages
                 user_total_commits = user_stats.total_commits

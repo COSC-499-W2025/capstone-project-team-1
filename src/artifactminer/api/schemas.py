@@ -8,6 +8,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from artifactminer.generators import ExpertiseLevel
+
 
 # ---------------------------------------------------------------------------
 # Evidence types
@@ -310,6 +312,7 @@ class SkillChronologyItem(BaseModel):
     proficiency: float | None = Field(
         default=None, description="Proficiency level 0.0-1.0."
     )
+    level: ExpertiseLevel = Field(description="Mapped expertise level for proficiency.")
     category: str | None = Field(
         default=None, description="Skill category (e.g., 'Programming Languages')."
     )
@@ -323,9 +326,26 @@ class SkillResponse(BaseModel):
     id: int
     name: str
     category: str | None = None
+    level: ExpertiseLevel = Field(description="Mapped expertise level for the skill.")
     project_count: int | None = Field(
         default=None, description="Number of projects using this skill."
     )
+
+
+class ActivityHeatmapDateRange(BaseModel):
+    """Inclusive date range represented by a heatmap response."""
+
+    start_date: _dt.date
+    end_date: _dt.date
+
+
+class ActivityHeatmapResponse(BaseModel):
+    """Response shape for aggregated daily commit activity."""
+
+    daily_activity: dict[str, int] = Field(default_factory=dict)
+    total_days_active: int = 0
+    max_daily_commits: int = 0
+    date_range: ActivityHeatmapDateRange
 
 
 class ResumeItemEditRequest(BaseModel):
@@ -614,6 +634,27 @@ class PortfolioEditResponse(BaseModel):
         default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
     )
     preferences: RepresentationPreferences
+
+
+class GenerateArtifactRequest(BaseModel):
+    """Shared request payload for HTML artifact generation."""
+
+    portfolio_id: str = Field(
+        min_length=1,
+        description="Portfolio UUID returned by ZIP uploads.",
+    )
+
+
+class GeneratedArtifactResponse(BaseModel):
+    """Shared response payload for generated HTML artifacts."""
+
+    success: bool
+    artifact: Literal["portfolio", "resume"]
+    path: str = Field(description="Absolute path to the generated artifact.")
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    warnings: list[str] = Field(default_factory=list)
 
 
 class PortfolioGenerationRequest(BaseModel):

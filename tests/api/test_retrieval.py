@@ -2,14 +2,17 @@
 
 import pytest
 from datetime import datetime, timedelta, UTC
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
 
 from artifactminer.api.app import create_app
 from artifactminer.db import (
     Base,
+    Question,
+    UploadedZip,
+    UserAnswer,
     get_db,
     RepoStat,
     UserRepoStat,
@@ -45,29 +48,58 @@ def client_with_data():
     # Seed test data
     db = TestingSessionLocal()
     now = datetime.now(UTC).replace(tzinfo=None)
+    today = datetime.now(UTC).date()
+    day_3 = (today - timedelta(days=3)).isoformat()
+    day_2 = (today - timedelta(days=2)).isoformat()
+    day_1 = (today - timedelta(days=1)).isoformat()
+
+    db.add(Question(id=1, key="email", question_text="Email?", order=1, required=True))
+    db.add(
+        UserAnswer(
+            question_id=1,
+            answer_text="stavan@example.com",
+            answered_at=now,
+        )
+    )
 
     # Projects: Old (2020) -> Middle (2021) -> New (2023)
     repos = [
         RepoStat(
             id=1,
             project_name="OldProject",
-            project_path="/repo1",
+            project_path="/extracted/10/repo1",
             first_commit=datetime(2020, 1, 15),
             last_commit=datetime(2020, 6, 20),
         ),
         RepoStat(
             id=2,
             project_name="NewProject",
-            project_path="/repo2",
+            project_path="/extracted/11/repo2",
             first_commit=datetime(2023, 3, 1),
             last_commit=now - timedelta(days=5),
         ),
         RepoStat(
             id=3,
             project_name="MiddleProject",
-            project_path="/repo3",
+            project_path="/outside/repo3",
             first_commit=datetime(2021, 6, 1),
             last_commit=datetime(2022, 12, 15),
+        ),
+    ]
+    uploaded_zips = [
+        UploadedZip(
+            id=10,
+            filename="portfolio-a.zip",
+            path="/uploads/portfolio-a.zip",
+            portfolio_id="portfolio-123",
+            extraction_path="/extracted/10",
+        ),
+        UploadedZip(
+            id=11,
+            filename="portfolio-b.zip",
+            path="/uploads/portfolio-b.zip",
+            portfolio_id="portfolio-123",
+            extraction_path="/extracted/11",
         ),
     ]
     skills = [
@@ -112,19 +144,19 @@ def client_with_data():
     ]
     summaries = [
         UserAIntelligenceSummary(
-            repo_path="/repo1",
+            repo_path="/extracted/10/repo1",
             user_email="stavan@example.com",
             summary_text="Python skills",
             generated_at=now - timedelta(days=10),
         ),
         UserAIntelligenceSummary(
-            repo_path="/repo2",
+            repo_path="/extracted/11/repo2",
             user_email="stavan@example.com",
             summary_text="FastAPI experience",
             generated_at=now - timedelta(days=5),
         ),
         UserAIntelligenceSummary(
-            repo_path="/repo3",
+            repo_path="/outside/repo3",
             user_email="other@example.com",
             summary_text="React dev",
             generated_at=now,
@@ -133,17 +165,26 @@ def client_with_data():
     user_repo_stats = [
         UserRepoStat(
             project_name="OldProject",
-            project_path="/repo1",
+            project_path="/extracted/10/repo1",
             user_role="Contributor",
+            daily_commits={day_3: 1, day_2: 2},
         ),
         UserRepoStat(
             project_name="NewProject",
-            project_path="/repo2",
+            project_path="/extracted/11/repo2",
             user_role="Lead Developer",
+            daily_commits={day_2: 3, day_1: 4},
+        ),
+        UserRepoStat(
+            project_name="MiddleProject",
+            project_path="/outside/repo3",
+            user_role="Contributor",
+            daily_commits={day_1: 10},
         ),
     ]
     db.add_all(
-        repos
+        uploaded_zips
+        + repos
         + skills
         + project_skills
         + user_project_skills
@@ -178,6 +219,14 @@ def client_empty():
 
     app = create_app()
     app.dependency_overrides[get_db] = override_get_db
+
+    db = TestingSessionLocal()
+    now = datetime.now(UTC).replace(tzinfo=None)
+    db.add(Question(id=1, key="email", question_text="Email?", order=1, required=True))
+    db.add(UserAnswer(question_id=1, answer_text="empty@example.com", answered_at=now))
+    db.commit()
+    db.close()
+
     yield TestClient(app)
     app.dependency_overrides.clear()
 
@@ -197,10 +246,12 @@ def test_skills_chronology_returns_ordered_list(client_with_data):
     assert data[0]["project"] == "OldProject"
     assert data[0]["skill"] == "Python"
     assert data[0]["proficiency"] == 0.7
+    assert data[0]["level"] == "Advanced"
     assert data[0]["category"] == "Programming Languages"
     # Required fields present
     assert all(
-        k in data[0] for k in ["date", "skill", "project", "proficiency", "category"]
+        k in data[0]
+        for k in ["date", "skill", "project", "proficiency", "level", "category"]
     )
 
 
@@ -326,7 +377,7 @@ def test_AI_summaries_filters_by_email_and_repo(client_with_data):
     """Returns only summaries matching user_email and repo_path prefix."""
     resp = client_with_data.get("/AI_summaries", params={
         "user_email": "stavan@example.com",
-        "repo_path": "/repo"
+        "repo_path": "/extracted"
     })
     assert resp.status_code == 200
     data = resp.json()
@@ -334,8 +385,8 @@ def test_AI_summaries_filters_by_email_and_repo(client_with_data):
     # Only summaries for stavan@example.com
     assert all(s["user_email"] == "stavan@example.com" for s in data)
 
-    # Only repos starting with "/repo"
-    assert all(s["repo_path"].startswith("/repo") for s in data)
+    # Only repos starting with "/extracted"
+    assert all(s["repo_path"].startswith("/extracted") for s in data)
 
     # Required fields present
     for s in data:
@@ -350,7 +401,7 @@ def test_AI_summaries_other_user(client_with_data):
     """Returns correct summaries for a different user."""
     resp = client_with_data.get("/AI_summaries", params={
         "user_email": "other@example.com",
-        "repo_path": "/repo"
+        "repo_path": "/outside"
     })
     assert resp.status_code == 200
     data = resp.json()
@@ -394,6 +445,20 @@ def test_skills_returns_correct_fields(client_with_data):
         assert "id" in skill
         assert "name" in skill
         assert "category" in skill
+        assert "level" in skill
+
+
+def test_skills_returns_aggregated_level(client_with_data):
+    """GET /skills maps the max proficiency for each skill to an expertise level."""
+    resp = client_with_data.get("/skills")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    python_skill = next(skill for skill in data if skill["name"] == "Python")
+    fastapi_skill = next(skill for skill in data if skill["name"] == "FastAPI")
+
+    assert python_skill["level"] == "Expert"
+    assert fastapi_skill["level"] == "Expert"
 
 
 def test_skills_filter_by_category(client_with_data):
@@ -448,3 +513,44 @@ def test_skills_project_count_no_double_counting(client_with_data):
     python_data = next(s for s in data if s["name"] == "Python")
     # Should be 2 (not 3), because repo 1 appears in both tables but is deduplicated
     assert python_data["project_count"] == 2
+
+
+def test_activity_heatmap_aggregates_selected_portfolio_repos(client_with_data):
+    """GET /activity/heatmap scopes aggregation to repos inside the selected portfolio."""
+    resp = client_with_data.get("/activity/heatmap?portfolio_id=portfolio-123")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    today = datetime.now(UTC).date()
+    day_3 = (today - timedelta(days=3)).isoformat()
+    day_2 = (today - timedelta(days=2)).isoformat()
+    day_1 = (today - timedelta(days=1)).isoformat()
+
+    assert data["daily_activity"] == {
+        day_3: 1,
+        day_2: 5,
+        day_1: 4,
+    }
+    assert data["total_days_active"] == 3
+    assert data["max_daily_commits"] == 5
+    assert data["date_range"]["end_date"] == today.isoformat()
+    assert data["date_range"]["start_date"] == (
+        today - timedelta(days=363)
+    ).isoformat()
+
+
+def test_activity_heatmap_returns_graceful_empty_state(client_empty):
+    """GET /activity/heatmap returns an empty payload when no commit data exists."""
+    resp = client_empty.get("/activity/heatmap")
+    assert resp.status_code == 200
+
+    data = resp.json()
+    today = datetime.now(UTC).date()
+
+    assert data["daily_activity"] == {}
+    assert data["total_days_active"] == 0
+    assert data["max_daily_commits"] == 0
+    assert data["date_range"]["end_date"] == today.isoformat()
+    assert data["date_range"]["start_date"] == (
+        today - timedelta(days=363)
+    ).isoformat()

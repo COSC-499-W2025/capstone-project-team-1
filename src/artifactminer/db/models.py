@@ -89,6 +89,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)
+    daily_commits = Column(JSON, nullable=True)
     userStatspercentages = Column(
         Float, nullable=True
     )  # Percentage of user's contributions compared to total repo activity
