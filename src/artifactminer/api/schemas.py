@@ -601,6 +601,27 @@ class PortfolioEditResponse(BaseModel):
     preferences: RepresentationPreferences
 
 
+class GenerateArtifactRequest(BaseModel):
+    """Shared request payload for HTML artifact generation."""
+
+    portfolio_id: str = Field(
+        min_length=1,
+        description="Portfolio UUID returned by ZIP uploads.",
+    )
+
+
+class GeneratedArtifactResponse(BaseModel):
+    """Shared response payload for generated HTML artifacts."""
+
+    success: bool
+    artifact: Literal["portfolio", "resume"]
+    path: str = Field(description="Absolute path to the generated artifact.")
+    generated_at: datetime = Field(
+        default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    warnings: list[str] = Field(default_factory=list)
+
+
 class PortfolioGenerationRequest(BaseModel):
     """Request payload for on-demand portfolio assembly."""
 

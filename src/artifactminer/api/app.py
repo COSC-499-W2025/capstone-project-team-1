@@ -28,6 +28,7 @@ from ..db import (
 )
 from .consent import router as consent_router
 from .zip import router as zip_router
+from .generate import router as generate_router
 from .openai import router as openai_router
 from .projects import router as projects_router
 from .analyze import router as analyze_router
@@ -234,6 +235,7 @@ def create_app() -> FastAPI:
     app.include_router(consent_router)
     app.include_router(zip_router)
     app.include_router(projects_router)
+    app.include_router(generate_router)
     app.include_router(openai_router)
     app.include_router(retrieval_router)
     app.include_router(portfolio_router)
