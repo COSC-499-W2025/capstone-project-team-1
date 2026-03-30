@@ -102,4 +102,28 @@ export const api = {
 
 	extractLocal: (zipId: number): Promise<ExtractLocalResponse> =>
 		client.post("/zip/extract-local", { zip_id: zipId }),
+
+	// Education endpoints
+	listEducation: (portfolioId: string): Promise<any[]> =>
+		client.get(withQuery("/education", { portfolio_id: portfolioId })),
+	getEducation: (id: number): Promise<any> =>
+		client.get(`/education/${id}`),
+	createEducation: (portfolioId: string, data: any): Promise<any> =>
+		client.post(withQuery("/education", { portfolio_id: portfolioId }), data),
+	updateEducation: (id: number, data: any): Promise<any> =>
+		client.put(`/education/${id}`, data),
+	deleteEducation: (id: number): Promise<DeleteResponse> =>
+		client.delete(`/education/${id}`),
+
+	// Award endpoints
+	listAwards: (portfolioId: string): Promise<any[]> =>
+		client.get(withQuery("/education/awards", { portfolio_id: portfolioId })),
+	getAward: (id: number): Promise<any> =>
+		client.get(`/education/awards/${id}`),
+	createAward: (portfolioId: string, data: any): Promise<any> =>
+		client.post(withQuery("/education/awards", { portfolio_id: portfolioId }), data),
+	updateAward: (id: number, data: any): Promise<any> =>
+		client.put(`/education/awards/${id}`, data),
+	deleteAward: (id: number): Promise<DeleteResponse> =>
+		client.delete(`/education/awards/${id}`),
 };

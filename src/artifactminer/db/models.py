@@ -288,3 +288,48 @@ class RepresentationPrefs(Base):
         default=lambda: datetime.now(UTC).replace(tzinfo=None),
         onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
+
+
+class Education(Base):
+    """Stores education entries for portfolio."""
+
+    __tablename__ = "education"
+
+    id = Column(Integer, primary_key=True, index=True)
+    portfolio_id = Column(String, nullable=False, index=True)
+    institution = Column(String, nullable=False)
+    degree = Column(String, nullable=False)
+    field_of_study = Column(String, nullable=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    gpa = Column(String, nullable=True)
+    honors = Column(String, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
+
+
+class Award(Base):
+    """Stores award entries for portfolio."""
+
+    __tablename__ = "awards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    portfolio_id = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    issuer = Column(String, nullable=False)
+    date = Column(Date, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
