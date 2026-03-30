@@ -194,6 +194,7 @@ describe("EducationAwardsScreen", () => {
 			await flushEffects(view);
 
 			await pressKey(view, { name: "n" });
+			await flushEffects(view);
 			expect(view.captureCharFrame()).toContain("Add Education");
 
 			await typeText(view, "UVic");
@@ -234,6 +235,7 @@ describe("EducationAwardsScreen", () => {
 			await flushEffects(view);
 
 			await pressKey(view, { name: "n" });
+			await flushEffects(view);
 			expect(view.captureCharFrame()).toContain("Add Education");
 
 			await pressKey(view, { name: "escape" });
