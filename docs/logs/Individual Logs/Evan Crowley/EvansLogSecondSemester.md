@@ -311,3 +311,64 @@ My plan is to continue the work of transferring work from the experimental branc
 
 
 
+
+
+# Evan Crowley
+## Week March 16 - 22
+
+## Monday
+Peer testing today. We got a lot of feedback on the UI, and a lot of people mentioned being able to use the mouse.
+
+## Friday
+Determined what we needed to get done and continue finishing up and polishing for the last milestone and end of the project.
+
+## Saturday
+Worked on a PR and got a few PR reviews done. I wanted to continue working on a new PR but ended up waiting on a dependency.
+
+## Sunday
+Did more PR reviews, worked on a PR in order to get it done for this week. I wanted to get more done but had to wait for some dependency. 
+
+## My Prs:
+#502 - 443-Add-Generation-Cancel-Endpoint
+
+## My Pr Reviews:
+#499 - mouse-first TUI with Miller columns file browser and toast notifications
+
+
+# Week March 23 - 29
+
+![Tasks_I_Did](Tasks%20March23-29.png)
+
+## Monday
+Had Milestone 3 presentations. Overall the reception from the other groups seemed good, and it looked like we were on track to finish everything on time.
+
+## Tuesday
+Did a PR review and went over some teammates' work. Continued focusing on getting things ready to be handed in for the 29th.
+
+## Wednesday
+Made more PR reviews, and continued my work on addressing issues. Started work on issue 444.
+
+## Thursday
+Continuing my work on issue 444 made some progress.
+
+## Saturday
+Made necessary changes to the issue 44 branch in order to have it merged to development. Addressed the smaller issue 445 so that 446 was ready to go.
+
+## My Prs:
+#522 - 444 normalize local llm http error contracts
+#524 - 445 add local llm route coverage and api surface verification
+#529 - 509 proficiency to expertise level mapping utility
+
+## My Pr Reviews:
+
+#528 - Local LLM Pipeline is all done now
+#519 - add cloud generation flow and progress experience
+#518 - add cloud auth, model selection, and consent flow
+#517 - add PI agent backend foundation and contracts
+
+## Team Dynamic:
+We did good this week and supported each other for the peer review. Overall I think that the rest of the project went smoothly.
+
+## Plan:
+I plan to continue finishing up and polishing the project. I plan to simply review other groups' projects this week.
+
