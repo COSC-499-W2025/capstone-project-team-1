@@ -362,12 +362,12 @@ export function EducationAwardsScreen({ onNext }: EducationAwardsScreenProps) {
 		}
 
 		if (key.name === "return") {
-			onNext("resume-preview");
+			onNext("analysis");
 			return;
 		}
 
 		if (key.name === "escape") {
-			onNext("analysis");
+			onNext("identity");
 		}
 	});
 
