@@ -24,6 +24,7 @@ from artifactminer.db import (
     UserRepoStat,
 )
 
+OUTPUT_PATH = Path.home() / ".artifactminer" / "output" / "portfolio.html"
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 ACTIVITY_BUCKETS = ("code", "test", "docs", "config", "other")
 
@@ -43,7 +44,7 @@ def _json_default(value: Any) -> Any:
 
 
 def _output_path() -> Path:
-    return Path.home() / ".artifactminer" / "output" / "portfolio.html"
+    return OUTPUT_PATH
 
 
 def _warn(warnings: list[str], message: str) -> None:
