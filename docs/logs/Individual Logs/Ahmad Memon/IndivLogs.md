@@ -1,5 +1,6 @@
 # Week Navigation
 
+- [Term 2 Week 11-12 (Mar 16 - Mar 29)](#logs---term-2-week-11-12)
 - [Term 2 Week 10 (Mar 9 - Mar 15)](#logs---term-2-week-10)
 - [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
 - [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
@@ -19,6 +20,88 @@
 - [Term 1 Week 4 (Sep 15 - Sep 21)](Log-9-21-25.md)
 
 ---
+
+# logs - Term 2 Week 11-12
+
+## Connection to Previous Week
+
+Last week I focused on finishing the IdentityScreen work and keeping the OpenTUI migration moving. Over this cumulative two-week period I pushed the migration further by wiring the live analysis flow, building the draft-review and preview experience, polishing the UI, and starting the shared HTML resume-generation foundation for milestone 3 while also helping with planning, prioritization, and team coordination.
+
+---
+
+## Coding Tasks
+
+* Implemented real pipeline polling for the OpenTUI analysis flow in [PR #503](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/503), replacing mock progress with live status polling, terminal-state routing, and cancel handling.
+
+* Built the OpenTUI `DraftPauseScreen` in [PR #504](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/504), including paused draft review, keyboard navigation, inline feedback controls, and pipeline cancel/submit behavior.
+
+* Reworked `ResumePreview` for pipeline-based output in [PR #505](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/505) and the follow-up reapply [PR #516](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/516), adding draft/final/diff preview modes, section navigation, and save/polish/restart actions.
+
+* Continued the OpenTUI navigation integration work in [PR #523](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523), wiring the consent, project-list, identity, pipeline-launch, draft-pause, and feedback flow together on top of current `development`.
+
+* Ported UI polish and formatting updates in [PR #521](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/521), refreshing `Landing`, `TopBar`, `BottomBar`, and `ConsentScreen` behavior and presentation.
+
+* Started the milestone 3 HTML resume-generation foundation in [PR #536](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/536) by adding the shared generator package, API router surface, schemas, and initial test coverage for the new generation flow.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added analysis-screen tests covering live polling, `draft_ready` / `complete` routing, and Escape-driven cancellation in [PR #503](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/503).
+
+* Added `DraftPauseScreen` coverage for layout, section navigation, and cancel behavior in [PR #504](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/504).
+
+* Added and updated `ResumePreview` tests while debugging flush timing and state issues during the pipeline-output rewrite in [PR #505](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/505).
+
+* Fixed merge-related frontend issues after syncing with `development`, including `CopilotLogin` text-prop fallout, test timing issues, and lockfile / compile cleanup needed to keep the migration branches usable.
+
+* Added targeted coverage for migrated UI behavior in [PR #521](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/521) and a focused proficiency-mapping test for the new generator foundation in [PR #536](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/536).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Participated in sprint planning, task prioritization, and team meetings for the OpenTUI migration and milestone 3 HTML-generation work, helping break larger goals into reviewable slices and assign follow-up work.
+
+* Reviewed active frontend / local-LLM migration work and coordinated merge sequencing so the OpenTUI branches stayed compatible with adjacent backend changes.
+
+* Helped teammates unblock integration work by discussing review feedback, validating follow-up fixes, and sharing context on the newer pipeline-state flow.
+
+* Worked on design-facing polish for the updated OpenTUI screens and helped prepare demo-ready flows / walkthrough material for the sprint work.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this period.
+
+* Main challenge was branch churn across stacked OpenTUI PRs, including merge conflicts, repeated development syncs, and the accidental `ResumePreview` merge/revert cycle; these were handled with follow-up fixes and rebases.
+
+---
+
+## Plan for Next Week
+
+* Finish the remaining HTML resume-generation pieces on top of the new shared foundation.
+
+* Continue closing out OpenTUI integration and frontend cleanup work.
+
+* Support final review, documentation, and submission follow-up tasks.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Analysis polling flow | Done | [PR #503](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/503) |
+| `DraftPauseScreen` implementation | Done | [PR #504](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/504) |
+| `ResumePreview` pipeline rewrite | Done | [PR #505](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/505) and [PR #516](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/516) |
+| OpenTUI navigation integration | Done | [PR #523](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523) branch work completed this period |
+| OpenTUI polish / formatting updates | Done | [PR #521](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/521) |
+| HTML resume-generation foundation | Done | [PR #536](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/536) |
+| Sprint planning / prioritization / meetings | Done | Included planning, assigning follow-up work, and coordination |
+| Review and integration support | Done | Helped teammates through rebases, review follow-up, and merge sequencing |
+
+---
+![Personal Logs Week 11-12](Personal_logs-03-29-26.png)
 
 # logs - Term 2 Week 10
 
