@@ -57,7 +57,9 @@ class ResumeProjectModel(BaseModel):
 
         payload = dict(value)
         period = payload.get("period")
-        if not isinstance(period, dict):
+        if isinstance(period, ResumeProjectPeriod):
+            period = period.model_dump()
+        elif not isinstance(period, dict):
             period = {}
         else:
             period = dict(period)
