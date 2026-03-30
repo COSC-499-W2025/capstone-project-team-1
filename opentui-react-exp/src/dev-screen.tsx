@@ -18,6 +18,7 @@ function Harness() {
 	return (
 		<box flexGrow={1} flexDirection="column">
 			<SnakeWithProgress
+				mode="cloud"
 				zipPath="/dev/null"
 				modelId="claude-haiku-4-5"
 				gitIdentity={null}
