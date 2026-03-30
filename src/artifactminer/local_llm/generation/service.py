@@ -218,6 +218,21 @@ def _normalize_output(
     return output
 
 
+def _repair_json(text: str) -> str:
+    """Fix common small-LLM JSON mistakes."""
+    import re
+    # Remove trailing commas before } or ]
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+    # Fix missing commas between "value" "key" patterns
+    text = re.sub(r'"\s*\n\s*"', '",\n"', text)
+    # Fix missing commas between ] "key" or } "key"
+    text = re.sub(r'(\])\s*\n\s*"', r'],\n"', text)
+    text = re.sub(r'(\})\s*\n\s*"', r'},\n"', text)
+    # Fix missing commas between value and "key" on same line
+    text = re.sub(r'(\d)\s+"', r'\1, "', text)
+    return text
+
+
 def _extract_json(text: str) -> dict:
     """Best-effort JSON extraction from LLM text that may include reasoning."""
     text = text.strip()
@@ -231,7 +246,14 @@ def _extract_json(text: str) -> dict:
     end = text.rfind("}")
     if start != -1 and end != -1 and end > start:
         text = text[start : end + 1]
-    return json_lib.loads(text)
+    # Try parsing as-is first
+    try:
+        return json_lib.loads(text)
+    except json_lib.JSONDecodeError:
+        pass
+    # Try repairing common mistakes
+    repaired = _repair_json(text)
+    return json_lib.loads(repaired)
 
 
 async def generate_project_facts(
@@ -245,12 +267,28 @@ async def generate_project_facts(
     snapshot = _build_snapshot(repo_path, user_email)
     if progress:
         progress(f"Compiling facts for {repo_path.name}")
-    raw = await query_text(
-        build_project_facts_prompt(snapshot),
-        model=model,
-        system=FACTS_SYSTEM,
-    )
-    parsed = _extract_json(raw)
+    max_attempts = 3
+    last_error: Exception | None = None
+    parsed: dict | None = None
+    for attempt in range(max_attempts):
+        raw = await query_text(
+            build_project_facts_prompt(snapshot),
+            model=model,
+            system=FACTS_SYSTEM,
+        )
+        try:
+            parsed = _extract_json(raw)
+            break
+        except (json_lib.JSONDecodeError, ValueError) as exc:
+            last_error = exc
+            if progress:
+                remaining = max_attempts - attempt - 1
+                if remaining > 0:
+                    progress(f"Retrying facts for {repo_path.name} ({remaining} attempts left)")
+                else:
+                    progress(f"Facts extraction failed for {repo_path.name}")
+    if parsed is None:
+        raise last_error  # type: ignore[misc]
     facts = ProjectFacts.model_validate(parsed)
     facts.project_name = str(snapshot["project_name"])
     facts.primary_language = snapshot["primary_language"] or facts.primary_language
