@@ -11,9 +11,9 @@ interface PipelineLaunchScreenProps {
 	onBack: () => void;
 }
 
-const DEFAULT_STAGE1_MODEL = "qwen2.5-coder-3b-q4";
-const DEFAULT_STAGE2_MODEL = "lfm2.5-1.2b-q8";
-const DEFAULT_STAGE3_MODEL = "lfm2.5-1.2b-q8";
+const DEFAULT_STAGE1_MODEL = "qwen3.5-2b-q4";
+const DEFAULT_STAGE2_MODEL = "qwen3.5-2b-q4";
+const DEFAULT_STAGE3_MODEL = "qwen3.5-2b-q4";
 
 export function PipelineLaunchScreen({
 	onStarted,

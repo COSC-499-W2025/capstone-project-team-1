@@ -81,8 +81,12 @@ const STEP_MAP: Array<[string, string]> = [
 	["Analyzing import graph", "Mapping dependencies"],
 	["Extracting config fingerprint", "Reading project configuration"],
 	["Inferring project purpose", "AI: Inferring project purpose"],
+	["Running project query for", "AI: Writing project description"],
 	["Running project query", "AI: Writing project bullets"],
+	["Running portfolio query for summary", "AI: Writing professional summary"],
+	["Running portfolio query for developer", "AI: Writing developer profile"],
 	["Running portfolio query", "AI: Composing portfolio summary"],
+	["Writing grounded draft", "AI: Drafting your resume"],
 	["Assembling resume", "Assembling resume document"],
 ];
 
@@ -115,9 +119,9 @@ const LOCAL_STAGE_LABELS: Record<PipelineStage, string> = {
 	POLISH: "Polishing with your feedback",
 };
 
-const DEFAULT_STAGE1_MODEL = "qwen2.5-coder-3b-q4";
-const DEFAULT_STAGE2_MODEL = "lfm2.5-1.2b-q8";
-const DEFAULT_STAGE3_MODEL = "lfm2.5-1.2b-q8";
+const DEFAULT_STAGE1_MODEL = "qwen3.5-2b-q4";
+const DEFAULT_STAGE2_MODEL = "qwen3.5-2b-q4";
+const DEFAULT_STAGE3_MODEL = "qwen3.5-2b-q4";
 
 // ── Cloud Mode Props ─────────────────────────────────────────────────────────
 

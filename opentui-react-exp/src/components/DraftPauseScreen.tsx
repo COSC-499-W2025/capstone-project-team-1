@@ -176,7 +176,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 									index === selectedSection ? theme.gold : theme.textSecondary
 								}
 							>
-								{index === selectedSection ? "▶ " : "  "}
+								{index === selectedSection ? "👉 " : "   "}
 								{index + 1}. {section.tocLabel}
 							</span>
 						</text>

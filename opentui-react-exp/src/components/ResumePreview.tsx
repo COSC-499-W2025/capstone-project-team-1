@@ -228,8 +228,8 @@ function SectionNav({ sections, selectedIndex, stats }: SectionNavProps) {
 				<text key={section.id}>
 					<span fg={index === selectedIndex ? theme.gold : theme.textSecondary}>
 						{index === selectedIndex
-							? `▶ ${section.tocLabel}`
-							: `  ${section.tocLabel}`}
+							? `\ud83d\udc49 ${section.tocLabel}`
+							: `   ${section.tocLabel}`}
 					</span>
 				</text>
 			))}
