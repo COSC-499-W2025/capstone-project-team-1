@@ -1,5 +1,7 @@
 # Week Navigation
 
+- [Term 2 Week 12 (Mar 23 - Mar 29)](#logs---term-2-week-12)
+- [Term 2 Week 11 (Mar 16 - Mar 22)](#logs---term-2-week-11)
 - [Term 2 Week 10 (Mar 9 - Mar 15)](#logs---term-2-week-10)
 - [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
 - [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
@@ -11,6 +13,166 @@
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 12
+
+## Connection to Previous Week
+Last week I merged OpenTUI Migration PR9c (FileUpload refactor), submitted the structured JSON inference PR (#501) and the Milestone 3 HTML generation plan (#507), created 5 new M3 issues (#508–#512), and reviewed 7 teammate PRs across local LLM runtime and OpenTUI migration work. This week I merged the dev-to-main sync (#514), re-proposed and merged the ResumePreview rewrite (#516), submitted and merged the analysis screen pipeline status UI (#506) and the root navigation rewrite (#523), started the portfolio HTML generator (#533), and reviewed 12 teammate PRs spanning cloud AI flow, local LLM pipeline, and Milestone 3 feature work.
+
+---
+
+## Coding Tasks
+
+* Merged development changes into main ([PR #514](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/514)).
+
+* Re-proposed and merged the ResumePreview rewrite for pipeline output — originally opened by Ahmad (#505), accidentally merged and reverted (#515), re-proposed from the correct base ([PR #516](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/516); closes [Issue #432](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/432)).
+
+* Merged analysis screen pipeline status UI — two-column pipeline/activity layout, stage timeline, repo progress display, friendly activity-message transforms, terminal-state rendering, and cancel-flow fix ([PR #506](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/506); +826/−710; closes [Issue #429](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/429)).
+
+* Merged OpenTUI Migration PR4: root navigation rewrite — rewired local pipeline flow end to end (`consent-policy`, `project-list`, `identity`, `pipeline-launch`, `draft-pause`, `feedback`), added `BottomBar` hint support, `IdentityScreen` Escape/back support, removed `mockProjects` usage, and included `ProjectList` migration ([PR #523](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523); +864/−762; closes [Issue #425](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/425)).
+
+* Submitted portfolio HTML generator — `POST /generate/portfolio` endpoint, self-contained HTML template with private/public mode, timeline, heatmap, and top-project rendering, OpenTUI final-screen wiring so the user can generate and open the portfolio in the default browser ([PR #533](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/533); +2453/−94; closes [Issue #511](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/511)).
+
+---
+
+## Testing & Debugging Tasks
+
+* Added 541 lines of tests for the analysis screen pipeline status UI covering stage timeline rendering, repo progress display, activity message transforms, terminal-state rendering, and cancel flow (`opentui-react-exp/src/components/Analysis.test.tsx` in [PR #506](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/506)).
+
+* Added 513 lines of tests for root navigation rewrite covering `ProjectList`, `IdentityScreen`, and `BottomBar` components (`opentui-react-exp/src/components/` in [PR #523](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523)).
+
+* Added focused tests for portfolio HTML generator covering proficiency mapping, retrieval foundation, HTML generator surface, and generate endpoint (`tests/generators/`, `tests/api/test_generate.py` in [PR #533](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/533)).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #513](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/513) (polish endpoint by Nathan) — flagged unrelated test removal from `test_local_llm.py`. Approved after fix.
+
+* Reviewed [PR #517](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/517) (PI agent backend foundation by Shlok) — flagged path-traversal risk in `extract-local` endpoint trusting client-provided filesystem paths, missing quote in JSON prompt template causing invalid model output, and orphan DB rows on failed extraction. Approved after fixes.
+
+* Reviewed [PR #518](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/518) (cloud auth/consent flow by Shlok) — flagged duplicated login-success UI between `CopilotLogin` and `CloudAuth`, suggested `onLoginSuccess(user)` callback pattern. Approved after fix.
+
+* Reviewed [PR #519](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/519) (cloud generation flow by Shlok) — flagged removed `FileUploadProps` interface breaking type-check, lost keyboard navigation in search results, incomplete Windows path normalization in `getZipsInDir()`, and stale `extractLocal` contract. Approved after fixes.
+
+* Reviewed [PR #520](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/520) (cloud resume preview by Shlok) — flagged missing null guards for partially populated developer profile JSON that could throw during render. Approved after fix.
+
+* Reviewed [PR #521](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/521) (OpenTUI polish updates by Ahmad) — approved; UI and code looked solid.
+
+* Reviewed [PR #522](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/522) (normalize local LLM HTTP error contracts by Evan) — approved; all local test cases pass.
+
+* Reviewed [PR #524](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/524) (local LLM route coverage by Evan) — approved; issue closed properly.
+
+* Reviewed [PR #529](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/529) (proficiency-to-expertise mapping by Evan) — approved; solid PR with passing tests.
+
+* Reviewed [PR #530](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/530) (education and awards input by Nathan) — approved.
+
+* Reviewed [PR #531](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/531) (daily commit heatmap aggregation by Ahmad) — approved; tests pass.
+
+* Reviewed [PR #534](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/534) (upgrade local LLM pipeline by Shlok) — approved.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Get portfolio HTML generator PR merged: [PR #533](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/533).
+* Work on HTML resume generator: [Issue #510](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/510).
+* Review teammate PRs as Milestone 3 work progresses.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Merge dev to main | ✅ Done | [PR #514](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/514) — merged Mar 23 |
+| ResumePreview rewrite (re-propose) | ✅ Done | [PR #516](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/516) — merged Mar 29 |
+| Analysis screen pipeline status UI | ✅ Done | [PR #506](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/506) — merged Mar 27 |
+| OpenTUI PR4: root navigation rewrite | ✅ Done | [PR #523](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523) — merged Mar 29 |
+| Portfolio HTML generator | 🔄 In review | [PR #533](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/533) — closes #511 |
+| Review PRs (#513, #517, #518, #519, #520, #521, #522, #524, #529, #530, #531, #534) | ✅ Done | Reviewed + approved |
+
+![Tasks Week 12](Tasks_T2_Week12.png)
+
+---
+
+# logs - Term 2 Week 11
+
+## Connection to Previous Week
+Last week I continued the OpenTUI migration by submitting three new migration PRs — pipeline endpoint client methods, PipelineLaunchScreen, and FeedbackScreen — and conducted six PR reviews across the team including local LLM runtime work and frontend migration screens. This week I merged the FileUpload refactor migration PR (#494), submitted the structured JSON and grammar-constrained inference PR (#501) for the local LLM runtime, authored the Milestone 3 HTML generation plan (#507) with 5 new issue breakdowns (#508–#512), and reviewed 7 teammate PRs across local LLM runtime and OpenTUI work.
+
+---
+
+## Coding Tasks
+
+* Merged OpenTUI Migration PR9c: FileUpload refactor — ported FileUpload utils, hidden-directory ZIP filtering, and tsconfig DOM libs ([PR #494](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/494); +148/−38; closes [Issue #435](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/435)).
+
+* Submitted Local LLM Runtime 07: added schema-validated structured JSON inference via `query_llm_json(...)`, grammar-constrained text generation via `query_llm_text(..., grammar=...)`, typed runtime failures for empty responses/malformed JSON/schema validation, and focused runtime tests ([PR #501](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/501); +385/−79; closes [Issue #456](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/456)).
+
+* Authored Milestone 3 HTML generation plan document (`.plans/m3-html-generation.md`) covering shared architecture, data sources, conventions, and a dependency graph for 5 upcoming issues — merged after team approval ([PR #507](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/507); +183 lines).
+
+* Created 5 GitHub issues ([Issue #508](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/508) through [Issue #512](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/512)) breaking down Milestone 3 into individually assignable tasks — education/awards input, proficiency mapping, HTML resume generator, HTML portfolio generator, and daily commit aggregation.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added focused runtime tests for structured JSON inference and grammar-constrained generation paths covering request shape, failure behavior, and export surface (`tests/local_llm/test_inference.py` in [PR #501](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/501)).
+
+* Fixed test infrastructure issue — updated `FakeClient` usage in grammar overrides test to support proper `close()` calls.
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #493](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/493) (LLM Runtime 05: process reuse/restart by Shlok) — flagged that same-model reuse skips the health check, allowing an alive but unresponsive server to be reused instead of restarted. Approved after fix.
+
+* Reviewed [PR #495](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/495) (LLM Runtime 06: async text inference by Shlok) — flagged concurrency race in `ensure_server` (no `asyncio.Lock` guarding shared globals), and unclosed `AsyncOpenAI` client needing `try/finally`. Approved after both fixes with tests.
+
+* Reviewed [PR #499](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/499) (mouse-first TUI by Shlok) — flagged that the `<select>` to mouse-only list conversion lost arrow-key navigation in `ProjectList`, and search results in `FileUpload` became mouse-only after refactor. Approved after keyboard support restored.
+
+* Reviewed [PR #500](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/500) (status endpoint by Nathan) — flagged using `telemetry.stage` instead of the job's saved stage, which could return wrong data if they diverge. Approved after fix.
+
+* Reviewed [PR #503](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/503) (analysis polling flow by Ahmad) — flagged polling interval not stopping on terminal states (`error`, `cancelled`, `failed_resource_guard`), and `onNext("preview")` target not matching the real screen name `resume-preview`. Approved after fixes.
+
+* Reviewed [PR #504](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/504) (DraftPauseScreen by Ahmad) — approved; praised scoped approach of keeping the component isolated without wiring into `index.tsx` yet. Tests pass locally.
+
+* Reviewed [PR #505](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/505) (ResumePreview rewrite by Ahmad) — verified close port of source-branch behavior against the new `#429` base, component tests pass locally. Approved for merge once base stack lands.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Merge structured JSON inference PR: [PR #501](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/501).
+* Continue OpenTUI migration: [Issue #429](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/429), [Issue #425](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/425).
+* Begin Milestone 3 implementation from issue breakdown (#508–#512).
+* Review teammate PRs as local LLM and migration work progresses.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| OpenTUI PR9c: FileUpload refactor | ✅ Done | [PR #494](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/494) — merged Mar 20 |
+| Local LLM Runtime 07: structured JSON inference | 🔄 In review | [PR #501](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/501) — closes #456 |
+| Milestone 3 HTML generation plan | ✅ Done | [PR #507](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/507) — merged Mar 22 |
+| Create 5 M3 issues (#508–#512) | ✅ Done | Full issue breakdown for Milestone 3 |
+| Review PRs (#493, #495, #499, #500, #503, #504, #505) | ✅ Done | Reviewed + approved |
+
+![Tasks Week 11](Tasks_T2_Week11.png)
+
+> ⬆️ Screenshot to be added.
 
 ---
 
