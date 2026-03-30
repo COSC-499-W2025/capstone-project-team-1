@@ -1,5 +1,8 @@
 # Week Navigation
 
+- [Term 2 Week 10 (Mar 9 - Mar 15)](#logs---term-2-week-10)
+- [Term 2 Week 9 (Mar 2 - Mar 8)](#logs---term-2-week-9)
+- [Term 2 Week 7-8 (Feb 16 - Mar 1)](#logs---term-2-week-7-8)
 - [Term 2 Week 4-5 (Jan 26 - Feb 8)](#logs---term-2-week-4-5)
 - [Term 2 Week 3 (Jan 19 - Jan 25)](#logs---term-2-week-3)
 - [Term 2 Week 2 (Jan 12 - Jan 18)](#logs---term-2-week-2)
@@ -8,6 +11,232 @@
 - [Term 1 Week 13 (Nov 24 - Nov 30)](Log%20Week13.md)
 - [Term 1 Week 11-12 (Nov 10 - Nov 23)](Log%20Week11-12.md)
 - [Term 1 Week 10 (Nov 3 - Nov 9)](Log%20Week10.md)
+
+---
+
+# logs - Term 2 Week 10
+
+## Connection to Previous Week
+Last week I merged the final outstanding PRs (#407, #410), synced development into main, authored the OpenTUI frontend migration plan with a 15-PR issue breakdown, submitted the first migration PR (#436), merged dev-to-main (#470), and submitted Week 9 logs. This week I continued the OpenTUI migration by submitting three new migration PRs — pipeline endpoint client methods, PipelineLaunchScreen, and FeedbackScreen — and conducted six PR reviews across the team including local LLM runtime work and frontend migration screens.
+
+---
+
+## Coding Tasks
+
+* Submitted OpenTUI migration PR2: migrated six pipeline client methods (`uploadZip`, `runAnalysis`, `getStatus`, `getResume`, `startGeneration`, `getPortfolio`) to `opentui-react-exp/src/api/endpoints.ts` with full endpoint behavior tests ([PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472); closes [Issue #423](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/423)).
+
+* Submitted OpenTUI migration PR5b: added `PipelineLaunchScreen` component allowing users to select a repository candidate and launch the resume generation pipeline ([PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476); closes [Issue #427](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/427)).
+
+* Submitted OpenTUI migration PR7b: added `FeedbackScreen` component with `onNext(target)` callback contract, calling `onNext("analysis")` on submit to match the issue specification ([PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478); closes [Issue #431](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/431)).
+
+* Fixed two concurrency bugs in `PipelineLaunchScreen` — guarded submit/cancel against concurrent calls and missing job ID, and moved `resetRunState` after successful API response to prevent premature state reset.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added endpoint behavior tests for all six new pipeline client methods covering request construction, response handling, and `runAnalysis` optional directories handling (`opentui-react-exp/src/api/endpoints.test.ts` — 166 lines added in [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472)).
+
+* Added 224 lines of focused tests for `PipelineLaunchScreen` covering component rendering, repo selection, pipeline launch flow, and error states (`opentui-react-exp/src/components/PipelineLaunchScreen.test.tsx` in [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476)).
+
+* Added 194 lines of focused tests for `FeedbackScreen` covering rendering, form interaction, and callback contract (`opentui-react-exp/src/components/FeedbackScreen.test.tsx` in [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478)).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #473](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/473) (model registry by Shlok) — flagged incorrect model filename that wouldn't match after a normal Hugging Face download, and suggested `is_file()` over `exists()` to prevent a directory false-positive. Approved after fixes.
+
+* Reviewed [PR #474](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/474) (llama-server health check by Shlok) — approved; noted strong test coverage around timeout behavior, exported runtime symbols, and registry resolution.
+
+* Reviewed [PR #475](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/475) (process manager by Shlok) — requested explicit `127.0.0.1` bind for `llama-server` to satisfy [Issue #453](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/453) loopback-only requirement, even though it is the default.
+
+* Reviewed [PR #477](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/477) (IdentityScreen by Ahmad) — flagged a bug where the selected contributor's email overwrote the manual email input after the user had already confirmed via manual mode. Approved after fix.
+
+* Reviewed [PR #481](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/481) (find git repo refactor by Nathan) — questioned necessity of refactor, flagged lost macOS metadata filtering and nested repo detection, overly broad exception catch wrapping its own `ValueError`, duplicate ZIP extraction, and incorrect `repos_with_commits` counter incrementing per commit line instead of per repo. Approved after fixes.
+
+* Reviewed [PR #482](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/482) (generation start endpoint by Evan) — approved; satisfied all acceptance criteria from [Issue #440](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/440), clean and well-tested.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Get open OpenTUI migration PRs merged: [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472), [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476), [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478).
+* Continue OpenTUI migration: [Issue #428](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/428), [Issue #429](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/429), [Issue #430](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/430).
+* Review teammate PRs as migration and local LLM runtime work progresses.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| OpenTUI PR2: pipeline endpoint client methods | 🔄 In review | [PR #472](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/472) — closes #423 |
+| OpenTUI PR5b: PipelineLaunchScreen | 🔄 In review | [PR #476](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/476) — closes #427 |
+| OpenTUI PR7b: FeedbackScreen | 🔄 In review | [PR #478](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/478) — closes #431 |
+| Fix concurrency bugs in PipelineLaunchScreen | ✅ Done | Guard submit/cancel + resetRunState ordering |
+| Review PRs (#473, #474, #475, #477, #481, #482) | ✅ Done | Reviewed + approved |
+
+![Tasks Week 10](Tasks_T2_Week10.png)
+
+---
+
+# logs - Term 2 Week 9
+
+## Connection to Previous Week
+Last period I merged the remaining evidence PRs (PR-3, PR-4), the resume edit endpoint, fixed Alembic startup migration drift, and started the portfolio edit endpoint. This week I merged the final outstanding PRs (#407, #410), synced development into main, authored the OpenTUI frontend migration plan with a 15-PR issue breakdown, kicked off the first migration PR, performed backlog grooming by closing 16 stale issues, and continued active code reviews across the team.
+
+---
+
+## Coding Tasks
+
+* Merged Alembic startup migration fix — replaced direct `Base.metadata.create_all()` with Alembic `upgrade head` at startup so schema stays consistent across environments ([PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407)).
+
+* Merged portfolio edit endpoint — `PortfolioEditRequest` inherits from `RepresentationPreferences` to avoid field duplication; preferences are persisted and affect subsequent `/portfolio/generate` calls. Added 14 integration tests and 18 schema unit tests ([PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410); closes [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335)).
+
+* Merged development changes into main ([PR #418](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/418)).
+
+* Authored the OpenTUI frontend migration plan document (`.plans/opentui-migration.md`) covering architecture, target state model, API shape, screen flow, conventions, and a 15-PR dependency graph — merged after team approval ([PR #420](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/420)).
+
+* Created 15 GitHub issues ([Issue #421](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/421) through [Issue #435](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/435)) breaking down the OpenTUI migration into individually reviewable PRs — types, API client, AppContext rewrite, navigation, screens, and polish.
+
+* Submitted first migration PR: added pipeline API types and consent flow alignment to `opentui-react-exp/` with backward-compatible type additions ([PR #436](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/436); closes [Issue #421](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/421)).
+
+* Closed 16 stale issues from the backlog (#160, #161, #162, #164, #165, #248, #252, #267, #273, #302, #320, #321, #322, #323, #324, #325) as part of issue hygiene and project board cleanup.
+
+---
+
+## Testing & Debugging Tasks
+
+* No new test files this week — testing effort was concentrated in previously merged PRs (#410 portfolio edit tests, #407 Alembic migration validation).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #406](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406) (GET /portfolio/{id} by Ahmad) — requested title/body alignment, flagged duplicated `_coerce_date` helper across `git_stats_bridge.py` and `insight_bridge.py`, suggested keeping dataclasses in `models.py` instead of `deep_analysis.py`. Approved after fixes.
+
+* Reviewed [PR #411](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/411) (cleanup directory_crawler by Nathan) — noted the key fix was tests now correctly asserting against the returned `files_dict` instead of a separate instance. Approved.
+
+* Reviewed [PR #412](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/412) (README updates by Ahmad) — approved; noted the Mermaid diagram addition.
+
+* Reviewed [PR #414](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/414) (weekly logs by Evan) — approved.
+
+* Reviewed [PR #415](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/415) (individual logs by Shlok) — approved.
+
+* Reviewed [PR #417](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/417) (Ahmad's logs) and [PR #419](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/419) (team logs by Ahmad) — approved both.
+
+---
+
+## Blockers & Issues
+
+* No major blockers this week.
+
+---
+
+## Plan for Next Week
+
+* Continue OpenTUI migration PRs: [Issue #422](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/422), [Issue #423](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/423), [Issue #424](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/424).
+* Review teammate PRs as migration and backend work progresses.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Merge Alembic startup fix | ✅ Done | [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407) — merged Mar 2 |
+| Merge portfolio edit endpoint | ✅ Done | [PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410) — merged Mar 2 |
+| Merge dev to main | ✅ Done | [PR #418](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/418) — merged Mar 2 |
+| Author OpenTUI migration plan | ✅ Done | [PR #420](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/420) — merged Mar 8 |
+| Create 15 migration issues (#421–#435) | ✅ Done | Full issue breakdown for OpenTUI migration |
+| OpenTUI PR1a: pipeline API types | ✅ Done | [PR #436](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/436) — merged Mar 8 |
+| Close 16 stale backlog issues | ✅ Done | Backlog grooming (#160–#325) |
+| Review PRs (#406, #411, #412, #414, #415, #417, #419) | ✅ Done | Reviewed + approved |
+
+![Tasks Week 9](Tasks_T2_Week9.png)
+
+---
+
+# logs - Term 2 Week 7-8
+
+## Connection to Previous Week
+Last period I focused on evidence foundation (PR-1, PR-2) and API retrieval endpoints. Over this two-week period, I merged the remaining evidence PRs (PR-3 and PR-4), added the resume edit endpoint, fixed Alembic startup migration drift, started the portfolio edit endpoint, and continued active code reviews across the team.
+
+---
+
+## Coding Tasks
+
+* Merged evidence PR-3: git contribution metrics and infra signal extractors — commit window count, commit frequency, contribution %, CI/CD and Docker detection, wired into evidence persistence ([PR #371](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/371); closes [Issue #356](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/356)).
+
+* Merged evidence PR-4: testing/docs/code-quality heuristic extractors — 3 detectors for test signals, docs signals, and code-quality tooling across 7 languages ([PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376); closes [Issue #354](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/354)).
+
+* Added `POST /resume/{id}/edit` endpoint with Pydantic validation requiring at least one field ([PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378); closes [Issue #332](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/332)).
+
+* Merged development changes into main ([PR #382](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/382)).
+
+* Fixed Alembic startup migration bug — replaced direct `Base.metadata.create_all()` with Alembic `upgrade head` at startup so schema stays consistent across environments ([PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407)).
+
+* Added `POST /portfolio/{id}/edit` endpoint — `PortfolioEditRequest` inherits from `RepresentationPreferences` to avoid field duplication; preferences are persisted and affect subsequent `/portfolio/generate` calls ([PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410); closes [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335)).
+
+* Pushed follow-up fixes on evidence PR-4 ([PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376)) and resume edit ([PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378)) addressing review feedback — clarified missing-tests evidence signal, populated role in resume edit response, added category validation, and added rollback on commit failures.
+
+---
+
+## Testing & Debugging Tasks
+
+* Added 5 tests for resume edit endpoint covering full update, partial update, 404, empty request rejection, and soft-deleted item (`tests/api/test_resume_edit.py`).
+
+* Added 14 integration tests for portfolio edit endpoint covering happy path, 404, 422, persistence, idempotency, full replacement, chronology overrides, and generate-side effects (`tests/api/test_portfolio_edit.py`).
+
+* Added 18 unit tests for schema models — ChronologyOverride, CustomRanking, RepresentationPreferences (`tests/api/test_representation_preferences.py`).
+
+---
+
+## Reviewing & Collaboration Tasks
+
+* Reviewed [PR #377](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/377) (POST /portfolio/generate by Ahmad) — flagged unindexed `LIKE 'prefix%'` query on `project_path`, suggested DB-side `None` filtering on `extraction_path`, and noted non-deterministic resume item ordering. Approved after fixes.
+
+* Reviewed [PR #379](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/379) (local LLM benchmark summary by Evan) — approved; asked about qwen3:0.5b as alternative to 2.5.
+
+* Reviewed [PR #381](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/381) (markdown logic by Nathan) — flagged `file_values` type mismatch, `str_response` overwrite-on-loop bug, inconsistent return types, and weak test assertion. Approved after fixes.
+
+* Reviewed [PR #385](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/385) (consent enums + TUI redesign by Shlok) — requested React cleanup logic for unmounted components, proper error handling in `.catch`, and a shared `ConsentPanel` component to deduplicate Panel1/2/3. Approved after updates.
+
+* Reviewed [PR #392](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/392) (extend user representation preferences by Nathan) — flagged incomplete schema-to-API wiring. Approved after requested changes.
+
+* Reviewed [PR #404](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/404) (local LLM testing + API rename by Shlok) — flagged orphaned-job risk from resetting `_active_job_id` without teardown. Approved after graceful teardown fix.
+
+* Reviewed [PR #406](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/406) (GET /portfolio/{id} by Ahmad) — requested title/body alignment, flagged duplicated `_coerce_date` helper, suggested keeping dataclasses in `models.py`.
+
+---
+
+## Blockers & Issues
+
+* API startup was using direct SQLAlchemy table creation instead of Alembic migrations, causing schema drift across environments — resolved with [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407).
+
+---
+
+## Plan for Next Week
+
+* Continue portfolio edit and generation endpoint work: [Issue #334](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/334), [Issue #335](https://github.com/COSC-499-W2025/capstone-project-team-1/issues/335).
+* Address remaining review feedback on open PRs.
+
+---
+
+| **Task** | **Status** | **Notes** |
+| --- | --- | --- |
+| Evidence PR-3 git/infra extractors | ✅ Done | [PR #371](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/371) — merged Feb 16 |
+| Evidence PR-4 testing/docs/code-quality | ✅ Done | [PR #376](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/376) — merged Feb 22 |
+| Add `POST /resume/{id}/edit` | ✅ Done | [PR #378](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/378) — merged Feb 22 |
+| Merge dev to main | ✅ Done | [PR #382](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/382) |
+| Fix Alembic startup migration | ✅ Done | [PR #407](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/407) |
+| Add `POST /portfolio/{id}/edit` | 🔄 In review | [PR #410](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/410) |
+| Review PRs (#377, #379, #381, #385, #392, #404, #406) | ✅ Done | Reviewed + follow-up requested changes |
+
+![Tasks Week 7-8](Tasks_T2_Week7-8.png)
 
 ---
 
