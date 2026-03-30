@@ -36,12 +36,14 @@ from .portfolio import router as portfolio_router
 from .file_intelligence import router as file_intelligence_router
 from .resume import router as resume_router
 from .local_llm import router as local_llm_router
+from .education import awards_router, legacy_awards_router, router as education_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
     getRepoStats,
     saveRepoStats,
 )
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     getUserRepoStats,
+    get_daily_commit_counts,
     saveUserRepoStats,
 )
 from .retrieval import router as retrieval_router
@@ -186,6 +188,7 @@ def create_app() -> FastAPI:
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
         repo_path: str,
+        user_email: str | None = None,
         db: Session = Depends(get_db),
     ):
         """
@@ -194,17 +197,19 @@ def create_app() -> FastAPI:
         Both saves are performed in a single transaction for atomicity.
         """
         try:
-            email_answer = (
-                db.query(UserAnswer)
-                .filter(UserAnswer.question_id == 1)
-                .order_by(UserAnswer.answered_at.desc())
-                .first()
-            )
+            if not user_email:
+                email_answer = (
+                    db.query(UserAnswer)
+                    .filter(UserAnswer.question_id == 1)
+                    .order_by(UserAnswer.answered_at.desc())
+                    .first()
+                )
 
-            user_email = email_answer.answer_text.strip() if email_answer else None
+                user_email = email_answer.answer_text.strip() if email_answer else None
 
             repo_stats = getRepoStats(repo_path)
             user_stats = getUserRepoStats(repo_path, user_email)
+            user_stats.daily_commits = get_daily_commit_counts(repo_path, user_email)
 
             # Save both within the same transaction
             saveRepoStats(repo_stats, db=db)
@@ -237,6 +242,9 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_router)
     app.include_router(resume_router)
     app.include_router(local_llm_router)
+    app.include_router(legacy_awards_router)
+    app.include_router(education_router)
+    app.include_router(awards_router)
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
     app.include_router(views_router)

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
+from collections import Counter
+import subprocess
 import git
 from sqlalchemy import inspect, or_
 from artifactminer.db.database import SessionLocal
@@ -27,10 +29,55 @@ class UserRepoStats:
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
+    daily_commits: Optional[dict[str, int]] = None
     userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
     commitActivities: Optional[dict] = None # New field to store activity breakdown
     user_role: Optional[str] = None
+
+
+def get_daily_commit_counts(repo_path: Pathish, user_email: str) -> dict[str, int]:
+    """Return per-day commit counts for a user in a git repository.
+
+    Uses `git log --author=<email> --format=%Y-%m-%d` so the output is already
+    normalized to calendar days. Any git error, timeout, invalid input, or empty
+    result returns an empty mapping.
+    """
+    if not user_email:
+        return {}
+
+    try:
+        validated = validate_email(user_email, check_deliverability=False)
+        email_norm = validated.normalized
+    except EmailNotValidError:
+        return {}
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                f"--author={email_norm}",
+                "--format=%Y-%m-%d",
+            ],
+            cwd=Path(repo_path),
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return {}
+    except Exception:
+        return {}
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return {}
+
+    counts = Counter(
+        line.strip() for line in result.stdout.splitlines() if line.strip()
+    )
+    return dict(sorted(counts.items()))
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -71,6 +118,7 @@ def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats:
         first_commit=first_commit,
         last_commit=last_commit,
         total_commits=total_commits,
+        daily_commits=None,
         userStatspercentages=userStatspercentages,
         commitFrequency=commitFrequency,
         commitActivities=commitActivities
@@ -193,6 +241,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
+            daily_commits=stats.daily_commits,
             userStatspercentages=stats.userStatspercentages,
             commitFrequency=stats.commitFrequency,
             activity_breakdown=stats.commitActivities,

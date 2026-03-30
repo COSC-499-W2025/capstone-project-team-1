@@ -51,3 +51,26 @@ test("BottomBar only shows the forward CTA when a screen opts into it", async ()
 		withForward.renderer.destroy();
 	});
 });
+
+test("BottomBar renders an optional hint alongside breadcrumbs", async () => {
+	const rendered = await renderBottomBar(
+		<BottomBar
+			actions={[{ key: "Enter", label: "Continue" }]}
+			hint="Select at least one repository before continuing."
+			breadcrumbs={[
+				{ screen: "consent", label: "Consent", visited: true },
+				{ screen: "project-list", label: "Repos", visited: true },
+			]}
+			currentScreen="project-list"
+		/>,
+	);
+
+	const frame = rendered.captureCharFrame();
+	expect(frame).toContain("Consent");
+	expect(frame).toContain("Repos");
+	expect(frame).toContain("Select at least one repository");
+
+	await act(async () => {
+		rendered.renderer.destroy();
+	});
+});

@@ -2,10 +2,14 @@ import { ApiClient } from "./client";
 import type {
 	AnalysisResponse,
 	AnswersRequest,
+	Award,
+	AwardCreateRequest,
 	ConsentLevel,
 	ConsentResponse,
 	DeleteResponse,
 	DirectoriesResponse,
+	Education,
+	EducationCreateRequest,
 	ExtractLocalResponse,
 	PipelineCancelResponse,
 	PipelineContributorsRequest,
@@ -102,4 +106,28 @@ export const api = {
 
 	extractLocal: (zipId: number): Promise<ExtractLocalResponse> =>
 		client.post("/zip/extract-local", { zip_id: zipId }),
+
+	// Education endpoints
+	listEducation: (portfolioId: string): Promise<Education[]> =>
+		client.get(withQuery("/education", { portfolio_id: portfolioId })),
+	getEducation: (id: number, portfolioId?: string): Promise<Education> =>
+		client.get(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
+	createEducation: (portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
+		client.post(withQuery("/education", { portfolio_id: portfolioId }), data),
+	updateEducation: (id: number, portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
+		client.put(withQuery(`/education/${id}`, { portfolio_id: portfolioId }), data),
+	deleteEducation: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
+
+	// Award endpoints
+	listAwards: (portfolioId: string): Promise<Award[]> =>
+		client.get(withQuery("/awards", { portfolio_id: portfolioId })),
+	getAward: (id: number, portfolioId?: string): Promise<Award> =>
+		client.get(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
+	createAward: (portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
+		client.post(withQuery("/awards", { portfolio_id: portfolioId }), data),
+	updateAward: (id: number, portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
+		client.put(withQuery(`/awards/${id}`, { portfolio_id: portfolioId }), data),
+	deleteAward: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
 };
