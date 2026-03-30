@@ -1,3 +1,4 @@
+import { pathToFileURL } from "node:url";
 import { useCallback, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import type {
@@ -8,8 +9,11 @@ import type {
 	ProjectCard,
 	TalkingPoint,
 } from "../api/types";
+import { api } from "../api/endpoints";
 import { theme } from "../types";
+import { useToast } from "./Toast";
 import { TopBar } from "./TopBar";
+import { openInBrowser } from "./cloud-ai/shared";
 
 // ── Tab definitions ──────────────────────────────────────────────
 
@@ -25,6 +29,7 @@ const TABS: Array<{ name: string; description: string; value: Tab }> = [
 
 interface CloudResumePreviewProps {
 	profile: DeveloperProfile;
+	portfolioId: string;
 	onBack: () => void;
 	onRestart: () => void;
 }
@@ -498,18 +503,49 @@ function ProjectsTab({ projects }: { projects: ProjectCard[] }) {
 
 export function CloudResumePreview({
 	profile,
+	portfolioId,
 	onBack,
 	onRestart,
 }: CloudResumePreviewProps) {
 	const [activeTab, setActiveTab] = useState<Tab>("insights");
+	const [isGeneratingPortfolio, setIsGeneratingPortfolio] = useState(false);
+	const toast = useToast();
 
 	const TAB_KEYS: Record<string, Tab> = { "1": "insights", "2": "projects", "3": "resume" };
+	const openPortfolioHtml = useCallback(async () => {
+		if (!portfolioId || isGeneratingPortfolio) return;
+		setIsGeneratingPortfolio(true);
+		try {
+			const response = await api.generatePortfolio(portfolioId);
+			openInBrowser(pathToFileURL(response.path).href);
+			toast.show({
+				variant: "success",
+				title: "Portfolio Ready",
+				message: "Generated portfolio.html and opened it in your browser.",
+			});
+		} catch (error) {
+			toast.show({
+				variant: "error",
+				title: "Portfolio Generation Failed",
+				message: error instanceof Error ? error.message : String(error),
+				duration: 0,
+			});
+		} finally {
+			setIsGeneratingPortfolio(false);
+		}
+	}, [isGeneratingPortfolio, portfolioId, toast]);
 
 	useKeyboard(
 		useCallback((key: { name: string }) => {
 			const tab = TAB_KEYS[key.name];
-			if (tab) setActiveTab(tab);
-		}, []),
+			if (tab) {
+				setActiveTab(tab);
+				return;
+			}
+			if (key.name === "o") {
+				void openPortfolioHtml();
+			}
+		}, [openPortfolioHtml]),
 	);
 
 	return (
@@ -518,6 +554,38 @@ export function CloudResumePreview({
 				title="Developer Profile"
 				description="Your AI-generated developer profile. Switch tabs to explore your resume, insights, and project analysis."
 			/>
+			<box
+				flexDirection="row"
+				justifyContent="space-between"
+				alignItems="center"
+				paddingLeft={2}
+				paddingRight={2}
+				paddingBottom={1}
+			>
+				<text>
+					<span fg={theme.textDim}>Press </span>
+					<span fg={theme.cyan}>o</span>
+					<span fg={theme.textDim}> to generate and open your portfolio HTML.</span>
+				</text>
+				<box
+					border
+					borderStyle="rounded"
+					borderColor={isGeneratingPortfolio ? theme.textDim : theme.cyan}
+					paddingLeft={1}
+					paddingRight={1}
+					onMouseDown={() => {
+						void openPortfolioHtml();
+					}}
+				>
+					<text>
+						<span fg={isGeneratingPortfolio ? theme.textDim : theme.cyan}>
+							<strong>
+								{isGeneratingPortfolio ? "Generating..." : "Open Portfolio HTML"}
+							</strong>
+						</span>
+					</text>
+				</box>
+			</box>
 
 			<box flexGrow={1} flexDirection="row">
 				{/* Sidebar navigation */}

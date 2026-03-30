@@ -18,7 +18,10 @@ interface CloudFlowProps {
 	modelId: string;
 	gitIdentity: GitIdentity | null;
 	selectedRepoPaths: string[];
-	onComplete: (profile: DeveloperProfile) => void;
+	onComplete: (result: {
+		profile: DeveloperProfile;
+		portfolioId: string;
+	}) => void;
 	onBack: () => void;
 }
 

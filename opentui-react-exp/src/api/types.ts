@@ -35,6 +35,14 @@ export interface UploadResponse {
 	portfolio_id: string;
 }
 
+export interface GeneratedArtifactResponse {
+	success: boolean;
+	artifact: "portfolio" | "resume";
+	path: string;
+	generated_at: string;
+	warnings: string[];
+}
+
 export interface DirectoriesResponse {
 	zip_id: number;
 	filename: string;

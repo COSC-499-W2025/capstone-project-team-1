@@ -50,6 +50,25 @@ test("extractLocal sends POST /zip/extract-local with zip_id", async () => {
 	expect(fetchCalls[0]?.options?.body).toBe(JSON.stringify({ zip_id: 7 }));
 });
 
+test("generatePortfolio sends POST /generate/portfolio with portfolio_id", async () => {
+	installMockFetch({
+		success: true,
+		artifact: "portfolio",
+		path: "/tmp/portfolio.html",
+		generated_at: "2026-03-30T00:00:00Z",
+		warnings: [],
+	});
+
+	await api.generatePortfolio("portfolio-123");
+
+	expect(fetchCalls).toHaveLength(1);
+	expect(fetchCalls[0]?.url).toBe("http://127.0.0.1:8000/generate/portfolio");
+	expect(fetchCalls[0]?.options?.method).toBe("POST");
+	expect(fetchCalls[0]?.options?.body).toBe(
+		JSON.stringify({ portfolio_id: "portfolio-123" }),
+	);
+});
+
 test("getPipelineContributors posts the request payload unchanged", async () => {
 	installMockFetch({ contributors: [] });
 	const request = { repo_ids: ["repo-1", "repo-2"] };

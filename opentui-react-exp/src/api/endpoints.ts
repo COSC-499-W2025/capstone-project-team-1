@@ -21,6 +21,7 @@ import type {
 	ResumeItem,
 	SkillChronologyItem,
 	Summary,
+	GeneratedArtifactResponse,
 	UploadResponse,
 	UserAnswer,
 } from "./types";
@@ -102,4 +103,8 @@ export const api = {
 
 	extractLocal: (zipId: number): Promise<ExtractLocalResponse> =>
 		client.post("/zip/extract-local", { zip_id: zipId }),
+	generatePortfolio: (
+		portfolioId: string,
+	): Promise<GeneratedArtifactResponse> =>
+		client.post("/generate/portfolio", { portfolio_id: portfolioId }),
 };

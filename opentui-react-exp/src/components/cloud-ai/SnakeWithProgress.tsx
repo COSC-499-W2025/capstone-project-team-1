@@ -131,7 +131,10 @@ interface CloudModeProps {
 	modelId: string;
 	gitIdentity: GitIdentity | null;
 	selectedRepoPaths: string[];
-	onComplete: (profile: DeveloperProfile) => void;
+	onComplete: (result: {
+		profile: DeveloperProfile;
+		portfolioId: string;
+	}) => void;
 	onBack: () => void;
 }
 
@@ -165,6 +168,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 
 	// Cloud-specific refs
 	const cloudResultRef = useRef<DeveloperProfile | null>(null);
+	const cloudPortfolioIdRef = useRef<string | null>(null);
 	const phaseRef = useRef(flowPhase);
 	phaseRef.current = flowPhase;
 
@@ -299,6 +303,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					undefined,
 					zipFilename,
 				);
+				cloudPortfolioIdRef.current = upload.portfolio_id;
 				if (cancelled) return;
 				pushActivity("system", "Archive uploaded.", "done");
 				pushActivity("system", "Unpacking your projects...");
@@ -580,8 +585,15 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				}
 
 				if (phaseRef.current === "done" && key.name === "return") {
-					if (props.mode === "cloud" && cloudResultRef.current) {
-						props.onComplete(cloudResultRef.current);
+					if (
+						props.mode === "cloud" &&
+						cloudResultRef.current &&
+						cloudPortfolioIdRef.current
+					) {
+						props.onComplete({
+							profile: cloudResultRef.current,
+							portfolioId: cloudPortfolioIdRef.current,
+						});
 					} else if (props.mode === "local") {
 						if (
 							handledStatusRef.current === "draft_ready" &&

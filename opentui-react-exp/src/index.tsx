@@ -103,6 +103,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	"cloud-generation": [{ key: "Esc", label: "Back" }],
 	"cloud-resume": [
 		{ key: "1/2/3", label: "Switch Tab" },
+		{ key: "o", label: "Open Portfolio" },
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
@@ -135,6 +136,7 @@ function App() {
 		name: string | null;
 		email: string;
 	} | null>(null);
+	const [cloudPortfolioId, setCloudPortfolioId] = useState<string | null>(null);
 	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(
 		null,
 	);
@@ -165,6 +167,8 @@ function App() {
 		reset();
 		setFilePath("");
 		setLocalFlowError(null);
+		setCloudPortfolioId(null);
+		setCloudProfile(null);
 		setScreen("landing");
 	};
 
@@ -391,23 +395,25 @@ function App() {
 
 			case "cloud-generation":
 				return (
-					<CloudFlow
-						zipPath={filePath}
-						modelId={cloudModelId}
-						gitIdentity={cloudGitIdentity}
-						selectedRepoPaths={state.selectedRepoIds}
-						onComplete={(profile) => {
-							setCloudProfile(profile);
-							setScreen("cloud-resume");
-						}}
-						onBack={() => setScreen("configure")}
-					/>
+						<CloudFlow
+							zipPath={filePath}
+							modelId={cloudModelId}
+							gitIdentity={cloudGitIdentity}
+							selectedRepoPaths={state.selectedRepoIds}
+							onComplete={({ profile, portfolioId }) => {
+								setCloudProfile(profile);
+								setCloudPortfolioId(portfolioId);
+								setScreen("cloud-resume");
+							}}
+							onBack={() => setScreen("configure")}
+						/>
 				);
 
 			case "cloud-resume":
 				return cloudProfile ? (
 					<CloudResumePreview
 						profile={cloudProfile}
+						portfolioId={cloudPortfolioId ?? ""}
 						onBack={() => setScreen("cloud-generation")}
 						onRestart={() => setScreen("landing")}
 					/>
