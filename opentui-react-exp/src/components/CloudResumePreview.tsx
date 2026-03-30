@@ -99,7 +99,17 @@ function InlineText({ text }: { text: string }) {
 // ── Resume tab ───────────────────────────────────────────────────
 
 function ResumeTab({ markdown }: { markdown: string }) {
-	const blocks = parseMarkdown(markdown);
+	const allBlocks = parseMarkdown(markdown);
+	// Drop the leading H1 ("Resume") and any blank lines right after it —
+	// the tab label already identifies this section.
+	let startIdx = 0;
+	if (allBlocks.length > 0 && allBlocks[0].type === "h1") {
+		startIdx = 1;
+		while (startIdx < allBlocks.length && allBlocks[startIdx].type === "blank") {
+			startIdx++;
+		}
+	}
+	const blocks = allBlocks.slice(startIdx);
 	return (
 		<box flexDirection="column" gap={0}>
 			{blocks.map((block, i) => {
@@ -506,7 +516,7 @@ export function CloudResumePreview({
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Developer Profile"
-				description="Your AI-generated developer profile — switch tabs to explore your resume, insights, and project analysis."
+				description="Your AI-generated developer profile. Switch tabs to explore your resume, insights, and project analysis."
 			/>
 
 			<box flexGrow={1} flexDirection="row">

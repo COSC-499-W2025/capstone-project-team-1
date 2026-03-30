@@ -318,6 +318,7 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
 
     facts_total = 0
     project_facts = []
+    snapshots: list[dict] = []
 
     try:
         update_job(job, status="running", stage="ANALYZE", current_repo=None)
@@ -337,13 +338,14 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
                 facts_total=facts_total,
             )
             append_message(job, f"Compiling facts for {repo_path.name}")
-            fact = await generate_project_facts(
+            fact, snapshot = await generate_project_facts(
                 repo_path,
                 user_email=job["user_email"],
                 model=job["stage1_model"],
                 progress=lambda message: append_message(job, message),
             )
             project_facts.append(fact)
+            snapshots.append(snapshot)
             facts_total += len(fact.highlights) + len(fact.evidence)
             update_job(
                 job,
@@ -370,8 +372,10 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
         append_message(job, "Writing grounded draft resume.")
         draft_output = await build_draft_output(
             project_facts,
+            snapshots=snapshots,
             user_email=job["user_email"],
             model=job["stage2_model"],
+            progress=lambda message: append_message(job, message),
         )
         draft_payload = finalize_output(
             draft_output,
@@ -401,7 +405,6 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
     except Exception as exc:
         error_message = f"{type(exc).__name__}: {exc}"
         update_job(job, status="error", error=error_message)
-        append_message(job, error_message)
     finally:
         job["generation_task"] = None
         stop_server()
@@ -439,6 +442,7 @@ async def _run_polish_job(job_id: str) -> None:
             draft_output,
             feedback,
             model=job["stage3_model"],
+            facts=project_facts_models,
         )
         output_payload = finalize_output(
             final_output,
@@ -466,7 +470,6 @@ async def _run_polish_job(job_id: str) -> None:
     except Exception as exc:
         error_message = f"{type(exc).__name__}: {exc}"
         update_job(job, status="error", error=error_message)
-        append_message(job, error_message)
     finally:
         job["generation_task"] = None
         stop_server()

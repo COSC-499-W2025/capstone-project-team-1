@@ -60,33 +60,39 @@ export function resumeToSections(data: ResumeV3Output | null): ResumeSection[] {
 					? "n/a"
 					: `${Math.round(project.contribution_pct)}%`;
 
-			projectLines.push(`${project.name} (${project.type})`);
-			projectLines.push(`Language: ${project.primary_language || "n/a"}`);
-			projectLines.push(`Frameworks: ${frameworkText}`);
-			projectLines.push(`Contribution: ${contribution}`);
+			projectLines.push(`### ${project.name}`);
+			projectLines.push(
+				`**${project.type}** · ${project.primary_language || "n/a"} · ${frameworkText} · ${contribution} contribution`,
+			);
+			projectLines.push("");
 			if (project.description) {
-				projectLines.push(`Description: ${project.description}`);
+				projectLines.push(project.description);
+				projectLines.push("");
 			}
 			if (project.bullets?.length) {
 				for (const bullet of project.bullets) {
 					projectLines.push(`- ${bullet}`);
 				}
+				projectLines.push("");
 			}
 			if (project.narrative) {
-				projectLines.push(`Narrative: ${project.narrative}`);
+				projectLines.push(`> ${project.narrative}`);
+				projectLines.push("");
 			}
+			projectLines.push("---");
 			projectLines.push("");
 		}
 	}
 
 	const metadataLines: string[] = [
-		`Stage: ${data.metadata.stage || "unknown"}`,
-		`Models: ${data.metadata.models_used.length ? data.metadata.models_used.join(" -> ") : "n/a"}`,
-		`Generation Time: ${Number(data.metadata.generation_time_seconds || 0).toFixed(1)}s`,
+		`**Stage:** ${data.metadata.stage || "unknown"}`,
+		`**Models:** ${data.metadata.models_used.length ? data.metadata.models_used.join(" → ") : "n/a"}`,
+		`**Generation Time:** ${Number(data.metadata.generation_time_seconds || 0).toFixed(1)}s`,
 	];
 
 	if (data.metadata.errors.length) {
-		metadataLines.push("Errors:");
+		metadataLines.push("");
+		metadataLines.push("**Errors:**");
 		for (const error of data.metadata.errors) {
 			metadataLines.push(`- ${error}`);
 		}

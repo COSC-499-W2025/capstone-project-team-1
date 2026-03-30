@@ -16,6 +16,12 @@ from .errors import ModelNotFoundError
 # filenames so builders do not have to redownload the same weights.
 _SUPPORTED_MODELS = MappingProxyType(
     {
+        "qwen3.5-2b-q4": ModelDescriptor(
+            name="qwen3.5-2b-q4",
+            filename="Qwen3.5-2B-Q4_K_M.gguf",
+            repo_url="https://huggingface.co/Qwen/Qwen3.5-2B",
+            context_window=20480,
+        ),
         "qwen3.5-4b-q4": ModelDescriptor(
             name="qwen3.5-4b-q4",
             filename="Qwen3.5-4B-Q4_K_M.gguf",

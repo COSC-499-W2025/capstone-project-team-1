@@ -52,11 +52,11 @@ export const api = {
 	getQuestions: (): Promise<Question[]> => client.get("/questions"),
 	submitAnswers: (answers: AnswersRequest["answers"]): Promise<UserAnswer[]> =>
 		client.post("/answers", { answers }),
-	uploadZip: (file: Blob, portfolioId?: string): Promise<UploadResponse> => {
+	uploadZip: (file: Blob, portfolioId?: string, filename = "upload.zip"): Promise<UploadResponse> => {
 		const path = portfolioId
 			? `/zip/upload?portfolio_id=${encodeURIComponent(portfolioId)}`
 			: "/zip/upload";
-		return client.uploadFile(path, file);
+		return client.uploadFile(path, file, "file", undefined, filename);
 	},
 	listDirectories: (zipId: number): Promise<DirectoriesResponse> =>
 		client.get(`/zip/${zipId}/directories`),

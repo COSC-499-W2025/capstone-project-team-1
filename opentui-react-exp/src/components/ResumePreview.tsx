@@ -9,6 +9,7 @@ import {
 	resumeToSections,
 	resumeToText,
 } from "../utils";
+import { MarkdownBlock } from "./MarkdownBlock";
 import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {
@@ -228,8 +229,8 @@ function SectionNav({ sections, selectedIndex, stats }: SectionNavProps) {
 				<text key={section.id}>
 					<span fg={index === selectedIndex ? theme.gold : theme.textSecondary}>
 						{index === selectedIndex
-							? `▶ ${section.tocLabel}`
-							: `  ${section.tocLabel}`}
+							? `\ud83d\udc49 ${section.tocLabel}`
+							: `   ${section.tocLabel}`}
 					</span>
 				</text>
 			))}
@@ -270,72 +271,9 @@ function SectionContent({ section }: { section: ResumeSection }) {
 					viewportOptions: { paddingLeft: 1, paddingRight: 1 },
 				}}
 			>
-				{section.lines.map((line, index) => (
-					<FormatLine key={`${section.id}-${index}`} line={line} />
-				))}
+				<MarkdownBlock content={section.lines.join("\n")} />
 			</scrollbox>
 		</box>
-	);
-}
-
-const KEY_VALUE_RE = /^([A-Za-z][A-Za-z ]+):\s+(.+)$/;
-const BULLET_RE = /^- (.+)$/;
-const PROJECT_NAME_RE = /^(.+) \(([^)]+)\)$/;
-const DASH_UNDERLINE_RE = /^-{3,}$/;
-
-function FormatLine({ line }: { line: string }) {
-	if (!line || line.trim() === "") {
-		return (
-			<text>
-				<span> </span>
-			</text>
-		);
-	}
-
-	if (DASH_UNDERLINE_RE.test(line)) {
-		return (
-			<text>
-				<span fg={theme.goldDim}>{"─".repeat(line.length)}</span>
-			</text>
-		);
-	}
-
-	const projectMatch = PROJECT_NAME_RE.exec(line);
-	if (projectMatch && !KEY_VALUE_RE.test(line)) {
-		return (
-			<text>
-				<span fg={theme.textPrimary}>
-					<strong>{projectMatch[1]}</strong>
-				</span>
-				<span fg={theme.textDim}>{` (${projectMatch[2]})`}</span>
-			</text>
-		);
-	}
-
-	const bulletMatch = BULLET_RE.exec(line);
-	if (bulletMatch) {
-		return (
-			<text>
-				<span fg={theme.cyan}>{"  • "}</span>
-				<span fg={theme.textPrimary}>{bulletMatch[1]}</span>
-			</text>
-		);
-	}
-
-	const keyValueMatch = KEY_VALUE_RE.exec(line);
-	if (keyValueMatch) {
-		return (
-			<text>
-				<span fg={theme.textDim}>{keyValueMatch[1]}: </span>
-				<span fg={theme.textPrimary}>{keyValueMatch[2]}</span>
-			</text>
-		);
-	}
-
-	return (
-		<text>
-			<span fg={theme.textSecondary}>{line}</span>
-		</text>
 	);
 }
 

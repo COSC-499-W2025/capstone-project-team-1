@@ -10,7 +10,7 @@ interface ConsentScreenProps {
 	onBack: () => void;
 }
 
-const OPTIONS: ConsentLevel[] = ["local", "local-llm", "cloud"];
+const OPTIONS: ConsentLevel[] = ["local-llm", "cloud"];
 
 // ── ConsentPanel ──────────────────────────────────────────────────────────────
 
@@ -111,41 +111,6 @@ function ConsentPanel({
 type PanelConfig = Omit<ConsentPanelProps, "selected" | "onSelect">;
 
 const PANELS: PanelConfig[] = [
-	{
-		level: "local",
-		title: "Local Only",
-		subtitle: "pattern-based",
-		description:
-			"Reads your repos using static rules. No AI model needed or involved.",
-		sections: [
-			{
-				heading: "What we read",
-				headingColor: theme.cyan,
-				items: [
-					{ text: "· File & folder names" },
-					{ text: "· Language detection" },
-					{ text: "· Commit count & dates" },
-					{ text: "· Framework fingerprints" },
-				],
-			},
-			{
-				heading: "Privacy",
-				headingColor: theme.gold,
-				items: [
-					{ text: "No model required." },
-					{ text: "Zero network calls." },
-					{ text: "Nothing ever leaves your machine.", color: theme.textDim },
-				],
-			},
-		],
-		ratings: [
-			{ text: " + Complete privacy", color: theme.success },
-			{ text: " + No setup required", color: theme.success },
-			{ text: " + Works instantly", color: theme.success },
-			{ text: " - No AI narratives", color: theme.warning },
-			{ text: " - Basic skill detection", color: theme.warning },
-		],
-	},
 	{
 		level: "local-llm",
 		title: "Local AI",
@@ -304,7 +269,7 @@ export function ConsentScreen({ onContinue, onBack }: ConsentScreenProps) {
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Consent"
-				description="Before we analyze your projects, please choose how you'd like your data to be processed. Local Only and Local AI keep code on-device; the cloud option sends code to your authenticated provider for analysis."
+				description="Before we analyze your projects, please choose how you'd like your data to be processed. Local AI keeps code entirely on-device; the cloud option sends code to your authenticated provider for analysis."
 			/>
 
 			<box

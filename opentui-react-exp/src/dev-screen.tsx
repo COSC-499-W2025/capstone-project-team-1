@@ -18,9 +18,11 @@ function Harness() {
 	return (
 		<box flexGrow={1} flexDirection="column">
 			<SnakeWithProgress
+				mode="cloud"
 				zipPath="/dev/null"
 				modelId="claude-haiku-4-5"
 				gitIdentity={null}
+				selectedRepoPaths={[]}
 				onComplete={(profile) => {
 					console.log("Profile ready:", profile.developer_dna.archetype);
 					process.exit(0);

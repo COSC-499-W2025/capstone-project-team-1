@@ -11,16 +11,23 @@ from ...RepositoryIntelligence.repo_intelligence_user import (
     collect_user_additions,
     getUserRepoStats,
 )
-from ..client import query_json
+import json as json_lib
+
+from ..client import query_text
+from .markdown_parser import parse_resume_markdown
 from .prompts import (
-    DRAFT_SYSTEM,
     FACTS_SYSTEM,
     POLISH_SYSTEM,
-    build_draft_prompt,
+    PROJECT_CONTENT_SYSTEM,
+    PROFILE_SYSTEM,
+    SUMMARY_SYSTEM,
     build_polish_prompt,
+    build_profile_prompt,
+    build_project_content_prompt,
     build_project_facts_prompt,
+    build_summary_prompt,
 )
-from .schemas import GenerationFeedback, ProjectFacts, ResumeOutputModel
+from .schemas import GenerationFeedback, ProjectFacts, ResumeOutputModel, ResumeProjectModel, ResumeProjectPeriod
 
 
 ProgressCallback = Callable[[str], None]
@@ -92,20 +99,31 @@ def _build_snapshot(repo_path: Path, user_email: str) -> dict[str, object]:
         additions = []
 
     commit_breakdown = {}
+    activity_breakdown: dict[str, object] = {}
     if user_stats and user_stats.commitActivities:
-        commit_breakdown = {
-            str(key): int(value)
-            for key, value in user_stats.commitActivities.items()
-            if isinstance(value, (int, float))
-        }
+        activities = user_stats.commitActivities
+        if isinstance(activities, dict):
+            for key, value in activities.items():
+                if isinstance(value, dict):
+                    activity_breakdown[str(key)] = {
+                        "commits": value.get("commits", 0),
+                        "lines_added": value.get("lines_added", 0),
+                        "percentage": value.get("percentage", 0),
+                    }
+                elif isinstance(value, (int, float)):
+                    commit_breakdown[str(key)] = int(value)
 
     return {
         "project_name": repo_stats.project_name,
         "project_path": str(repo_path),
         "primary_language": repo_stats.primary_language,
         "languages": list(repo_stats.Languages),
+        "language_percentages": list(repo_stats.language_percentages)
+        if hasattr(repo_stats, "language_percentages")
+        else [],
         "frameworks": list(repo_stats.frameworks),
         "health_score": repo_stats.health_score,
+        "is_collaborative": getattr(repo_stats, "is_collaborative", False),
         "total_commits": repo_stats.total_commits,
         "first_commit": repo_stats.first_commit.isoformat() if repo_stats.first_commit else None,
         "last_commit": repo_stats.last_commit.isoformat() if repo_stats.last_commit else None,
@@ -115,10 +133,16 @@ def _build_snapshot(repo_path: Path, user_email: str) -> dict[str, object]:
             else None
         ),
         "user_total_commits": user_stats.total_commits if user_stats else None,
+        "commit_frequency": (
+            round(float(user_stats.commitFrequency), 2)
+            if user_stats and getattr(user_stats, "commitFrequency", None) is not None
+            else None
+        ),
         "commit_breakdown": commit_breakdown,
+        "activity_breakdown": activity_breakdown,
         "readme_excerpt": _read_readme(repo_path),
         "recent_commit_messages": _recent_commit_messages(repo_path, user_email),
-        "recent_added_lines": additions[-3:],
+        "recent_added_lines": additions[-8:],
         "sample_files": _sample_files(repo_path),
     }
 
@@ -194,22 +218,78 @@ def _normalize_output(
     return output
 
 
+def _repair_json(text: str) -> str:
+    """Fix common small-LLM JSON mistakes."""
+    import re
+    # Remove trailing commas before } or ]
+    text = re.sub(r",\s*([}\]])", r"\1", text)
+    # Fix missing commas between "value" "key" patterns
+    text = re.sub(r'"\s*\n\s*"', '",\n"', text)
+    # Fix missing commas between ] "key" or } "key"
+    text = re.sub(r'(\])\s*\n\s*"', r'],\n"', text)
+    text = re.sub(r'(\})\s*\n\s*"', r'},\n"', text)
+    # Fix missing commas between value and "key" on same line
+    text = re.sub(r'(\d)\s+"', r'\1, "', text)
+    return text
+
+
+def _extract_json(text: str) -> dict:
+    """Best-effort JSON extraction from LLM text that may include reasoning."""
+    text = text.strip()
+    # Strip code fences
+    if "```json" in text:
+        text = text.split("```json", 1)[1]
+    if "```" in text:
+        text = text.split("```", 1)[0]
+    # Find the first { and last }
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        text = text[start : end + 1]
+    # Try parsing as-is first
+    try:
+        return json_lib.loads(text)
+    except json_lib.JSONDecodeError:
+        pass
+    # Try repairing common mistakes
+    repaired = _repair_json(text)
+    return json_lib.loads(repaired)
+
+
 async def generate_project_facts(
     repo_path: Path,
     *,
     user_email: str,
     model: str,
     progress: ProgressCallback | None = None,
-) -> ProjectFacts:
+) -> tuple[ProjectFacts, dict[str, object]]:
+    """Return (facts, snapshot) so callers can pass snapshot to stage 2."""
     snapshot = _build_snapshot(repo_path, user_email)
     if progress:
         progress(f"Compiling facts for {repo_path.name}")
-    facts = await query_json(
-        build_project_facts_prompt(snapshot),
-        ProjectFacts,
-        model=model,
-        system=FACTS_SYSTEM,
-    )
+    max_attempts = 3
+    last_error: Exception | None = None
+    parsed: dict | None = None
+    for attempt in range(max_attempts):
+        raw = await query_text(
+            build_project_facts_prompt(snapshot),
+            model=model,
+            system=FACTS_SYSTEM,
+        )
+        try:
+            parsed = _extract_json(raw)
+            break
+        except (json_lib.JSONDecodeError, ValueError) as exc:
+            last_error = exc
+            if progress:
+                remaining = max_attempts - attempt - 1
+                if remaining > 0:
+                    progress(f"Retrying facts for {repo_path.name} ({remaining} attempts left)")
+                else:
+                    progress(f"Facts extraction failed for {repo_path.name}")
+    if parsed is None:
+        raise last_error  # type: ignore[misc]
+    facts = ProjectFacts.model_validate(parsed)
     facts.project_name = str(snapshot["project_name"])
     facts.primary_language = snapshot["primary_language"] or facts.primary_language
     facts.frameworks = list(snapshot["frameworks"]) or facts.frameworks
@@ -217,27 +297,156 @@ async def generate_project_facts(
     facts.commit_breakdown = dict(snapshot["commit_breakdown"]) or facts.commit_breakdown
     facts.first_commit = snapshot["first_commit"] or facts.first_commit
     facts.last_commit = snapshot["last_commit"] or facts.last_commit
-    return facts
+    return facts, snapshot
+
+
+def _derive_skills(facts: list[ProjectFacts]) -> str:
+    """Build skills section programmatically from facts — no LLM needed."""
+    languages: list[str] = []
+    frameworks: list[str] = []
+    tools: list[str] = []
+
+    for fact in facts:
+        if fact.primary_language and fact.primary_language not in languages:
+            languages.append(fact.primary_language)
+        for fw in fact.frameworks:
+            if fw not in frameworks:
+                frameworks.append(fw)
+        for tech in fact.technologies:
+            normalized = tech.strip()
+            if normalized and normalized not in languages and normalized not in frameworks and normalized not in tools:
+                tools.append(normalized)
+
+    lines: list[str] = []
+    if languages:
+        lines.append(f"Languages: {', '.join(languages)}")
+    if frameworks:
+        lines.append(f"Frameworks: {', '.join(frameworks)}")
+    if tools:
+        lines.append(f"Tools & Technologies: {', '.join(tools[:12])}")
+    return "\n".join(lines)
+
+
+def _parse_project_content(text: str) -> tuple[str | None, list[str]]:
+    """Parse LLM output for a single project into (description, bullets)."""
+    text = text.strip()
+    # Strip code fences if present
+    if text.startswith("```"):
+        first_nl = text.index("\n") if "\n" in text else len(text)
+        text = text[first_nl + 1:]
+    if text.endswith("```"):
+        text = text[:text.rfind("```")]
+    text = text.strip()
+
+    description_lines: list[str] = []
+    bullets: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- ") or stripped.startswith("* "):
+            bullets.append(stripped[2:].strip())
+        elif stripped.startswith("#"):
+            continue  # skip any heading the LLM might add
+        elif stripped:
+            description_lines.append(stripped)
+
+    description = " ".join(description_lines) if description_lines else None
+    return description, bullets
 
 
 async def build_draft_output(
     facts: list[ProjectFacts],
     *,
+    snapshots: list[dict[str, object]] | None = None,
     user_email: str,
     model: str,
+    progress: ProgressCallback | None = None,
 ) -> ResumeOutputModel:
-    portfolio_summary = _build_portfolio_summary(facts)
-    output = await query_json(
-        build_draft_prompt(
-            user_email=user_email,
-            project_facts=[fact.model_dump() for fact in facts],
-            portfolio_summary=portfolio_summary,
-        ),
-        ResumeOutputModel,
+    """Build a draft resume using focused LLM calls per section."""
+    snapshot_list = snapshots or []
+    facts_dicts = [fact.model_dump() for fact in facts]
+
+    # ── Per-project content (focused call per project) ──
+    projects: list[ResumeProjectModel] = []
+    for i, fact in enumerate(facts):
+        snapshot = snapshot_list[i] if i < len(snapshot_list) else {}
+        if progress:
+            progress(f"Running project query for {fact.project_name}")
+
+        raw = await query_text(
+            build_project_content_prompt(facts_dicts[i], snapshot),
+            model=model,
+            system=PROJECT_CONTENT_SYSTEM,
+        )
+        description, bullets = _parse_project_content(raw)
+        projects.append(
+            ResumeProjectModel(
+                name=fact.project_name,
+                type=fact.project_type,
+                primary_language=fact.primary_language,
+                frameworks=list(fact.frameworks),
+                contribution_pct=fact.contribution_pct,
+                commit_breakdown=dict(fact.commit_breakdown),
+                period=ResumeProjectPeriod(
+                    first_commit=fact.first_commit,
+                    last_commit=fact.last_commit,
+                ),
+                description=description,
+                bullets=bullets,
+                bullet_fact_ids=[],
+                narrative=None,
+            )
+        )
+
+    # ── Professional summary (one call, all facts) ──
+    if progress:
+        progress("Running portfolio query for summary")
+    professional_summary = await query_text(
+        build_summary_prompt(facts_dicts, snapshot_list),
         model=model,
-        system=DRAFT_SYSTEM,
+        system=SUMMARY_SYSTEM,
     )
-    return output
+
+    # ── Developer profile (one call, all facts + activity data) ──
+    if progress:
+        progress("Running portfolio query for developer profile")
+    developer_profile = await query_text(
+        build_profile_prompt(facts_dicts, snapshot_list),
+        model=model,
+        system=PROFILE_SYSTEM,
+    )
+
+    # ── Skills (programmatic, no LLM) ──
+    skills_section = _derive_skills(facts)
+
+    return ResumeOutputModel(
+        professional_summary=professional_summary.strip(),
+        skills_section=skills_section,
+        developer_profile=developer_profile.strip(),
+        projects=projects,
+    )
+
+
+def _resume_to_markdown(output: ResumeOutputModel) -> str:
+    """Convert a ResumeOutputModel back to markdown for the polish prompt."""
+    lines: list[str] = []
+    lines.append("## Professional Summary")
+    lines.append(output.professional_summary or "(empty)")
+    lines.append("")
+    lines.append("## Technical Skills")
+    lines.append(output.skills_section or "(empty)")
+    lines.append("")
+    lines.append("## Developer Profile")
+    lines.append(output.developer_profile or "(empty)")
+    lines.append("")
+    lines.append("## Projects")
+    for project in output.projects:
+        lines.append(f"### {project.name}")
+        if project.description:
+            lines.append(project.description)
+        for bullet in project.bullets:
+            lines.append(f"- {bullet}")
+        lines.append("")
+    return "\n".join(lines)
 
 
 async def build_polished_output(
@@ -245,17 +454,18 @@ async def build_polished_output(
     feedback: GenerationFeedback,
     *,
     model: str,
+    facts: list[ProjectFacts] | None = None,
 ) -> ResumeOutputModel:
-    output = await query_json(
+    draft_md = _resume_to_markdown(draft_output)
+    markdown = await query_text(
         build_polish_prompt(
-            draft_output=draft_output.model_dump(),
+            draft_markdown=draft_md,
             feedback=feedback.model_dump(),
         ),
-        ResumeOutputModel,
         model=model,
         system=POLISH_SYSTEM,
     )
-    return output
+    return parse_resume_markdown(markdown, facts or [])
 
 
 def finalize_output(

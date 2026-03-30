@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class ProjectFacts(BaseModel):
     """Grounded per-project facts produced by stage 1."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     project_name: str = Field(min_length=1)
     project_type: str = Field(min_length=1)
@@ -28,14 +28,14 @@ class ProjectFacts(BaseModel):
 
 
 class ResumeProjectPeriod(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     first_commit: str | None = None
     last_commit: str | None = None
 
 
 class ResumeProjectModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     name: str
     type: str
@@ -57,7 +57,9 @@ class ResumeProjectModel(BaseModel):
 
         payload = dict(value)
         period = payload.get("period")
-        if not isinstance(period, dict):
+        if isinstance(period, ResumeProjectPeriod):
+            period = period.model_dump()
+        elif not isinstance(period, dict):
             period = {}
         else:
             period = dict(period)
@@ -94,7 +96,7 @@ class ResumeProjectModel(BaseModel):
 
 
 class ResumeMetadataModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     model_used: str | None = None
     models_used: list[str] = Field(default_factory=list)
@@ -105,7 +107,7 @@ class ResumeMetadataModel(BaseModel):
 
 
 class ResumePortfolioModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     total_projects: int = 0
     total_commits: int = 0
@@ -118,7 +120,7 @@ class ResumePortfolioModel(BaseModel):
 class ResumeOutputModel(BaseModel):
     """Draft/final output contract consumed by the OpenTUI frontend."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     professional_summary: str = ""
     skills_section: str = ""
@@ -131,7 +133,7 @@ class ResumeOutputModel(BaseModel):
 class GenerationFeedback(BaseModel):
     """User feedback captured before the polish stage."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     general_notes: str = ""
     tone: str = ""
