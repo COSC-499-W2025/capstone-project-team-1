@@ -543,7 +543,7 @@ export function EducationAwardsScreen({ onNext }: EducationAwardsScreenProps) {
 								{educationLines.length > 0 ? (
 									educationLines.map((line, i) => (
 										<box 
-											key={i} 
+											key={education[i]?.id ?? line}
 											paddingLeft={1}
 											backgroundColor={selectedColumn === "education" && selectedIndex === i ? theme.bgMedium : undefined}
 										>
@@ -622,7 +622,7 @@ export function EducationAwardsScreen({ onNext }: EducationAwardsScreenProps) {
 								{awardLines.length > 0 ? (
 									awardLines.map((line, i) => (
 										<box 
-											key={i}
+											key={awards[i]?.id ?? line}
 											paddingLeft={1}
 											backgroundColor={selectedColumn === "awards" && selectedIndex === i ? theme.bgMedium : undefined}
 										>
