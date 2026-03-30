@@ -87,6 +87,8 @@ const STEP_MAP: Array<[string, string]> = [
 	["Running portfolio query for summary", "AI: Writing professional summary"],
 	["Running portfolio query for developer", "AI: Writing developer profile"],
 	["Running portfolio query", "AI: Composing portfolio summary"],
+	["Retrying facts for", "Retrying analysis (LLM hiccup)"],
+	["Facts extraction failed", "Analysis failed — retries exhausted"],
 	["Writing grounded draft", "AI: Drafting your resume"],
 	["Assembling resume", "Assembling resume document"],
 ];
@@ -101,6 +103,23 @@ const NOISE_PREFIXES = [
 	"Found ",
 	"Analyzing [",
 ];
+
+function friendlyError(raw: string): string {
+	if (raw.includes("JSONDecodeError") || raw.includes("json")) {
+		return "The local AI produced invalid output. Try running again — small models can be inconsistent.";
+	}
+	if (raw.includes("InferenceRequestError") || raw.includes("inference")) {
+		return "The local AI server crashed or timed out. Restart the backend and try again.";
+	}
+	if (raw.includes("SchemaValidation")) {
+		return "The local AI output didn't match the expected format. Try running again.";
+	}
+	if (raw.includes("ModelNotFound")) {
+		return "Model not found. Check that the GGUF file is in ~/.artifactminer/models/";
+	}
+	// Truncate long error messages
+	return raw.length > 120 ? `${raw.slice(0, 120)}…` : raw;
+}
 
 function toFriendlyStep(msg: string): string | null {
 	for (const [prefix, friendly] of STEP_MAP) {
@@ -461,12 +480,12 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				) {
 					stopPolling();
 					setFlowPhase("error");
-					const msg = response.error ||
-						(response.status === "cancelled"
-							? "Pipeline cancelled."
-							: response.status === "failed_resource_guard"
-								? "Pipeline stopped: resource limits reached."
-								: "Pipeline failed.");
+					const rawError = response.error ?? "Pipeline failed.";
+					const msg = response.status === "cancelled"
+						? "Pipeline cancelled."
+						: response.status === "failed_resource_guard"
+							? "Pipeline stopped: resource limits reached."
+							: friendlyError(rawError);
 					toast.show({
 						variant: response.status === "cancelled" ? "warning" : "error",
 						title: response.status === "cancelled" ? "Cancelled" : "Pipeline Error",
