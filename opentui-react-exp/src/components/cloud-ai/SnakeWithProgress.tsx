@@ -134,6 +134,7 @@ interface CloudModeProps {
 	onComplete: (result: {
 		profile: DeveloperProfile;
 		portfolioId: string;
+		zipId: number;
 	}) => void;
 	onBack: () => void;
 }
@@ -169,6 +170,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 	// Cloud-specific refs
 	const cloudResultRef = useRef<DeveloperProfile | null>(null);
 	const cloudPortfolioIdRef = useRef<string | null>(null);
+	const cloudZipIdRef = useRef<number | null>(null);
 	const phaseRef = useRef(flowPhase);
 	phaseRef.current = flowPhase;
 
@@ -261,18 +263,12 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				case "tool_end":
 					setActivity((prev) =>
 						prev.map((e) =>
-							e.status === "active"
-								? { ...e, status: "done" as const }
-								: e,
+							e.status === "active" ? { ...e, status: "done" as const } : e,
 						),
 					);
 					break;
 				case "agent_end":
-					pushActivity(
-						"system",
-						"Your developer profile is ready!",
-						"done",
-					);
+					pushActivity("system", "Your developer profile is ready!", "done");
 					setFlowPhase("done");
 					break;
 				case "error":
@@ -304,12 +300,11 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					zipFilename,
 				);
 				cloudPortfolioIdRef.current = upload.portfolio_id;
+				cloudZipIdRef.current = upload.zip_id;
 				if (cancelled) return;
 				pushActivity("system", "Archive uploaded.", "done");
 				pushActivity("system", "Unpacking your projects...");
-				const { extraction_path } = await api.extractLocal(
-					upload.zip_id,
-				);
+				const { extraction_path } = await api.extractLocal(upload.zip_id);
 				if (cancelled) return;
 				pushActivity("system", "Found your projects!", "done");
 
@@ -327,7 +322,9 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 						// Support nested rel_paths (e.g. "subdir/project")
 						const parentParts = relPath.split("/").slice(0, -1);
 						if (parentParts.length > 0) {
-							await mkdir(join(filteredDir, ...parentParts), { recursive: true });
+							await mkdir(join(filteredDir, ...parentParts), {
+								recursive: true,
+							});
 						}
 						await symlink(src, dest, "dir");
 					}
@@ -382,7 +379,13 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				rm(filteredDir, { recursive: true, force: true }).catch(() => {});
 			}
 		};
-	}, [props.mode === "cloud" ? props.gitIdentity : null, props.mode === "cloud" ? props.modelId : null, props.mode === "cloud" ? props.zipPath : null, props.mode === "cloud" ? props.selectedRepoPaths : null, props.mode]);
+	}, [
+		props.mode === "cloud" ? props.gitIdentity : null,
+		props.mode === "cloud" ? props.modelId : null,
+		props.mode === "cloud" ? props.zipPath : null,
+		props.mode === "cloud" ? props.selectedRepoPaths : null,
+		props.mode,
+	]);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// LOCAL MODE — start pipeline + poll for status
@@ -418,8 +421,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 
 		const pollStatus = async () => {
 			try {
-				const response: PipelineStatusResponse =
-					await api.getPipelineStatus();
+				const response: PipelineStatusResponse = await api.getPipelineStatus();
 				if (disposed) return;
 
 				setLocalStage(response.stage);
@@ -446,11 +448,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				) {
 					stopPolling();
 					handledStatusRef.current = "draft_ready";
-					pushActivity(
-						"system",
-						"Draft complete — review & refine",
-						"done",
-					);
+					pushActivity("system", "Draft complete — review & refine", "done");
 					setFlowPhase("done");
 					return;
 				}
@@ -462,7 +460,8 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				) {
 					stopPolling();
 					setFlowPhase("error");
-					const msg = response.error ||
+					const msg =
+						response.error ||
 						(response.status === "cancelled"
 							? "Pipeline cancelled."
 							: response.status === "failed_resource_guard"
@@ -470,7 +469,8 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 								: "Pipeline failed.");
 					toast.show({
 						variant: response.status === "cancelled" ? "warning" : "error",
-						title: response.status === "cancelled" ? "Cancelled" : "Pipeline Error",
+						title:
+							response.status === "cancelled" ? "Cancelled" : "Pipeline Error",
 						message: msg,
 						duration: 0,
 					});
@@ -515,9 +515,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				if (disposed) return;
 				setFlowPhase("error");
 				const msg =
-					startErr instanceof Error
-						? startErr.message
-						: String(startErr);
+					startErr instanceof Error ? startErr.message : String(startErr);
 				const isConnErr =
 					msg.includes("Unable to connect") ||
 					msg.includes("ECONNREFUSED") ||
@@ -537,7 +535,12 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 			disposed = true;
 			stopPolling();
 		};
-	}, [props.mode === "local" ? props.intakeId : null, props.mode === "local" ? props.repoIds : null, props.mode === "local" ? props.userEmail : null, props.mode]);
+	}, [
+		props.mode === "local" ? props.intakeId : null,
+		props.mode === "local" ? props.repoIds : null,
+		props.mode === "local" ? props.userEmail : null,
+		props.mode,
+	]);
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// Cancel (local only)
@@ -546,12 +549,21 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 	const cancelLocalPipeline = async () => {
 		if (props.mode !== "local" || isCancelling) return;
 		setIsCancelling(true);
-		toast.show({ variant: "info", message: "Cancelling pipeline...", duration: 3000 });
+		toast.show({
+			variant: "info",
+			message: "Cancelling pipeline...",
+			duration: 3000,
+		});
 		try {
 			const response = await api.cancelPipeline();
 			if (response.ok && response.status === "cancelled") {
 				setFlowPhase("error");
-				toast.show({ variant: "warning", title: "Cancelled", message: "Pipeline was cancelled.", duration: 0 });
+				toast.show({
+					variant: "warning",
+					title: "Cancelled",
+					message: "Pipeline was cancelled.",
+					duration: 0,
+				});
 			}
 		} catch (cancelError) {
 			toast.show({ variant: "error", message: toErrorMessage(cancelError) });
@@ -588,33 +600,28 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					if (
 						props.mode === "cloud" &&
 						cloudResultRef.current &&
-						cloudPortfolioIdRef.current
+						cloudPortfolioIdRef.current &&
+						cloudZipIdRef.current !== null
 					) {
 						props.onComplete({
 							profile: cloudResultRef.current,
 							portfolioId: cloudPortfolioIdRef.current,
+							zipId: cloudZipIdRef.current,
 						});
 					} else if (props.mode === "local") {
 						if (
 							handledStatusRef.current === "draft_ready" &&
 							localDraftRef.current
 						) {
-							(props as LocalModeProps).onDraftReady(
-								localDraftRef.current,
-							);
+							(props as LocalModeProps).onDraftReady(localDraftRef.current);
 						} else if (localOutputRef.current) {
-							(props as LocalModeProps).onComplete(
-								localOutputRef.current,
-							);
+							(props as LocalModeProps).onComplete(localOutputRef.current);
 						}
 					}
 					return;
 				}
 
-				if (
-					!showSnake &&
-					(key.name === "s" || key.name === "p")
-				) {
+				if (!showSnake && (key.name === "s" || key.name === "p")) {
 					setShowSnake(true);
 				}
 			},
@@ -639,7 +646,9 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 	return (
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
-				title={props.mode === "cloud" ? "AI Resume Generation" : "Local AI Analysis"}
+				title={
+					props.mode === "cloud" ? "AI Resume Generation" : "Local AI Analysis"
+				}
 				description={description}
 			/>
 
@@ -677,11 +686,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 								flexDirection="column"
 								gap={1}
 							>
-								<ascii-font
-									text="SNAKE"
-									font="tiny"
-									color={theme.goldDim}
-								/>
+								<ascii-font text="SNAKE" font="tiny" color={theme.goldDim} />
 								<box
 									border
 									borderStyle="rounded"
@@ -709,12 +714,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 				</box>
 
 				{/* Right: Activity sidebar - enclosed in bordered panel like snake */}
-				<box
-					flexGrow={1}
-					flexBasis={0}
-					flexDirection="column"
-					paddingLeft={1}
-				>
+				<box flexGrow={1} flexBasis={0} flexDirection="column" paddingLeft={1}>
 					<box
 						flexGrow={1}
 						flexDirection="column"
@@ -733,19 +733,11 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 									<span fg={theme.success}>
 										<strong>✓ Complete</strong>
 									</span>
-									<span fg={theme.textDim}>
-										{" - press Enter to view"}
-									</span>
+									<span fg={theme.textDim}>{" - press Enter to view"}</span>
 								</text>
 							) : (
 								<text>
-									<span
-										fg={
-											isActive
-												? glowColors[glowIndex]
-												: theme.gold
-										}
-									>
+									<span fg={isActive ? glowColors[glowIndex] : theme.gold}>
 										<strong>{statusLabel}</strong>
 									</span>
 								</text>

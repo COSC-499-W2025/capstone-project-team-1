@@ -1,9 +1,11 @@
 import { createCliRenderer } from "@opentui/core";
 import { createRoot, useKeyboard, useRenderer } from "@opentui/react";
-import { useEffect, useMemo, useState } from "react";
+import { pathToFileURL } from "node:url";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api/endpoints";
 import { BottomBar } from "./components/BottomBar";
 import { CloudAuth, CloudFlow } from "./components/cloud-ai";
+import { openInBrowser } from "./components/cloud-ai/shared";
 import { SnakeWithProgress } from "./components/cloud-ai/SnakeWithProgress";
 import { CloudResumePreview } from "./components/CloudResumePreview";
 import { ConfigureScreen } from "./components/ConfigureScreen";
@@ -12,12 +14,13 @@ import { DraftPauseScreen } from "./components/DraftPauseScreen";
 import { FileUpload } from "./components/FileUpload";
 import { Landing } from "./components/Landing";
 import { ResumePreview } from "./components/ResumePreview";
-import { ToastProvider } from "./components/Toast";
+import { ToastProvider, useToast } from "./components/Toast";
 import { AppProvider, useAppState } from "./context/AppContext";
 import { useSelectionCopy } from "./hooks/useSelectionCopy";
 import type { ConsentLevel, DeveloperProfile } from "./api/types";
 import { type KeyAction, type Screen, theme } from "./types";
 import type { Breadcrumb } from "./components/BottomBar";
+import { prepareAndGenerateCloudPortfolio } from "./utils/cloudPortfolioPrep";
 import { toErrorMessage } from "./utils";
 
 // Screens shown in breadcrumbs (in order)
@@ -112,6 +115,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 
 function App() {
 	const renderer = useRenderer();
+	const toast = useToast();
 	useSelectionCopy();
 	const {
 		state,
@@ -137,9 +141,15 @@ function App() {
 		email: string;
 	} | null>(null);
 	const [cloudPortfolioId, setCloudPortfolioId] = useState<string | null>(null);
+	const [cloudZipId, setCloudZipId] = useState<number | null>(null);
 	const [cloudProfile, setCloudProfile] = useState<DeveloperProfile | null>(
 		null,
 	);
+	const [cloudPortfolioPrepared, setCloudPortfolioPrepared] = useState(false);
+	const [isPreparingPortfolio, setIsPreparingPortfolio] = useState(false);
+	const [portfolioStatusMessage, setPortfolioStatusMessage] = useState<
+		string | null
+	>(null);
 	const [isLandingIntroPhase, setIsLandingIntroPhase] = useState(true);
 	const [visitedScreens, setVisitedScreens] = useState<Set<Screen>>(new Set());
 	const [localFlowError, setLocalFlowError] = useState<string | null>(null);
@@ -163,17 +173,26 @@ function App() {
 		setScreen(target);
 	};
 
+	const resetCloudRunState = useCallback(() => {
+		setCloudPortfolioId(null);
+		setCloudZipId(null);
+		setCloudProfile(null);
+		setCloudPortfolioPrepared(false);
+		setIsPreparingPortfolio(false);
+		setPortfolioStatusMessage(null);
+	}, []);
+
 	const resetLocalFlow = () => {
 		reset();
 		setFilePath("");
 		setLocalFlowError(null);
-		setCloudPortfolioId(null);
-		setCloudProfile(null);
+		resetCloudRunState();
 		setScreen("landing");
 	};
 
 	const loadLocalPipelineContext = async (path: string) => {
 		setLocalFlowError(null);
+		resetCloudRunState();
 		setFilePath(path);
 		setContextZipPath(path);
 		setPipelineNotice(null);
@@ -193,6 +212,102 @@ function App() {
 			setLocalFlowError(toErrorMessage(error));
 		}
 	};
+
+	useEffect(() => {
+		setCloudPortfolioPrepared(false);
+		setIsPreparingPortfolio(false);
+		setPortfolioStatusMessage(null);
+	}, [cloudPortfolioId, cloudZipId]);
+
+	const openCloudPortfolio = useCallback(async () => {
+		if (isPreparingPortfolio) {
+			return;
+		}
+
+		if (!cloudPortfolioId) {
+			toast.show({
+				variant: "error",
+				title: "Portfolio Unavailable",
+				message: "No portfolio ID is available for this cloud run.",
+				duration: 0,
+			});
+			return;
+		}
+
+		setIsPreparingPortfolio(true);
+
+		try {
+			let path: string;
+			let warnings: string[] = [];
+			let analysisWarnings: string[] = [];
+
+			if (cloudPortfolioPrepared) {
+				setPortfolioStatusMessage("Generating portfolio HTML...");
+				const generated = await api.generatePortfolio(cloudPortfolioId);
+				path = generated.path;
+				warnings = generated.warnings;
+			} else {
+				if (cloudZipId === null || !state.selectedEmail) {
+					throw new Error(
+						"Cloud portfolio preparation needs both zip metadata and the selected email.",
+					);
+				}
+
+				const result = await prepareAndGenerateCloudPortfolio(
+					{
+						portfolioId: cloudPortfolioId,
+						zipId: cloudZipId,
+						email: state.selectedEmail,
+						selectedRepoIds: state.selectedRepoIds,
+					},
+					{ onStatusChange: setPortfolioStatusMessage },
+				);
+
+				path = result.path;
+				warnings = result.warnings;
+				analysisWarnings = result.analysisWarnings;
+				if (result.prepared) {
+					setCloudPortfolioPrepared(true);
+				}
+			}
+
+			const allWarnings = [...new Set([...analysisWarnings, ...warnings])];
+			if (allWarnings.length > 0) {
+				toast.show({
+					variant: "warning",
+					title: "Portfolio Ready With Warnings",
+					message: allWarnings.join(" "),
+					duration: 0,
+				});
+			} else {
+				toast.show({
+					variant: "success",
+					title: "Portfolio Ready",
+					message: "Generated portfolio.html and opened it in your browser.",
+				});
+			}
+
+			openInBrowser(pathToFileURL(path).href);
+		} catch (error) {
+			toast.show({
+				variant: "error",
+				title: "Portfolio Generation Failed",
+				message: toErrorMessage(error),
+				duration: 0,
+			});
+		} finally {
+			setIsPreparingPortfolio(false);
+			setPortfolioStatusMessage(null);
+		}
+	}, [
+		cloudPortfolioId,
+		cloudPortfolioPrepared,
+		cloudZipId,
+		isPreparingPortfolio,
+		state.selectedEmail,
+		state.selectedRepoIds,
+		toast,
+	]);
 
 	useEffect(() => {
 		if (screen === "landing") {
@@ -267,7 +382,7 @@ function App() {
 
 			case "cloud-resume":
 				if (key.name === "r") {
-					setScreen("landing");
+					resetLocalFlow();
 				} else if (key.name === "escape") {
 					renderer.destroy();
 				}
@@ -324,11 +439,7 @@ function App() {
 						consentLevel={consentLevel}
 						projects={localProjects}
 						initialSelectedIds={state.selectedRepoIds}
-						initialEmail={
-							state.selectedEmail ??
-							cloudGitIdentity?.email ??
-							""
-						}
+						initialEmail={state.selectedEmail ?? cloudGitIdentity?.email ?? ""}
 						cloudLogin={cloudGitIdentity?.login}
 						cloudName={cloudGitIdentity?.name}
 						onContinue={(result) => {
@@ -357,7 +468,7 @@ function App() {
 				return null;
 
 			case "pipeline-launch":
-				// Legacy — falls through to analysis
+			// Legacy — falls through to analysis
 			case "analysis":
 				return (
 					<SnakeWithProgress
@@ -379,9 +490,7 @@ function App() {
 
 			case "draft-pause":
 				return (
-					<DraftPauseScreen
-						onNext={(target) => setScreen(target as Screen)}
-					/>
+					<DraftPauseScreen onNext={(target) => setScreen(target as Screen)} />
 				);
 
 			case "resume-preview":
@@ -395,27 +504,30 @@ function App() {
 
 			case "cloud-generation":
 				return (
-						<CloudFlow
-							zipPath={filePath}
-							modelId={cloudModelId}
-							gitIdentity={cloudGitIdentity}
-							selectedRepoPaths={state.selectedRepoIds}
-							onComplete={({ profile, portfolioId }) => {
-								setCloudProfile(profile);
-								setCloudPortfolioId(portfolioId);
-								setScreen("cloud-resume");
-							}}
-							onBack={() => setScreen("configure")}
-						/>
+					<CloudFlow
+						zipPath={filePath}
+						modelId={cloudModelId}
+						gitIdentity={cloudGitIdentity}
+						selectedRepoPaths={state.selectedRepoIds}
+						onComplete={({ profile, portfolioId, zipId }) => {
+							setCloudProfile(profile);
+							setCloudPortfolioId(portfolioId);
+							setCloudZipId(zipId);
+							setScreen("cloud-resume");
+						}}
+						onBack={() => setScreen("configure")}
+					/>
 				);
 
 			case "cloud-resume":
 				return cloudProfile ? (
 					<CloudResumePreview
 						profile={cloudProfile}
-						portfolioId={cloudPortfolioId ?? ""}
-						onBack={() => setScreen("cloud-generation")}
-						onRestart={() => setScreen("landing")}
+						onOpenPortfolio={() => {
+							void openCloudPortfolio();
+						}}
+						isOpeningPortfolio={isPreparingPortfolio}
+						portfolioStatusMessage={portfolioStatusMessage}
 					/>
 				) : null;
 

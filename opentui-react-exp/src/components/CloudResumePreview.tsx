@@ -1,5 +1,4 @@
-import { pathToFileURL } from "node:url";
-import { useCallback, useState } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useKeyboard } from "@opentui/react";
 import type {
 	DeveloperProfile,
@@ -9,19 +8,24 @@ import type {
 	ProjectCard,
 	TalkingPoint,
 } from "../api/types";
-import { api } from "../api/endpoints";
 import { theme } from "../types";
-import { useToast } from "./Toast";
 import { TopBar } from "./TopBar";
-import { openInBrowser } from "./cloud-ai/shared";
 
 // ── Tab definitions ──────────────────────────────────────────────
 
 type Tab = "resume" | "insights" | "projects";
 
 const TABS: Array<{ name: string; description: string; value: Tab }> = [
-	{ name: "Insights", description: "Developer DNA, strengths, and impact", value: "insights" },
-	{ name: "Projects", description: "Project-by-project skill cards", value: "projects" },
+	{
+		name: "Insights",
+		description: "Developer DNA, strengths, and impact",
+		value: "insights",
+	},
+	{
+		name: "Projects",
+		description: "Project-by-project skill cards",
+		value: "projects",
+	},
 	{ name: "Resume", description: "Your generated resume", value: "resume" },
 ];
 
@@ -29,9 +33,9 @@ const TABS: Array<{ name: string; description: string; value: Tab }> = [
 
 interface CloudResumePreviewProps {
 	profile: DeveloperProfile;
-	portfolioId: string;
-	onBack: () => void;
-	onRestart: () => void;
+	onOpenPortfolio: () => void;
+	isOpeningPortfolio: boolean;
+	portfolioStatusMessage: string | null;
 }
 
 // ── Inline markdown renderer ─────────────────────────────────────
@@ -62,7 +66,7 @@ function parseMarkdown(raw: string): MdBlock[] {
 }
 
 function InlineText({ text }: { text: string }) {
-	const parts: JSX.Element[] = [];
+	const parts: ReactNode[] = [];
 	const pattern = /\*\*(.+?)\*\*|`(.+?)`/g;
 	let last = 0;
 	let match: RegExpExecArray | null;
@@ -108,9 +112,9 @@ function ResumeTab({ markdown }: { markdown: string }) {
 	// Drop the leading H1 ("Resume") and any blank lines right after it —
 	// the tab label already identifies this section.
 	let startIdx = 0;
-	if (allBlocks.length > 0 && allBlocks[0].type === "h1") {
+	if (allBlocks[0]?.type === "h1") {
 		startIdx = 1;
-		while (startIdx < allBlocks.length && allBlocks[startIdx].type === "blank") {
+		while (allBlocks[startIdx]?.type === "blank") {
 			startIdx++;
 		}
 	}
@@ -207,7 +211,11 @@ function DNACard({ dna }: { dna: DeveloperProfile["developer_dna"] }) {
 	);
 }
 
-function HiddenStrengthsSection({ strengths }: { strengths: HiddenStrength[] }) {
+function HiddenStrengthsSection({
+	strengths,
+}: {
+	strengths: HiddenStrength[];
+}) {
 	if (strengths.length === 0) return null;
 	return (
 		<box flexDirection="column" marginTop={2}>
@@ -369,7 +377,9 @@ function ImpactSection({ impact }: { impact: Impact }) {
 				<box flexDirection="column" paddingLeft={1} marginBottom={1}>
 					<text>
 						<span fg={theme.cyan}>Workflow </span>
-						<span fg={theme.textSecondary}>{impact.collaboration.workflow_style}</span>
+						<span fg={theme.textSecondary}>
+							{impact.collaboration.workflow_style}
+						</span>
 					</text>
 					{impact.collaboration.branch_count > 0 ? (
 						<text>
@@ -382,7 +392,8 @@ function ImpactSection({ impact }: { impact: Impact }) {
 			)}
 
 			{/* Complexity */}
-			{(impact.complexity.project_types.length > 0 || impact.complexity.distinct_tools.length > 0) && (
+			{(impact.complexity.project_types.length > 0 ||
+				impact.complexity.distinct_tools.length > 0) && (
 				<box flexDirection="column" paddingLeft={1}>
 					<text>
 						<span fg={theme.cyan}>Breadth </span>
@@ -503,49 +514,36 @@ function ProjectsTab({ projects }: { projects: ProjectCard[] }) {
 
 export function CloudResumePreview({
 	profile,
-	portfolioId,
-	onBack,
-	onRestart,
+	onOpenPortfolio,
+	isOpeningPortfolio,
+	portfolioStatusMessage,
 }: CloudResumePreviewProps) {
 	const [activeTab, setActiveTab] = useState<Tab>("insights");
-	const [isGeneratingPortfolio, setIsGeneratingPortfolio] = useState(false);
-	const toast = useToast();
 
-	const TAB_KEYS: Record<string, Tab> = { "1": "insights", "2": "projects", "3": "resume" };
-	const openPortfolioHtml = useCallback(async () => {
-		if (!portfolioId || isGeneratingPortfolio) return;
-		setIsGeneratingPortfolio(true);
-		try {
-			const response = await api.generatePortfolio(portfolioId);
-			openInBrowser(pathToFileURL(response.path).href);
-			toast.show({
-				variant: "success",
-				title: "Portfolio Ready",
-				message: "Generated portfolio.html and opened it in your browser.",
-			});
-		} catch (error) {
-			toast.show({
-				variant: "error",
-				title: "Portfolio Generation Failed",
-				message: error instanceof Error ? error.message : String(error),
-				duration: 0,
-			});
-		} finally {
-			setIsGeneratingPortfolio(false);
-		}
-	}, [isGeneratingPortfolio, portfolioId, toast]);
+	const TAB_KEYS: Record<string, Tab> = {
+		"1": "insights",
+		"2": "projects",
+		"3": "resume",
+	};
+	const openPortfolioHtml = useCallback(() => {
+		if (isOpeningPortfolio) return;
+		onOpenPortfolio();
+	}, [isOpeningPortfolio, onOpenPortfolio]);
 
 	useKeyboard(
-		useCallback((key: { name: string }) => {
-			const tab = TAB_KEYS[key.name];
-			if (tab) {
-				setActiveTab(tab);
-				return;
-			}
-			if (key.name === "o") {
-				void openPortfolioHtml();
-			}
-		}, [openPortfolioHtml]),
+		useCallback(
+			(key: { name: string }) => {
+				const tab = TAB_KEYS[key.name];
+				if (tab) {
+					setActiveTab(tab);
+					return;
+				}
+				if (key.name === "o") {
+					void openPortfolioHtml();
+				}
+			},
+			[openPortfolioHtml],
+		),
 	);
 
 	return (
@@ -555,36 +553,48 @@ export function CloudResumePreview({
 				description="Your AI-generated developer profile. Switch tabs to explore your resume, insights, and project analysis."
 			/>
 			<box
-				flexDirection="row"
-				justifyContent="space-between"
-				alignItems="center"
+				flexDirection="column"
 				paddingLeft={2}
 				paddingRight={2}
 				paddingBottom={1}
 			>
-				<text>
-					<span fg={theme.textDim}>Press </span>
-					<span fg={theme.cyan}>o</span>
-					<span fg={theme.textDim}> to generate and open your portfolio HTML.</span>
-				</text>
 				<box
-					border
-					borderStyle="rounded"
-					borderColor={isGeneratingPortfolio ? theme.textDim : theme.cyan}
-					paddingLeft={1}
-					paddingRight={1}
-					onMouseDown={() => {
-						void openPortfolioHtml();
-					}}
+					flexDirection="row"
+					justifyContent="space-between"
+					alignItems="center"
 				>
 					<text>
-						<span fg={isGeneratingPortfolio ? theme.textDim : theme.cyan}>
-							<strong>
-								{isGeneratingPortfolio ? "Generating..." : "Open Portfolio HTML"}
-							</strong>
+						<span fg={theme.textDim}>Press </span>
+						<span fg={theme.cyan}>o</span>
+						<span fg={theme.textDim}>
+							{" "}
+							to generate and open your portfolio HTML.
 						</span>
 					</text>
+					<box
+						border
+						borderStyle="rounded"
+						borderColor={isOpeningPortfolio ? theme.textDim : theme.cyan}
+						paddingLeft={1}
+						paddingRight={1}
+						onMouseDown={openPortfolioHtml}
+					>
+						<text>
+							<span fg={isOpeningPortfolio ? theme.textDim : theme.cyan}>
+								<strong>
+									{isOpeningPortfolio ? "Generating..." : "Open Portfolio HTML"}
+								</strong>
+							</span>
+						</text>
+					</box>
 				</box>
+				{portfolioStatusMessage ? (
+					<box marginTop={1}>
+						<text>
+							<span fg={theme.cyan}>{portfolioStatusMessage}</span>
+						</text>
+					</box>
+				) : null}
 			</box>
 
 			<box flexGrow={1} flexDirection="row">
@@ -618,9 +628,7 @@ export function CloudResumePreview({
 									</span>
 								</text>
 								<text>
-									<span fg={theme.textDim}>
-										{`   ${String(idx + 1)}`}
-									</span>
+									<span fg={theme.textDim}>{`   ${String(idx + 1)}`}</span>
 								</text>
 							</box>
 						);
@@ -643,9 +651,13 @@ export function CloudResumePreview({
 							viewportOptions: { padding: 2 },
 						}}
 					>
-						{activeTab === "resume" && <ResumeTab markdown={profile.resume_markdown} />}
+						{activeTab === "resume" && (
+							<ResumeTab markdown={profile.resume_markdown} />
+						)}
 						{activeTab === "insights" && <InsightsTab profile={profile} />}
-						{activeTab === "projects" && <ProjectsTab projects={profile.projects} />}
+						{activeTab === "projects" && (
+							<ProjectsTab projects={profile.projects} />
+						)}
 					</scrollbox>
 				</box>
 			</box>

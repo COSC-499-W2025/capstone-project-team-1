@@ -21,11 +21,19 @@ interface CloudFlowProps {
 	onComplete: (result: {
 		profile: DeveloperProfile;
 		portfolioId: string;
+		zipId: number;
 	}) => void;
 	onBack: () => void;
 }
 
-export function CloudFlow({ zipPath, modelId, gitIdentity, selectedRepoPaths, onComplete, onBack }: CloudFlowProps) {
+export function CloudFlow({
+	zipPath,
+	modelId,
+	gitIdentity,
+	selectedRepoPaths,
+	onComplete,
+	onBack,
+}: CloudFlowProps) {
 	return (
 		<SnakeWithProgress
 			mode="cloud"

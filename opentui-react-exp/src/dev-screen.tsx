@@ -23,7 +23,7 @@ function Harness() {
 				modelId="claude-haiku-4-5"
 				gitIdentity={null}
 				selectedRepoPaths={[]}
-				onComplete={(profile) => {
+				onComplete={({ profile }) => {
 					console.log("Profile ready:", profile.developer_dna.archetype);
 					process.exit(0);
 				}}
