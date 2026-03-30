@@ -21,7 +21,7 @@ This week I closed out the remaining Local LLM Runtime issues and shipped a majo
 
 **My Code Contributions For Week 12**:
 
-This was a huge week — I shipped both the PI Agent cloud-tier resume generation (4 stacked PRs) and closed out the remaining local LLM pipeline work (3 PRs). The local LLM pipeline is fully done and the cloud generation path via the PI Agent SDK is end-to-end functional.
+This was a huge week. I shipped both the PI Agent cloud-tier resume generation (4 stacked PRs) and closed out the remaining local LLM pipeline work (3 PRs). The local LLM pipeline is fully done and the cloud generation path via the PI Agent SDK is end-to-end functional.
 
 1. [PR #517](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/517) adds the PI Agent backend foundation — the core agent session lifecycle, system prompt template, and `DeveloperProfile` type contract for cloud-tier resume generation.
 2. [PR #518](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/518) adds the cloud auth, model selection, and consent flow — 6 new UI components (`CloudAuth`, `CopilotLogin`, `ModelList`, `ModelPicker`, `SnakeGame`, `shared.ts`) forming the consent → device code login → model selection pipeline.
@@ -41,7 +41,7 @@ This was a huge week — I shipped both the PI Agent cloud-tier resume generatio
 6. Reviewed [Stavan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/523) as he rewrote the root navigation in the OpenTUI migration. Approved.
 7. Reviewed [Nathan's PR](https://github.com/COSC-499-W2025/capstone-project-team-1/pull/527) as he removed the OpenAI dependency and updated surface docs for Issue #446. Approved.
 
-![T2Week11](T2Week11.png)
+![T2Week11](T2Week12.png)
 
 ## Term 2 Week 10: Mar 9- Mar 15
 **My Code Contributions For Week 10**:
