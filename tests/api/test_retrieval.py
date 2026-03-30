@@ -135,11 +135,13 @@ def client_with_data():
             project_name="OldProject",
             project_path="/repo1",
             user_role="Contributor",
+            daily_commits={"2024-01-01": 1, "2024-01-02": 2},
         ),
         UserRepoStat(
             project_name="NewProject",
             project_path="/repo2",
             user_role="Lead Developer",
+            daily_commits={"2024-01-02": 3, "2024-01-03": 4},
         ),
     ]
     db.add_all(
@@ -304,6 +306,37 @@ def test_summaries_empty(client_empty):
     resp = client_empty.get("/summaries?user_email=anyone@example.com")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+# === /activity/heatmap ===
+
+
+def test_activity_heatmap_aggregates_daily_commits(client_with_data):
+    """Returns summed per-day commit counts across all user repo stats."""
+    resp = client_with_data.get("/activity/heatmap?user_email=stavan@example.com")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["daily_activity"] == {
+        "2024-01-01": 1,
+        "2024-01-02": 5,
+        "2024-01-03": 4,
+    }
+    assert data["total_days_active"] == 3
+    assert data["max_daily_commits"] == 5
+    assert data["date_range"] == {"start": "2024-01-01", "end": "2024-01-03"}
+
+
+def test_activity_heatmap_empty(client_empty):
+    """Returns empty heatmap payload when no daily data exists."""
+    resp = client_empty.get("/activity/heatmap?user_email=anyone@example.com")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["daily_activity"] == {}
+    assert data["total_days_active"] == 0
+    assert data["max_daily_commits"] == 0
+    assert data["date_range"] == {"start": None, "end": None}
 
 # === /AI_summaries ===
 

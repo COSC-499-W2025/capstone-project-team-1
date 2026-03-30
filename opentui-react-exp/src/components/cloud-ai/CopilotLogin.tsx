@@ -2,6 +2,7 @@ import { useKeyboard } from "@opentui/react";
 import { useEffect, useRef, useState } from "react";
 import { fetchGitHubUser, type GitHubUser, loginCopilot } from "../../agent";
 import { theme } from "../../types";
+import { useToast } from "../Toast";
 import { TopBar } from "../TopBar";
 import { openInBrowser, spinnerFrames } from "./shared";
 
@@ -11,20 +12,21 @@ interface CopilotLoginProps {
 }
 
 export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
+	const toast = useToast();
 	const [deviceUrl, setDeviceUrl] = useState<string | null>(null);
 	const [deviceCode, setDeviceCode] = useState<string | null>(null);
 	const [loginProgress, setLoginProgress] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [hasError, setHasError] = useState(false);
 	const [spinnerIndex, setSpinnerIndex] = useState(0);
 	const abortRef = useRef<AbortController | null>(null);
 
 	useEffect(() => {
-		if (error) return;
+		if (hasError) return;
 		const interval = setInterval(() => {
 			setSpinnerIndex((i) => (i + 1) % spinnerFrames.length);
 		}, 80);
 		return () => clearInterval(interval);
-	}, [error]);
+	}, [hasError]);
 
 	useEffect(() => {
 		const abortController = new AbortController();
@@ -54,14 +56,20 @@ export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
 				onLoginSuccess(user);
 			} catch (err) {
 				if (abortController.signal.aborted) return;
-				setError(err instanceof Error ? err.message : String(err));
+				setHasError(true);
+				toast.show({
+					variant: "error",
+					title: "Login Failed",
+					message: err instanceof Error ? err.message : String(err),
+					duration: 0,
+				});
 			}
 		})();
 
 		return () => {
 			abortController.abort();
 		};
-	}, [onLoginSuccess]);
+	}, [onLoginSuccess, toast]);
 
 	useKeyboard((key) => {
 		if (key.name === "escape") {
@@ -84,18 +92,10 @@ export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
 				justifyContent="center"
 				gap={3}
 			>
-				{error ? (
-					<box
-						border
-						borderStyle="single"
-						borderColor={theme.error}
-						padding={2}
-						width={60}
-					>
-						<text wrap selectable>
-							<span fg={theme.error}>{error}</span>
-						</text>
-					</box>
+				{hasError ? (
+					<text>
+						<span fg={theme.error}>Login failed. Press Esc to go back and try again.</span>
+					</text>
 				) : deviceUrl && deviceCode ? (
 					<>
 						<text>
@@ -159,7 +159,7 @@ export function CopilotLogin({ onLoginSuccess, onBack }: CopilotLoginProps) {
 					padding={1}
 					width={55}
 				>
-					<text wrap>
+					<text>
 						<span fg={theme.textDim}>
 							Students with GitHub Education get free access to Copilot, which
 							includes Claude and GPT models at no cost.

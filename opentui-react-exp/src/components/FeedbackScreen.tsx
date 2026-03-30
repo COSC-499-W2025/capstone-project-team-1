@@ -4,6 +4,7 @@ import { api } from "../api/endpoints";
 import { useAppState } from "../context/AppContext";
 import { theme } from "../types";
 import { keyedLines, resumeToLines, toErrorMessage } from "../utils";
+import { useToast } from "./Toast";
 import { TopBar } from "./TopBar";
 
 interface FeedbackScreenProps {
@@ -19,6 +20,7 @@ function parseList(value: string): string[] {
 
 export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 	const { state, setPipelineNotice, setPipelineStatus } = useAppState();
+	const toast = useToast();
 	const [focusIndex, setFocusIndex] = useState(0);
 	const [generalNotes, setGeneralNotes] = useState("");
 	const [tone, setTone] = useState("");
@@ -26,7 +28,6 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 	const [removalsText, setRemovalsText] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isCancelling, setIsCancelling] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	const draftLines = useMemo(
 		() => resumeToLines(state.resumeV3Draft),
@@ -39,15 +40,15 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 
 	const submitFeedback = async () => {
 		if (!state.pipelineJobId) {
-			setError("No active pipeline job.");
+			toast.show({ variant: "error", message: "No active pipeline job." });
 			return;
 		}
 		if (isSubmitting || isCancelling) {
 			return;
 		}
 
-		setError(null);
 		setIsSubmitting(true);
+		toast.show({ variant: "info", message: "Submitting feedback...", duration: 3000 });
 		try {
 			await api.polishPipeline({
 				general_notes: generalNotes.trim(),
@@ -57,7 +58,7 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 			});
 			onNext("analysis");
 		} catch (submitError) {
-			setError(toErrorMessage(submitError));
+			toast.show({ variant: "error", message: toErrorMessage(submitError), duration: 0 });
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -65,21 +66,22 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 
 	const cancelJob = async () => {
 		if (!state.pipelineJobId) {
-			setError("No active pipeline job to cancel.");
+			toast.show({ variant: "error", message: "No active pipeline job to cancel." });
 			return;
 		}
 		if (isCancelling || isSubmitting) {
 			return;
 		}
 		setIsCancelling(true);
-		setError(null);
+		toast.show({ variant: "info", message: "Cancelling pipeline...", duration: 3000 });
 		try {
 			await api.cancelPipeline();
 			setPipelineStatus("cancelled");
 			setPipelineNotice("Pipeline cancelled from feedback screen.");
+			toast.show({ variant: "warning", title: "Cancelled", message: "Pipeline was cancelled." });
 			onNext("project-list");
 		} catch (cancelError) {
-			setError(toErrorMessage(cancelError));
+			toast.show({ variant: "error", message: toErrorMessage(cancelError), duration: 0 });
 		} finally {
 			setIsCancelling(false);
 		}
@@ -190,32 +192,6 @@ export function FeedbackScreen({ onNext }: FeedbackScreenProps) {
 						</span>
 					</text>
 				</box>
-			</box>
-
-			<box
-				paddingLeft={2}
-				paddingRight={2}
-				paddingBottom={1}
-				flexDirection="column"
-				gap={1}
-			>
-				{isSubmitting ? (
-					<text>
-						<span fg={theme.cyan}>
-							Submitting feedback and starting Stage 3...
-						</span>
-					</text>
-				) : null}
-				{isCancelling ? (
-					<text>
-						<span fg={theme.warning}>Cancelling pipeline...</span>
-					</text>
-				) : null}
-				{error ? (
-					<text>
-						<span fg={theme.error}>{error}</span>
-					</text>
-				) : null}
 			</box>
 		</box>
 	);

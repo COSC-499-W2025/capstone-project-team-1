@@ -1,4 +1,11 @@
-import { createContext, useCallback, useContext, useState, useEffect, type ReactNode } from "react";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useState,
+	useEffect,
+	type ReactNode,
+} from "react";
 import { useTerminalDimensions, useTimeline } from "@opentui/react";
 import { theme } from "../types";
 
@@ -33,27 +40,36 @@ const VARIANT_COLORS: Record<ToastVariant, string> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
 	const [toast, setToast] = useState<ToastState | null>(null);
-	const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout> | null>(null);
+	const [timeoutId, setTimeoutId] = useState<ReturnType<
+		typeof setTimeout
+	> | null>(null);
 
 	const dismiss = useCallback(() => setToast(null), []);
 
-	const show = useCallback((options: ToastOptions) => {
-		if (timeoutId) clearTimeout(timeoutId);
-		setToast({
-			message: options.message,
-			title: options.title,
-			variant: options.variant ?? "info",
-		});
-		const id = setTimeout(() => {
-			setToast(null);
-		}, options.duration ?? 5000);
-		setTimeoutId(id);
-	}, [timeoutId]);
+	const show = useCallback(
+		(options: ToastOptions) => {
+			if (timeoutId) clearTimeout(timeoutId);
+			setToast({
+				message: options.message,
+				title: options.title,
+				variant: options.variant ?? "info",
+			});
+			const id = setTimeout(() => {
+				setToast(null);
+			}, options.duration ?? 5000);
+			setTimeoutId(id);
+		},
+		[timeoutId],
+	);
 
-	const error = useCallback((err: unknown) => {
-		const message = err instanceof Error ? err.message : "An unknown error occurred";
-		show({ variant: "error", message });
-	}, [show]);
+	const error = useCallback(
+		(err: unknown) => {
+			const message =
+				err instanceof Error ? err.message : "An unknown error occurred";
+			show({ variant: "error", message });
+		},
+		[show],
+	);
 
 	return (
 		<ToastContext.Provider value={{ show, error, dismiss }}>
@@ -74,7 +90,13 @@ const VARIANT_ICONS: Record<ToastVariant, string> = {
 	error: "❌",
 };
 
-function ToastDisplay({ toast, onDismiss }: { toast: ToastState; onDismiss: () => void }) {
+function ToastDisplay({
+	toast,
+	onDismiss,
+}: {
+	toast: ToastState;
+	onDismiss: () => void;
+}) {
 	const { width } = useTerminalDimensions();
 	const color = VARIANT_COLORS[toast.variant];
 	const [offset, setOffset] = useState(40);
@@ -87,7 +109,7 @@ function ToastDisplay({ toast, onDismiss }: { toast: ToastState; onDismiss: () =
 			{
 				offset: 0,
 				duration: 200,
-				ease: "easeInCubic",
+				ease: "outQuad",
 				onUpdate: (anim) => {
 					setOffset(Math.round(anim.targets[0].offset));
 				},
@@ -103,7 +125,13 @@ function ToastDisplay({ toast, onDismiss }: { toast: ToastState; onDismiss: () =
 				paddingRight={2}
 				paddingTop={1}
 				paddingBottom={1}
-				backgroundColor={toast.variant === "success" ? "#0a2e0a" : toast.variant === "error" ? "#2e0a0a" : theme.bgMedium}
+				backgroundColor={
+					toast.variant === "success"
+						? "#0a2e0a"
+						: toast.variant === "error"
+							? "#2e0a0a"
+							: theme.bgMedium
+				}
 				border
 				borderStyle="rounded"
 				borderColor={color}
@@ -111,7 +139,9 @@ function ToastDisplay({ toast, onDismiss }: { toast: ToastState; onDismiss: () =
 			>
 				{toast.title ? (
 					<text>
-						<span fg={color}><strong>{toast.title}</strong></span>
+						<span fg={color}>
+							<strong>{toast.title}</strong>
+						</span>
 					</text>
 				) : null}
 				<text>

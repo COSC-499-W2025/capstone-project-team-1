@@ -22,7 +22,6 @@ dependencies = [
   "aiosqlite>=0.19",
   "email_validator>=2.3.0",
   "python-multipart>=0.0.20",
-  "ollama>=0.4.0",
   "pypdf",
   "requests"
 ]

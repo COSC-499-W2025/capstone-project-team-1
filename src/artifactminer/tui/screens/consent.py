@@ -171,8 +171,13 @@ class ConsentScreen(Screen[None]):
             )
 
     def _set_selection(self, level: str) -> None:
-        self.selected_level = level
-        message = self.SELECTED_FULL if level == "full" else self.SELECTED_NO_LLM
+        if level == "full":
+            # Normalize to the API-backed consent value.
+            self.selected_level = "local-llm"
+            message = self.SELECTED_FULL
+        else:
+            self.selected_level = "no_llm"
+            message = self.SELECTED_NO_LLM
         self._update_status(message, error=False)
 
     def _update_status(self, message: str, *, error: bool) -> None:

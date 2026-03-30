@@ -45,7 +45,7 @@ class Consent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     consent_level = Column(String, default="none", nullable=False) # e.g., "none", "local", "local-llm", "cloud"
-    LLM_model = Column(String, default="chatGPT", nullable=False) # e.g., "ollama", "chatGPT"
+    LLM_model = Column(String, default="chatGPT", nullable=False) # legacy provider-selection field retained for compatibility
     accepted_at = Column(DateTime, nullable=True)
 
 class RepoStat(Base):#model for storing repository statistics
@@ -89,6 +89,7 @@ class UserRepoStat(Base):#model for storing user-specific repository statistics 
     first_commit = Column(DateTime, nullable=True)
     last_commit = Column(DateTime, nullable=True)
     total_commits = Column(Integer, nullable=True)
+    daily_commits = Column(JSON, nullable=True)
     userStatspercentages = Column(
         Float, nullable=True
     )  # Percentage of user's contributions compared to total repo activity
@@ -283,6 +284,51 @@ class RepresentationPrefs(Base):
 
     portfolio_id = Column(String, primary_key=True)
     prefs_json = Column(Text, nullable=False, default="{}")
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
+
+
+class Education(Base):
+    """Stores education entries for portfolio."""
+
+    __tablename__ = "education"
+
+    id = Column(Integer, primary_key=True, index=True)
+    portfolio_id = Column(String, nullable=False, index=True)
+    institution = Column(String, nullable=False)
+    degree = Column(String, nullable=False)
+    field_of_study = Column(String, nullable=True)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=True)
+    gpa = Column(String, nullable=True)
+    honors = Column(String, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
+    updated_at = Column(
+        DateTime,
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
+        onupdate=lambda: datetime.now(UTC).replace(tzinfo=None),
+    )
+
+
+class Award(Base):
+    """Stores award entries for portfolio."""
+
+    __tablename__ = "awards"
+
+    id = Column(Integer, primary_key=True, index=True)
+    portfolio_id = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    issuer = Column(String, nullable=False)
+    date = Column(Date, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(
+        DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None)
+    )
     updated_at = Column(
         DateTime,
         default=lambda: datetime.now(UTC).replace(tzinfo=None),

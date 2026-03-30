@@ -94,3 +94,4 @@ projects/
 .opencode
 .worktrees/
 node_modules/
+.gstack/

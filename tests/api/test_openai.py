@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+pytestmark = pytest.mark.skip(
+    reason="OpenAI endpoint removed from this branch; tests retained for history"
+)
+
 """
 # Run all OpenAI endpoint tests
 uv run pytest tests/api/test_openai.py -v

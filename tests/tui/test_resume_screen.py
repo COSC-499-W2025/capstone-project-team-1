@@ -146,5 +146,5 @@ def test_export_text_creates_file(tmp_path: Path) -> None:
     
     assert path.exists()
     content = path.read_text()
-    assert "RESUME EXPORT" in content
+    assert "PORTFOLIO ANALYSIS EXPORT" in content
     assert "Test Project" in content

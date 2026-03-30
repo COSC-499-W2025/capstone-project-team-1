@@ -16,6 +16,8 @@ from .models import (
     UserAIntelligenceSummary,
     ProjectEvidence,
     RepresentationPrefs,
+    Education,
+    Award,
 )
 from .seed import seed_questions, seed_repo_stats
 
@@ -38,6 +40,8 @@ __all__ = [
     "UserAIntelligenceSummary",
     "ProjectEvidence",
     "RepresentationPrefs",
+    "Education",
+    "Award",
     "seed_questions",
     "seed_repo_stats",
 ]

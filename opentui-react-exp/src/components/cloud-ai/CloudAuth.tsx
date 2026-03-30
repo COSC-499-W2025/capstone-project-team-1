@@ -1,44 +1,60 @@
 /**
- * Auth gate + model picker for the cloud flow.
+ * Auth gate for the cloud flow.
  *
  * Checks for existing credentials on mount:
- * - If already authenticated → fetches GitHub profile, shows success card + model picker
- * - If not authenticated → renders CopilotLogin until auth succeeds, then shows model picker
+ * - If already authenticated → auto-completes with default model + user info, skips ahead
+ * - If not authenticated → renders CopilotLogin until auth succeeds, then auto-completes
+ *
+ * Model selection and email entry happen in ConfigureScreen (the unified flow).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
 	checkAvailableModels,
 	fetchGitHubUser,
 	type GitHubUser,
 } from "../../agent";
-import { theme } from "../../types";
-import { TopBar } from "../TopBar";
 import { CopilotLogin } from "./CopilotLogin";
-import { ModelList, type ModelListResult } from "./ModelList";
+import { DEFAULT_MODEL_ID } from "./ModelPicker";
+import type { ModelListResult } from "./ModelList";
 
 interface CloudAuthProps {
 	onComplete: (result: ModelListResult) => void;
 	onBack: () => void;
 }
 
-type AuthState = "checking" | "needs-login" | "pick-model";
+type AuthState = "checking" | "needs-login" | "completing";
 
 export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 	const [state, setState] = useState<AuthState>("checking");
-	const [ghUser, setGhUser] = useState<GitHubUser | null>(null);
+
+	const completeWithUser = useCallback(
+		(user: GitHubUser | null) => {
+			onComplete({
+				modelId: DEFAULT_MODEL_ID,
+				gitIdentity: {
+					login: user?.login ?? "",
+					name: user?.name ?? null,
+					email: user?.email ?? "",
+				},
+			});
+		},
+		[onComplete],
+	);
 
 	useEffect(() => {
 		(async () => {
 			try {
 				const result = await checkAvailableModels();
 				if (result.hasCopilot) {
+					// Already authenticated → fetch user and skip ahead
+					setState("completing");
+					let user: GitHubUser | null = null;
 					try {
-						const user = await fetchGitHubUser();
-						setGhUser(user);
+						user = await fetchGitHubUser();
 					} catch {
-						// Non-fatal
+						// Non-fatal — proceed without user info
 					}
-					setState("pick-model");
+					completeWithUser(user);
 				} else {
 					setState("needs-login");
 				}
@@ -46,34 +62,18 @@ export function CloudAuth({ onComplete, onBack }: CloudAuthProps) {
 				setState("needs-login");
 			}
 		})();
-	}, []);
+	}, [completeWithUser]);
 
-	if (state === "checking") return null;
+	// While checking or completing, render nothing (instant transition)
+	if (state === "checking" || state === "completing") return null;
 
-	if (state === "needs-login") {
-		return (
-			<CopilotLogin
-				onLoginSuccess={(user) => {
-					setGhUser(user);
-					setState("pick-model");
-				}}
-				onBack={onBack}
-			/>
-		);
-	}
-
+	// Not authenticated — show login flow
 	return (
-		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
-			<TopBar
-				title="GitHub Copilot Login"
-				description="Sign in with your GitHub account to use AI-powered resume generation."
-			/>
-			<ModelList
-				successMessage="✓ Already logged in to GitHub Copilot"
-				user={ghUser}
-				onSelect={onComplete}
-				onBack={onBack}
-			/>
-		</box>
+		<CopilotLogin
+			onLoginSuccess={(user) => {
+				completeWithUser(user);
+			}}
+			onBack={onBack}
+		/>
 	);
 }

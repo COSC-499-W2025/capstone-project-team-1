@@ -19,12 +19,12 @@ from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
 )
 from artifactminer.RepositoryIntelligence.repo_intelligence_user import (
     getUserRepoStats,
+    get_daily_commit_counts,
     saveUserRepoStats,
     generate_summaries_for_ranked
 )
 from artifactminer.helpers.project_ranker import rank_projects
 from artifactminer.helpers.zip_utils import safe_extract_zip
-from artifactminer.RepositoryIntelligence.repo_intelligence_AI import set_user_consent
 import pytest
 
 
@@ -48,9 +48,6 @@ async def test_full_pipeline_zip_to_summaries():
         db.query(UserAnswer).delete()
         db.commit()
         
-        set_user_consent("full")  # Disable LLM calls for testing
-
-
         # 1. Insert user config (email)
         test_email = "shlok10@student.ubc.ca"
         user_answer = UserAnswer(question_id=1, answer_text=test_email)
@@ -92,6 +89,7 @@ async def test_full_pipeline_zip_to_summaries():
             saveRepoStats(repo_stats)
 
             user_stats = getUserRepoStats(str(repo), test_email)
+            user_stats.daily_commits = get_daily_commit_counts(str(repo), test_email)
             saveUserRepoStats(user_stats)
 
         # 6. Rank repos (using existing helper)
@@ -115,6 +113,10 @@ async def test_full_pipeline_zip_to_summaries():
         # 9. Assert summaries created
         assert len(summaries) > 0
         assert len(summaries) <= 3
+
+        stored_user_stats = db.query(UserRepoStat).all()
+        assert stored_user_stats
+        assert any(stat.daily_commits for stat in stored_user_stats)
 
         # Also verify DB persisted entries
         stored = db.query(UserAIntelligenceSummary).all()

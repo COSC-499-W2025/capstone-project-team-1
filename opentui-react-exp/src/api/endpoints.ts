@@ -2,10 +2,14 @@ import { ApiClient } from "./client";
 import type {
 	AnalysisResponse,
 	AnswersRequest,
+	Award,
+	AwardCreateRequest,
 	ConsentLevel,
 	ConsentResponse,
 	DeleteResponse,
 	DirectoriesResponse,
+	Education,
+	EducationCreateRequest,
 	ExtractLocalResponse,
 	PipelineCancelResponse,
 	PipelineContributorsRequest,
@@ -48,11 +52,11 @@ export const api = {
 	getQuestions: (): Promise<Question[]> => client.get("/questions"),
 	submitAnswers: (answers: AnswersRequest["answers"]): Promise<UserAnswer[]> =>
 		client.post("/answers", { answers }),
-	uploadZip: (file: Blob, portfolioId?: string): Promise<UploadResponse> => {
+	uploadZip: (file: Blob, portfolioId?: string, filename = "upload.zip"): Promise<UploadResponse> => {
 		const path = portfolioId
 			? `/zip/upload?portfolio_id=${encodeURIComponent(portfolioId)}`
 			: "/zip/upload";
-		return client.uploadFile(path, file);
+		return client.uploadFile(path, file, "file", undefined, filename);
 	},
 	listDirectories: (zipId: number): Promise<DirectoriesResponse> =>
 		client.get(`/zip/${zipId}/directories`),
@@ -102,4 +106,28 @@ export const api = {
 
 	extractLocal: (zipId: number): Promise<ExtractLocalResponse> =>
 		client.post("/zip/extract-local", { zip_id: zipId }),
+
+	// Education endpoints
+	listEducation: (portfolioId: string): Promise<Education[]> =>
+		client.get(withQuery("/education", { portfolio_id: portfolioId })),
+	getEducation: (id: number, portfolioId?: string): Promise<Education> =>
+		client.get(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
+	createEducation: (portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
+		client.post(withQuery("/education", { portfolio_id: portfolioId }), data),
+	updateEducation: (id: number, portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
+		client.put(withQuery(`/education/${id}`, { portfolio_id: portfolioId }), data),
+	deleteEducation: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
+
+	// Award endpoints
+	listAwards: (portfolioId: string): Promise<Award[]> =>
+		client.get(withQuery("/awards", { portfolio_id: portfolioId })),
+	getAward: (id: number, portfolioId?: string): Promise<Award> =>
+		client.get(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
+	createAward: (portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
+		client.post(withQuery("/awards", { portfolio_id: portfolioId }), data),
+	updateAward: (id: number, portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
+		client.put(withQuery(`/awards/${id}`, { portfolio_id: portfolioId }), data),
+	deleteAward: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
 };

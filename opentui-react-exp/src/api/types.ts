@@ -4,12 +4,6 @@ export type ConsentLevel =
 	| "local-llm"
 	| "cloud";
 
-// Legacy generation responses may still use pre-PR1a consent labels.
-export type AnalysisConsentLevel =
-	| ConsentLevel
-	| "no_llm"
-	| "full";
-
 export interface ConsentResponse {
 	consent_level: ConsentLevel;
 	accepted_at: string | null;
@@ -127,7 +121,7 @@ export interface AnalysisResponse {
 	repos_analyzed: RepoAnalysisResult[];
 	rankings: RankingResult[];
 	summaries: SummaryResult[];
-	consent_level: AnalysisConsentLevel;
+	consent_level: ConsentLevel;
 	user_email: string;
 }
 
@@ -274,6 +268,50 @@ export interface PipelinePolishResponse {
 export interface PipelineCancelResponse {
 	ok: boolean;
 	status: PipelineJobStatus;
+}
+
+// ── Education & Awards types ──────────────────────────────────────
+
+export interface Education {
+	id: number;
+	portfolio_id: string;
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface EducationCreateRequest {
+	institution: string;
+	degree: string;
+	field_of_study?: string | null;
+	start_date: string;
+	end_date?: string | null;
+	gpa?: string | null;
+	honors?: string | null;
+}
+
+export interface Award {
+	id: number;
+	portfolio_id: string;
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface AwardCreateRequest {
+	title: string;
+	issuer: string;
+	date: string;
+	description?: string | null;
 }
 
 // ── Structured developer profile (cloud AI output) ──────────────
