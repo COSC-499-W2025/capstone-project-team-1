@@ -121,13 +121,13 @@ export const api = {
 
 	// Award endpoints
 	listAwards: (portfolioId: string): Promise<Award[]> =>
-		client.get(withQuery("/education/awards", { portfolio_id: portfolioId })),
+		client.get(withQuery("/awards", { portfolio_id: portfolioId })),
 	getAward: (id: number, portfolioId?: string): Promise<Award> =>
-		client.get(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId })),
+		client.get(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
 	createAward: (portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
-		client.post(withQuery("/education/awards", { portfolio_id: portfolioId }), data),
+		client.post(withQuery("/awards", { portfolio_id: portfolioId }), data),
 	updateAward: (id: number, portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
-		client.put(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId }), data),
+		client.put(withQuery(`/awards/${id}`, { portfolio_id: portfolioId }), data),
 	deleteAward: (id: number, portfolioId: string): Promise<DeleteResponse> =>
-		client.delete(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId })),
+		client.delete(withQuery(`/awards/${id}`, { portfolio_id: portfolioId })),
 };

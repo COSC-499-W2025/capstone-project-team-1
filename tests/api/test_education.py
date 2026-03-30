@@ -163,7 +163,11 @@ def test_delete_education(client):
 
     response = client.delete(f"/education/{education_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
-    assert "deleted" in response.json()["detail"].lower()
+    assert response.json() == {
+        "success": True,
+        "message": "Education entry deleted",
+        "deleted_id": education_id,
+    }
 
     get_response = client.get(f"/education/{education_id}?portfolio_id=test-portfolio")
     assert get_response.status_code == 404
@@ -222,7 +226,7 @@ def test_list_education_by_portfolio(client):
 
 def test_list_awards_empty(client):
     """Test listing awards when none exist."""
-    response = client.get("/education/awards/?portfolio_id=test-portfolio")
+    response = client.get("/awards?portfolio_id=test-portfolio")
     assert response.status_code == 200
     assert response.json() == []
 
@@ -236,7 +240,7 @@ def test_create_award(client):
         "description": "Awarded for exceptional contribution to open source",
     }
     response = client.post(
-        "/education/awards/?portfolio_id=test-portfolio",
+        "/awards?portfolio_id=test-portfolio",
         json=payload,
     )
     assert response.status_code == 200
@@ -257,7 +261,7 @@ def test_create_award_minimal(client):
         "date": "2024-01-01",
     }
     response = client.post(
-        "/education/awards/?portfolio_id=test-portfolio",
+        "/awards?portfolio_id=test-portfolio",
         json=payload,
     )
     assert response.status_code == 200
@@ -273,12 +277,12 @@ def test_get_award(client):
         "date": "2023-09-01",
     }
     create_response = client.post(
-        "/education/awards/?portfolio_id=test-portfolio",
+        "/awards?portfolio_id=test-portfolio",
         json=payload,
     )
     award_id = create_response.json()["id"]
 
-    response = client.get(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
+    response = client.get(f"/awards/{award_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == award_id
@@ -287,7 +291,7 @@ def test_get_award(client):
 
 def test_get_award_not_found(client):
     """Test retrieving non-existent award."""
-    response = client.get("/education/awards/99999?portfolio_id=test-portfolio")
+    response = client.get("/awards/99999?portfolio_id=test-portfolio")
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -300,7 +304,7 @@ def test_update_award(client):
         "date": "2024-01-01",
     }
     create_response = client.post(
-        "/education/awards/?portfolio_id=test-portfolio",
+        "/awards?portfolio_id=test-portfolio",
         json=payload,
     )
     award_id = create_response.json()["id"]
@@ -312,7 +316,7 @@ def test_update_award(client):
         "description": "For outstanding engineering achievements",
     }
     response = client.put(
-        f"/education/awards/{award_id}?portfolio_id=test-portfolio",
+        f"/awards/{award_id}?portfolio_id=test-portfolio",
         json=update_payload,
     )
     assert response.status_code == 200
@@ -329,7 +333,7 @@ def test_update_award_wrong_portfolio(client):
         "date": "2024-01-01",
     }
     create_response = client.post(
-        "/education/awards/?portfolio_id=portfolio-a",
+        "/awards?portfolio_id=portfolio-a",
         json=payload,
     )
     award_id = create_response.json()["id"]
@@ -340,7 +344,7 @@ def test_update_award_wrong_portfolio(client):
         "date": "2024-03-15",
     }
     response = client.put(
-        f"/education/awards/{award_id}?portfolio_id=portfolio-b",
+        f"/awards/{award_id}?portfolio_id=portfolio-b",
         json=update_payload,
     )
     assert response.status_code == 404
@@ -354,16 +358,20 @@ def test_delete_award(client):
         "date": "2024-01-01",
     }
     create_response = client.post(
-        "/education/awards/?portfolio_id=test-portfolio",
+        "/awards?portfolio_id=test-portfolio",
         json=payload,
     )
     award_id = create_response.json()["id"]
 
-    response = client.delete(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
+    response = client.delete(f"/awards/{award_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
-    assert "deleted" in response.json()["detail"].lower()
+    assert response.json() == {
+        "success": True,
+        "message": "Award entry deleted",
+        "deleted_id": award_id,
+    }
 
-    get_response = client.get(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
+    get_response = client.get(f"/awards/{award_id}?portfolio_id=test-portfolio")
     assert get_response.status_code == 404
 
 
@@ -375,12 +383,12 @@ def test_delete_award_wrong_portfolio(client):
         "date": "2024-01-01",
     }
     create_response = client.post(
-        "/education/awards/?portfolio_id=portfolio-x",
+        "/awards?portfolio_id=portfolio-x",
         json=payload,
     )
     award_id = create_response.json()["id"]
 
-    response = client.delete(f"/education/awards/{award_id}?portfolio_id=portfolio-y")
+    response = client.delete(f"/awards/{award_id}?portfolio_id=portfolio-y")
     assert response.status_code == 404
 
 
@@ -391,23 +399,42 @@ def test_list_awards_by_portfolio(client):
         "issuer": "Org 1",
         "date": "2024-01-01",
     }
-    client.post("/education/awards/?portfolio_id=portfolio1", json=payload1)
+    client.post("/awards?portfolio_id=portfolio1", json=payload1)
 
     payload2 = {
         "title": "Award 2",
         "issuer": "Org 2",
         "date": "2024-02-01",
     }
-    client.post("/education/awards/?portfolio_id=portfolio2", json=payload2)
+    client.post("/awards?portfolio_id=portfolio2", json=payload2)
 
-    response = client.get("/education/awards/?portfolio_id=portfolio1")
+    response = client.get("/awards?portfolio_id=portfolio1")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["title"] == "Award 1"
 
-    response = client.get("/education/awards/?portfolio_id=portfolio2")
+    response = client.get("/awards?portfolio_id=portfolio2")
     assert response.status_code == 200
     data = response.json()
     assert len(data) == 1
     assert data[0]["title"] == "Award 2"
+
+
+def test_awards_compatibility_routes_still_work(client):
+    """Legacy /education/awards routes remain available during migration."""
+    payload = {
+        "title": "Compatibility Award",
+        "issuer": "Legacy Org",
+        "date": "2024-05-01",
+    }
+    create_response = client.post(
+        "/education/awards?portfolio_id=test-portfolio",
+        json=payload,
+    )
+    assert create_response.status_code == 200
+    award_id = create_response.json()["id"]
+
+    list_response = client.get("/education/awards?portfolio_id=test-portfolio")
+    assert list_response.status_code == 200
+    assert any(item["id"] == award_id for item in list_response.json())

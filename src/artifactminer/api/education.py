@@ -1,7 +1,6 @@
 """API routes for Education and Award management."""
 
 from datetime import datetime, UTC
-from typing import Sequence
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -10,7 +9,7 @@ from artifactminer.db import get_db
 from artifactminer.db.models import Education, Award
 from . import schemas
 
-router = APIRouter(prefix="/education", tags=["education"])
+router = APIRouter(tags=["education"])
 
 
 # ============================================================================
@@ -18,14 +17,14 @@ router = APIRouter(prefix="/education", tags=["education"])
 # ============================================================================
 
 
-@router.get("/", response_model=list[schemas.EducationResponse])
+@router.get("/education", response_model=list[schemas.EducationResponse])
 def list_education(portfolio_id: str = Query(..., description="Portfolio ID"), db: Session = Depends(get_db)):
     """List all education entries for a portfolio."""
     entries = db.query(Education).filter(Education.portfolio_id == portfolio_id).all()
     return entries
 
 
-@router.get("/{education_id}", response_model=schemas.EducationResponse)
+@router.get("/education/{education_id:int}", response_model=schemas.EducationResponse)
 def get_education(
     education_id: int,
     portfolio_id: str = Query(None, description="Portfolio ID for ownership verification"),
@@ -41,7 +40,7 @@ def get_education(
     return entry
 
 
-@router.post("/", response_model=schemas.EducationResponse)
+@router.post("/education", response_model=schemas.EducationResponse)
 def create_education(
     request: schemas.EducationCreateRequest,
     portfolio_id: str = Query(..., description="Portfolio ID"),
@@ -64,7 +63,7 @@ def create_education(
     return entry
 
 
-@router.put("/{education_id}", response_model=schemas.EducationResponse)
+@router.put("/education/{education_id:int}", response_model=schemas.EducationResponse)
 def update_education(
     education_id: int,
     request: schemas.EducationCreateRequest,
@@ -93,7 +92,7 @@ def update_education(
     return entry
 
 
-@router.delete("/{education_id}")
+@router.delete("/education/{education_id:int}", response_model=schemas.DeleteResponse)
 def delete_education(
     education_id: int,
     portfolio_id: str = Query(..., description="Portfolio ID for ownership verification"),
@@ -109,7 +108,11 @@ def delete_education(
     
     db.delete(entry)
     db.commit()
-    return {"detail": "Education entry deleted"}
+    return schemas.DeleteResponse(
+        success=True,
+        message="Education entry deleted",
+        deleted_id=education_id,
+    )
 
 
 # ============================================================================
@@ -117,7 +120,8 @@ def delete_education(
 # ============================================================================
 
 
-@router.get("/awards/", response_model=list[schemas.AwardResponse])
+@router.get("/awards", response_model=list[schemas.AwardResponse])
+@router.get("/education/awards", response_model=list[schemas.AwardResponse], include_in_schema=False)
 def list_awards(portfolio_id: str = Query(..., description="Portfolio ID"), db: Session = Depends(get_db)):
     """List all awards for a portfolio."""
     entries = db.query(Award).filter(Award.portfolio_id == portfolio_id).all()
@@ -125,6 +129,7 @@ def list_awards(portfolio_id: str = Query(..., description="Portfolio ID"), db: 
 
 
 @router.get("/awards/{award_id}", response_model=schemas.AwardResponse)
+@router.get("/education/awards/{award_id}", response_model=schemas.AwardResponse, include_in_schema=False)
 def get_award(
     award_id: int,
     portfolio_id: str = Query(None, description="Portfolio ID for ownership verification"),
@@ -140,7 +145,8 @@ def get_award(
     return entry
 
 
-@router.post("/awards/", response_model=schemas.AwardResponse)
+@router.post("/awards", response_model=schemas.AwardResponse)
+@router.post("/education/awards", response_model=schemas.AwardResponse, include_in_schema=False)
 def create_award(
     request: schemas.AwardCreateRequest,
     portfolio_id: str = Query(..., description="Portfolio ID"),
@@ -161,6 +167,7 @@ def create_award(
 
 
 @router.put("/awards/{award_id}", response_model=schemas.AwardResponse)
+@router.put("/education/awards/{award_id}", response_model=schemas.AwardResponse, include_in_schema=False)
 def update_award(
     award_id: int,
     request: schemas.AwardCreateRequest,
@@ -186,7 +193,8 @@ def update_award(
     return entry
 
 
-@router.delete("/awards/{award_id}")
+@router.delete("/awards/{award_id}", response_model=schemas.DeleteResponse)
+@router.delete("/education/awards/{award_id}", response_model=schemas.DeleteResponse, include_in_schema=False)
 def delete_award(
     award_id: int,
     portfolio_id: str = Query(..., description="Portfolio ID for ownership verification"),
@@ -202,4 +210,8 @@ def delete_award(
     
     db.delete(entry)
     db.commit()
-    return {"detail": "Award entry deleted"}
+    return schemas.DeleteResponse(
+        success=True,
+        message="Award entry deleted",
+        deleted_id=award_id,
+    )
