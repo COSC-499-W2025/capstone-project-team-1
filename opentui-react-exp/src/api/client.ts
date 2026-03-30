@@ -90,14 +90,21 @@ export class ApiClient {
 		file: Blob,
 		fieldName = "file",
 		extraFields?: Record<string, string>,
+		filename = "upload.zip",
 	): Promise<T> {
 		const formData = new FormData();
-		formData.append(fieldName, file);
+		// Pass filename as third argument to FormData.append
+		formData.append(fieldName, file, filename);
 		if (extraFields) {
 			for (const [key, value] of Object.entries(extraFields)) {
 				formData.append(key, value);
 			}
 		}
-		return this.request<T>(path, { method: "POST", body: formData });
+		// Use a longer timeout for file uploads (5 minutes)
+		const uploadTimeout =
+			typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+				? AbortSignal.timeout(300000)
+				: undefined;
+		return this.request<T>(path, { method: "POST", body: formData, signal: uploadTimeout });
 	}
 }
