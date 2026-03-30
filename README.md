@@ -4,32 +4,24 @@
 
 **Team Members**: Shlok Shah SN:50732213, Brendan James SN:31927486, Ahmad Memon SN:61846432, Stavan Shah SN:43960608, Evan Crowley SN:82710823, Nathan Helm SN:68837038
 
-Artifact Miner helps students turn raw project repositories into portfolio-ready evidence. The system accepts uploaded ZIP archives, discovers Git repositories, analyzes repository and contributor activity, extracts skills and supporting evidence, and assembles outputs for resume and portfolio workflows.
+Artifact Miner helps students turn raw project repositories into portfolio-ready resumes. Upload a ZIP archive of your code, and the system discovers Git repositories, analyzes your contributions, extracts skills with supporting evidence, and generates a structured resume — either locally using a small language model or in the cloud via GitHub Copilot.
 
 **Primary users:** CS students, TAs, and career advisors.
 
 **Project links**
 - Team Contract: [Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)
-- Extended documentation: [Mintlify project docs](https://www.mintlify.com/COSC-499-W2025/capstone-project-team-1)
-
-## Current Project Surfaces
-
-- **FastAPI backend** for consent, upload, analysis, retrieval, resume, and portfolio services.
-- **Textual TUI** for guided consent, ZIP upload, repository selection, and results review.
-- **Experimental OpenTUI React client** for alternate terminal-style interaction.
 
 ## Architecture Overview
 
 ```mermaid
 flowchart TB
-    subgraph Clients["Client Layer"]
-        TUI["Textual TUI"]
-        React["OpenTUI React (experimental)"]
+    subgraph Client["Client Layer"]
+        React["OpenTUI React Terminal Client"]
     end
 
-    subgraph API["FastAPI Layer"]
+    subgraph API["FastAPI Backend"]
         Gateway["artifactminer.api.app"]
-        Routers["Consent, upload, analysis, projects, retrieval, resume, portfolio, views"]
+        Routers["14 API routers"]
     end
 
     subgraph Core["Core Processing"]
@@ -39,18 +31,17 @@ flowchart TB
         Evidence["Evidence orchestration"]
     end
 
-    subgraph Integrations["Optional AI Services"]
-        AI["Consent-gated cloud/local AI helpers"]
+    subgraph Generation["Resume Generation"]
+        LocalLLM["Local LLM"]
+        CloudAgent["Cloud Agent"]
     end
 
     subgraph Data["Data Layer"]
         SQLite[("SQLite")]
         Uploads[("uploads/")]
         Extracted[(".extracted/")]
-        Thumbs[("uploads/thumbnails/")]
     end
 
-    TUI --> Gateway
     React --> Gateway
     Gateway --> Routers
 
@@ -64,78 +55,229 @@ flowchart TB
 
     RepoIntel --> SQLite
     Evidence --> SQLite
-    Routers --> Thumbs
-    Skills -. optional summary/generation path .-> AI
+
+    Routers --> LocalLLM
+    React --> CloudAgent
+
+    LocalLLM --> SQLite
+    CloudAgent --> SQLite
 ```
 
 ## Core Workflow
 
 ```mermaid
 flowchart LR
-    User(("User")) --> Consent["Consent + user configuration"]
-    Consent --> Upload["ZIP upload and extraction"]
-    Upload --> Discovery["Repository discovery and analysis"]
-    Discovery --> Evidence["Skills, evidence, ranking, summaries"]
-    Evidence --> Outputs["Resume, portfolio, project retrieval views"]
+    User(("User")) --> Consent["Consent + configuration"]
+    Consent --> Upload["ZIP upload"]
+    Upload --> Configure["Select repos + identity"]
+    Configure --> Generate["Resume generation"]
+    Generate --> Review["Review + edit resume"]
 ```
 
-1. Capture consent and user context.
-2. Upload one or more ZIP archives and inspect their contents.
-3. Discover Git repositories and compute project and contributor metrics.
-4. Derive skills, evidence, rankings, and summaries.
-5. Retrieve resume- and portfolio-ready project outputs.
+1. **Consent and configuration** — choose your name, email, and consent level (local LLM, cloud AI, or heuristic-only).
+2. **Upload** — select a ZIP archive containing one or more Git repositories.
+3. **Configure** — pick which repositories and identity to use for analysis.
+4. **Generate** — the system analyzes repositories, extracts skills, and generates a structured resume using local or cloud AI. The generated resume is saved to the SQLite database for future retrieval.
+5. **Review** — view, edit, and export the generated resume in the terminal.
 
-## Current Capabilities
+## Resume Generation Modes
 
-- Multi-ZIP portfolio flow using `portfolio_id` linkage.
-- Directory-scoped analysis from uploaded ZIP contents.
-- Repository intelligence covering languages, frameworks, commit windows, collaboration, and repository health.
-- User-level contribution intelligence and role metadata.
-- Evidence CRUD flows for project artifacts and supporting details.
-- Retrieval APIs for skills, chronology, resume items, summaries, and timelines.
-- Portfolio generation and per-portfolio view preferences.
-- Textual TUI flow for consent, user configuration, ZIP upload, directory selection, and resume views.
-- Consent-gated AI-assisted generation paths for supported local or cloud providers.
+Artifact Miner supports two AI-powered resume generation paths. Both are consent-gated — the user chooses which (if any) AI path to use.
 
-## Quick Start
+### Local LLM Generation
 
-### Prerequisites
+Runs entirely on your machine using [llama.cpp](https://github.com/ggml-org/llama.cpp) and a small quantized model. No data leaves your computer.
 
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv)
-- Git
-- Optional: Bun for `opentui-react-exp`
-- Optional: environment variables for AI-assisted endpoints
+**How it works:**
+- The backend starts a `llama-server` process automatically when generation begins.
+- The server loads a GGUF model from `~/.artifactminer/models/`.
+- The pipeline extracts project facts from your repositories, generates a draft resume, and optionally polishes it — all via local inference.
 
-### Install and Configure
+**Model:** Qwen 3.5 2B (Q4_K_M quantization, ~1.5 GB)
+
+### Cloud Agent Generation (GitHub Copilot)
+
+Uses GitHub Copilot models (Claude, GPT) via the [Pi Agent SDK](https://github.com/nicepkg/pi-agent). Free for students with [GitHub Education](https://education.github.com/).
+
+**How it works:**
+- The OpenTUI client authenticates you via GitHub's device flow (opens your browser).
+- A Pi Agent session is created with read-only access to your extracted code.
+- The agent explores your repositories, analyzes contributions using `git log` and `git blame`, and generates a structured developer profile as JSON.
+
+---
+
+## Setup Guide
+
+This section walks through setting up Artifact Miner from scratch on **macOS**, **Linux**, and **Windows**.
+
+### Step 1 — Install prerequisites
+
+You need four tools installed before you begin. The table below shows how to install each one on every platform.
+
+#### Python 3.11+
+
+| Platform | Command |
+|---|---|
+| **macOS** | `brew install python@3.11` (or download from [python.org](https://www.python.org/downloads/)) |
+| **Linux (Ubuntu/Debian)** | `sudo apt update && sudo apt install python3.11 python3.11-venv` |
+| **Windows** | Download and run the installer from [python.org](https://www.python.org/downloads/). **Check "Add Python to PATH"** during installation. |
+
+Verify: `python3 --version` (macOS/Linux) or `python --version` (Windows)
+
+#### Git
+
+| Platform | Command |
+|---|---|
+| **macOS** | `brew install git` (or install Xcode Command Line Tools: `xcode-select --install`) |
+| **Linux (Ubuntu/Debian)** | `sudo apt install git` |
+| **Windows** | Download and run the installer from [git-scm.com](https://git-scm.com/download/win). Use the default settings. |
+
+Verify: `git --version`
+
+#### uv (Python package manager)
+
+| Platform | Command |
+|---|---|
+| **macOS / Linux** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| **Windows (PowerShell)** | `irm https://astral.sh/uv/install.ps1 \| iex` |
+
+After installing, **restart your terminal** so that `uv` is on your PATH.
+
+Verify: `uv --version`
+
+#### Bun (JavaScript runtime for the terminal client)
+
+| Platform | Command |
+|---|---|
+| **macOS / Linux** | `curl -fsSL https://bun.sh/install \| bash` |
+| **Windows (PowerShell)** | `irm https://bun.sh/install.ps1 \| iex` |
+
+After installing, **restart your terminal**.
+
+Verify: `bun --version`
+
+### Step 2 — Clone and install dependencies
+
+Open a terminal (or PowerShell on Windows) and run:
+
+```bash
+git clone https://github.com/COSC-499-W2025/capstone-project-team-1.git
+cd capstone-project-team-1
+```
+
+**Install the Python backend:**
 
 ```bash
 uv sync
-cp .env.example .env
-uv run alembic upgrade head
 ```
 
-## Run The Project
+This creates a virtual environment and installs all Python dependencies automatically.
 
-### Backend API
+**Install the frontend:**
 
 ```bash
+cd opentui-react-exp
+bun install
+cd ..
+```
+
+### Step 3 — Set up local LLM (optional — skip if using cloud mode only)
+
+If you want to use **local resume generation** (no internet required, all data stays on your machine), you need two things: the `llama-server` binary and the model file.
+
+#### 3a. Install llama.cpp
+
+`llama-server` is the inference server that runs the local model.
+
+**macOS:**
+
+```bash
+brew install llama.cpp
+```
+
+**Linux (Ubuntu/Debian):**
+
+```bash
+sudo apt install cmake build-essential
+git clone https://github.com/ggml-org/llama.cpp.git
+cd llama.cpp
+cmake -B build
+cmake --build build --config Release
+```
+
+After building, add the binary to your PATH:
+
+```bash
+# Add this line to your ~/.bashrc or ~/.zshrc:
+export PATH="$PATH:/path/to/llama.cpp/build/bin"
+```
+
+Then restart your terminal or run `source ~/.bashrc`.
+
+**Windows:**
+
+1. Go to the [llama.cpp Releases page](https://github.com/ggml-org/llama.cpp/releases).
+2. Download the latest release ZIP for Windows (look for `llama-<version>-bin-win-cpu-x64.zip` or the CUDA variant if you have an NVIDIA GPU).
+3. Extract the ZIP to a folder, e.g. `C:\llama-cpp\`.
+4. Add that folder to your system PATH:
+   - Open **Start** → search **"Environment Variables"** → click **"Edit the system environment variables"**.
+   - Click **"Environment Variables…"** → under **"User variables"**, select **Path** → click **Edit** → click **New**.
+   - Paste the path to the folder containing `llama-server.exe` (e.g. `C:\llama-cpp\`).
+   - Click **OK** on all dialogs.
+5. **Restart your terminal.**
+
+Verify on all platforms: `llama-server --version`
+
+#### 3b. Download the model
+
+Download **Qwen3.5-2B-Q4_K_M.gguf** (~1.5 GB) from Hugging Face:
+
+> [https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf)
+
+On the Hugging Face page, click the **download** button next to `Qwen3.5-2B-Q4_K_M.gguf`.
+
+Then move the file into the Artifact Miner models directory:
+
+**macOS / Linux:**
+
+```bash
+mkdir -p ~/.artifactminer/models
+mv ~/Downloads/Qwen3.5-2B-Q4_K_M.gguf ~/.artifactminer/models/
+```
+
+**Windows (PowerShell):**
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.artifactminer\models"
+Move-Item "$env:USERPROFILE\Downloads\Qwen3.5-2B-Q4_K_M.gguf" "$env:USERPROFILE\.artifactminer\models\"
+```
+
+The backend will automatically start and manage `llama-server` when you choose local generation. No manual server startup is needed.
+
+### Step 4 — Run the system
+
+You need **two terminals** open — one for the backend API server and one for the terminal client.
+
+#### Terminal 1 — Start the backend
+
+```bash
+# From the project root directory:
 uv run api
 ```
 
-Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+You should see output like:
 
-### Textual TUI
-
-Start the backend first, then run:
-
-```bash
-uv run artifactminer-tui
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000
 ```
 
-### Experimental OpenTUI React Client
+Leave this terminal running. The API server is now ready.
 
-Start the backend first, then run:
+You can verify it's working by opening [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser — this shows the interactive Swagger API documentation.
+
+#### Terminal 2 — Start the OpenTUI client
+
+Open a **second** terminal window and run:
 
 ```bash
 cd opentui-react-exp
@@ -143,64 +285,167 @@ bun install
 bun run src/index.tsx
 ```
 
-## API Areas
+The terminal client launches and connects to the backend automatically. You should see the Artifact Miner landing screen.
 
-**System and setup**
-- `GET /health`
-- `GET /consent`, `PUT /consent`
-- `GET /questions`, `POST /answers`
+> **Windows note:** Use **PowerShell** or **Windows Terminal** for the best experience. The default `cmd.exe` may not render the terminal UI correctly.
 
-**ZIP intake and analysis**
-- `POST /zip/upload`
-- `GET /zip/{zip_id}/directories`
-- `GET /zip/portfolios/{portfolio_id}`
-- `POST /analyze/{zip_id}`
-- `POST /repos/analyze`
-- `GET /crawler`
-- `GET /fileintelligence`
+### Step 5 — Use the application
 
-**Projects, evidence, and views**
-- `GET /projects`
-- `GET /projects/{project_id}`
-- `POST /projects/{project_id}/thumbnail`
-- `PUT/POST /projects/{project_id}/role`
-- `POST /projects/{project_id}/evidence`
-- `GET /projects/{project_id}/evidence`
-- `DELETE /projects/{project_id}/evidence/{evidence_id}`
-- `GET /projects/timeline`
-- `GET /projects/ranking`
-- `DELETE /projects/{project_id}`
-- `GET /views/{portfolio_id}/prefs`
-- `PUT /views/{portfolio_id}/prefs`
+Once both terminals are running:
 
-**Retrieval and generation**
-- `GET /skills`
-- `GET /skills/chronology`
-- `GET /resume`
-- `GET /resume/{resume_id}`
-- `POST /resume/generate`
-- `POST /resume/{resume_id}/edit`
-- `GET /summaries`
-- `GET /AI_summaries`
-- `POST /portfolio/generate`
-- `POST /openai`
-- `/local-llm/*` for local generation workflows
+1. **Landing screen** — press **Enter** to begin.
+2. **Consent** — choose your AI preference:
+   - **Local LLM** — uses the Qwen model on your machine (requires Step 3 above).
+   - **Cloud (GitHub Copilot)** — uses GitHub Copilot models over the internet (free with GitHub Education).
+   - **No AI** — heuristic-only analysis, no LLM generation.
+3. **File upload** — browse your filesystem and select a ZIP archive containing your project(s). Use arrow keys to navigate, Enter to open folders, and Enter on a `.zip` file to select it.
+4. **Configure** — select which repositories to analyze, enter your name and email, and choose your identity for collaborative projects.
+5. **Generate** — the system analyzes your code and generates a resume.
+   - **Local mode:** runs inference on your machine via llama-server. You'll see a progress indicator.
+   - **Cloud mode:** authenticates via GitHub device flow (opens a browser window where you enter a code), then uses Copilot models to explore your code and build a profile.
+6. **Review** — view the generated resume, edit sections, and copy to clipboard. The generated resume is persisted in the database so it can be retrieved across sessions.
+
+### Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `uv: command not found` | Restart your terminal after installing uv, or run the install command again. |
+| `bun: command not found` | Restart your terminal after installing Bun. On Windows, make sure you used PowerShell for the install. |
+| `llama-server: command not found` | Make sure llama-server is on your PATH (see Step 3a). Restart your terminal. |
+| Backend fails to start | Make sure port 8000 is not in use. Try `lsof -i :8000` (macOS/Linux) or `netstat -ano \| findstr :8000` (Windows) to check. |
+| TUI shows connection error | Make sure the backend is running in Terminal 1 before starting the TUI in Terminal 2. |
+| Model not found error | Verify `Qwen3.5-2B-Q4_K_M.gguf` is in `~/.artifactminer/models/` (or `%USERPROFILE%\.artifactminer\models\` on Windows). |
+| Windows terminal renders incorrectly | Use **Windows Terminal** or **PowerShell** instead of `cmd.exe`. |
+| GitHub Copilot login fails | Make sure you have an active GitHub account. Students can get free Copilot access via [GitHub Education](https://education.github.com/). |
+
+---
+
+## API Reference
+
+Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### System and setup
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/health` | Readiness probe |
+| `GET` | `/consent` | Get current consent level |
+| `PUT` | `/consent` | Update consent level and LLM model preference |
+| `GET` | `/questions` | Fetch configuration questions |
+| `POST` | `/answers` | Submit user answers (keyed format) |
+
+### ZIP intake and analysis
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/zip/upload` | Upload a ZIP archive |
+| `GET` | `/zip/{zip_id}/directories` | List directories in an uploaded ZIP |
+| `GET` | `/zip/portfolios/{portfolio_id}` | List all ZIPs linked to a portfolio |
+| `POST` | `/zip/extract-local` | Extract a local ZIP path (no upload) |
+| `POST` | `/analyze/{zip_id}` | Run the full analysis pipeline on a ZIP |
+| `POST` | `/repos/analyze` | Analyze a single repository by path |
+| `GET` | `/crawler` | Discover files in an extracted ZIP |
+| `GET` | `/fileintelligence` | File-level intelligence |
+
+### Projects, evidence, and views
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/projects` | List all analyzed projects |
+| `GET` | `/projects/{project_id}` | Get project details |
+| `POST` | `/projects/{project_id}/thumbnail` | Upload project thumbnail |
+| `PUT/POST` | `/projects/{project_id}/role` | Set user role for a project |
+| `POST` | `/projects/{project_id}/evidence` | Add evidence to a project |
+| `GET` | `/projects/{project_id}/evidence` | List project evidence |
+| `DELETE` | `/projects/{project_id}/evidence/{evidence_id}` | Delete an evidence item |
+| `GET` | `/projects/timeline` | Get project timeline |
+| `GET` | `/projects/ranking` | Get project ranking scores |
+| `DELETE` | `/projects/{project_id}` | Soft-delete a project |
+| `GET` | `/views/{portfolio_id}/prefs` | Get portfolio display preferences |
+| `PUT` | `/views/{portfolio_id}/prefs` | Update portfolio display preferences |
+
+### Retrieval and generation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/skills` | List extracted skills |
+| `GET` | `/skills/chronology` | Skills with time context |
+| `GET` | `/resume` | List all resume items |
+| `GET` | `/resume/{resume_id}` | Get a single resume item |
+| `POST` | `/resume/generate` | Generate resume items for a project |
+| `POST` | `/resume/{resume_id}/edit` | Edit a resume item |
+| `GET` | `/summaries` | Get project summaries |
+| `GET` | `/AI_summaries` | Get AI-generated summaries |
+| `GET` | `/activity/heatmap` | Daily commit activity heatmap |
+| `POST` | `/portfolio/generate` | Generate a multi-project portfolio |
+| `GET` | `/portfolio/{portfolio_id}` | Get portfolio display data |
+| `POST` | `/portfolio/{portfolio_id}/edit` | Edit portfolio content |
+| `POST` | `/openai` | Cloud AI endpoint |
+
+### Local LLM generation
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/local-llm/context` | Create an intake context from a ZIP |
+| `POST` | `/local-llm/context/contributors` | Discover contributors in repositories |
+| `POST` | `/local-llm/generation/start` | Start local resume generation |
+| `GET` | `/local-llm/generation/status` | Poll generation progress |
+| `POST` | `/local-llm/generation/cancel` | Cancel an in-progress generation |
+| `POST` | `/local-llm/generation/polish` | Polish a generated draft |
+
+### Education and awards
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/education` | List education entries |
+| `GET` | `/education/{education_id}` | Get an education entry |
+| `POST` | `/education` | Create an education entry |
+| `PUT` | `/education/{education_id}` | Update an education entry |
+| `DELETE` | `/education/{education_id}` | Delete an education entry |
+| `GET` | `/awards` | List award entries |
+| `GET` | `/awards/{award_id}` | Get an award entry |
+| `POST` | `/awards` | Create an award entry |
+| `PUT` | `/awards/{award_id}` | Update an award entry |
+| `DELETE` | `/awards/{award_id}` | Delete an award entry |
+
+### User info
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/useranswer` | Get saved user answers |
+| `POST` | `/useranswer/update` | Update user email |
+
+---
 
 ## Project Structure
 
 ```text
 src/artifactminer/
-  api/                    FastAPI app and routers
-  db/                     SQLAlchemy models, sessions, and seeders
+  api/                    FastAPI app, 14 routers, Pydantic schemas
+  db/                     SQLAlchemy models (17 tables), sessions, seeders
   RepositoryIntelligence/ Repository and contributor analytics
-  skills/                 Skill extraction, signals, and ranking
-  evidence/               Evidence models and extractors
-  directorycrawler/       ZIP and directory crawl utilities
-  local_llm/              Local-generation runtime support
-  tui/                    Textual app and screens
-opentui-react-exp/        Experimental React/OpenTUI client
-tests/                    API, DB, crawler, evidence, repo intelligence, and TUI tests
-alembic/                  Database migrations
+  skills/                 Heuristic skill extraction, signals, ranking
+  evidence/               Evidence models, extractors, orchestration
+  directorycrawler/       ZIP and directory traversal utilities
+  local_llm/              Local LLM runtime (llama-server process management,
+                          model registry, generation service, prompt templates)
+  FileIntelligence/       File-level analysis
+  helpers/                Utility functions (project ranker, OpenAI client)
+  cli/                    CLI entry point and interactive mode
+
+opentui-react-exp/        React terminal client (OpenTUI + Pi Agent SDK)
+  src/
+    api/                  API client and TypeScript interfaces
+    agent/                Pi Agent session, prompts, profile normalization
+    components/           30+ screens (Landing, Consent, FileUpload, Configure,
+                          Analysis, ResumePreview, EducationAwards, cloud-ai/*)
+    context/              Global React state (AppContext)
+    hooks/                Clipboard and selection utilities
+    utils/                ZIP scanning, error messages, path helpers
+
+tests/                    50+ test files covering API, DB, crawler, evidence,
+                          repo intelligence, signals, skills, local LLM, and TUI
+alembic/                  Database migrations (18 versions)
 ```
 
 ## Tests
@@ -209,19 +454,19 @@ alembic/                  Database migrations
 uv run pytest
 ```
 
-The automated suite covers API, database, crawler, evidence/signals, repository intelligence, and TUI flows.
+The test suite covers API routes, database models, directory crawling, evidence extraction, repository intelligence, skill signals, local LLM runtime, and TUI flows.
 
 ## Database Migrations (Alembic)
 
-Always apply migrations instead of manually recreating `artifactminer.db`.
+The API server runs migrations automatically on startup. For manual control:
 
-### Keep DB Up to Date
+### Apply all migrations
 
 ```bash
 uv run alembic upgrade head
 ```
 
-### Create a New Migration
+### Create a new migration
 
 1. Update SQLAlchemy models in `src/artifactminer/db/models.py`.
 2. Generate migration:
@@ -235,12 +480,12 @@ uv run alembic upgrade head
    ```
 5. Commit model + migration together.
 
-### Downgrade One Revision
+### Downgrade one revision
 
 ```bash
 uv run alembic downgrade -1
 ```
 
-### Seed Behavior
+## Local Model
 
-On API startup, baseline question records are seeded when the questions table is empty.
+The local LLM runtime uses **Qwen 3.5 2B** (Q4_K_M quantization). Download `Qwen3.5-2B-Q4_K_M.gguf` from [Hugging Face](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf) and place it in `~/.artifactminer/models/`.
