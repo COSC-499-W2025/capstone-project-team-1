@@ -198,10 +198,13 @@ def test_skills_chronology_returns_ordered_list(client_with_data):
     assert data[0]["skill"] == "Python"
     assert data[0]["proficiency"] == 0.7
     assert data[0]["category"] == "Programming Languages"
-    # Required fields present
+    # Required fields present (now includes 'level')
     assert all(
-        k in data[0] for k in ["date", "skill", "project", "proficiency", "category"]
+        k in data[0]
+        for k in ["date", "skill", "project", "proficiency", "category", "level"]
     )
+    # Level derived from proficiency: 0.7 -> Advanced
+    assert data[0]["level"] == "Advanced"
 
 
 def test_skills_chronology_empty(client_empty):
@@ -448,3 +451,31 @@ def test_skills_project_count_no_double_counting(client_with_data):
     python_data = next(s for s in data if s["name"] == "Python")
     # Should be 2 (not 3), because repo 1 appears in both tables but is deduplicated
     assert python_data["project_count"] == 2
+
+
+def test_skills_includes_level_and_is_correct(client_with_data):
+    """GET /skills includes derived level aggregated across projects/users."""
+    resp = client_with_data.get("/skills")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # Ensure 'level' appears and values are correct given seeded proficiencies
+    py = next(s for s in data if s["name"] == "Python")
+    fa = next(s for s in data if s["name"] == "FastAPI")
+
+    assert "level" in py and "level" in fa
+    # Python: max(0.7, 0.9, 0.75) -> 0.9 -> Expert
+    assert py["level"] == "Expert"
+    # FastAPI: 0.8 -> Expert
+    assert fa["level"] == "Expert"
+
+
+def test_skills_level_with_project_count(client_with_data):
+    """'level' coexists with project_count when requested."""
+    resp = client_with_data.get("/skills?include_project_count=true")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    for s in data:
+        assert "level" in s
+        assert "project_count" in s and s["project_count"] is not None

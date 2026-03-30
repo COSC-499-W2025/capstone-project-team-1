@@ -30,6 +30,10 @@ from ..db import (
     ResumeItem,
     UserAIntelligenceSummary,
 )
+from artifactminer.generators.models import (
+    proficiency_to_level,
+    aggregate_skill_proficiency,
+)
 
 
 router = APIRouter(tags=["retrieval"])
@@ -62,6 +66,9 @@ async def get_skills(
 
     # Pre-compute project counts in bulk (2 queries total) to avoid N+1
     project_count_map: dict[int, int] | None = None
+    # Pre-compute aggregated proficiencies across projects/users (2 queries total)
+    from collections import defaultdict
+    prof_values: dict[int, list[float]] = defaultdict(list)
     if include_project_count:
         # Collect (skill_id, repo_stat_id) pairs from both tables in two queries
         skill_repo_pairs: dict[int, set[int]] = defaultdict(set)
@@ -84,11 +91,32 @@ async def get_skills(
             skill_id: len(repo_ids) for skill_id, repo_ids in skill_repo_pairs.items()
         }
 
+    # Build proficiencies map from both tables (ignore None values)
+    for skill_id, prof in (
+        db.query(ProjectSkill.skill_id, ProjectSkill.proficiency)
+        .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(RepoStat.deleted_at.is_(None))
+    ):
+        if prof is not None:
+            prof_values[skill_id].append(float(prof))
+
+    for skill_id, prof in (
+        db.query(UserProjectSkill.skill_id, UserProjectSkill.proficiency)
+        .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+        .filter(RepoStat.deleted_at.is_(None))
+    ):
+        if prof is not None:
+            prof_values[skill_id].append(float(prof))
+
     result = []
     for skill in skills:
         project_count = None
         if project_count_map is not None:
             project_count = project_count_map.get(skill.id, 0)
+
+        # Compute aggregated level across all projects for this skill
+        agg = aggregate_skill_proficiency(prof_values.get(skill.id, []))
+        level = proficiency_to_level(agg).value
 
         result.append(
             SkillResponse(
@@ -96,6 +124,7 @@ async def get_skills(
                 name=skill.name,
                 category=skill.category,
                 project_count=project_count,
+                level=level,
             )
         )
 
@@ -148,6 +177,7 @@ def fetch_skill_chronology(
                 project=repo_stat.project_name,
                 proficiency=project_skill.proficiency,
                 category=skill.category,
+                level=proficiency_to_level(project_skill.proficiency).value,
             )
         )
 
@@ -159,6 +189,7 @@ def fetch_skill_chronology(
                 project=repo_stat.project_name,
                 proficiency=user_skill.proficiency,
                 category=skill.category,
+                level=proficiency_to_level(user_skill.proficiency).value,
             )
         )
 
