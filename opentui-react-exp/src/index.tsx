@@ -27,14 +27,14 @@ import { type AnalysisMode, type KeyAction, type Screen, theme } from "./types";
 const LOCAL_LLM_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },
 	{ screen: "consent-policy", label: "Policy" },
-		{ screen: "file-upload", label: "Upload" },
-		{ screen: "project-list", label: "Repos" },
-		{ screen: "identity", label: "Identity" },
-		{ screen: "education-awards", label: "Education/Awards" },
-		{ screen: "pipeline-launch", label: "Launch" },
-		{ screen: "analysis", label: "Analyze" },
-		{ screen: "resume-preview", label: "Resume" },
-	];
+	{ screen: "file-upload", label: "Upload" },
+	{ screen: "project-list", label: "Repos" },
+	{ screen: "identity", label: "Identity" },
+	{ screen: "education-awards", label: "Education/Awards" },
+	{ screen: "pipeline-launch", label: "Launch" },
+	{ screen: "analysis", label: "Analyze" },
+	{ screen: "resume-preview", label: "Resume" },
+];
 
 const CLOUD_BREADCRUMB_SCREENS: { screen: Screen; label: string }[] = [
 	{ screen: "consent", label: "Consent" },

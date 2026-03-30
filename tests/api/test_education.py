@@ -76,7 +76,7 @@ def test_get_education(client):
     )
     education_id = create_response.json()["id"]
 
-    response = client.get(f"/education/{education_id}")
+    response = client.get(f"/education/{education_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == education_id
@@ -85,7 +85,7 @@ def test_get_education(client):
 
 def test_get_education_not_found(client):
     """Test retrieving non-existent education entry."""
-    response = client.get("/education/99999")
+    response = client.get("/education/99999?portfolio_id=test-portfolio")
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -113,7 +113,7 @@ def test_update_education(client):
         "honors": "Summa Cum Laude",
     }
     response = client.put(
-        f"/education/{education_id}",
+        f"/education/{education_id}?portfolio_id=test-portfolio",
         json=update_payload,
     )
     assert response.status_code == 200
@@ -121,6 +121,31 @@ def test_update_education(client):
     assert data["institution"] == "Yale University"
     assert data["degree"] == "Master"
     assert data["gpa"] == "3.9"
+
+
+def test_update_education_wrong_portfolio(client):
+    """Test that updating with wrong portfolio_id returns 404."""
+    payload = {
+        "institution": "Berkeley",
+        "degree": "Bachelor",
+        "start_date": "2020-01-01",
+    }
+    create_response = client.post(
+        "/education/?portfolio_id=portfolio-a",
+        json=payload,
+    )
+    education_id = create_response.json()["id"]
+
+    update_payload = {
+        "institution": "Berkeley Updated",
+        "degree": "Master",
+        "start_date": "2022-01-01",
+    }
+    response = client.put(
+        f"/education/{education_id}?portfolio_id=portfolio-b",
+        json=update_payload,
+    )
+    assert response.status_code == 404
 
 
 def test_delete_education(client):
@@ -136,12 +161,29 @@ def test_delete_education(client):
     )
     education_id = create_response.json()["id"]
 
-    response = client.delete(f"/education/{education_id}")
+    response = client.delete(f"/education/{education_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
     assert "deleted" in response.json()["detail"].lower()
 
-    get_response = client.get(f"/education/{education_id}")
+    get_response = client.get(f"/education/{education_id}?portfolio_id=test-portfolio")
     assert get_response.status_code == 404
+
+
+def test_delete_education_wrong_portfolio(client):
+    """Test that deleting with wrong portfolio_id returns 404."""
+    payload = {
+        "institution": "Columbia",
+        "degree": "Bachelor",
+        "start_date": "2020-01-01",
+    }
+    create_response = client.post(
+        "/education/?portfolio_id=portfolio-x",
+        json=payload,
+    )
+    education_id = create_response.json()["id"]
+
+    response = client.delete(f"/education/{education_id}?portfolio_id=portfolio-y")
+    assert response.status_code == 404
 
 
 def test_list_education_by_portfolio(client):
@@ -236,7 +278,7 @@ def test_get_award(client):
     )
     award_id = create_response.json()["id"]
 
-    response = client.get(f"/education/awards/{award_id}")
+    response = client.get(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == award_id
@@ -245,7 +287,7 @@ def test_get_award(client):
 
 def test_get_award_not_found(client):
     """Test retrieving non-existent award."""
-    response = client.get("/education/awards/99999")
+    response = client.get("/education/awards/99999?portfolio_id=test-portfolio")
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
@@ -270,13 +312,38 @@ def test_update_award(client):
         "description": "For outstanding engineering achievements",
     }
     response = client.put(
-        f"/education/awards/{award_id}",
+        f"/education/awards/{award_id}?portfolio_id=test-portfolio",
         json=update_payload,
     )
     assert response.status_code == 200
     data = response.json()
     assert data["title"] == "Excellence in Engineering Award"
     assert data["description"] == "For outstanding engineering achievements"
+
+
+def test_update_award_wrong_portfolio(client):
+    """Test that updating award with wrong portfolio_id returns 404."""
+    payload = {
+        "title": "Award",
+        "issuer": "Org",
+        "date": "2024-01-01",
+    }
+    create_response = client.post(
+        "/education/awards/?portfolio_id=portfolio-a",
+        json=payload,
+    )
+    award_id = create_response.json()["id"]
+
+    update_payload = {
+        "title": "Updated Award",
+        "issuer": "New Org",
+        "date": "2024-03-15",
+    }
+    response = client.put(
+        f"/education/awards/{award_id}?portfolio_id=portfolio-b",
+        json=update_payload,
+    )
+    assert response.status_code == 404
 
 
 def test_delete_award(client):
@@ -292,12 +359,29 @@ def test_delete_award(client):
     )
     award_id = create_response.json()["id"]
 
-    response = client.delete(f"/education/awards/{award_id}")
+    response = client.delete(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
     assert response.status_code == 200
     assert "deleted" in response.json()["detail"].lower()
 
-    get_response = client.get(f"/education/awards/{award_id}")
+    get_response = client.get(f"/education/awards/{award_id}?portfolio_id=test-portfolio")
     assert get_response.status_code == 404
+
+
+def test_delete_award_wrong_portfolio(client):
+    """Test that deleting award with wrong portfolio_id returns 404."""
+    payload = {
+        "title": "Award",
+        "issuer": "Org",
+        "date": "2024-01-01",
+    }
+    create_response = client.post(
+        "/education/awards/?portfolio_id=portfolio-x",
+        json=payload,
+    )
+    award_id = create_response.json()["id"]
+
+    response = client.delete(f"/education/awards/{award_id}?portfolio_id=portfolio-y")
+    assert response.status_code == 404
 
 
 def test_list_awards_by_portfolio(client):

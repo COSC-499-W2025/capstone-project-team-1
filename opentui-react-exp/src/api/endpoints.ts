@@ -2,10 +2,14 @@ import { ApiClient } from "./client";
 import type {
 	AnalysisResponse,
 	AnswersRequest,
+	Award,
+	AwardCreateRequest,
 	ConsentLevel,
 	ConsentResponse,
 	DeleteResponse,
 	DirectoriesResponse,
+	Education,
+	EducationCreateRequest,
 	ExtractLocalResponse,
 	PipelineCancelResponse,
 	PipelineContributorsRequest,
@@ -104,26 +108,26 @@ export const api = {
 		client.post("/zip/extract-local", { zip_id: zipId }),
 
 	// Education endpoints
-	listEducation: (portfolioId: string): Promise<any[]> =>
+	listEducation: (portfolioId: string): Promise<Education[]> =>
 		client.get(withQuery("/education", { portfolio_id: portfolioId })),
-	getEducation: (id: number): Promise<any> =>
-		client.get(`/education/${id}`),
-	createEducation: (portfolioId: string, data: any): Promise<any> =>
+	getEducation: (id: number, portfolioId?: string): Promise<Education> =>
+		client.get(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
+	createEducation: (portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
 		client.post(withQuery("/education", { portfolio_id: portfolioId }), data),
-	updateEducation: (id: number, data: any): Promise<any> =>
-		client.put(`/education/${id}`, data),
-	deleteEducation: (id: number): Promise<DeleteResponse> =>
-		client.delete(`/education/${id}`),
+	updateEducation: (id: number, portfolioId: string, data: EducationCreateRequest): Promise<Education> =>
+		client.put(withQuery(`/education/${id}`, { portfolio_id: portfolioId }), data),
+	deleteEducation: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/education/${id}`, { portfolio_id: portfolioId })),
 
 	// Award endpoints
-	listAwards: (portfolioId: string): Promise<any[]> =>
+	listAwards: (portfolioId: string): Promise<Award[]> =>
 		client.get(withQuery("/education/awards", { portfolio_id: portfolioId })),
-	getAward: (id: number): Promise<any> =>
-		client.get(`/education/awards/${id}`),
-	createAward: (portfolioId: string, data: any): Promise<any> =>
+	getAward: (id: number, portfolioId?: string): Promise<Award> =>
+		client.get(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId })),
+	createAward: (portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
 		client.post(withQuery("/education/awards", { portfolio_id: portfolioId }), data),
-	updateAward: (id: number, data: any): Promise<any> =>
-		client.put(`/education/awards/${id}`, data),
-	deleteAward: (id: number): Promise<DeleteResponse> =>
-		client.delete(`/education/awards/${id}`),
+	updateAward: (id: number, portfolioId: string, data: AwardCreateRequest): Promise<Award> =>
+		client.put(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId }), data),
+	deleteAward: (id: number, portfolioId: string): Promise<DeleteResponse> =>
+		client.delete(withQuery(`/education/awards/${id}`, { portfolio_id: portfolioId })),
 };
