@@ -1,4 +1,10 @@
-import { useCallback, useState, type ReactNode } from "react";
+import {
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	type ReactNode,
+} from "react";
 import { useKeyboard } from "@opentui/react";
 import type {
 	DeveloperProfile,
@@ -519,6 +525,13 @@ export function CloudResumePreview({
 	portfolioStatusMessage,
 }: CloudResumePreviewProps) {
 	const [activeTab, setActiveTab] = useState<Tab>("insights");
+	const hasPendingOpenRef = useRef(false);
+
+	useEffect(() => {
+		if (!isOpeningPortfolio) {
+			hasPendingOpenRef.current = false;
+		}
+	}, [isOpeningPortfolio]);
 
 	const TAB_KEYS: Record<string, Tab> = {
 		"1": "insights",
@@ -526,7 +539,8 @@ export function CloudResumePreview({
 		"3": "resume",
 	};
 	const openPortfolioHtml = useCallback(() => {
-		if (isOpeningPortfolio) return;
+		if (isOpeningPortfolio || hasPendingOpenRef.current) return;
+		hasPendingOpenRef.current = true;
 		onOpenPortfolio();
 	}, [isOpeningPortfolio, onOpenPortfolio]);
 

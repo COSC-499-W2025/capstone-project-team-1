@@ -67,6 +67,21 @@ async function pressKeyboardShortcut(key: KeyboardEventLike) {
 	await rendered?.renderOnce();
 }
 
+async function pressKeyboardShortcutTwiceWithoutRerender(
+	key: KeyboardEventLike,
+) {
+	if (!keyboardHandler) {
+		throw new Error("CloudResumePreview keyboard handler was not registered");
+	}
+
+	await act(async () => {
+		keyboardHandler?.(key);
+		keyboardHandler?.(key);
+		await Promise.resolve();
+	});
+	await rendered?.renderOnce();
+}
+
 function destroyRenderer() {
 	if (!rendered) {
 		return;
@@ -141,4 +156,24 @@ test("CloudResumePreview calls onOpenPortfolio on o and blocks duplicate trigger
 	expect(openCount).toBe(1);
 	expect(rendered.captureCharFrame()).toContain("Generating portfolio HTML...");
 	expect(rendered.captureCharFrame()).toContain("Generating...");
+});
+
+test("CloudResumePreview blocks same-tick duplicate open shortcuts before busy props rerender", async () => {
+	let openCount = 0;
+
+	rendered = await testRender(
+		<CloudResumePreview
+			profile={sampleProfile}
+			onOpenPortfolio={() => {
+				openCount += 1;
+			}}
+			isOpeningPortfolio={false}
+			portfolioStatusMessage={null}
+		/>,
+		{ width: 120, height: 40 },
+	);
+	await rendered.renderOnce();
+	await pressKeyboardShortcutTwiceWithoutRerender({ name: "o" });
+
+	expect(openCount).toBe(1);
 });
