@@ -4,53 +4,53 @@
 
 **Team Members**: Shlok Shah SN:50732213, Brendan James SN:31927486, Ahmad Memon SN:61846432, Stavan Shah SN:43960608, Evan Crowley SN:82710823, Nathan Helm SN:68837038
 
-Artifact Miner analyzes one or more uploaded project ZIPs, discovers Git repositories, extracts repository + user contribution intelligence, derives skills/evidence, and builds resume/portfolio-ready outputs.
+Artifact Miner helps students turn raw project repositories into portfolio-ready evidence. The system accepts uploaded ZIP archives, discovers Git repositories, analyzes repository and contributor activity, extracts skills and supporting evidence, and assembles outputs for resume and portfolio workflows.
 
 **Primary users:** CS students, TAs, and career advisors.
 
-Team Contract link: **[Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)**
+**Project links**
+- Team Contract: [Team Contract](https://docs.google.com/document/d/1arR_i6NhFLMh0BFLVMIacb_dQp-CcDTXX7lH2BcLZeI/edit?usp=sharing)
+- Extended documentation: [Mintlify project docs](https://www.mintlify.com/COSC-499-W2025/capstone-project-team-1)
 
-## Milestone 2 Status
+## Current Project Surfaces
 
-This README reflects the current Milestone 2 implementation in this repository (FastAPI backend, Textual TUI, CLI pipeline, and experimental OpenTUI React client).
+- **FastAPI backend** for consent, upload, analysis, retrieval, resume, and portfolio services.
+- **Textual TUI** for guided consent, ZIP upload, repository selection, and results review.
+- **Experimental OpenTUI React client** for alternate terminal-style interaction.
 
-## System Architecture Diagram
+## Architecture Overview
 
 ```mermaid
 flowchart TB
     subgraph Clients["Client Layer"]
         TUI["Textual TUI"]
-        CLI["Python CLI"]
         React["OpenTUI React (experimental)"]
     end
 
     subgraph API["FastAPI Layer"]
         Gateway["artifactminer.api.app"]
-        Routers["Routers: consent, zip, analyze, projects, retrieval, resume, portfolio, views"]
+        Routers["Consent, upload, analysis, projects, retrieval, resume, portfolio, views"]
     end
 
     subgraph Core["Core Processing"]
-        Ingest["ZIP Ingestion + Extraction"]
-        RepoIntel["Repository Intelligence"]
-        Skills["DeepRepoAnalyzer + Skill Extraction"]
-        Evidence["Evidence Orchestration"]
-        Ranking["Ranking + Timeline + Summaries"]
+        Ingest["ZIP ingestion + extraction"]
+        RepoIntel["Repository intelligence"]
+        Skills["Skill extraction + ranking"]
+        Evidence["Evidence orchestration"]
     end
 
-    subgraph Integrations["Optional LLM Integrations"]
-        OpenAI["OpenAI helper"]
-        Ollama["Ollama helper"]
+    subgraph Integrations["Optional AI Services"]
+        AI["Consent-gated cloud/local AI helpers"]
     end
 
     subgraph Data["Data Layer"]
-        SQLite[("SQLite (artifactminer.db)")]
+        SQLite[("SQLite")]
         Uploads[("uploads/")]
         Extracted[(".extracted/")]
         Thumbs[("uploads/thumbnails/")]
     end
 
     TUI --> Gateway
-    CLI --> Gateway
     React --> Gateway
     Gateway --> Routers
 
@@ -61,94 +61,96 @@ flowchart TB
     Routers --> RepoIntel
     Routers --> Skills
     Skills --> Evidence
-    Routers --> Ranking
 
     RepoIntel --> SQLite
     Evidence --> SQLite
-    Ranking --> SQLite
     Routers --> Thumbs
-
-    Skills -. consent gated .-> OpenAI
-    Skills -. local option .-> Ollama
+    Skills -. optional summary/generation path .-> AI
 ```
 
-## Data Flow Diagram (Level 0)
+## Core Workflow
 
 ```mermaid
 flowchart LR
-    User(("User")) --> Interfaces["CLI / Textual TUI / OpenTUI"]
-    Interfaces --> System["Artifact Miner System"]
-    System --> Outputs["Project stats, skills chronology, evidence, summaries, portfolio output"]
-    Outputs --> User
-    System --> DB[("SQLite + Filesystem Stores")]
+    User(("User")) --> Consent["Consent + user configuration"]
+    Consent --> Upload["ZIP upload and extraction"]
+    Upload --> Discovery["Repository discovery and analysis"]
+    Discovery --> Evidence["Skills, evidence, ranking, summaries"]
+    Evidence --> Outputs["Resume, portfolio, project retrieval views"]
 ```
 
-## Data Flow Diagram (Level 1)
+1. Capture consent and user context.
+2. Upload one or more ZIP archives and inspect their contents.
+3. Discover Git repositories and compute project and contributor metrics.
+4. Derive skills, evidence, rankings, and summaries.
+5. Retrieve resume- and portfolio-ready project outputs.
 
-```mermaid
-flowchart TB
-    User(("User"))
-    FSUploads[("uploads/ ZIP store")]
-    FSExtracted[(".extracted/ workspace")]
-    DB[("SQLite DB")]
-    LLM["Optional LLM (OpenAI/Ollama)"]
-
-    P1["1.0 Consent + User Config\n/consent, /questions, /answers"]
-    P2["2.0 ZIP Intake\n/zip/upload, /zip/{id}/directories"]
-    P3["3.0 Repo Discovery + Analysis\n/analyze/{zip_id}, /repos/analyze"]
-    P4["4.0 Skills + Evidence + Ranking\nDeep analyzer, evidence extractors, ranking"]
-    P5["5.0 Retrieval + Portfolio Assembly\n/projects, /resume, /summaries, /portfolio/generate"]
-
-    User --> P1
-    User --> P2
-    P2 --> FSUploads
-    P2 --> FSExtracted
-    P1 --> DB
-
-    FSExtracted --> P3
-    DB --> P3
-    P3 --> DB
-
-    P3 --> P4
-    P4 --> DB
-    P4 -. consent path .-> LLM
-    LLM -. summary response .-> P4
-
-    P4 --> P5
-    DB --> P5
-    P5 --> User
-```
-
-## DFD Explanation
-
-- `1.0 Consent + User Config` captures consent and analysis context (email, goals, file filters).
-- `2.0 ZIP Intake` stores uploads and prepares extraction paths for analysis.
-- `3.0 Repo Discovery + Analysis` finds Git repos and computes repository/user contribution stats.
-- `4.0 Skills + Evidence + Ranking` derives skill signals, insights, repository quality evidence, and ranking scores.
-- `5.0 Retrieval + Portfolio Assembly` serves timeline/skills/resume/summaries and builds portfolio-scoped outputs.
-
-## Milestone 2 Capabilities
+## Current Capabilities
 
 - Multi-ZIP portfolio flow using `portfolio_id` linkage.
 - Directory-scoped analysis from uploaded ZIP contents.
-- Repository intelligence: languages, frameworks, commit windows, collaboration, health score.
+- Repository intelligence covering languages, frameworks, commit windows, collaboration, and repository health.
 - User-level contribution intelligence and role metadata.
-- Evidence model with CRUD endpoints for project evidence.
-- Retrieval APIs for skills, skills chronology, resume items, summaries, and timeline.
-- Portfolio generation endpoint with representation preferences per portfolio.
-- Project management endpoints: role, thumbnail upload/URL, soft delete, ranking, timeline.
-- Textual TUI flow for consent, user config, ZIP upload, directory selection, and resume views.
-- CLI interactive and non-interactive export flow (`.txt` or `.json`).
+- Evidence CRUD flows for project artifacts and supporting details.
+- Retrieval APIs for skills, chronology, resume items, summaries, and timelines.
+- Portfolio generation and per-portfolio view preferences.
+- Textual TUI flow for consent, user configuration, ZIP upload, directory selection, and resume views.
+- Consent-gated AI-assisted generation paths for supported local or cloud providers.
 
-## API Surface (Current)
+## Quick Start
 
-**System + Setup**
+### Prerequisites
+
+- Python 3.11+
+- [uv](https://github.com/astral-sh/uv)
+- Git
+- Optional: Bun for `opentui-react-exp`
+- Optional: environment variables for AI-assisted endpoints
+
+### Install and Configure
+
+```bash
+uv sync
+cp .env.example .env
+uv run alembic upgrade head
+```
+
+## Run The Project
+
+### Backend API
+
+```bash
+uv run api
+```
+
+Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+### Textual TUI
+
+Start the backend first, then run:
+
+```bash
+uv run artifactminer-tui
+```
+
+### Experimental OpenTUI React Client
+
+Start the backend first, then run:
+
+```bash
+cd opentui-react-exp
+bun install
+bun run src/index.tsx
+```
+
+## API Areas
+
+**System and setup**
 - `GET /health`
 - `GET /consent`, `PUT /consent`
 - `GET /questions`, `POST /answers`
-- `GET /useranswer`, `POST /postanswer/`
 
-**ZIP + Analysis**
+**ZIP intake and analysis**
 - `POST /zip/upload`
 - `GET /zip/{zip_id}/directories`
 - `GET /zip/portfolios/{portfolio_id}`
@@ -157,7 +159,7 @@ flowchart TB
 - `GET /crawler`
 - `GET /fileintelligence`
 
-**Projects + Evidence**
+**Projects, evidence, and views**
 - `GET /projects`
 - `GET /projects/{project_id}`
 - `POST /projects/{project_id}/thumbnail`
@@ -168,8 +170,10 @@ flowchart TB
 - `GET /projects/timeline`
 - `GET /projects/ranking`
 - `DELETE /projects/{project_id}`
+- `GET /views/{portfolio_id}/prefs`
+- `PUT /views/{portfolio_id}/prefs`
 
-**Retrieval + Resume + Portfolio**
+**Retrieval and generation**
 - `GET /skills`
 - `GET /skills/chronology`
 - `GET /resume`
@@ -179,75 +183,24 @@ flowchart TB
 - `GET /summaries`
 - `GET /AI_summaries`
 - `POST /portfolio/generate`
-- `GET /views/{portfolio_id}/prefs`
-- `PUT /views/{portfolio_id}/prefs`
 - `POST /openai`
+- `/local-llm/*` for local generation workflows
 
 ## Project Structure
 
 ```text
 src/artifactminer/
-  api/                    FastAPI app + routers
-  db/                     SQLAlchemy models, session, seeders
-  RepositoryIntelligence/ Repo and user contribution analytics
-  skills/                 Skill extraction, deep analysis, signals
+  api/                    FastAPI app and routers
+  db/                     SQLAlchemy models, sessions, and seeders
+  RepositoryIntelligence/ Repository and contributor analytics
+  skills/                 Skill extraction, signals, and ranking
   evidence/               Evidence models and extractors
-  directorycrawler/       ZIP/directory crawl utilities
-  tui/                    Textual app + screens
-  cli/                    Interactive/non-interactive CLI pipeline
+  directorycrawler/       ZIP and directory crawl utilities
+  local_llm/              Local-generation runtime support
+  tui/                    Textual app and screens
 opentui-react-exp/        Experimental React/OpenTUI client
-tests/                    API, DB, crawler, TUI, evidence, signals, repo intelligence
+tests/                    API, DB, crawler, evidence, repo intelligence, and TUI tests
 alembic/                  Database migrations
-```
-
-## Local Setup
-
-### Prerequisites
-
-- Python 3.11+
-- [uv](https://github.com/astral-sh/uv)
-- Git
-- Optional: Bun (for `opentui-react-exp`)
-- Optional: OpenAI API key (for OpenAI-backed paths)
-- Optional: local Ollama install (for local LLM paths)
-
-### Install and Configure
-
-```bash
-uv sync
-cp .env.example .env
-uv run alembic upgrade head
-```
-
-### Run Backend API
-
-```bash
-uv run api
-```
-
-API docs: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-
-### Run Textual TUI
-
-```bash
-uv run artifactminer-tui
-```
-
-### Run CLI
-
-```bash
-uv run artifactminer --help
-uv run artifactminer -i /path/to/projects.zip -o /path/to/report.txt -c no_llm -u you@example.com
-```
-
-CLI consent flags currently use `full | no_llm | none` in the CLI pipeline, while the API `/consent` contract uses `local | local-llm | cloud | none`.
-
-### Run Experimental OpenTUI React Client
-
-```bash
-cd opentui-react-exp
-bun install
-bun run src/index.tsx
 ```
 
 ## Tests
@@ -256,7 +209,7 @@ bun run src/index.tsx
 uv run pytest
 ```
 
-This repository currently includes tests across API, database, crawler, evidence/signals, repo intelligence, CLI, and TUI layers.
+The automated suite covers API, database, crawler, evidence/signals, repository intelligence, and TUI flows.
 
 ## Database Migrations (Alembic)
 
