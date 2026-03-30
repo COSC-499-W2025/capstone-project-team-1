@@ -1,1 +1,3 @@
-"""API tests package marker."""
+"""
+Package marker for `tests.api` to avoid import name collisions.
+"""

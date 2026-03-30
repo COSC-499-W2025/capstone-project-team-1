@@ -12,8 +12,8 @@ interface PipelineLaunchScreenProps {
 }
 
 const DEFAULT_STAGE1_MODEL = "qwen2.5-coder-3b-q4";
-const DEFAULT_STAGE2_MODEL = "lfm2.5-1.2b-bf16";
-const DEFAULT_STAGE3_MODEL = "lfm2.5-1.2b-bf16";
+const DEFAULT_STAGE2_MODEL = "lfm2.5-1.2b-q8";
+const DEFAULT_STAGE3_MODEL = "lfm2.5-1.2b-q8";
 
 export function PipelineLaunchScreen({
 	onStarted,

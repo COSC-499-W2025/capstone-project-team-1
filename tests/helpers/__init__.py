@@ -1,1 +1,3 @@
-"""Helper tests package marker."""
+"""
+Package marker for `tests.helpers` to avoid import name collisions.
+"""

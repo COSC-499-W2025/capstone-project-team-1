@@ -1,30 +1,42 @@
-"""Local LLM API endpoints for resume generation workflow.
+"""Local LLM API endpoints for the OpenTUI resume-generation flow."""
 
-This module provides the /local-llm/* route family for orchestrating
-resume generation using local LLM models. It exposes endpoints for:
-- Context intake (ZIP discovery and repository scanning)
-- Contributor discovery (git history analysis)
-- Generation start and monitoring
-- Draft polishing and customization
+from __future__ import annotations
 
-These endpoints support the full local generation pipeline as an alternative
-to cloud-based generation workflows.
-"""
-
+import asyncio
+import contextlib
 import inspect
 import shutil
 import subprocess
 import tempfile
 import uuid
 from pathlib import Path
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable
 from zipfile import ZipFile, is_zipfile
-from ..helpers.zip_utils import safe_extract_zip
-
 
 from fastapi import APIRouter, HTTPException, Query
 
+from ..helpers.zip_utils import safe_extract_zip
+from ..local_llm.generation.jobs import (
+    append_message,
+    make_job,
+    make_telemetry,
+    mark_cancelled,
+    should_stop,
+    update_job,
+)
+from ..local_llm.generation.schemas import (
+    GenerationFeedback,
+    ProjectFacts,
+    ResumeOutputModel,
+)
+from ..local_llm.generation.service import (
+    build_draft_output,
+    build_polished_output,
+    finalize_output,
+    generate_project_facts,
+)
 from ..local_llm.runtime.process_manager import stop_server
+from ..local_llm.runtime.registry import list_supported_models
 from .local_llm_schemas import (
     CancellationResponse,
     ContributorDiscoveryRequest,
@@ -42,92 +54,69 @@ from .local_llm_schemas import (
 )
 
 
-router = APIRouter(
-    prefix="/local-llm",
-    tags=["local-llm"],
-)
+router = APIRouter(prefix="/local-llm", tags=["local-llm"])
 
 
-# In-memory storage for active intake contexts
-# Maps intake_id -> {zip_path, repos}
-_active_intakes: Dict[str, Dict] = {}
-
-# In-memory storage for generation jobs
-# Maps job_id -> minimal generation request context
-_generation_jobs: Dict[str, Dict] = {}
+_active_intakes: dict[str, "IntakeContext"] = {}
+_generation_jobs: dict[str, dict[str, Any]] = {}
 _active_generation_id: str | None = None
-_generation_cancel_hooks: Dict[str, Callable[[], Any]] = {}
-
-
-def register_generation_cancellation_hook(job_id: str, cancel_hook: Callable[[], Any]) -> None:
-    """Register optional runtime cancellation hook for a generation job."""
-    _generation_cancel_hooks[job_id] = cancel_hook
-
-
-async def _stop_job_runtime(job_id: str, job: Dict) -> None:
-    """Stop all runtime controls attached to a generation job.
-
-    Cancels the async generation task (if any), shuts down the
-    llama-server process via the existing process manager, and
-    invokes any registered cancellation hooks.
-    """
-    runtime_stopped = False
-
-    # Cancel the async generation task if one is attached.
-    generation_task = job.get("generation_task")
-    if generation_task is not None and hasattr(generation_task, "cancel"):
-        generation_task.cancel()
-        runtime_stopped = True
-
-    # Stop the llama-server process via the runtime process manager.
-    stop_server()
-    runtime_stopped = True
-
-    # Invoke any registered cancellation hooks for this job.
-    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
-    if callable(cancel_hook):
-        maybe_awaitable = cancel_hook()
-        if inspect.isawaitable(maybe_awaitable):
-            await maybe_awaitable
-        runtime_stopped = True
+_generation_cancel_hooks: dict[str, Callable[[], Any]] = {}
+_JOB_LAUNCH_DELAY_SECONDS = 0.1
 
 
 class IntakeContext:
     """Represents an active intake session with metadata."""
-    
+
     def __init__(
         self,
         intake_id: str,
         zip_path: str,
-        repos: List[RepositoryCandidate],
+        repos: list[RepositoryCandidate],
         extracted_dir: str,
     ):
         self.intake_id = intake_id
         self.zip_path = zip_path
         self.repos = repos
         self.extracted_dir = extracted_dir
-        self.repo_id_to_path: Dict[str, Path] = {
-            repo.id: Path(extracted_dir) / repo.rel_path
-            for repo in repos
+        self.repo_id_to_path: dict[str, Path] = {
+            repo.id: Path(extracted_dir) / repo.rel_path for repo in repos
         }
 
 
+def register_generation_cancellation_hook(
+    job_id: str, cancel_hook: Callable[[], Any]
+) -> None:
+    """Register optional runtime cancellation hook for a generation job."""
+
+    _generation_cancel_hooks[job_id] = cancel_hook
+
+
+async def _stop_job_runtime(job_id: str, job: dict[str, Any]) -> None:
+    """Stop all runtime controls attached to a generation job."""
+
+    generation_task = job.get("generation_task")
+    if generation_task is not None and hasattr(generation_task, "cancel"):
+        generation_task.cancel()
+
+    stop_server()
+
+    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
+    if callable(cancel_hook):
+        maybe_awaitable = cancel_hook()
+        if inspect.isawaitable(maybe_awaitable):
+            await maybe_awaitable
+
+    if generation_task is not None and hasattr(generation_task, "__await__"):
+        with contextlib.suppress(asyncio.CancelledError, TimeoutError, Exception):
+            await asyncio.wait_for(generation_task, timeout=1.5)
+
+
 def _is_git_repo(path: Path) -> bool:
-    """Check if a path is a valid git repository.
-    
-    Aligned with experimental-llamacpp-v3 validation logic.
-    Requires both .git directory and HEAD file to exist.
-    """
     git_dir = path / ".git"
     return git_dir.is_dir() and (git_dir / "HEAD").is_file()
 
 
 def _is_macos_metadata(path: Path, base_path: Path) -> bool:
-    """Check if path is macOS metadata that should be ignored.
-    
-    Filters __MACOSX directories and resource fork files (._*).
-    Aligned with experimental-llamacpp-v3 filtering logic.
-    """
     try:
         parts = path.relative_to(base_path).parts
     except ValueError:
@@ -135,127 +124,79 @@ def _is_macos_metadata(path: Path, base_path: Path) -> bool:
     return any(part == "__MACOSX" or part.startswith("._") for part in parts)
 
 
-def _discover_repos_in_zip(zip_path: str) -> tuple[List[RepositoryCandidate], str]:
-    """Scan a ZIP file for git repositories and return candidates.
-
-    Extracts the ZIP to a temporary directory and discovers git repositories
-    using validation logic aligned with experimental-llamacpp-v3:
-    - Requires both .git directory and .git/HEAD file
-    - Filters out macOS metadata (__MACOSX, ._* files)
-    - Skips nested repositories
-    
-    Args:
-        zip_path: Filesystem path to the ZIP file
-        
-    Returns:
-        Tuple of (List of RepositoryCandidate objects sorted by name, path to extracted directory)
-        The extracted directory should be cleaned up by the caller.
-        
-    Raises:
-        ValueError: If ZIP is invalid or cannot be read
-    """
+def _discover_repos_in_zip(zip_path: str) -> tuple[list[RepositoryCandidate], str]:
     if not Path(zip_path).exists():
         raise ValueError(f"ZIP file not found: {zip_path}")
-    
     if not is_zipfile(zip_path):
         raise ValueError(f"Invalid ZIP file: {zip_path}")
-    
-    candidates = []
-    seen_repos = set()
-    
-    # Extract ZIP to temporary directory
+
+    candidates: list[RepositoryCandidate] = []
+    seen_repos: set[str] = set()
     temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
-    
+
     try:
         try:
-            with ZipFile(zip_path, 'r') as zf:
+            with ZipFile(zip_path, "r") as zf:
                 safe_extract_zip(zf, Path(temp_extracted_dir))
-        except Exception as e:
-            # Extraction failures are user errors (corrupted ZIP, etc.)
+        except Exception as exc:
             shutil.rmtree(temp_extracted_dir)
-            raise ValueError(f"Failed to extract ZIP file: {str(e)}")
-        
+            raise ValueError(f"Failed to extract ZIP file: {exc}") from exc
+
         extracted_root = Path(temp_extracted_dir)
-
-        # Discovery logic aligned with experimental-llamacpp-v3
-        # Check base path first
-        if _is_git_repo(extracted_root) and not _is_macos_metadata(extracted_root, extracted_root):
-            repo_rel_path = "."
-            if repo_rel_path not in seen_repos:
-                seen_repos.add(repo_rel_path)
-                candidates.append(
-                    RepositoryCandidate(
-                        id=repo_rel_path,
-                        name=extracted_root.name,
-                        rel_path=repo_rel_path,
-                    )
+        if _is_git_repo(extracted_root) and not _is_macos_metadata(
+            extracted_root, extracted_root
+        ):
+            candidates.append(
+                RepositoryCandidate(
+                    id=".",
+                    name=extracted_root.name,
+                    rel_path=".",
                 )
+            )
+            seen_repos.add(".")
 
-        # Search subdirectories
         for path in extracted_root.rglob("*"):
             if not path.is_dir() or _is_macos_metadata(path, extracted_root):
                 continue
+            if not _is_git_repo(path):
+                continue
 
-            if _is_git_repo(path):
-                # Avoid nested repos
-                is_nested = any(
-                    _is_git_repo(parent)
-                    for parent in path.parents
-                    if parent != extracted_root and parent.is_relative_to(extracted_root)
+            is_nested = any(
+                _is_git_repo(parent)
+                for parent in path.parents
+                if parent != extracted_root and parent.is_relative_to(extracted_root)
+            )
+            if is_nested:
+                continue
+
+            repo_rel_path = path.relative_to(extracted_root).as_posix()
+            if repo_rel_path in seen_repos:
+                continue
+            seen_repos.add(repo_rel_path)
+            candidates.append(
+                RepositoryCandidate(
+                    id=repo_rel_path,
+                    name=path.name,
+                    rel_path=repo_rel_path,
                 )
-                if not is_nested:
-                    repo_rel_path = path.relative_to(extracted_root).as_posix()
-                    if repo_rel_path not in seen_repos:
-                        seen_repos.add(repo_rel_path)
-                        candidates.append(
-                            RepositoryCandidate(
-                                id=repo_rel_path,
-                                name=path.name,
-                                rel_path=repo_rel_path,
-                            )
-                        )
+            )
     except ValueError:
-        # Re-raise ValueError without cleaning up temp_extracted_dir 
-        # (it's already cleaned up by the inner exception handler)
         raise
-    except Exception as e:
-        # Clean up on unexpected errors
+    except Exception as exc:
         if Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
-        raise ValueError(f"Failed to discover repositories: {str(e)}")
-    
-    return sorted(candidates, key=lambda x: x.name), temp_extracted_dir
+        raise RuntimeError(f"Failed to discover repositories: {exc}") from exc
+
+    return sorted(candidates, key=lambda repo: repo.name), temp_extracted_dir
 
 
-def _discover_contributors_in_repos(
-    repo_paths: List[Path],
-) -> List[ContributorIdentity]:
-    """Discover unique contributors from git history across multiple repositories.
-    
-    Scans git commit history to extract contributor identities (email/name pairs)
-    and aggregate statistics across repositories.
-    
-    Args:
-        repo_paths: List of paths to git repositories
-        
-    Returns:
-        List of unique ContributorIdentity objects sorted by commit count
-        
-    Raises:
-        ValueError: If git operations fail on all repositories
-    """
-    # Track unique contributors by email
-    # email -> {name, repos_set, commit_count}
-    contributors_map: Dict[str, Dict] = {}
-    repos_with_commits = 0
-    
+def _discover_contributors_in_repos(repo_paths: list[Path]) -> list[ContributorIdentity]:
+    contributors_map: dict[str, dict[str, Any]] = {}
     for repo_path in repo_paths:
         if not repo_path.exists() or not _is_git_repo(repo_path):
             raise ValueError(f"Invalid git repository: {repo_path}")
-        
+
         try:
-            # Get all commits with author email and name
-            # Format: email|name (separated by pipe for reliable parsing)
             result = subprocess.run(
                 ["git", "log", "--format=%ae|%an"],
                 cwd=str(repo_path),
@@ -263,321 +204,399 @@ def _discover_contributors_in_repos(
                 text=True,
                 timeout=30,
             )
-            
-            # If git log fails, skip this repo (may not have commits yet)
             if result.returncode != 0:
                 continue
-            
-            repos_with_commits += 1
-            
-            # Parse commits
             for line in result.stdout.strip().split("\n"):
                 if not line.strip():
                     continue
-                
                 parts = line.split("|", 1)
                 if len(parts) != 2:
                     continue
-                
                 email = parts[0].strip()
-                name = parts[1].strip() if parts[1].strip() else None
-                
+                name = parts[1].strip() or None
                 if not email:
                     continue
-                
-                # Update or create contributor entry
-                if email not in contributors_map:
-                    contributors_map[email] = {
-                        "name": name,
-                        "repos": set(),
-                        "commit_count": 0,
-                    }
-                
-                contrib = contributors_map[email]
-                contrib["repos"].add(repo_path.name)
-                contrib["commit_count"] += 1
-                
-                # Update name if we get a better one
-                if name and (not contrib["name"] or len(name) > len(contrib["name"])):
-                    contrib["name"] = name
-        
-        except subprocess.TimeoutExpired:
-            # Timeout is an error - repo may be corrupted or too large
-            raise ValueError(f"Git operation timed out for {repo_path}")
-        except Exception as e:
-            # All other errors should be surfaced - don't silently skip repos
-            raise ValueError(f"Failed to analyze git repository {repo_path}: {str(e)}")
-    
-    # Convert to ContributorIdentity objects
-    identities = []
-    for email, data in contributors_map.items():
-        # Extract potential username from email (part before @)
-        candidate_username = email.split("@")[0]
-        
-        identities.append(
-            ContributorIdentity(
-                email=email,
-                name=data["name"],
-                repo_count=len(data["repos"]),
-                commit_count=data["commit_count"],
-                candidate_username=candidate_username,
-            )
+
+                contributor = contributors_map.setdefault(
+                    email,
+                    {"name": name, "repos": set(), "commit_count": 0},
+                )
+                contributor["repos"].add(repo_path.name)
+                contributor["commit_count"] += 1
+                if name and (not contributor["name"] or len(name) > len(contributor["name"])):
+                    contributor["name"] = name
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(f"Git operation timed out for {repo_path}") from exc
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to analyze git repository {repo_path}: {exc}"
+            ) from exc
+
+    identities = [
+        ContributorIdentity(
+            email=email,
+            name=data["name"],
+            repo_count=len(data["repos"]),
+            commit_count=data["commit_count"],
+            candidate_username=email.split("@")[0],
         )
-    
-    # Sort by commit count descending, then by email
-    return sorted(identities, key=lambda x: (-x.commit_count, x.email))
+        for email, data in contributors_map.items()
+    ]
+    return sorted(identities, key=lambda item: (-item.commit_count, item.email))
+
+
+def _resolve_context(intake_id: str | None) -> IntakeContext:
+    if intake_id:
+        context = _active_intakes.get(intake_id)
+        if context is None:
+            raise ValueError(f"No active intake context found for intake_id: {intake_id}")
+        return context
+    if not _active_intakes:
+        raise ValueError("No active intake context found")
+    return list(_active_intakes.values())[-1]
+
+
+def _resolve_repo_paths(
+    context: IntakeContext, repo_ids: list[str]
+) -> tuple[list[str], list[Path]]:
+    valid_repo_ids = {repo.id for repo in context.repos}
+    invalid_ids = set(repo_ids) - valid_repo_ids
+    if invalid_ids:
+        raise ValueError(
+            f"Invalid repository IDs for active intake: {', '.join(sorted(invalid_ids))}"
+        )
+
+    selected_repos = [repo for repo in context.repos if repo.id in repo_ids]
+    return [repo.name for repo in selected_repos], [
+        context.repo_id_to_path[repo.id] for repo in selected_repos
+    ]
+
+
+def _default_telemetry_for_job(job_data: dict[str, Any]) -> dict[str, Any]:
+    telemetry_data = job_data.get("telemetry", {})
+    if telemetry_data:
+        return telemetry_data
+    return make_telemetry(job_data.get("repo_names", job_data.get("repo_ids", [])))
+
+
+def _validate_requested_models(*models: str) -> None:
+    supported = {descriptor.name for descriptor in list_supported_models()}
+    for model in models:
+        if model not in supported:
+            supported_names = ", ".join(sorted(supported))
+            raise ValueError(
+                f"Model '{model}' is not a supported local model. "
+                f"Supported model names: {supported_names}."
+            )
+
+
+async def _cancel_superseded_job() -> None:
+    global _active_generation_id
+
+    existing_job_id = _active_generation_id
+    if existing_job_id is None:
+        return
+
+    existing_job = _generation_jobs.get(existing_job_id)
+    if existing_job is None:
+        _active_generation_id = None
+        return
+
+    if existing_job.get("status") in {"cancelled", "complete", "error"}:
+        return
+
+    await _stop_job_runtime(existing_job_id, existing_job)
+    mark_cancelled(existing_job, message="Superseded by a new pipeline run.")
+    _generation_cancel_hooks.pop(existing_job_id, None)
+    _active_generation_id = None
+
+
+async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
+    job = _generation_jobs.get(job_id)
+    if job is None:
+        return
+
+    facts_total = 0
+    project_facts = []
+
+    try:
+        update_job(job, status="running", stage="ANALYZE", current_repo=None)
+        append_message(job, "Starting local repository analysis.")
+
+        for index, repo_path in enumerate(repo_paths, start=1):
+            if should_stop(job):
+                raise asyncio.CancelledError
+
+            update_job(
+                job,
+                status="running",
+                stage="FACTS",
+                active_model=job["stage1_model"],
+                current_repo=repo_path.name,
+                repos_done=index - 1,
+                facts_total=facts_total,
+            )
+            append_message(job, f"Compiling facts for {repo_path.name}")
+            fact = await generate_project_facts(
+                repo_path,
+                user_email=job["user_email"],
+                model=job["stage1_model"],
+                progress=lambda message: append_message(job, message),
+            )
+            project_facts.append(fact)
+            facts_total += len(fact.highlights) + len(fact.evidence)
+            update_job(
+                job,
+                status="running",
+                stage="FACTS",
+                active_model=job["stage1_model"],
+                current_repo=repo_path.name,
+                repos_done=index,
+                facts_total=facts_total,
+            )
+
+        if should_stop(job):
+            raise asyncio.CancelledError
+
+        update_job(
+            job,
+            status="running",
+            stage="DRAFT",
+            active_model=job["stage2_model"],
+            current_repo=None,
+            repos_done=len(repo_paths),
+            facts_total=facts_total,
+        )
+        append_message(job, "Writing grounded draft resume.")
+        draft_output = await build_draft_output(
+            project_facts,
+            user_email=job["user_email"],
+            model=job["stage2_model"],
+        )
+        draft_payload = finalize_output(
+            draft_output,
+            facts=project_facts,
+            stage="draft",
+            models_used=[job["stage1_model"], job["stage2_model"]],
+            generation_time_seconds=float(
+                _default_telemetry_for_job(job).get("elapsed_seconds", 0.0)
+            ),
+            errors=[],
+        )
+        job["project_facts"] = [fact.model_dump() for fact in project_facts]
+        job["draft"] = draft_payload
+        update_job(
+            job,
+            status="draft_ready",
+            stage="DRAFT",
+            active_model=job["stage2_model"],
+            current_repo=None,
+            draft_projects=len(draft_payload.get("projects", [])),
+            facts_total=facts_total,
+        )
+        append_message(job, "Draft ready for review.")
+    except asyncio.CancelledError:
+        if job.get("status") != "cancelled":
+            mark_cancelled(job, message="Pipeline cancelled.")
+    except Exception as exc:
+        error_message = f"{type(exc).__name__}: {exc}"
+        update_job(job, status="error", error=error_message)
+        append_message(job, error_message)
+    finally:
+        job["generation_task"] = None
+        stop_server()
+
+
+async def _deferred_run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
+    await asyncio.sleep(_JOB_LAUNCH_DELAY_SECONDS)
+    await _run_generation_job(job_id, repo_paths)
+
+
+async def _run_polish_job(job_id: str) -> None:
+    job = _generation_jobs.get(job_id)
+    if job is None:
+        return
+
+    try:
+        if should_stop(job):
+            raise asyncio.CancelledError
+
+        feedback = GenerationFeedback.model_validate(job.get("feedback") or {})
+        draft_output = ResumeOutputModel.model_validate(job.get("draft") or {})
+        project_facts_models = [
+            ProjectFacts.model_validate(item) for item in job.get("project_facts", [])
+        ]
+
+        update_job(
+            job,
+            status="polishing",
+            stage="POLISH",
+            active_model=job["stage3_model"],
+            current_repo=None,
+        )
+        append_message(job, "Applying polish feedback.")
+        final_output = await build_polished_output(
+            draft_output,
+            feedback,
+            model=job["stage3_model"],
+        )
+        output_payload = finalize_output(
+            final_output,
+            facts=project_facts_models,
+            stage="polish",
+            models_used=[job["stage1_model"], job["stage2_model"], job["stage3_model"]],
+            generation_time_seconds=float(
+                _default_telemetry_for_job(job).get("elapsed_seconds", 0.0)
+            ),
+            errors=[],
+        )
+        job["output"] = output_payload
+        update_job(
+            job,
+            status="complete",
+            stage="POLISH",
+            active_model=job["stage3_model"],
+            current_repo=None,
+            polished_projects=len(output_payload.get("projects", [])),
+        )
+        append_message(job, "Polish complete.")
+    except asyncio.CancelledError:
+        if job.get("status") != "cancelled":
+            mark_cancelled(job, message="Pipeline cancelled.")
+    except Exception as exc:
+        error_message = f"{type(exc).__name__}: {exc}"
+        update_job(job, status="error", error=error_message)
+        append_message(job, error_message)
+    finally:
+        job["generation_task"] = None
+        stop_server()
 
 
 @router.post("/context", response_model=IntakeCreateResponse)
-async def create_intake(
-    request: IntakeCreateRequest,
-) -> IntakeCreateResponse:
-    """Create a new intake from an uploaded ZIP file.
-    
-    Scans the provided ZIP file for git repositories and returns a list
-    of discovered candidates. This is the first step in the local LLM
-    generation workflow.
-    
-    A unique UUID is generated for each intake request. The intake context
-    is stored in memory for subsequent contributor discovery and generation steps.
-    
-    Args:
-        request: IntakeCreateRequest with zip_path
-        
-    Returns:
-        IntakeCreateResponse with intake_id and discovered repositories
-        
-    Raises:
-        HTTPException: 400 if ZIP is invalid, 404 if not found, 500 on internal error
-    """
+async def create_intake(request: IntakeCreateRequest) -> IntakeCreateResponse:
     temp_extracted_dir = None
-    
     try:
-        # Validate and discover repositories (includes extraction)
         repos, temp_extracted_dir = _discover_repos_in_zip(request.zip_path)
-
         if not repos:
             raise ValueError("No git repositories found in ZIP")
 
-        # Generate globally unique intake identifier
         intake_id = str(uuid.uuid4())
-        
-        # Store intake context for later use
-        context = IntakeContext(
+        _active_intakes[intake_id] = IntakeContext(
             intake_id=intake_id,
             zip_path=request.zip_path,
             repos=repos,
             extracted_dir=temp_extracted_dir,
         )
-        _active_intakes[intake_id] = context
-        
         return IntakeCreateResponse(
             intake_id=intake_id,
             zip_path=request.zip_path,
             repos=repos,
         )
-    
-    except ValueError as e:
-        # Client error: invalid ZIP or not found
+    except ValueError as exc:
         if temp_extracted_dir and Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
-        
-        if "not found" in str(e).lower():
-            raise HTTPException(status_code=404, detail=str(e))
-        else:
-            raise HTTPException(status_code=400, detail=str(e))
-    
-    except Exception as e:
-        # Internal server error
+        if "not found" in str(exc).lower():
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
         if temp_extracted_dir and Path(temp_extracted_dir).exists():
             shutil.rmtree(temp_extracted_dir)
-        
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to create intake: {str(e)}",
-        )
+            detail=f"Failed to create intake: {exc}",
+        ) from exc
 
 
-@router.post("/context/contributors", response_model=ContributorDiscoveryResponse)
+@router.post(
+    "/context/contributors", response_model=ContributorDiscoveryResponse
+)
 async def discover_contributors(
     request: ContributorDiscoveryRequest,
 ) -> ContributorDiscoveryResponse:
-    """Discover contributors across selected repositories.
-    
-    Requires an active intake context created by POST /local-llm/context.
-    Scans git commit history of selected repositories to identify unique
-    contributor identities and their contribution statistics.
-    
-    Args:
-        request: ContributorDiscoveryRequest with repo_ids
-        
-    Returns:
-        ContributorDiscoveryResponse with discovered contributors
-        
-    Raises:
-        HTTPException: 404 if no active intake, 400 if invalid repo IDs, 
-                      422 if validation fails, 500 on internal error
-    """
     try:
-        # This would normally come from a session/user context.
-        # For now, use the most recent active intake as the current context.
-        if not _active_intakes:
-            raise ValueError("No active intake context found")
-        
-        # Get the last (most recent) active intake
-        # In production, this would be retrieved from session/user context
-        context = next(iter(_active_intakes.values()))
-        
-        # Validate all repo_ids are valid for this intake
-        valid_repo_ids = {repo.id for repo in context.repos}
-        requested_repo_ids = set(request.repo_ids)
-        
-        invalid_ids = requested_repo_ids - valid_repo_ids
-        if invalid_ids:
-            raise ValueError(
-                f"Invalid repository IDs for active intake: {', '.join(sorted(invalid_ids))}"
-            )
-        
-        # Get paths for selected repositories
-        repo_paths = [
-            context.repo_id_to_path[repo_id]
-            for repo_id in request.repo_ids
-        ]
-        
-        # Discover contributors
+        context = _resolve_context(None)
+        _, repo_paths = _resolve_repo_paths(context, request.repo_ids)
         contributors = _discover_contributors_in_repos(repo_paths)
-        
         return ContributorDiscoveryResponse(contributors=contributors)
-    
-    except ValueError as e:
-        error_msg = str(e)
-        if "no active intake" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        elif "invalid repository ids" in error_msg.lower():
-            raise HTTPException(status_code=422, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-    
-    except Exception as e:
-        # Internal server error
+    except ValueError as exc:
+        error_message = str(exc)
+        if "no active intake" in error_message.lower():
+            raise HTTPException(status_code=404, detail=error_message) from exc
+        raise HTTPException(status_code=422, detail=error_message) from exc
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to discover contributors: {str(e)}",
-        )
+            detail=f"Failed to discover contributors: {exc}",
+        ) from exc
 
 
 @router.post("/generation/start", response_model=GenerationStartResponse)
 async def start_generation(
     request: GenerationStartRequest,
 ) -> GenerationStartResponse:
-    """Start the local generation workflow for selected repositories.
-
-    Validates intake context and selected repositories, then creates a new
-    generation job record. Runtime execution lifecycle is intentionally out of
-    scope for this endpoint.
-
-    Args:
-        request: GenerationStartRequest with repo selection, user identity,
-                 and optional intake/model selection
-
-    Returns:
-        GenerationStartResponse with created job ID and initial status
-
-    Raises:
-        HTTPException: 404 if no active intake, 422 if repo selection invalid,
-                      422 if request validation fails, 500 on internal error
-    """
     global _active_generation_id
 
     try:
-        # Resolve intake context from explicit reference or current active context.
-        if request.intake_id:
-            context = _active_intakes.get(request.intake_id)
-            if context is None:
-                raise ValueError(
-                    f"No active intake context found for intake_id: {request.intake_id}"
-                )
-        else:
-            if not _active_intakes:
-                raise ValueError("No active intake context found")
+        context = _resolve_context(request.intake_id)
+        repo_names, repo_paths = _resolve_repo_paths(context, request.repo_ids)
+        _validate_requested_models(
+            request.stage1_model,
+            request.stage2_model,
+            request.stage3_model,
+        )
+        await _cancel_superseded_job()
 
-            # Use the most recently created intake context.
-            context = list(_active_intakes.values())[-1]
-
-        # Validate all selected repositories belong to the resolved intake.
-        valid_repo_ids = {repo.id for repo in context.repos}
-        requested_repo_ids = set(request.repo_ids)
-        invalid_ids = requested_repo_ids - valid_repo_ids
-
-        if invalid_ids:
-            raise ValueError(
-                f"Invalid repository IDs for active intake: {', '.join(sorted(invalid_ids))}"
-            )
-
-        # Create a queued job envelope for downstream polling/worker endpoints.
         job_id = str(uuid.uuid4())
-        _generation_jobs[job_id] = {
-            "job_id": job_id,
-            "status": "queued",
-            "stage": "ANALYZE",
-            "intake_id": context.intake_id,
-            "repo_ids": list(request.repo_ids),
-            "user_email": str(request.user_email),
-            "stage1_model": request.stage1_model,
-            "stage2_model": request.stage2_model,
-            "stage3_model": request.stage3_model,
-        }
+        job = make_job(
+            job_id=job_id,
+            intake_id=context.intake_id,
+            repo_ids=list(request.repo_ids),
+            repo_names=repo_names,
+            user_email=str(request.user_email),
+            stage1_model=request.stage1_model,
+            stage2_model=request.stage2_model,
+            stage3_model=request.stage3_model,
+        )
+        _generation_jobs[job_id] = job
         _active_generation_id = job_id
 
+        task = asyncio.create_task(_deferred_run_generation_job(job_id, repo_paths))
+        job["generation_task"] = task
         return GenerationStartResponse(job_id=job_id, status="queued")
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "no active intake" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        elif "invalid repository ids" in error_msg.lower():
-            raise HTTPException(status_code=422, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
-    except Exception as e:
-        # Internal server error
+    except ValueError as exc:
+        error_message = str(exc)
+        if "no active intake" in error_message.lower():
+            raise HTTPException(status_code=404, detail=error_message) from exc
+        raise HTTPException(status_code=422, detail=error_message) from exc
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to start generation: {str(e)}",
-        )
+            detail=f"Failed to start generation: {exc}",
+        ) from exc
 
 
 @router.post("/generation/cancel", response_model=CancellationResponse)
 async def cancel_generation(
-    job_id: str | None = Query(default=None, description="Job ID to cancel. Defaults to the current active job.")
+    job_id: str | None = Query(
+        default=None,
+        description="Job ID to cancel. Defaults to the current active job.",
+    )
 ) -> CancellationResponse:
-    """Cancel a generation job by job_id, or the current active job if no job_id is provided.
-
-    This operation is idempotent. Cancelling an already-cancelled job returns
-    ok=True. If no matching job exists, returns ok=False.
-
-    Returns:
-        CancellationResponse describing the post-cancel state.
-    """
     global _active_generation_id
 
-    # Resolve which job to target.
     target_id = job_id if job_id is not None else _active_generation_id
-
-    # No job to cancel.
     if target_id is None:
-        return CancellationResponse(ok=False, status="not_found")
+        raise HTTPException(status_code=404, detail="No active generation job found")
 
     target_job = _generation_jobs.get(target_id)
-
-    # If the target job doesn't exist, clear stale active pointer if applicable.
     if target_job is None:
         if target_id == _active_generation_id:
             _active_generation_id = None
-        return CancellationResponse(ok=False, status="not_found")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No generation job found with ID: {target_id}",
+        )
 
-    # Idempotent: already cancelled — return success without side-effects.
     if target_job.get("status") == "cancelled":
         if target_id == _active_generation_id:
             _active_generation_id = None
@@ -585,74 +604,40 @@ async def cancel_generation(
 
     try:
         await _stop_job_runtime(target_id, target_job)
-    except RuntimeError as e:
-        raise HTTPException(status_code=409, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to cancel generation runtime: {str(e)}")
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cancel generation runtime: {exc}",
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cancel generation runtime: {exc}",
+        ) from exc
 
-    target_job["status"] = "cancelled"
+    mark_cancelled(target_job, message="Pipeline cancelled by user.")
     if target_id == _active_generation_id:
         _active_generation_id = None
     _generation_cancel_hooks.pop(target_id, None)
     return CancellationResponse(ok=True, status="cancelled")
-"""
-note that the data is initally returned with null/zero values
-its expected that a background worker would need to update the job as it processes. 
-"""
+
+
 @router.get("/generation/status", response_model=GenerationStatusResponse)
-async def get_generation_status(job_id: str | None = None) -> GenerationStatusResponse:
-    """Get the current status of a generation job.
-    
-    Returns the real-time status of an in-flight generation, including
-    current stage, progress metrics (telemetry), draft output, and errors.
-    This endpoint supports polling-based monitoring of the generation pipeline.
-
-    Args:
-        job_id: Optional job ID returned by /generation/start. If not provided,
-                returns status of the most recent/active generation job.
-
-    Returns:
-        GenerationStatusResponse with current job state, or 404 if no job found
-
-    Raises:
-        HTTPException: 404 if job not found
-    """
+async def get_generation_status(
+    job_id: str | None = None,
+) -> GenerationStatusResponse:
     global _active_generation_id
 
     try:
-        # Determine which job to retrieve
         target_job_id = job_id if job_id else _active_generation_id
-        
-        # Check if the target job exists
         if not target_job_id or target_job_id not in _generation_jobs:
             raise ValueError(
-                f"No generation job found" + 
-                (f" with ID: {target_job_id}" if target_job_id else "")
+                "No generation job found"
+                + (f" with ID: {target_job_id}" if target_job_id else "")
             )
 
-        # Retrieve the job state
         job_data = _generation_jobs[target_job_id]
-
-        # Build response from stored job state
-        # Initialize telemetry with defaults if not present
-        telemetry_data = job_data.get("telemetry", {})
-        if not telemetry_data:
-            telemetry_data = {
-                "stage": "ANALYZE",
-                "active_model": None,
-                "repos_total": len(job_data.get("repo_ids", [])),
-                "repos_done": 0,
-                "current_repo": None,
-                "facts_total": 0,
-                "draft_projects": 0,
-                "polished_projects": 0,
-                "elapsed_seconds": 0.0,
-                "model_check_seconds": 0.0,
-                "selected_repos": job_data.get("repo_ids", []),
-            }
-
-        telemetry = GenerationTelemetry(**telemetry_data)
-
+        telemetry = GenerationTelemetry(**_default_telemetry_for_job(job_data))
         return GenerationStatusResponse(
             status=job_data.get("status", "queued"),
             stage=job_data.get("stage", "ANALYZE"),
@@ -662,62 +647,31 @@ async def get_generation_status(job_id: str | None = None) -> GenerationStatusRe
             output=job_data.get("output"),
             error=job_data.get("error"),
         )
-
-    except ValueError as e:
-        # No job found is a 404
-        raise HTTPException(
-            status_code=404,
-            detail=str(e),
-        )
-
-    except Exception as e:
-        # Internal server error
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve generation status: {str(e)}",
-        )
+            detail=f"Failed to retrieve generation status: {exc}",
+        ) from exc
 
 
 @router.post("/generation/polish", response_model=PolishResponse)
-async def polish_generation(
-    request: PolishRequest,
-) -> PolishResponse:
-    """Request polish/refinement of the draft output with user feedback.
-
-    Validates that a generation job exists in draft_ready or complete state,
-    validates that the user has provided feedback, and transitions the job
-    to polishing state. Actual runtime execution is out of scope.
-
-    Args:
-        request: PolishRequest with feedback (general_notes, tone, additions, removals)
-
-    Returns:
-        PolishResponse confirming the polish operation was initiated
-
-    Raises:
-        HTTPException: 404 if no active generation job, 409 if job state is invalid,
-                      422 if no feedback provided, 500 on internal error
-    """
+async def polish_generation(request: PolishRequest) -> PolishResponse:
     global _active_generation_id
 
     try:
-        # Get the active generation job
         job_id = _active_generation_id
         if not job_id or job_id not in _generation_jobs:
-            raise ValueError(
-                "No active generation found. Start generation first."
-            )
+            raise ValueError("No active generation found. Start generation first.")
 
         job = _generation_jobs[job_id]
-
-        # Validate job status is in a state where polish is allowed
         if job["status"] not in {"draft_ready", "complete"}:
             raise ValueError(
                 f"Pipeline must be in draft_ready or complete state to polish, "
                 f"but is currently in '{job['status']}' state"
             )
 
-        # Normalize and validate feedback fields
         normalized_notes = str(request.general_notes or "").strip()
         normalized_tone = str(request.tone or "").strip()
         normalized_additions = [
@@ -727,7 +681,6 @@ async def polish_generation(
             str(item).strip() for item in request.removals if str(item).strip()
         ]
 
-        # Validate that at least one feedback field is provided
         if not (
             normalized_notes
             or normalized_tone
@@ -739,25 +692,35 @@ async def polish_generation(
                 "or Removals before starting polish."
             )
 
-        # Update job status to polishing
-        job["status"] = "polishing"
-
+        feedback = GenerationFeedback(
+            general_notes=normalized_notes,
+            tone=normalized_tone,
+            additions=normalized_additions,
+            removals=normalized_removals,
+        )
+        job["feedback"] = feedback.model_dump()
+        update_job(
+            job,
+            status="polishing",
+            stage="POLISH",
+            active_model=job["stage3_model"],
+            current_repo=None,
+        )
+        append_message(job, "Polish requested.")
+        task = asyncio.create_task(_run_polish_job(job_id))
+        job["generation_task"] = task
         return PolishResponse(ok=True, status="polishing")
-
-    except ValueError as e:
-        error_msg = str(e)
-        if "no active generation" in error_msg.lower():
-            raise HTTPException(status_code=404, detail=error_msg)
-        elif "pipeline must be in" in error_msg.lower():
-            raise HTTPException(status_code=409, detail=error_msg)
-        elif "no feedback provided" in error_msg.lower():
-            raise HTTPException(status_code=422, detail=error_msg)
-        else:
-            raise HTTPException(status_code=400, detail=error_msg)
-
-    except Exception as e:
-        # Internal server error
+    except ValueError as exc:
+        error_message = str(exc)
+        if "no active generation" in error_message.lower():
+            raise HTTPException(status_code=404, detail=error_message) from exc
+        if "pipeline must be in" in error_message.lower():
+            raise HTTPException(status_code=409, detail=error_message) from exc
+        if "no feedback provided" in error_message.lower():
+            raise HTTPException(status_code=422, detail=error_message) from exc
+        raise HTTPException(status_code=422, detail=error_message) from exc
+    except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to process polish request: {str(e)}",
-        )
+            detail=f"Failed to process polish request: {exc}",
+        ) from exc

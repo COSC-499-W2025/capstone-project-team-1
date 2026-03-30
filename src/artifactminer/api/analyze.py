@@ -1,5 +1,5 @@
 """
-Master analysis endpoint that orchestrates the full artifact mining pipeline.
+Master analysis endpoint that orchestrates the static artifact mining pipeline.
 
 This module ties together ZIP extraction with repository analysis, providing
 a single endpoint that:
@@ -7,7 +7,7 @@ a single endpoint that:
 2. Discovers git repositories within
 3. Analyzes each repo (stats, skills, insights)
 4. Ranks projects by user contribution
-5. Generates summaries (LLM if consented, template otherwise)
+5. Generates lightweight static summaries for ranked projects
 
 Owner: Nathan (orchestration)
 Dependencies:
@@ -108,9 +108,6 @@ def get_user_email(db: Session) -> str:
 def get_consent_level(db: Session) -> str:
     """
     Retrieve current consent level from database.
-
-    Returns:
-        Consent level string: 'full', 'no_llm', or 'none'
     """
     consent = db.query(Consent).filter(Consent.id == 1).first()
     return consent.consent_level if consent else "none"
@@ -320,8 +317,7 @@ async def analyze_zip(
 
     **Step 4 - Post-Processing:**
     - Call Shlok's rank_projects() → update RepoStat.ranking_score
-    - Call Evan's generate_summaries_for_ranked() → create summaries
-      (Uses LLM if consent='full', otherwise template fallback)
+    - Call Evan's generate_summaries_for_ranked() → create lightweight summaries
 
     **Error Handling:**
     - Individual repo failures are logged but don't stop the pipeline
@@ -555,7 +551,7 @@ async def analyze_zip(
 
     # Commit all changes before summary generation
     db.commit()
-    print("[analyze] Generating summaries...")
+    print("[analyze] Generating static summaries...")
 
     summaries: List[SummaryResult] = []
     try:
@@ -574,7 +570,7 @@ async def analyze_zip(
             )
 
     except Exception as e:
-        print(f"[analyze] Warning: Summary generation failed: {e}")
+        print(f"[analyze] Warning: Static summary generation failed: {e}")
         import traceback
 
         traceback.print_exc()

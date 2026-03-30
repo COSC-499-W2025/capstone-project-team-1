@@ -45,7 +45,7 @@ class Consent(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     consent_level = Column(String, default="none", nullable=False) # e.g., "none", "local", "local-llm", "cloud"
-    LLM_model = Column(String, default="chatGPT", nullable=False) # e.g., "ollama", "chatGPT"
+    LLM_model = Column(String, default="chatGPT", nullable=False) # legacy provider-selection field retained for compatibility
     accepted_at = Column(DateTime, nullable=True)
 
 class RepoStat(Base):#model for storing repository statistics
