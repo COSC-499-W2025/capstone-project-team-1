@@ -47,7 +47,7 @@ def client(tmp_path, monkeypatch):
     app.dependency_overrides[get_db] = override_get_db
 
     output_path = tmp_path / ".artifactminer" / "output" / "portfolio.html"
-    monkeypatch.setattr(portfolio_html, "OUTPUT_PATH", output_path)
+    monkeypatch.setattr(portfolio_html, "_output_path", lambda: output_path)
 
     now = datetime.now(UTC).replace(tzinfo=None)
     today = datetime.now(UTC).date()
