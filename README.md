@@ -97,7 +97,7 @@ Runs entirely on your machine using [llama.cpp](https://github.com/ggml-org/llam
 
 ### Cloud Agent Generation (GitHub Copilot)
 
-Uses GitHub Copilot models (Claude, GPT) via the [Pi Agent SDK](https://github.com/nicepkg/pi-agent). Free for students with [GitHub Education](https://education.github.com/).
+Uses GitHub Copilot models (Claude, GPT and Gemini) via the [Pi Agent SDK](https://github.com/badlogic/pi-mono/tree/main/packages/coding-agent). Free for students with [GitHub Education](https://education.github.com/).
 
 **How it works:**
 - The OpenTUI client authenticates you via GitHub's device flow (opens your browser).
