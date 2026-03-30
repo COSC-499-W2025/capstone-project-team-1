@@ -88,7 +88,7 @@ def export_to_text(
 
     lines: list[str] = [
         "=" * 80,
-        "PORTFOLIO ANALYSIS EXPORT",
+        "RESUME EXPORT",
         f"Generated: {datetime.now().isoformat()}",
         "=" * 80,
         "",

@@ -35,6 +35,7 @@ from .user_info import router as user_info_router
 from .portfolio import router as portfolio_router
 from .file_intelligence import router as file_intelligence_router
 from .generate import router as generate_router
+from .openai import router as openai_router
 from .resume import router as resume_router
 from .local_llm import router as local_llm_router
 from artifactminer.RepositoryIntelligence.repo_intelligence_main import (
@@ -187,6 +188,7 @@ def create_app() -> FastAPI:
     @app.post("/repos/analyze", tags=["repositories"])
     async def analyze_repo(
         repo_path: str,
+        user_email: str | None = None,
         db: Session = Depends(get_db),
     ):
         """
@@ -202,10 +204,14 @@ def create_app() -> FastAPI:
                 .first()
             )
 
-            user_email = email_answer.answer_text.strip() if email_answer else None
+            resolved_user_email = user_email
+            if not resolved_user_email:
+                resolved_user_email = (
+                    email_answer.answer_text.strip() if email_answer else None
+                )
 
             repo_stats = getRepoStats(repo_path)
-            user_stats = getUserRepoStats(repo_path, user_email)
+            user_stats = getUserRepoStats(repo_path, resolved_user_email)
 
             # Save both within the same transaction
             saveRepoStats(repo_stats, db=db)
@@ -239,6 +245,7 @@ def create_app() -> FastAPI:
     app.include_router(portfolio_router)
     app.include_router(resume_router)
     app.include_router(local_llm_router)
+    app.include_router(openai_router)
     app.include_router(analyze_router)  
     app.include_router(crawler_router) # Master orchestration endpoint
     app.include_router(views_router)

@@ -32,8 +32,9 @@ Please select your preference below to continue.
 class ConsentScreen(Screen[None]):
     DEFAULT_STATUS = "Select a consent option to continue."
     PROMPT_CHOOSE = "Please select a consent option before continuing."
-    SELECTED_FULL = "Consent with LLM selected."
+    SELECTED_FULL = "Consent with cloud LLM selected."
     SELECTED_NO_LLM = "Consent without LLM selected."
+    SELECTED_LOCAL_LLM = "Consent with local LLM selected."
     SAVING_STATUS = "Saving consent choice..."
     SUCCESS_STATUS = "Consent saved. Loading preferences..."
     CONNECT_ERROR_STATUS = "Cannot connect to the backend server."
@@ -103,7 +104,8 @@ class ConsentScreen(Screen[None]):
                     with ScrollableContainer(id="consent-content"):
                         yield Markdown(CONSENT_TEXT, id="consent-markdown")
                     with Horizontal(id="consent-buttons"):
-                        yield Button("Consent with LLM", id="consent-full-btn", variant="success")
+                        yield Button("Consent with Cloud LLM", id="consent-full-btn", variant="success")
+                        yield Button("Consent with Local LLM", id="consent-local-llm-btn", variant="primary")
                         yield Button("Consent without LLM", id="consent-no-llm-btn", variant="primary")
                     yield Label(self.DEFAULT_STATUS, id="consent-status")
                     with Horizontal(id="consent-actions"):
@@ -117,7 +119,10 @@ class ConsentScreen(Screen[None]):
     async def on_button_pressed(self, event: Button.Pressed) -> None:
         button_id = event.button.id
         if button_id == "consent-full-btn":
-            self._set_selection("full")
+            self._set_selection("cloud")
+            return
+        if button_id == "consent-local-llm-btn":
+            self._set_selection("local-llm")
             return
         if button_id == "consent-no-llm-btn":
             self._set_selection("no_llm")
@@ -135,11 +140,12 @@ class ConsentScreen(Screen[None]):
 
     async def _save_consent(self, consent_level: str) -> None:
         self._update_status(self.SAVING_STATUS, error=False)
+        payload_level = "local" if consent_level == "no_llm" else consent_level
         try:
             async with httpx.AsyncClient() as client:
                 resp = await client.put(
                     "http://127.0.0.1:8000/consent",
-                    json={"consent_level": consent_level},
+                    json={"consent_level": payload_level},
                     timeout=10.0,
                 )
                 resp.raise_for_status()
@@ -172,7 +178,12 @@ class ConsentScreen(Screen[None]):
 
     def _set_selection(self, level: str) -> None:
         self.selected_level = level
-        message = self.SELECTED_FULL if level == "full" else self.SELECTED_NO_LLM
+        if level == "cloud":
+            message = self.SELECTED_FULL
+        elif level == "local-llm":
+            message = self.SELECTED_LOCAL_LLM
+        else:
+            message = self.SELECTED_NO_LLM
         self._update_status(message, error=False)
 
     def _update_status(self, message: str, *, error: bool) -> None:

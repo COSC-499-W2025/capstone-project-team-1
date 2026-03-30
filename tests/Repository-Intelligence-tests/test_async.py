@@ -8,6 +8,12 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 from artifactminer.helpers.openai import get_gpt5_nano_response_sync, get_gpt5_nano_response
 
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("OPENAI_API_KEY"),
+    reason="OPENAI_API_KEY not set",
+)
+
 def test_gpt5_nano_response_sync():
     time = datetime.now()
     prompt = "Summarize the following text: 'The quick brown fox jumps over the lazy dog.'"
