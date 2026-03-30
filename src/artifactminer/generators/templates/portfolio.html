@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ data.meta.title }}</title>
+  <style>
+    :root {
+      --bg: #f7f2ea;
+      --panel: rgba(255, 250, 243, 0.92);
+      --line: rgba(33, 44, 39, 0.14);
+      --text: #1f2422;
+      --muted: #6e746d;
+      --emerald: #1e8a63;
+      --cobalt: #315ccf;
+      --rust: #b15b37;
+      --shadow: 0 16px 40px rgba(39, 34, 26, 0.08);
+      --sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at top left, rgba(49, 92, 207, 0.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(30, 138, 99, 0.14), transparent 36%),
+        radial-gradient(circle at bottom, rgba(177, 91, 55, 0.12), transparent 42%),
+        var(--bg);
+    }
+    h1, h2, h3 { margin: 0; font-family: var(--serif); font-weight: 600; }
+    p, ul { margin: 0; }
+    button, input, select {
+      font: inherit;
+      color: inherit;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.74);
+      padding: 0.62rem 0.9rem;
+    }
+    button { cursor: pointer; }
+    .page {
+      width: min(1180px, calc(100vw - 2rem));
+      margin: 0 auto;
+      padding: 1rem 0 2rem;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1rem;
+      align-items: end;
+      margin-bottom: 1rem;
+    }
+    .hero-copy, .hero-stats, .controls, .panel {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+    .hero-copy {
+      padding: 1.25rem;
+      min-height: 18rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .eyebrow {
+      color: var(--emerald);
+      font-size: 0.75rem;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+    .hero-title {
+      font-size: clamp(2.3rem, 6vw, 4.8rem);
+      line-height: 0.92;
+      max-width: 8ch;
+    }
+    .hero-meta {
+      display: grid;
+      gap: 0.4rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .hero-stats {
+      padding: 1.1rem;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.8rem;
+    }
+    .stat {
+      padding: 0.9rem;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(33, 44, 39, 0.08);
+    }
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .stat-value {
+      margin-top: 0.35rem;
+      font-family: var(--serif);
+      font-size: 1.7rem;
+    }
+    .controls {
+      position: sticky;
+      top: 0.7rem;
+      z-index: 5;
+      padding: 0.9rem;
+      display: grid;
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+    }
+    .controls-row, .section-toggles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .controls-row strong {
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .section-toggles label {
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+    .section-toggles input { accent-color: var(--emerald); }
+    body[data-mode="public"] .private-only { display: none !important; }
+    body[data-mode="private"] .public-controls { display: none; }
+    body[data-mode="public"] .public-controls { display: flex; }
+    .grid { display: grid; gap: 1rem; }
+    .metrics-grid { grid-template-columns: 1.15fr 0.85fr; }
+    .panel { padding: 1rem; overflow: hidden; }
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      align-items: flex-end;
+      margin-bottom: 0.9rem;
+    }
+    .panel-header p {
+      color: var(--muted);
+      font-size: 0.9rem;
+      max-width: 28rem;
+    }
+    .chart-wrap { height: 21rem; }
+    .heatmap-shell {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.75rem;
+      align-items: start;
+    }
+    .heatmap-days, .heatmap-grid { display: grid; gap: 0.2rem; }
+    .heatmap-days {
+      grid-template-rows: repeat(7, 0.85rem);
+      font-size: 0.72rem;
+      color: var(--muted);
+      padding-top: 1.45rem;
+    }
+    .heatmap-main { overflow-x: auto; }
+    .month-row {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: 0.85rem;
+      gap: 0.2rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+      min-width: max-content;
+    }
+    .heatmap-grid {
+      grid-template-columns: repeat(52, 0.85rem);
+      grid-template-rows: repeat(7, 0.85rem);
+      grid-auto-flow: column;
+      min-width: max-content;
+    }
+    .heat-cell {
+      border-radius: 0.22rem;
+      border: 1px solid rgba(33, 44, 39, 0.05);
+      background: rgba(31, 36, 34, 0.06);
+    }
+    .empty-state {
+      border: 1px dashed var(--line);
+      border-radius: 18px;
+      padding: 1.2rem;
+      text-align: center;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.5);
+    }
+    .showcase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .projects-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .project-card, .feature-card {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 1rem;
+      background: rgba(255, 255, 255, 0.78);
+      display: grid;
+      gap: 0.8rem;
+    }
+    .feature-card { min-height: 22rem; }
+    .project-head, .metric-row, .chip-row, .edit-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.45rem;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chip-row { justify-content: flex-start; }
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.6rem;
+      font-size: 0.88rem;
+      color: var(--muted);
+    }
+    .chip, .tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.3rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      border: 1px solid rgba(33, 44, 39, 0.08);
+      background: rgba(255, 255, 255, 0.9);
+    }
+    .chip { color: var(--cobalt); }
+    .tag { color: var(--rust); }
+    .thumb {
+      width: 100%;
+      aspect-ratio: 16 / 8;
+      border-radius: 16px;
+      object-fit: cover;
+      border: 1px solid rgba(33, 44, 39, 0.08);
+      background: linear-gradient(135deg, rgba(49, 92, 207, 0.12), rgba(30, 138, 99, 0.18));
+    }
+    .activity-bar {
+      display: flex;
+      height: 0.7rem;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(31, 36, 34, 0.08);
+    }
+    .activity-bar span { display: block; height: 100%; }
+    .activity-bar span:nth-child(1) { background: rgba(30, 138, 99, 0.8); }
+    .activity-bar span:nth-child(2) { background: rgba(49, 92, 207, 0.68); }
+    .activity-bar span:nth-child(3) { background: rgba(177, 91, 55, 0.68); }
+    .activity-bar span:nth-child(4) { background: rgba(31, 36, 34, 0.38); }
+    .activity-bar span:nth-child(5) { background: rgba(31, 36, 34, 0.18); }
+    .list-block { display: grid; gap: 0.38rem; padding-left: 1rem; }
+    .summary-block {
+      border-left: 3px solid rgba(30, 138, 99, 0.45);
+      padding-left: 0.8rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .summary-block[contenteditable="true"] {
+      outline: 1px dashed rgba(49, 92, 207, 0.35);
+      border-radius: 10px;
+      padding: 0.7rem 0.8rem;
+      background: rgba(255, 255, 255, 0.72);
+    }
+    .hidden { display: none !important; }
+    @media (max-width: 980px) {
+      .hero, .metrics-grid, .showcase-grid, .projects-grid, .metric-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-mode="private">
+  <div class="page">
+    <section class="hero">
+      <div class="hero-copy">
+        <div>
+          <div class="eyebrow">{{ data.meta.title }}</div>
+          <h1 class="hero-title">{{ data.meta.user_email }}</h1>
+        </div>
+        <div class="hero-meta">
+          <p>{{ data.meta.title }} built from portfolio <strong>{{ data.meta.portfolio_id }}</strong>.</p>
+          <p>Generated {{ data.meta.generated_at }} UTC with consent level <strong>{{ data.meta.consent_level }}</strong>.</p>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><div class="stat-label">Projects</div><div class="stat-value" id="stat-projects">{{ data.stats.total_projects }}</div></div>
+        <div class="stat"><div class="stat-label">Skills</div><div class="stat-value">{{ data.stats.total_skills }}</div></div>
+        <div class="stat"><div class="stat-label">Commits</div><div class="stat-value">{{ data.stats.total_commits }}</div></div>
+        <div class="stat"><div class="stat-label">Active Days</div><div class="stat-value">{{ data.stats.active_days }}</div></div>
+        <div class="stat"><div class="stat-label">Languages</div><div class="stat-value">{{ data.stats.languages }}</div></div>
+        <div class="stat"><div class="stat-label">Frameworks</div><div class="stat-value">{{ data.stats.frameworks }}</div></div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div class="controls-row">
+        <strong>Mode</strong>
+        <button type="button" id="private-mode">Private</button>
+        <button type="button" id="public-mode">Public</button>
+        <button type="button" id="export-public" class="private-only">Export Public</button>
+      </div>
+      <div class="controls-row public-controls">
+        <input id="search-input" type="search" placeholder="Search projects or skills">
+        <select id="language-filter"><option value="all">All languages</option></select>
+        <select id="skill-category-filter"><option value="all">All skill categories</option></select>
+      </div>
+      <div class="section-toggles private-only">
+        <label><input type="checkbox" data-section-toggle="showcase" checked> Showcase</label>
+        <label><input type="checkbox" data-section-toggle="timeline" checked> Timeline</label>
+        <label><input type="checkbox" data-section-toggle="heatmap" checked> Heatmap</label>
+        <label><input type="checkbox" data-section-toggle="projects" checked> Projects</label>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="panel" id="showcase-section">
+        <div class="panel-header">
+          <div><h2>Top Project Showcase</h2><p>The first three ordered projects anchor the editorial view.</p></div>
+        </div>
+        <div class="showcase-grid" id="showcase-cards"></div>
+      </section>
+
+      <div class="grid metrics-grid">
+        <section class="panel" id="timeline-section">
+          <div class="panel-header">
+            <div><h2>Skills Timeline</h2><p>One line per skill, rebuilt client-side from the embedded data.</p></div>
+          </div>
+          <div class="chart-wrap"><canvas id="timeline-chart"></canvas></div>
+        </section>
+
+        <section class="panel" id="heatmap-section">
+          <div class="panel-header">
+            <div><h2>Activity Heatmap</h2><p>A 52-week Sunday-first commit view from stored daily activity.</p></div>
+          </div>
+          <div id="heatmap-root"></div>
+        </section>
+      </div>
+
+      <section class="panel" id="projects-section">
+        <div class="panel-header">
+          <div><h2>Projects</h2><p>Ordered cards with role, contribution, highlights, and editable summaries.</p></div>
+        </div>
+        <div class="projects-grid" id="project-cards"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const DATA = {{ data | tojson }};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script>
+    const state = {
+      mode: "private",
+      search: "",
+      language: "all",
+      skillCategory: "all",
+      sectionVisibility: { showcase: true, timeline: true, heatmap: true, projects: true },
+      projectOrder: DATA.projects.map((project) => project.id)
+    };
+    let timelineChart;
+
+    const categoryColor = (category) => {
+      const key = (category || "other").toLowerCase();
+      if (key.includes("framework")) return "#b15b37";
+      if (key.includes("language")) return "#315ccf";
+      if (key.includes("tool")) return "#1e8a63";
+      return "#1f2422";
+    };
+
+    const orderedProjects = () => state.projectOrder.map((id) => DATA.projects.find((project) => project.id === id)).filter(Boolean);
+    const filteredProjects = () => orderedProjects().filter((project) => {
+      const haystack = `${project.project_name} ${project.summary_text || ""} ${(project.languages || []).join(" ")}`.toLowerCase();
+      const matchesSearch = !state.search || haystack.includes(state.search);
+      const matchesLanguage = state.language === "all" || (project.languages || []).includes(state.language);
+      return matchesSearch && matchesLanguage;
+    });
+    const filteredTimelineItems = () => DATA.skills_timeline.filter((item) => {
+      const haystack = `${item.skill} ${item.project}`.toLowerCase();
+      const matchesSearch = !state.search || haystack.includes(state.search);
+      const matchesCategory = state.skillCategory === "all" || item.category === state.skillCategory;
+      return matchesSearch && matchesCategory;
+    });
+
+    function renderTimeline() {
+      const ctx = document.getElementById("timeline-chart");
+      const items = filteredTimelineItems().slice().sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+      const grouped = items.reduce((acc, item) => {
+        (acc[item.skill] ||= { category: item.category, points: [] }).points.push({
+          x: item.date ? Date.parse(item.date) : 0,
+          y: item.proficiency ?? 0,
+          project: item.project,
+          level: item.level,
+          proficiency: item.proficiency
+        });
+        return acc;
+      }, {});
+      const datasets = Object.entries(grouped).map(([skill, group]) => ({
+        label: skill,
+        data: group.points,
+        borderColor: categoryColor(group.category),
+        backgroundColor: categoryColor(group.category),
+        tension: 0.28,
+        borderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 5
+      }));
+      if (timelineChart) timelineChart.destroy();
+      timelineChart = new Chart(ctx, {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          parsing: false,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                title(items) { return new Date(items[0].raw.x).toISOString().slice(0, 10); },
+                label(item) {
+                  const raw = item.raw;
+                  return `${item.dataset.label} | ${raw.project} | ${(raw.proficiency ?? 0).toFixed(2)} | ${raw.level}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: "linear",
+              ticks: {
+                callback(value) { return new Date(Number(value)).toISOString().slice(0, 10); },
+                maxTicksLimit: 6
+              }
+            },
+            y: {
+              min: 0,
+              max: 1,
+              ticks: {
+                stepSize: 0.25,
+                callback(value) {
+                  const labels = { 0: "Beginner", 0.25: "Intermediate", 0.5: "Advanced", 0.75: "Expert", 1: "Expert" };
+                  return labels[value] || value;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderHeatmap() {
+      const root = document.getElementById("heatmap-root");
+      const activity = DATA.heatmap.daily_activity || {};
+      const maxDaily = DATA.heatmap.max_daily_commits || 0;
+      if (maxDaily === 0) {
+        root.innerHTML = '<div class="empty-state">No activity data</div>';
+        return;
+      }
+      const start = new Date(`${DATA.heatmap.date_range.start_date}T00:00:00Z`);
+      const cells = [];
+      const months = Array.from({ length: 52 }, () => "");
+      for (let week = 0; week < 52; week += 1) {
+        for (let day = 0; day < 7; day += 1) {
+          const current = new Date(start);
+          current.setUTCDate(start.getUTCDate() + week * 7 + day);
+          const iso = current.toISOString().slice(0, 10);
+          const count = activity[iso] || 0;
+          const ratio = maxDaily ? count / maxDaily : 0;
+          const bucket = count === 0 ? 0 : ratio < 0.25 ? 1 : ratio < 0.5 ? 2 : ratio < 0.75 ? 3 : 4;
+          const colors = [
+            "rgba(31,36,34,0.06)",
+            "rgba(30,138,99,0.22)",
+            "rgba(30,138,99,0.42)",
+            "rgba(30,138,99,0.62)",
+            "rgba(30,138,99,0.84)"
+          ];
+          if (!months[week] && current.getUTCDate() <= 7) months[week] = current.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+          cells.push(`<div class="heat-cell" title="${iso}: ${count} commits" style="background:${colors[bucket]}"></div>`);
+        }
+      }
+      root.innerHTML = `
+        <div class="heatmap-shell">
+          <div class="heatmap-days"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+          <div class="heatmap-main">
+            <div class="month-row">${months.map((month) => `<span>${month}</span>`).join("")}</div>
+            <div class="heatmap-grid">${cells.join("")}</div>
+          </div>
+        </div>`;
+    }
+
+    const activityBar = (project) => {
+      const values = ["code", "test", "docs", "config", "other"].map((key) => project.activity_breakdown?.[key] || 0);
+      const total = values.reduce((sum, value) => sum + value, 0) || 1;
+      return values.map((value) => `<span style="width:${(value / total) * 100}%"></span>`).join("");
+    };
+
+    const bullets = (items, field) => items.length ? `<ul class="list-block">${items.map((item) => `<li>${item[field] || item.content}</li>`).join("")}</ul>` : "<p class='summary-block'>No highlights yet.</p>";
+
+    const projectCard = (project, featured = false) => {
+      const summary = project.summary_text || "No summary available yet.";
+      const hero = project.thumbnail_url ? `<img class="thumb" alt="${project.project_name}" src="${project.thumbnail_url}">` : "";
+      return `
+        <article class="${featured ? "feature-card" : "project-card"}" data-project-id="${project.id}">
+          ${hero}
+          <div class="project-head">
+            <div>
+              <h3>${project.project_name}</h3>
+              <div class="chip-row">${(project.languages || []).map((language) => `<span class="chip">${language}</span>`).join("")}${(project.frameworks || []).map((framework) => `<span class="tag">${framework}</span>`).join("")}</div>
+            </div>
+            <div class="edit-row private-only">
+              <button type="button" data-move="up" data-project-id="${project.id}">Up</button>
+              <button type="button" data-move="down" data-project-id="${project.id}">Down</button>
+            </div>
+          </div>
+          <div class="metric-row">
+            <div><strong>Role</strong><br>${project.user_role || "Unspecified"}</div>
+            <div><strong>Contribution</strong><br>${project.contribution_pct == null ? "N/A" : `${project.contribution_pct.toFixed(1)}%`}</div>
+            <div><strong>Timeline</strong><br>${(project.first_commit || "").slice(0, 10) || "N/A"} to ${(project.last_commit || "").slice(0, 10) || "N/A"}</div>
+          </div>
+          <div class="activity-bar">${activityBar(project)}</div>
+          <div><strong>Resume bullets</strong>${bullets(project.resume_items || [], "content")}</div>
+          <div><strong>Evidence highlights</strong>${bullets(project.evidence || [], "content")}</div>
+          <div><strong>AI summary</strong><p class="summary-block" data-summary contenteditable="${state.mode === "private"}">${summary}</p></div>
+        </article>`;
+    };
+
+    function renderProjects() {
+      const projects = filteredProjects();
+      document.getElementById("stat-projects").textContent = projects.length;
+      document.getElementById("showcase-cards").innerHTML = projects.slice(0, 3).map((project) => projectCard(project, true)).join("") || "<div class='empty-state'>No projects match the current filters.</div>";
+      document.getElementById("project-cards").innerHTML = projects.map((project) => projectCard(project)).join("") || "<div class='empty-state'>No projects match the current filters.</div>";
+      document.querySelectorAll("[data-summary]").forEach((node) => { node.contentEditable = state.mode === "private"; });
+    }
+
+    function applyFilters() {
+      state.search = (document.getElementById("search-input")?.value || "").trim().toLowerCase();
+      state.language = document.getElementById("language-filter")?.value || "all";
+      state.skillCategory = document.getElementById("skill-category-filter")?.value || "all";
+      renderTimeline();
+      renderProjects();
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.body.dataset.mode = mode;
+      document.querySelectorAll("[data-summary]").forEach((node) => { node.contentEditable = mode === "private"; });
+    }
+
+    function wirePrivateControls() {
+      document.getElementById("private-mode").addEventListener("click", () => setMode("private"));
+      document.getElementById("public-mode").addEventListener("click", () => setMode("public"));
+      document.getElementById("export-public").addEventListener("click", () => setMode("public"));
+      document.querySelectorAll("[data-section-toggle]").forEach((input) => {
+        input.addEventListener("change", (event) => {
+          const key = event.target.dataset.sectionToggle;
+          state.sectionVisibility[key] = event.target.checked;
+          document.getElementById(`${key}-section`).classList.toggle("hidden", !event.target.checked);
+        });
+      });
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-move]");
+        if (!button) return;
+        const id = Number(button.dataset.projectId);
+        const index = state.projectOrder.indexOf(id);
+        const offset = button.dataset.move === "up" ? -1 : 1;
+        const swapIndex = index + offset;
+        if (index < 0 || swapIndex < 0 || swapIndex >= state.projectOrder.length) return;
+        [state.projectOrder[index], state.projectOrder[swapIndex]] = [state.projectOrder[swapIndex], state.projectOrder[index]];
+        renderProjects();
+      });
+      ["search-input", "language-filter", "skill-category-filter"].forEach((id) => {
+        const node = document.getElementById(id);
+        if (node) node.addEventListener("input", applyFilters);
+        if (node) node.addEventListener("change", applyFilters);
+      });
+    }
+
+    (() => {
+      const languageFilter = document.getElementById("language-filter");
+      const categoryFilter = document.getElementById("skill-category-filter");
+      DATA.filters.languages.forEach((language) => languageFilter.insertAdjacentHTML("beforeend", `<option value="${language}">${language}</option>`));
+      DATA.filters.skill_categories.forEach((category) => categoryFilter.insertAdjacentHTML("beforeend", `<option value="${category}">${category}</option>`));
+      renderTimeline();
+      renderHeatmap();
+      renderProjects();
+      wirePrivateControls();
+      setMode("private");
+    })();
+  </script>
+</body>
+</html>
