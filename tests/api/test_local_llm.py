@@ -751,6 +751,34 @@ def test_generation_start_empty_model_selection_rejected(client, tmp_path):
     assert any("stage1_model" in str(err).lower() for err in detail)
 
 
+def test_generation_start_rejects_unsupported_model_name(client, tmp_path):
+    """Test 422 response when a requested model is outside the approved set."""
+    zip_path = tmp_path / "unsupported_model.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    repo_id = intake_response.json()["repos"][0]["id"]
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "repo_ids": [repo_id],
+            "user_email": "developer@example.com",
+            "stage1_model": "unsupported-model",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "supported local model" in response.json()["detail"].lower()
+
+
 def test_generation_start_missing_active_context(client):
     """Test 404 response when no active intake context exists."""
     local_llm._active_intakes.clear()
@@ -921,6 +949,52 @@ def test_generation_cancel_repeat_cancel_behavior(client, tmp_path):
     assert local_llm._active_generation_id is None
     assert second_cancel.status_code == 200
     assert second_cancel.json() == {"ok": True, "status": "cancelled"}
+
+
+def test_generation_start_cancels_previous_active_job(client, tmp_path):
+    """Starting a new pipeline should cancel any older in-flight job."""
+    zip_path = tmp_path / "superseded_generation.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    first_start = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert first_start.status_code == 200
+    first_job_id = first_start.json()["job_id"]
+
+    second_start = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+    assert second_start.status_code == 200
+    second_job_id = second_start.json()["job_id"]
+
+    assert first_job_id != second_job_id
+    assert local_llm._generation_jobs[first_job_id]["status"] == "cancelled"
+    assert (
+        local_llm._generation_jobs[first_job_id]["messages"][-1]
+        == "Superseded by a new pipeline run."
+    )
+    assert local_llm._active_generation_id == second_job_id
 
 
 def test_generation_cancel_stops_runtime_controls_and_hook(client, monkeypatch):
@@ -1399,10 +1473,10 @@ def test_generation_status_polling_contract_with_job_id(client, tmp_path):
     job_id2 = start2.json()["job_id"]
     local_llm._generation_jobs[job_id2]["status"] = "draft_ready"
 
-    # Poll job 1 by ID
+    # Poll job 1 by ID: starting job 2 supersedes it
     resp1 = client.get(f"/local-llm/generation/status?job_id={job_id1}")
     assert resp1.status_code == 200
-    assert resp1.json()["status"] == "running"
+    assert resp1.json()["status"] == "cancelled"
     assert resp1.json()["telemetry"]["selected_repos"] == ["repo1"]
 
     # Poll job 2 by ID
@@ -1411,7 +1485,7 @@ def test_generation_status_polling_contract_with_job_id(client, tmp_path):
     assert resp2.json()["status"] == "draft_ready"
     assert resp2.json()["telemetry"]["selected_repos"] == ["repo2"]
 
-    # Poll without job_id returns most recent (job 2)
+    # Poll without job_id returns the current active job (job 2)
     resp_current = client.get("/local-llm/generation/status")
     assert resp_current.status_code == 200
     assert resp_current.json()["status"] == "draft_ready"

@@ -18,12 +18,14 @@ def test_list_supported_models_returns_exact_approved_models() -> None:
 
     assert [descriptor.name for descriptor in supported] == [
         "lfm2.5-1.2b-q4",
+        "lfm2.5-1.2b-q8",
         "qwen2.5-coder-3b-q4",
         "qwen3.5-4b-q4",
     ]
 
     by_name = {descriptor.name: descriptor for descriptor in supported}
     assert by_name["lfm2.5-1.2b-q4"].filename == "LFM2.5-1.2B-Instruct-Q4_K_M.gguf"
+    assert by_name["lfm2.5-1.2b-q8"].filename == "LFM2.5-1.2B-Instruct-Q8_0.gguf"
     assert by_name["qwen2.5-coder-3b-q4"].filename == (
         "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
     )
@@ -42,6 +44,19 @@ def test_resolve_model_descriptor_returns_installed_supported_model(
     assert descriptor.filename == model_path.name
     assert descriptor.path == model_path
     assert descriptor.context_window == 16384
+
+
+def test_resolve_model_descriptor_accepts_qwen_q4_0_variant(
+    tmp_path: Path,
+) -> None:
+    model_path = tmp_path / "qwen2.5-coder-3b-instruct-q4_0.gguf"
+    model_path.write_text("stub")
+
+    descriptor = resolve_model_descriptor("qwen2.5-coder-3b-q4", models_dir=tmp_path)
+
+    assert descriptor.name == "qwen2.5-coder-3b-q4"
+    assert descriptor.filename == "qwen2.5-coder-3b-instruct-q4_k_m.gguf"
+    assert descriptor.path == model_path
 
 
 def test_resolve_model_path_returns_expected_file_for_supported_model(
@@ -97,6 +112,23 @@ def test_list_available_models_returns_only_installed_supported_models(
         "qwen3.5-4b-q4",
     ]
     assert [descriptor.path for descriptor in available] == [qwen, qwen35]
+
+
+def test_list_available_models_includes_lfm_q8_when_installed(
+    tmp_path: Path,
+) -> None:
+    qwen = tmp_path / "qwen2.5-coder-3b-instruct-q4_0.gguf"
+    lfm_q8 = tmp_path / "LFM2.5-1.2B-Instruct-Q8_0.gguf"
+    qwen.write_text("stub")
+    lfm_q8.write_text("stub")
+
+    available = list_available_models(models_dir=tmp_path)
+
+    assert [descriptor.name for descriptor in available] == [
+        "lfm2.5-1.2b-q8",
+        "qwen2.5-coder-3b-q4",
+    ]
+    assert [descriptor.path for descriptor in available] == [lfm_q8, qwen]
 
 
 def test_list_available_models_returns_empty_for_missing_directory(
