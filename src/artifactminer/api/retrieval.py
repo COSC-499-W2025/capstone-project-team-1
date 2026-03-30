@@ -1,25 +1,24 @@
-"""Read-only retrieval endpoints for skills, resume items, and summaries.
+"""Read-only retrieval endpoints for skills, resume items, summaries, and activity."""
 
-These endpoints serve data for the final portfolio/resume generation.
-All are GET-only with no side effects (write operations moved to resume.py).
-"""
-
-from datetime import datetime
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from sqlalchemy import or_, func
-from collections import defaultdict
-
+from .analyze import get_user_email
 from .schemas import (
+    ActivityHeatmapDateRange,
+    ActivityHeatmapResponse,
     SkillChronologyItem,
     SkillResponse,
     ResumeItemResponse,
     SummaryResponse,
     UserAIIntelligenceSummaryResponse,
 )
+from ..generators import aggregate_skill_proficiency, proficiency_to_level
 from ..db import (
     get_db,
     ProjectSkill,
@@ -28,11 +27,142 @@ from ..db import (
     Skill,
     RepoStat,
     ResumeItem,
+    UploadedZip,
     UserAIntelligenceSummary,
 )
 
 
 router = APIRouter(tags=["retrieval"])
+
+
+def _build_path_prefix_filter(column, prefixes: list[str]):
+    return or_(*[or_(column == prefix, column.like(f"{prefix}/%")) for prefix in prefixes])
+
+
+def _empty_heatmap(today_utc: date | None = None) -> ActivityHeatmapResponse:
+    today = today_utc or datetime.now(UTC).date()
+    return ActivityHeatmapResponse(
+        daily_activity={},
+        total_days_active=0,
+        max_daily_commits=0,
+        date_range=ActivityHeatmapDateRange(
+            start_date=today - timedelta(days=363),
+            end_date=today,
+        ),
+    )
+
+
+def _resolve_portfolio_repo_paths(db: Session, portfolio_id: str) -> list[str]:
+    portfolio_exists = (
+        db.query(UploadedZip.id)
+        .filter(UploadedZip.portfolio_id == portfolio_id)
+        .first()
+    )
+    if portfolio_exists is None:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+
+    extraction_prefixes = sorted(
+        {
+            uploaded_zip.extraction_path.rstrip("/")
+            for uploaded_zip in (
+                db.query(UploadedZip)
+                .filter(UploadedZip.portfolio_id == portfolio_id)
+                .filter(UploadedZip.extraction_path.isnot(None))
+                .all()
+            )
+            if uploaded_zip.extraction_path and uploaded_zip.extraction_path.strip()
+        }
+    )
+    if not extraction_prefixes:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Portfolio has no analyzed ZIPs yet. "
+                "Run /analyze/{zip_id} for uploaded ZIPs first."
+            ),
+        )
+
+    return sorted(
+        {
+            project_path.rstrip("/")
+            for (project_path,) in (
+                db.query(RepoStat.project_path)
+                .filter(RepoStat.deleted_at.is_(None))
+                .filter(_build_path_prefix_filter(RepoStat.project_path, extraction_prefixes))
+                .all()
+            )
+            if project_path
+        }
+    )
+
+
+def fetch_activity_heatmap(
+    db: Session,
+    *,
+    project_paths: list[str] | None = None,
+) -> ActivityHeatmapResponse:
+    """Aggregate latest per-project daily commit data into a 364-day heatmap."""
+    today_utc = datetime.now(UTC).date()
+    if project_paths is not None and not project_paths:
+        return _empty_heatmap(today_utc)
+
+    latest_ids_query = db.query(func.max(UserRepoStat.id).label("id")).group_by(
+        UserRepoStat.project_path
+    )
+    if project_paths:
+        latest_ids_query = latest_ids_query.filter(
+            UserRepoStat.project_path.in_(project_paths)
+        )
+
+    latest_ids = latest_ids_query.subquery()
+    rows = (
+        db.query(UserRepoStat.daily_commits)
+        .join(latest_ids, UserRepoStat.id == latest_ids.c.id)
+        .all()
+    )
+
+    aggregated: dict[date, int] = defaultdict(int)
+    max_observed_commit_date: date | None = None
+
+    for (daily_commits,) in rows:
+        if not daily_commits:
+            continue
+        for raw_day, raw_count in daily_commits.items():
+            try:
+                observed_day = date.fromisoformat(str(raw_day))
+                commit_count = int(raw_count)
+            except (TypeError, ValueError):
+                continue
+            if commit_count < 0:
+                continue
+            aggregated[observed_day] += commit_count
+            if max_observed_commit_date is None or observed_day > max_observed_commit_date:
+                max_observed_commit_date = observed_day
+
+    end_date = (
+        max(today_utc, max_observed_commit_date)
+        if max_observed_commit_date is not None
+        else today_utc
+    )
+    start_date = end_date - timedelta(days=363)
+
+    retained_daily_activity = {
+        observed_day.isoformat(): count
+        for observed_day, count in sorted(aggregated.items())
+        if start_date <= observed_day <= end_date
+    }
+
+    return ActivityHeatmapResponse(
+        daily_activity=retained_daily_activity,
+        total_days_active=sum(
+            1 for count in retained_daily_activity.values() if count > 0
+        ),
+        max_daily_commits=max(retained_daily_activity.values(), default=0),
+        date_range=ActivityHeatmapDateRange(
+            start_date=start_date,
+            end_date=end_date,
+        ),
+    )
 
 
 @router.get("/skills", response_model=List[SkillResponse])
@@ -60,41 +190,70 @@ async def get_skills(
     query = query.order_by(Skill.name.asc())
     skills = query.all()
 
-    # Pre-compute project counts in bulk (2 queries total) to avoid N+1
+    skill_proficiencies: dict[int, list[float | None]] = defaultdict(list)
+
+    # Pre-compute project counts and aggregated proficiencies in bulk.
     project_count_map: dict[int, int] | None = None
     if include_project_count:
-        # Collect (skill_id, repo_stat_id) pairs from both tables in two queries
         skill_repo_pairs: dict[int, set[int]] = defaultdict(set)
 
-        for skill_id, repo_stat_id in (
-            db.query(ProjectSkill.skill_id, ProjectSkill.repo_stat_id)
+        for skill_id, repo_stat_id, proficiency in (
+            db.query(
+                ProjectSkill.skill_id,
+                ProjectSkill.repo_stat_id,
+                ProjectSkill.proficiency,
+            )
             .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
             .filter(RepoStat.deleted_at.is_(None))
         ):
             skill_repo_pairs[skill_id].add(repo_stat_id)
+            skill_proficiencies[skill_id].append(proficiency)
 
-        for skill_id, repo_stat_id in (
-            db.query(UserProjectSkill.skill_id, UserProjectSkill.repo_stat_id)
+        for skill_id, repo_stat_id, proficiency in (
+            db.query(
+                UserProjectSkill.skill_id,
+                UserProjectSkill.repo_stat_id,
+                UserProjectSkill.proficiency,
+            )
             .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
             .filter(RepoStat.deleted_at.is_(None))
         ):
             skill_repo_pairs[skill_id].add(repo_stat_id)
+            skill_proficiencies[skill_id].append(proficiency)
 
         project_count_map = {
             skill_id: len(repo_ids) for skill_id, repo_ids in skill_repo_pairs.items()
         }
+    else:
+        for skill_id, proficiency in (
+            db.query(ProjectSkill.skill_id, ProjectSkill.proficiency)
+            .join(RepoStat, ProjectSkill.repo_stat_id == RepoStat.id)
+            .filter(RepoStat.deleted_at.is_(None))
+        ):
+            skill_proficiencies[skill_id].append(proficiency)
+
+        for skill_id, proficiency in (
+            db.query(UserProjectSkill.skill_id, UserProjectSkill.proficiency)
+            .join(RepoStat, UserProjectSkill.repo_stat_id == RepoStat.id)
+            .filter(RepoStat.deleted_at.is_(None))
+        ):
+            skill_proficiencies[skill_id].append(proficiency)
 
     result = []
     for skill in skills:
         project_count = None
         if project_count_map is not None:
             project_count = project_count_map.get(skill.id, 0)
+        aggregate_proficiency = aggregate_skill_proficiency(
+            skill_proficiencies.get(skill.id, [])
+        )
 
         result.append(
             SkillResponse(
                 id=skill.id,
                 name=skill.name,
                 category=skill.category,
+                level=proficiency_to_level(aggregate_proficiency),
                 project_count=project_count,
             )
         )
@@ -147,6 +306,7 @@ def fetch_skill_chronology(
                 skill=skill.name,
                 project=repo_stat.project_name,
                 proficiency=project_skill.proficiency,
+                level=proficiency_to_level(project_skill.proficiency),
                 category=skill.category,
             )
         )
@@ -158,6 +318,7 @@ def fetch_skill_chronology(
                 skill=skill.name,
                 project=repo_stat.project_name,
                 proficiency=user_skill.proficiency,
+                level=proficiency_to_level(user_skill.proficiency),
                 category=skill.category,
             )
         )
@@ -178,6 +339,28 @@ async def get_skill_chronology(
     Milestone Req #19: Chronological list of skills.
     """
     return fetch_skill_chronology(db)
+
+
+@router.get("/activity/heatmap", response_model=ActivityHeatmapResponse)
+async def get_activity_heatmap(
+    portfolio_id: str | None = Query(
+        default=None,
+        description="Optional portfolio UUID to scope the aggregated heatmap.",
+    ),
+    db: Session = Depends(get_db),
+) -> ActivityHeatmapResponse:
+    """Get aggregated daily commit activity for the configured user."""
+    get_user_email(db)
+
+    if portfolio_id is None:
+        return fetch_activity_heatmap(db)
+
+    normalized_portfolio_id = portfolio_id.strip()
+    if not normalized_portfolio_id:
+        raise HTTPException(status_code=422, detail="portfolio_id cannot be empty.")
+
+    project_paths = _resolve_portfolio_repo_paths(db, normalized_portfolio_id)
+    return fetch_activity_heatmap(db, project_paths=project_paths)
 
 
 @router.get("/resume", response_model=List[ResumeItemResponse])

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
+from collections import Counter
+import subprocess
 import git
 from sqlalchemy import inspect, or_
 from artifactminer.db.database import SessionLocal
@@ -27,10 +29,47 @@ class UserRepoStats:
     first_commit: Optional[datetime] = None 
     last_commit: Optional[datetime] = None 
     total_commits: Optional[int] = None 
+    daily_commits: Optional[dict[str, int]] = None
     userStatspercentages:  Optional[float] = None# Percentage of user's contributions compared to total repo activity
     commitFrequency: Optional[float] = None # Average number of commits per week by the user
     commitActivities: Optional[dict] = None # New field to store activity breakdown
     user_role: Optional[str] = None
+
+
+def get_daily_commit_counts(repo_path: Pathish, user_email: str) -> dict[str, int]:
+    """Return per-day commit counts for a user's commits in a git repository."""
+    if not user_email:
+        return {}
+
+    try:
+        validated = validate_email(user_email, check_deliverability=False)
+        normalized_email = validated.normalized
+    except EmailNotValidError:
+        return {}
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                f"--author={normalized_email}",
+                "--date=short",
+                "--pretty=format:%ad",
+            ],
+            cwd=Path(repo_path),
+            capture_output=True,
+            check=False,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return {}
+
+    counts = Counter(line.strip() for line in result.stdout.splitlines() if line.strip())
+    return dict(sorted(counts.items()))
 
 
 def getUserRepoStats(repo_path: Pathish, user_email: str) -> UserRepoStats: 
@@ -193,6 +232,7 @@ def saveUserRepoStats(stats: UserRepoStats, db=None):
             first_commit=stats.first_commit,
             last_commit=stats.last_commit,
             total_commits=stats.total_commits,
+            daily_commits=stats.daily_commits,
             userStatspercentages=stats.userStatspercentages,
             commitFrequency=stats.commitFrequency,
             activity_breakdown=stats.commitActivities,
