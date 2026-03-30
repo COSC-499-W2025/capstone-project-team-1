@@ -193,6 +193,7 @@ class ArtifactMinerApp(App):
 
     consent_state: dict | None = None
     current_zip_id: int | None = None
+    current_portfolio_id: str | None = None
     user_email: str | None = None
     consent_level: str | None = None
 

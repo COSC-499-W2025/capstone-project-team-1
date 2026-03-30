@@ -51,6 +51,7 @@ class DummyApp:
         self.popped = False
         self.notifications: list[tuple[str, dict]] = []
         self.user_email: str | None = None
+        self.current_portfolio_id: str | None = None
 
     def pop_screen(self) -> None:
         self.popped = True
@@ -106,6 +107,49 @@ async def test_resume_placeholder_buttons_show_notification() -> None:
         active_app.reset(token)
 
 
+@pytest.mark.asyncio
+async def test_open_portfolio_button_generates_and_opens_html(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Generate portfolio HTML from the final screen and open it in the browser."""
+    screen, status, _, app, token = make_screen()
+    app.current_portfolio_id = "portfolio-123"
+
+    class FakeClient:
+        async def generate_portfolio_html(self, portfolio_id: str) -> dict[str, str]:
+            assert portfolio_id == "portfolio-123"
+            return {"path": "/tmp/portfolio.html"}
+
+    opened: list[str] = []
+
+    import artifactminer.tui.screens.resume as resume_module
+
+    monkeypatch.setattr(resume_module, "ApiClient", lambda: FakeClient())
+    monkeypatch.setattr(
+        resume_module,
+        "open_file_in_browser",
+        lambda path: opened.append(str(path)) or True,
+    )
+
+    try:
+        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="open-portfolio-btn")))
+        assert status.text == "Opened portfolio HTML in browser."
+        assert opened == ["/tmp/portfolio.html"]
+        assert len(app.notifications) == 1
+    finally:
+        active_app.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_open_portfolio_button_requires_portfolio_id() -> None:
+    """Show a helpful status when no portfolio has been uploaded yet."""
+    screen, status, _, app, token = make_screen()
+    app.current_portfolio_id = None
+    try:
+        await screen.on_button_pressed(SimpleNamespace(button=SimpleNamespace(id="open-portfolio-btn")))
+        assert "No portfolio is available yet" in status.text
+    finally:
+        active_app.reset(token)
+
+
 def test_group_by_project() -> None:
     """Ensure resume items are grouped by project correctly."""
     items = [
@@ -146,5 +190,5 @@ def test_export_text_creates_file(tmp_path: Path) -> None:
     
     assert path.exists()
     content = path.read_text()
-    assert "RESUME EXPORT" in content
+    assert "PROJECT ANALYSIS DETAILS" in content or "PORTFOLIO ANALYSIS EXPORT" in content
     assert "Test Project" in content

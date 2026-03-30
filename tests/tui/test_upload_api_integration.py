@@ -54,7 +54,7 @@ async def test_upload_screen_uses_zip_id_and_renders_dirs(tmp_path: Path, monkey
     class FakeClient:
         async def upload_zip(self, p: Path):  # noqa: D401
             called["upload_zip_path"] = p
-            return {"zip_id": 42, "filename": p.name}
+            return {"zip_id": 42, "filename": p.name, "portfolio_id": "portfolio-abc"}
 
         async def list_zip_directories(self, zip_id: int):  # noqa: D401
             called["list_zip_directories_zip_id"] = zip_id
@@ -65,7 +65,8 @@ async def test_upload_screen_uses_zip_id_and_renders_dirs(tmp_path: Path, monkey
     monkeypatch.setattr(upload_module, "ApiClient", lambda: FakeClient())
 
     from textual.app import active_app
-    token = active_app.set(SimpleNamespace(push_screen=fake_push_screen))
+    app = SimpleNamespace(push_screen=fake_push_screen, current_portfolio_id=None)
+    token = active_app.set(app)
 
     event = SimpleNamespace(button=SimpleNamespace(id="upload-btn"))
     try:
@@ -75,6 +76,7 @@ async def test_upload_screen_uses_zip_id_and_renders_dirs(tmp_path: Path, monkey
 
     assert called.get("upload_zip_path") == zip_path
     assert called.get("list_zip_directories_zip_id") == 42
+    assert app.current_portfolio_id == "portfolio-abc"
 
     assert isinstance(pushed.get("screen"), ListContentsScreen)
     list_screen = pushed["screen"]  # type: ignore[index]
@@ -102,7 +104,7 @@ async def test_upload_screen_handles_empty_directories_response(tmp_path: Path, 
 
     class FakeClientEmpty:
         async def upload_zip(self, p: Path):
-            return {"zip_id": 7, "filename": p.name}
+            return {"zip_id": 7, "filename": p.name, "portfolio_id": "portfolio-empty"}
 
         async def list_zip_directories(self, zip_id: int):
             return {"zip_id": zip_id, "filename": "empty.zip", "directories": []}

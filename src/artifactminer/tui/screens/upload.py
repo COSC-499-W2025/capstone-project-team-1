@@ -98,6 +98,7 @@ class UploadScreen(Screen[None]):
                 client = ApiClient()
                 upload = await client.upload_zip(path)
                 zip_id = int(upload["zip_id"])  # type: ignore[index]
+                portfolio_id = upload.get("portfolio_id")
                 data = await client.list_zip_directories(zip_id)
                 raw_items = list(data.get("directories", []))
                 cleaned = [item[:-1] if item.endswith("/") else item for item in raw_items]
@@ -114,6 +115,7 @@ class UploadScreen(Screen[None]):
 
         # Store zip_id on app for AnalyzingScreen
         self.app.current_zip_id = zip_id
+        self.app.current_portfolio_id = str(portfolio_id) if portfolio_id else None
 
         def handle_selection(result: list[str] | None) -> None:
             if result:

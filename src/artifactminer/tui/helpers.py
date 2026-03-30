@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -204,3 +205,9 @@ def export_to_text(
         f.write("\n".join(lines))
 
     return path
+
+
+def open_file_in_browser(path: str | Path) -> bool:
+    """Open a local HTML file in the default browser."""
+    target = Path(path).expanduser().resolve()
+    return webbrowser.open(target.as_uri())
