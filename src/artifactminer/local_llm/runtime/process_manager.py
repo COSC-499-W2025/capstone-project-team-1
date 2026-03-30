@@ -126,6 +126,9 @@ def start_server(
         "--port",
         str(port),
         "--log-disable",
+        "--jinja",
+        "--reasoning-budget",
+        "0",
     ]
 
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

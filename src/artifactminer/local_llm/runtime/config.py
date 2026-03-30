@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ..models import InferenceOptions
 
-DEFAULT_MODEL_NAME = "qwen2.5-coder-3b-q4"
+DEFAULT_MODEL_NAME = "qwen3.5-2b-q4"
 DEFAULT_MODELS_DIR = Path.home() / ".artifactminer" / "models"
 DEFAULT_STARTUP_TIMEOUT_SECONDS = 60.0
 DEFAULT_HEALTH_TIMEOUT_SECONDS = 60.0
@@ -27,8 +27,8 @@ MODEL_FAMILY_SAMPLING_DEFAULTS: dict[str, InferenceOptions] = {
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
     "qwen3": InferenceOptions(
-        temperature=0.2,
-        top_p=0.9,
+        temperature=0.7,
+        top_p=0.8,
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
     "fallback": InferenceOptions(
