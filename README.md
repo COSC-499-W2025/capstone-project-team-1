@@ -74,7 +74,7 @@ flowchart LR
     Generate --> Review["Review + edit resume"]
 ```
 
-1. **Consent and configuration** — choose your name, email, and consent level (local LLM, cloud AI, or heuristic-only).
+1. **Consent and configuration** — choose your name, email, and AI mode (local LLM or cloud AI).
 2. **Upload** — select a ZIP archive containing one or more Git repositories.
 3. **Configure** — pick which repositories and identity to use for analysis.
 4. **Generate** — the system analyzes repositories, extracts skills, and generates a structured resume using local or cloud AI. The generated resume is saved to the SQLite database for future retrieval.
@@ -313,7 +313,6 @@ Once both terminals are running:
 2. **Consent** — choose your AI preference:
    - **Local LLM** — uses the Qwen model on your machine (requires Step 3 above).
    - **Cloud (GitHub Copilot)** — uses GitHub Copilot models over the internet (free with GitHub Education).
-   - **No AI** — heuristic-only analysis, no LLM generation.
 3. **File upload** — browse your filesystem and select a ZIP archive containing your project(s). Use arrow keys to navigate, Enter to open folders, and Enter on a `.zip` file to select it.
 4. **Configure** — select which repositories to analyze, enter your name and email, and choose your identity for collaborative projects.
 5. **Generate** — the system analyzes your code and generates a resume.
