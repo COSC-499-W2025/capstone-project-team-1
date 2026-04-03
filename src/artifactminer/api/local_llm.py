@@ -35,8 +35,13 @@ from ..local_llm.generation.service import (
     finalize_output,
     generate_project_facts,
 )
-from ..local_llm.runtime.process_manager import stop_server
-from ..local_llm.runtime.registry import list_supported_models
+from ..local_llm.runtime.config import DEFAULT_MODEL_NAME, DEFAULT_MODELS_DIR
+from ..local_llm.runtime.process_manager import get_server_status, stop_server
+from ..local_llm.runtime.registry import (
+    list_available_models,
+    list_supported_models,
+    select_default_model_name,
+)
 from .local_llm_schemas import (
     CancellationResponse,
     ContributorDiscoveryRequest,
@@ -48,6 +53,7 @@ from .local_llm_schemas import (
     GenerationTelemetry,
     IntakeCreateRequest,
     IntakeCreateResponse,
+    LocalLLMSetupResponse,
     PolishRequest,
     PolishResponse,
     RepositoryCandidate,
@@ -288,6 +294,31 @@ def _validate_requested_models(*models: str) -> None:
                 f"Model '{model}' is not a supported local model. "
                 f"Supported model names: {supported_names}."
             )
+
+
+def _resolve_requested_models(*models: str | None) -> tuple[str, ...]:
+    selected_default_model = select_default_model_name(DEFAULT_MODELS_DIR)
+    if selected_default_model is None:
+        preferred = next(
+            (
+                descriptor
+                for descriptor in list_supported_models()
+                if descriptor.name == DEFAULT_MODEL_NAME
+            ),
+            None,
+        )
+        hint = (
+            f" Download {preferred.filename} from {preferred.repo_url}."
+            if preferred and preferred.filename and preferred.repo_url
+            else ""
+        )
+        raise ValueError(
+            "No supported local model is installed. "
+            f"Checked {DEFAULT_MODELS_DIR}."
+            f"{hint}"
+        )
+
+    return tuple(model or selected_default_model for model in models)
 
 
 async def _cancel_superseded_job() -> None:
@@ -533,6 +564,19 @@ async def discover_contributors(
         ) from exc
 
 
+@router.get("/setup", response_model=LocalLLMSetupResponse)
+async def get_local_llm_setup() -> LocalLLMSetupResponse:
+    return LocalLLMSetupResponse(
+        models_dir=str(DEFAULT_MODELS_DIR),
+        preferred_default_model=DEFAULT_MODEL_NAME,
+        selected_default_model=select_default_model_name(DEFAULT_MODELS_DIR),
+        supported_models=list_supported_models(),
+        available_models=list_available_models(DEFAULT_MODELS_DIR),
+        llama_server_found=shutil.which("llama-server") is not None,
+        runtime=get_server_status(),
+    )
+
+
 @router.post("/generation/start", response_model=GenerationStartResponse)
 async def start_generation(
     request: GenerationStartRequest,
@@ -542,11 +586,12 @@ async def start_generation(
     try:
         context = _resolve_context(request.intake_id)
         repo_names, repo_paths = _resolve_repo_paths(context, request.repo_ids)
-        _validate_requested_models(
+        stage1_model, stage2_model, stage3_model = _resolve_requested_models(
             request.stage1_model,
             request.stage2_model,
             request.stage3_model,
         )
+        _validate_requested_models(stage1_model, stage2_model, stage3_model)
         await _cancel_superseded_job()
 
         job_id = str(uuid.uuid4())
@@ -556,9 +601,9 @@ async def start_generation(
             repo_ids=list(request.repo_ids),
             repo_names=repo_names,
             user_email=str(request.user_email),
-            stage1_model=request.stage1_model,
-            stage2_model=request.stage2_model,
-            stage3_model=request.stage3_model,
+            stage1_model=stage1_model,
+            stage2_model=stage2_model,
+            stage3_model=stage3_model,
         )
         _generation_jobs[job_id] = job
         _active_generation_id = job_id

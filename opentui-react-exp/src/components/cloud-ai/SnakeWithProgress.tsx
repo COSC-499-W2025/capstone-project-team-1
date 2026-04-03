@@ -16,6 +16,7 @@ import { generateResume, type ResumeEvent } from "../../agent";
 import { api } from "../../api/endpoints";
 import type {
 	DeveloperProfile,
+	LocalLlmSetupResponse,
 	PipelineStage,
 	PipelineStatusResponse,
 	ResumeV3Output,
@@ -139,9 +140,30 @@ const LOCAL_STAGE_LABELS: Record<PipelineStage, string> = {
 	POLISH: "Polishing with your feedback",
 };
 
-const DEFAULT_STAGE1_MODEL = "qwen3.5-2b-q4";
-const DEFAULT_STAGE2_MODEL = "qwen3.5-2b-q4";
-const DEFAULT_STAGE3_MODEL = "qwen3.5-2b-q4";
+function buildLocalSetupError(setup: LocalLlmSetupResponse): string | null {
+	if (!setup.llama_server_found) {
+		return "Install llama.cpp and make sure `llama-server` is on your PATH before starting local mode.";
+	}
+
+	if (setup.selected_default_model) {
+		return null;
+	}
+
+	const preferredModel =
+		setup.supported_models.find(
+			(model) => model.name === setup.preferred_default_model,
+		) ?? setup.supported_models[0];
+
+	if (!preferredModel) {
+		return `No supported local model is installed. Add a supported GGUF file to ${setup.models_dir}.`;
+	}
+
+	if (preferredModel.repo_url) {
+		return `Download ${preferredModel.filename ?? preferredModel.name} from ${preferredModel.repo_url} and place it in ${setup.models_dir}.`;
+	}
+
+	return `Install ${preferredModel.filename ?? preferredModel.name} in ${setup.models_dir}.`;
+}
 
 // ── Cloud Mode Props ─────────────────────────────────────────────────────────
 
@@ -380,7 +402,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					variant: "error",
 					title: isConnErr ? "Backend Offline" : "Generation Failed",
 					message: isConnErr
-						? "Start the backend: uv run uvicorn artifactminer.api.app:app"
+						? "Start the backend: uv run api run"
 						: msg,
 					duration: 0,
 				});
@@ -516,13 +538,23 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					setFlowPhase("extracting");
 					pushActivity("system", "Starting local AI pipeline...");
 
+					const setup = await api.getLocalLlmSetup();
+					const setupError = buildLocalSetupError(setup);
+					if (setupError) {
+						throw new Error(setupError);
+					}
+					if (setup.selected_default_model) {
+						pushActivity(
+							"system",
+							`Using local model: ${setup.selected_default_model}`,
+							"done",
+						);
+					}
+
 					const response = await api.startPipeline({
 						intake_id: props.intakeId,
 						repo_ids: props.repoIds,
 						user_email: props.userEmail,
-						stage1_model: DEFAULT_STAGE1_MODEL,
-						stage2_model: DEFAULT_STAGE2_MODEL,
-						stage3_model: DEFAULT_STAGE3_MODEL,
 					});
 
 					if (disposed) return;
@@ -553,7 +585,7 @@ export function SnakeWithProgress(props: SnakeWithProgressProps) {
 					variant: "error",
 					title: isConnErr ? "Backend Offline" : "Pipeline Failed to Start",
 					message: isConnErr
-						? "Start the backend: uv run uvicorn artifactminer.api.app:app"
+						? "Start the backend: uv run api run"
 						: msg,
 					duration: 0,
 				});

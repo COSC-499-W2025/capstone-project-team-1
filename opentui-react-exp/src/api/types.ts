@@ -173,14 +173,41 @@ export interface PipelineStartRequest {
 	intake_id?: string | null;
 	repo_ids: string[];
 	user_email: string;
-	stage1_model: string;
-	stage2_model: string;
-	stage3_model: string;
+	stage1_model?: string;
+	stage2_model?: string;
+	stage3_model?: string;
 }
 
 export interface PipelineStartResponse {
 	job_id: string;
 	status: PipelineJobStatus;
+}
+
+export interface LocalLlmModelDescriptor {
+	name: string;
+	filename: string | null;
+	repo_url: string | null;
+	context_window: number | null;
+	path: string | null;
+}
+
+export interface LocalLlmRuntimeStatus {
+	loaded_model: string | null;
+	server_pid: number | null;
+	server_port: number | null;
+	is_running: boolean;
+	is_healthy: boolean;
+	models_dir: string;
+}
+
+export interface LocalLlmSetupResponse {
+	models_dir: string;
+	preferred_default_model: string;
+	selected_default_model: string | null;
+	supported_models: LocalLlmModelDescriptor[];
+	available_models: LocalLlmModelDescriptor[];
+	llama_server_found: boolean;
+	runtime: LocalLlmRuntimeStatus;
 }
 
 export interface ResumeV3ProjectPeriod {

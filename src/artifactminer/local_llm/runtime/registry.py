@@ -6,7 +6,7 @@ from pathlib import Path
 from types import MappingProxyType
 
 from ..models import ModelDescriptor
-from .config import DEFAULT_MODELS_DIR
+from .config import DEFAULT_MODEL_NAME, DEFAULT_MODELS_DIR
 from .errors import ModelNotFoundError
 
 
@@ -16,12 +16,6 @@ from .errors import ModelNotFoundError
 # filenames so builders do not have to redownload the same weights.
 _SUPPORTED_MODELS = MappingProxyType(
     {
-        "qwen3.5-2b-q4": ModelDescriptor(
-            name="qwen3.5-2b-q4",
-            filename="Qwen3.5-2B-Q4_K_M.gguf",
-            repo_url="https://huggingface.co/Qwen/Qwen3.5-2B",
-            context_window=20480,
-        ),
         "qwen3.5-4b-q4": ModelDescriptor(
             name="qwen3.5-4b-q4",
             filename="Qwen3.5-4B-Q4_K_M.gguf",
@@ -59,7 +53,15 @@ __all__ = [
     "list_supported_models",
     "resolve_model_descriptor",
     "resolve_model_path",
+    "select_default_model_name",
 ]
+
+_DEFAULT_SELECTION_ORDER = (
+    DEFAULT_MODEL_NAME,
+    "qwen3.5-4b-q4",
+    "lfm2.5-1.2b-q4",
+    "lfm2.5-1.2b-q8",
+)
 
 
 def list_supported_models() -> list[ModelDescriptor]:
@@ -111,6 +113,20 @@ def resolve_model_path(model: str, models_dir: Path = DEFAULT_MODELS_DIR) -> Pat
     if descriptor.path is None:
         raise RuntimeError(f"Resolved model '{model}' did not include a path.")
     return descriptor.path
+
+
+def select_default_model_name(models_dir: Path = DEFAULT_MODELS_DIR) -> str | None:
+    """Return the preferred installed local model name, if one is available."""
+
+    available_names = {descriptor.name for descriptor in list_available_models(models_dir)}
+    if not available_names:
+        return None
+
+    for model_name in _DEFAULT_SELECTION_ORDER:
+        if model_name in available_names:
+            return model_name
+
+    return sorted(available_names)[0]
 
 
 def _require_filename(model_name: str, descriptor: ModelDescriptor) -> str:

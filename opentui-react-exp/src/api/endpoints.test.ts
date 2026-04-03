@@ -64,6 +64,32 @@ test("getPipelineContributors posts the request payload unchanged", async () => 
 	expect(fetchCalls[0]?.options?.body).toBe(JSON.stringify(request));
 });
 
+test("getLocalLlmSetup performs GET /local-llm/setup", async () => {
+	installMockFetch({
+		models_dir: "/Users/example/.artifactminer/models",
+		preferred_default_model: "qwen2.5-coder-3b-q4",
+		selected_default_model: "qwen2.5-coder-3b-q4",
+		supported_models: [],
+		available_models: [],
+		llama_server_found: true,
+		runtime: {
+			loaded_model: null,
+			server_pid: null,
+			server_port: null,
+			is_running: false,
+			is_healthy: false,
+			models_dir: "/Users/example/.artifactminer/models",
+		},
+	});
+
+	await api.getLocalLlmSetup();
+
+	expect(fetchCalls).toHaveLength(1);
+	expect(fetchCalls[0]?.url).toBe("http://127.0.0.1:8000/local-llm/setup");
+	expect(fetchCalls[0]?.options?.method).toBe("GET");
+	expect(fetchCalls[0]?.options?.body).toBeUndefined();
+});
+
 test("startPipeline posts the request payload unchanged", async () => {
 	installMockFetch({ job_id: "job-1", status: "queued" });
 	const request = {

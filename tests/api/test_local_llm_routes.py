@@ -42,6 +42,7 @@ def test_openapi_exposes_all_local_llm_routes(client):
     expected = {
         "/local-llm/context": {"post"},
         "/local-llm/context/contributors": {"post"},
+        "/local-llm/setup": {"get"},
         "/local-llm/generation/start": {"post"},
         "/local-llm/generation/cancel": {"post"},
         "/local-llm/generation/status": {"get"},

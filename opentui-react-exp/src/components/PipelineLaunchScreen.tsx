@@ -1,6 +1,7 @@
 import { useKeyboard } from "@opentui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/endpoints";
+import type { LocalLlmSetupResponse } from "../api/types";
 import { useAppState } from "../context/AppContext";
 import { theme } from "../types";
 import { toErrorMessage } from "../utils";
@@ -10,10 +11,6 @@ interface PipelineLaunchScreenProps {
 	onStarted: () => void;
 	onBack: () => void;
 }
-
-const DEFAULT_STAGE1_MODEL = "qwen3.5-2b-q4";
-const DEFAULT_STAGE2_MODEL = "qwen3.5-2b-q4";
-const DEFAULT_STAGE3_MODEL = "qwen3.5-2b-q4";
 
 export function PipelineLaunchScreen({
 	onStarted,
@@ -32,6 +29,9 @@ export function PipelineLaunchScreen({
 
 	const [isStarting, setIsStarting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [setup, setSetup] = useState<LocalLlmSetupResponse | null>(null);
+	const [setupError, setSetupError] = useState<string | null>(null);
+	const [isLoadingSetup, setIsLoadingSetup] = useState(true);
 
 	const selectedRepos = useMemo(
 		() =>
@@ -45,6 +45,42 @@ export function PipelineLaunchScreen({
 		Boolean(state.intakeId) &&
 		Boolean(state.selectedEmail) &&
 		state.selectedRepoIds.length > 0;
+	const setupBlocked =
+		setup !== null &&
+		(!setup.llama_server_found || !setup.selected_default_model);
+	const preferredModel =
+		setup?.supported_models.find(
+			(model) => model.name === setup.preferred_default_model,
+		) ?? null;
+
+	useEffect(() => {
+		let ignore = false;
+
+		setIsLoadingSetup(true);
+		setSetupError(null);
+
+		api
+			.getLocalLlmSetup()
+			.then((response) => {
+				if (!ignore) {
+					setSetup(response);
+				}
+			})
+			.catch((loadError) => {
+				if (!ignore) {
+					setSetupError(toErrorMessage(loadError));
+				}
+			})
+			.finally(() => {
+				if (!ignore) {
+					setIsLoadingSetup(false);
+				}
+			});
+
+		return () => {
+			ignore = true;
+		};
+	}, []);
 
 	const startPipeline = async () => {
 		if (!canStart || isStarting || !state.intakeId || !state.selectedEmail) {
@@ -52,6 +88,25 @@ export function PipelineLaunchScreen({
 				setError("Missing intake, repo selection, or identity.");
 			}
 			return;
+		}
+		if (isLoadingSetup) {
+			setError("Still checking local model setup. Try again in a moment.");
+			return;
+		}
+		if (setupBlocked) {
+			if (setup && !setup.llama_server_found) {
+				setError("llama-server is not on PATH. Install llama.cpp first.");
+				return;
+			}
+			if (setup && !setup.selected_default_model) {
+				const missingFile =
+					preferredModel?.filename ??
+					"qwen2.5-coder-3b-instruct-q4_k_m.gguf";
+				setError(
+					`No supported local model found in ~/.artifactminer/models. Expected ${missingFile}.`,
+				);
+				return;
+			}
 		}
 
 		setError(null);
@@ -62,9 +117,6 @@ export function PipelineLaunchScreen({
 				intake_id: state.intakeId,
 				repo_ids: state.selectedRepoIds,
 				user_email: state.selectedEmail,
-				stage1_model: DEFAULT_STAGE1_MODEL,
-				stage2_model: DEFAULT_STAGE2_MODEL,
-				stage3_model: DEFAULT_STAGE3_MODEL,
 			});
 
 			resetRunState();
@@ -131,15 +183,56 @@ export function PipelineLaunchScreen({
 					))}
 
 					<box marginTop={1} flexDirection="column" gap={1}>
-						<text>
-							<span fg={theme.cyan}>Stage 1 model: {DEFAULT_STAGE1_MODEL}</span>
-						</text>
-						<text>
-							<span fg={theme.cyan}>Stage 2 model: {DEFAULT_STAGE2_MODEL}</span>
-						</text>
-						<text>
-							<span fg={theme.cyan}>Stage 3 model: {DEFAULT_STAGE3_MODEL}</span>
-						</text>
+						{isLoadingSetup ? (
+							<text>
+								<span fg={theme.cyan}>Checking local model setup...</span>
+							</text>
+						) : null}
+						{setup ? (
+							<>
+								<text>
+									<span
+										fg={
+											setup.selected_default_model
+												? theme.success
+												: theme.warning
+										}
+									>
+										{setup.selected_default_model
+											? `Detected model: ${setup.selected_default_model}`
+											: "No supported local model detected"}
+									</span>
+								</text>
+								<text>
+									<span
+										fg={
+											setup.llama_server_found ? theme.success : theme.warning
+										}
+									>
+										{setup.llama_server_found
+											? "llama-server found on PATH"
+											: "llama-server missing from PATH"}
+									</span>
+								</text>
+								<text>
+									<span fg={theme.textDim}>Models dir: {setup.models_dir}</span>
+								</text>
+								{!setup.selected_default_model && preferredModel?.filename ? (
+									<text>
+										<span fg={theme.warning}>
+											Install {preferredModel.filename} into ~/.artifactminer/models
+										</span>
+									</text>
+								) : null}
+							</>
+						) : null}
+						{setupError ? (
+							<text>
+								<span fg={theme.warning}>
+									Could not load setup status: {setupError}
+								</span>
+							</text>
+						) : null}
 					</box>
 
 					<box marginTop={1}>

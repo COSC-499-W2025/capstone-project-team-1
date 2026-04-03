@@ -5,6 +5,7 @@ import asyncio
 import sys
 from pathlib import Path
 
+from artifactminer.bootstrap import ensure_database_ready
 from artifactminer.cli.prompts import validate_input_path, validate_output_path
 from artifactminer.cli.selection import parse_selection
 
@@ -12,6 +13,8 @@ __all__ = ["parse_selection"]
 
 
 def main() -> None:
+    ensure_database_ready()
+
     parser = argparse.ArgumentParser(
         prog="artifactminer",
         description="Analyze student project portfolios and generate resumes",
@@ -67,4 +70,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

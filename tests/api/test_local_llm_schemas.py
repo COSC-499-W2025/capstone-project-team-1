@@ -147,9 +147,9 @@ class TestGenerationStartRequest:
             repo_ids=["repo-1"], user_email="user@example.com"
         )
         assert req.intake_id is None
-        assert req.stage1_model == "qwen3.5-2b-q4"
-        assert req.stage2_model == "qwen3.5-2b-q4"
-        assert req.stage3_model == "qwen3.5-2b-q4"
+        assert req.stage1_model is None
+        assert req.stage2_model is None
+        assert req.stage3_model is None
 
     def test_with_intake_id(self):
         req = GenerationStartRequest(

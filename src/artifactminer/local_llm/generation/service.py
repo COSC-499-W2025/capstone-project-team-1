@@ -27,7 +27,14 @@ from .prompts import (
     build_project_facts_prompt,
     build_summary_prompt,
 )
-from .schemas import GenerationFeedback, ProjectFacts, ResumeOutputModel, ResumeProjectModel, ResumeProjectPeriod
+from .schemas import (
+    GenerationFeedback,
+    ProjectFacts,
+    ResumeOutputModel,
+    ResumePortfolioModel,
+    ResumeProjectModel,
+    ResumeProjectPeriod,
+)
 
 
 ProgressCallback = Callable[[str], None]
@@ -208,7 +215,10 @@ def _normalize_output(
         normalized_projects.append(project)
 
     output.projects = normalized_projects
-    output.portfolio = output.portfolio or _build_portfolio_summary(facts)
+    if output.portfolio is None:
+        output.portfolio = ResumePortfolioModel.model_validate(
+            _build_portfolio_summary(facts)
+        )
     output.metadata.stage = stage
     output.metadata.models_used = list(models_used)
     output.metadata.model_used = models_used[-1] if models_used else None
