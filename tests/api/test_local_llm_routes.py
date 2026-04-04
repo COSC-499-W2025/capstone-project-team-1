@@ -9,6 +9,15 @@ import pytest
 from artifactminer.api import local_llm
 
 
+@pytest.fixture(autouse=True)
+def _mock_default_local_model(monkeypatch):
+    monkeypatch.setattr(
+        local_llm,
+        "select_default_model_name",
+        lambda _models_dir: "qwen2.5-coder-3b-q4",
+    )
+
+
 def make_fake_git_zip() -> str:
     """Create a temporary ZIP containing a minimal fake git repo structure.
 

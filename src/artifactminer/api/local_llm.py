@@ -297,6 +297,9 @@ def _validate_requested_models(*models: str) -> None:
 
 
 def _resolve_requested_models(*models: str | None) -> tuple[str, ...]:
+    if all(models):
+        return tuple(str(model) for model in models)
+
     selected_default_model = select_default_model_name(DEFAULT_MODELS_DIR)
     if selected_default_model is None:
         preferred = next(

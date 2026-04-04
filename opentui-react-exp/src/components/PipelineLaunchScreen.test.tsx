@@ -100,6 +100,19 @@ async function flushEffects() {
 	await Promise.resolve();
 }
 
+async function renderScreen(node: ReturnType<typeof createScreenHarness>["node"]) {
+	let rendered: RenderedScreen | null = null;
+	await act(async () => {
+		rendered = await testRender(node, { width: 100, height: 32 });
+		await flushEffects();
+	});
+	if (!rendered) {
+		throw new Error("Failed to render test screen");
+	}
+	await rendered.renderOnce();
+	return rendered;
+}
+
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 	keyboardHandler = null;
@@ -150,7 +163,7 @@ test("PipelineLaunchScreen renders the selected email and repo summary", async (
 			status: 200,
 			headers: { "Content-Type": "application/json" },
 		})) as typeof fetch;
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
+	const rendered = await renderScreen(harness.node);
 	const context = harness.getContext();
 
 	act(() => {
@@ -160,7 +173,6 @@ test("PipelineLaunchScreen renders the selected email and repo summary", async (
 		context.setSelectedEmail("dev@example.com");
 	});
 
-	await rendered.renderOnce();
 	await act(async () => {
 		await flushEffects();
 	});
@@ -204,7 +216,7 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 		});
 	}) as typeof fetch;
 
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
+	const rendered = await renderScreen(harness.node);
 	const context = harness.getContext();
 
 	act(() => {
@@ -219,7 +231,6 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 		context.setPipelineNotice("Old notice");
 	});
 
-	await rendered.renderOnce();
 	await act(async () => {
 		await flushEffects();
 	});
@@ -257,7 +268,6 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 
 test("PipelineLaunchScreen shows a validation error instead of launching with missing state", async () => {
 	const harness = createScreenHarness();
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
 	let fetchCalled = false;
 
 	globalThis.fetch = (async (_input, init) => {
@@ -274,7 +284,7 @@ test("PipelineLaunchScreen shows a validation error instead of launching with mi
 		});
 	}) as unknown as typeof fetch;
 
-	await rendered.renderOnce();
+	const rendered = await renderScreen(harness.node);
 	await act(async () => {
 		await flushEffects();
 	});
@@ -309,7 +319,7 @@ test("PipelineLaunchScreen blocks launch when no supported local model is instal
 			},
 		)) as typeof fetch;
 
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
+	const rendered = await renderScreen(harness.node);
 	const context = harness.getContext();
 
 	act(() => {
@@ -319,7 +329,6 @@ test("PipelineLaunchScreen blocks launch when no supported local model is instal
 		context.setSelectedEmail("dev@example.com");
 	});
 
-	await rendered.renderOnce();
 	await act(async () => {
 		await flushEffects();
 	});
