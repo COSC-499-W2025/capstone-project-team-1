@@ -11,6 +11,7 @@ import type {
 	Education,
 	EducationCreateRequest,
 	ExtractLocalResponse,
+	LocalLlmSetupResponse,
 	PipelineCancelResponse,
 	PipelineContributorsRequest,
 	PipelineContributorsResponse,
@@ -91,6 +92,8 @@ export const api = {
 		request: PipelineContributorsRequest,
 	): Promise<PipelineContributorsResponse> =>
 		client.post("/local-llm/context/contributors", request),
+	getLocalLlmSetup: (): Promise<LocalLlmSetupResponse> =>
+		client.get("/local-llm/setup"),
 	startPipeline: (
 		request: PipelineStartRequest,
 	): Promise<PipelineStartResponse> =>

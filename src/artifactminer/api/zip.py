@@ -8,6 +8,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
+from artifactminer.app_paths import UPLOADS_DIR
 from artifactminer.api.analyze import extract_zip_to_persistent_location
 from artifactminer.directorycrawler import directory_walk
 
@@ -20,9 +21,6 @@ from .schemas import (
     ExtractLocalResponse,
 )
 from ..db import UploadedZip, get_db
-
-
-UPLOADS_DIR = Path("./uploads")
 
 
 router = APIRouter(prefix="/zip", tags=["zip"])

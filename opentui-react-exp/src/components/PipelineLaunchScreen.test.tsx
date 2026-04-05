@@ -100,14 +100,70 @@ async function flushEffects() {
 	await Promise.resolve();
 }
 
+async function renderScreen(node: ReturnType<typeof createScreenHarness>["node"]) {
+	let rendered: RenderedScreen | null = null;
+	await act(async () => {
+		rendered = await testRender(node, { width: 100, height: 32 });
+		await flushEffects();
+	});
+	if (!rendered) {
+		throw new Error("Failed to render test screen");
+	}
+	await rendered.renderOnce();
+	return rendered;
+}
+
 afterEach(() => {
 	globalThis.fetch = originalFetch;
 	keyboardHandler = null;
 });
 
+function setupResponse(overrides?: Partial<Record<string, unknown>>) {
+	return {
+		models_dir: "/Users/stavan/.artifactminer/models",
+		preferred_default_model: "qwen2.5-coder-3b-q4",
+		selected_default_model: "qwen2.5-coder-3b-q4",
+		supported_models: [
+			{
+				name: "qwen2.5-coder-3b-q4",
+				filename: "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+				repo_url:
+					"https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF?show_file_info=qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+				context_window: 16384,
+				path: null,
+			},
+		],
+		available_models: [
+			{
+				name: "qwen2.5-coder-3b-q4",
+				filename: "qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+				repo_url:
+					"https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF?show_file_info=qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+				context_window: 16384,
+				path: "/Users/stavan/.artifactminer/models/qwen2.5-coder-3b-instruct-q4_k_m.gguf",
+			},
+		],
+		llama_server_found: true,
+		runtime: {
+			loaded_model: null,
+			server_pid: null,
+			server_port: null,
+			is_running: false,
+			is_healthy: false,
+			models_dir: "/Users/stavan/.artifactminer/models",
+		},
+		...overrides,
+	};
+}
+
 test("PipelineLaunchScreen renders the selected email and repo summary", async () => {
 	const harness = createScreenHarness();
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
+	globalThis.fetch = (async () =>
+		new Response(JSON.stringify(setupResponse()), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		})) as typeof fetch;
+	const rendered = await renderScreen(harness.node);
 	const context = harness.getContext();
 
 	act(() => {
@@ -117,6 +173,9 @@ test("PipelineLaunchScreen renders the selected email and repo summary", async (
 		context.setSelectedEmail("dev@example.com");
 	});
 
+	await act(async () => {
+		await flushEffects();
+	});
 	await rendered.renderOnce();
 	const frame = rendered.captureCharFrame();
 
@@ -125,6 +184,8 @@ test("PipelineLaunchScreen renders the selected email and repo summary", async (
 	expect(frame).toContain("Selected repos: 2");
 	expect(frame).toContain("- artifact-miner");
 	expect(frame).toContain("- resume-lab");
+	expect(frame).toContain("Detected model: qwen2.5-coder-3b-q4");
+	expect(frame).toContain("llama-server found on PATH");
 
 	destroyRenderer(rendered);
 });
@@ -136,7 +197,26 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 			startedCount += 1;
 		},
 	});
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
+	const fetchCalls: Array<{ url: string; body?: string }> = [];
+	globalThis.fetch = (async (input, init) => {
+		if (!init?.method || init.method === "GET") {
+			fetchCalls.push({ url: String(input) });
+			return new Response(JSON.stringify(setupResponse()), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
+		fetchCalls.push({
+			url: String(input),
+			body: typeof init?.body === "string" ? init.body : undefined,
+		});
+		return new Response(JSON.stringify({ job_id: "job-427", status: "queued" }), {
+			status: 200,
+			headers: { "Content-Type": "application/json" },
+		});
+	}) as typeof fetch;
+
+	const rendered = await renderScreen(harness.node);
 	const context = harness.getContext();
 
 	act(() => {
@@ -151,18 +231,9 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 		context.setPipelineNotice("Old notice");
 	});
 
-	const fetchCalls: Array<{ url: string; body?: string }> = [];
-	globalThis.fetch = (async (input, init) => {
-		fetchCalls.push({
-			url: String(input),
-			body: typeof init?.body === "string" ? init.body : undefined,
-		});
-		return new Response(JSON.stringify({ job_id: "job-427", status: "queued" }), {
-			status: 200,
-			headers: { "Content-Type": "application/json" },
-		});
-	}) as typeof fetch;
-
+	await act(async () => {
+		await flushEffects();
+	});
 	await rendered.renderOnce();
 	await act(async () => {
 		pressKey("return", "\r");
@@ -172,14 +243,14 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 
 	expect(fetchCalls).toEqual([
 		{
+			url: "http://127.0.0.1:8000/local-llm/setup",
+		},
+		{
 			url: "http://127.0.0.1:8000/local-llm/generation/start",
 			body: JSON.stringify({
 				intake_id: "intake-123",
 				repo_ids: ["repo-1"],
 				user_email: "dev@example.com",
-				stage1_model: "qwen2.5-coder-3b-q4",
-				stage2_model: "lfm2.5-1.2b-q8",
-				stage3_model: "lfm2.5-1.2b-q8",
 			}),
 		},
 	]);
@@ -197,10 +268,15 @@ test("PipelineLaunchScreen starts the pipeline on Enter and updates context", as
 
 test("PipelineLaunchScreen shows a validation error instead of launching with missing state", async () => {
 	const harness = createScreenHarness();
-	const rendered = await testRender(harness.node, { width: 100, height: 32 });
 	let fetchCalled = false;
 
-	globalThis.fetch = (async () => {
+	globalThis.fetch = (async (_input, init) => {
+		if (!init?.method || init.method === "GET") {
+			return new Response(JSON.stringify(setupResponse()), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		}
 		fetchCalled = true;
 		return new Response(JSON.stringify({ job_id: "job-should-not-run", status: "queued" }), {
 			status: 200,
@@ -208,6 +284,10 @@ test("PipelineLaunchScreen shows a validation error instead of launching with mi
 		});
 	}) as unknown as typeof fetch;
 
+	const rendered = await renderScreen(harness.node);
+	await act(async () => {
+		await flushEffects();
+	});
 	await rendered.renderOnce();
 	await act(async () => {
 		pressKey("return", "\r");
@@ -218,6 +298,49 @@ test("PipelineLaunchScreen shows a validation error instead of launching with mi
 	expect(fetchCalled).toBe(false);
 	expect(rendered.captureCharFrame()).toContain(
 		"Missing intake, repo selection, or identity.",
+	);
+
+	destroyRenderer(rendered);
+});
+
+test("PipelineLaunchScreen blocks launch when no supported local model is installed", async () => {
+	const harness = createScreenHarness();
+	globalThis.fetch = (async () =>
+		new Response(
+			JSON.stringify(
+				setupResponse({
+					selected_default_model: null,
+					available_models: [],
+				}),
+			),
+			{
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			},
+		)) as typeof fetch;
+
+	const rendered = await renderScreen(harness.node);
+	const context = harness.getContext();
+
+	act(() => {
+		context.setIntakeId("intake-123");
+		context.setDetectedRepos(repoCandidates);
+		context.setSelectedRepoIds(["repo-1"]);
+		context.setSelectedEmail("dev@example.com");
+	});
+
+	await act(async () => {
+		await flushEffects();
+	});
+	await rendered.renderOnce();
+	await act(async () => {
+		pressKey("return", "\r");
+		await flushEffects();
+	});
+	await rendered.renderOnce();
+
+	expect(rendered.captureCharFrame()).toContain(
+		"No supported local model found in ~/.artifactminer/models.",
 	);
 
 	destroyRenderer(rendered);

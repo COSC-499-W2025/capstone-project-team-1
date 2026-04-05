@@ -26,6 +26,53 @@ class ProjectFacts(BaseModel):
     first_commit: str | None = Field(default=None)
     last_commit: str | None = Field(default=None)
 
+    @model_validator(mode="before")
+    @classmethod
+    def _repair_common_llm_shape_errors(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+
+        payload = dict(value)
+
+        def _coerce_list(field_name: str) -> None:
+            raw_value = payload.get(field_name)
+            if isinstance(raw_value, str):
+                lines = [
+                    line.strip().lstrip("-* ").strip()
+                    for line in raw_value.splitlines()
+                    if line.strip()
+                ]
+                if not lines and raw_value.strip():
+                    lines = [part.strip() for part in raw_value.split(",") if part.strip()]
+                payload[field_name] = lines
+
+        for alias in ("Summary", "project_summary", "description", "overview"):
+            if alias in payload and not payload.get("summary"):
+                payload["summary"] = payload[alias]
+                break
+
+        for field_name in ("technologies", "highlights", "evidence", "frameworks"):
+            _coerce_list(field_name)
+
+        summary = payload.get("summary")
+        if isinstance(summary, str):
+            payload["summary"] = summary.strip()
+
+        if not payload.get("summary"):
+            highlights = payload.get("highlights")
+            evidence = payload.get("evidence")
+            if isinstance(highlights, list) and highlights:
+                payload["summary"] = str(highlights[0]).strip()
+            elif isinstance(evidence, list) and evidence:
+                payload["summary"] = str(evidence[0]).strip()
+            elif payload.get("project_type"):
+                payload["summary"] = (
+                    f"{str(payload['project_name']).strip() or 'This project'} "
+                    f"is a {str(payload['project_type']).strip()}."
+                )
+
+        return payload
+
 
 class ResumeProjectPeriod(BaseModel):
     model_config = ConfigDict(extra="ignore")

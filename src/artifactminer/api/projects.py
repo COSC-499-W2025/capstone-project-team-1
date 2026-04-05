@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from artifactminer.app_paths import THUMBNAILS_DIR
+
 from fastapi import Query
 from .schemas import (
     ProjectTimelineItem,
@@ -32,7 +34,6 @@ from ..helpers.project_ranker import rank_projects
 
 
 router = APIRouter(prefix="/projects", tags=["projects"])
-THUMBNAILS_DIR = Path("./uploads/thumbnails")
 MAX_THUMBNAIL_BYTES = 5 * 1024 * 1024 # 5 MB
 ALLOWED_THUMBNAIL_SUFFIXES = {".png", ".jpg", ".jpeg"}
 ALLOWED_THUMBNAIL_CONTENT_TYPES = {"image/png", "image/jpeg"}

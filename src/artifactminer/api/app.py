@@ -1,12 +1,14 @@
 """ASGI application exposing Artifact Miner backend services."""
 
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import List
 
 from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+
+from artifactminer.app_paths import THUMBNAILS_DIR, ensure_app_directories
+from artifactminer.bootstrap import ensure_database_ready
 
 from fastapi import HTTPException
 from email_validator import validate_email, EmailNotValidError
@@ -17,15 +19,7 @@ from .schemas import (
     UserAnswerResponse,
     KeyedAnswersRequest,
 )
-from ..db import (
-    Base,
-    engine,
-    SessionLocal,
-    Question,
-    UserAnswer,
-    get_db,
-    seed_questions,
-)
+from ..db import Question, UserAnswer, get_db
 from .consent import router as consent_router
 from .zip import router as zip_router
 from .projects import router as projects_router
@@ -52,13 +46,14 @@ from .views import router as views_router
 
 def create_app() -> FastAPI:
     """Construct the FastAPI instance so tests or scripts can customize it."""
+    ensure_app_directories()
     app = FastAPI(
         title="Artifact Miner API",
         description="Backend services powering the Artifact Miner TUI.",
         version="0.1.0",
     )
 
-    thumbnails_dir = Path("./uploads/thumbnails")
+    thumbnails_dir = THUMBNAILS_DIR
     thumbnails_dir.mkdir(parents=True, exist_ok=True)
     app.mount(
         "/uploads/thumbnails",
@@ -66,20 +61,7 @@ def create_app() -> FastAPI:
         name="project-thumbnails",
     )
 
-    # Run Alembic migrations on startup to keep the DB schema in sync
-    from alembic.config import Config as AlembicConfig
-    from alembic import command as alembic_command
-
-    _repo_root = Path(__file__).resolve().parents[3]
-    alembic_cfg = AlembicConfig(str(_repo_root / "alembic.ini"))
-    alembic_command.upgrade(alembic_cfg, "head")
-
-    # Initialize database schema and seed
-    db = SessionLocal()
-    try:
-        seed_questions(db)
-    finally:
-        db.close()
+    ensure_database_ready()
 
     @app.get("/health", response_model=HealthStatus, tags=["system"])
     async def healthcheck() -> HealthStatus:

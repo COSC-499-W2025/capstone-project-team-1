@@ -31,6 +31,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from artifactminer.local_llm.models import ModelDescriptor, RuntimeStatus
+
 
 # ---------------------------------------------------------------------------
 # Job and stage status types
@@ -175,21 +177,44 @@ class GenerationStartRequest(BaseModel):
     user_email: EmailStr = Field(
         description="User email for attribution and identification"
     )
-    stage1_model: str = Field(
-        default="qwen3.5-2b-q4",
+    stage1_model: str | None = Field(
+        default=None,
         min_length=1,
-        description="Model for analysis stage",
+        description="Optional model for analysis stage. Defaults to the preferred installed local model.",
     )
-    stage2_model: str = Field(
-        default="qwen3.5-2b-q4",
+    stage2_model: str | None = Field(
+        default=None,
         min_length=1,
-        description="Model for resume draft stage",
+        description="Optional model for resume draft stage. Defaults to the preferred installed local model.",
     )
-    stage3_model: str = Field(
-        default="qwen3.5-2b-q4",
+    stage3_model: str | None = Field(
+        default=None,
         min_length=1,
-        description="Model for polish/refinement stage",
+        description="Optional model for polish/refinement stage. Defaults to the preferred installed local model.",
     )
+
+
+class LocalLLMSetupResponse(BaseModel):
+    """Runtime setup and installation details for local model execution."""
+
+    models_dir: str = Field(description="Directory scanned for supported GGUF files.")
+    preferred_default_model: str = Field(
+        description="Preferred local model when it is installed."
+    )
+    selected_default_model: str | None = Field(
+        default=None,
+        description="Installed model that will be used when no explicit model is requested.",
+    )
+    supported_models: list[ModelDescriptor] = Field(
+        description="All supported local models, including download metadata."
+    )
+    available_models: list[ModelDescriptor] = Field(
+        description="Supported local models currently installed on disk."
+    )
+    llama_server_found: bool = Field(
+        description="Whether llama-server was found on the current PATH."
+    )
+    runtime: RuntimeStatus = Field(description="Current local runtime status snapshot.")
 
 
 class GenerationStartResponse(BaseModel):

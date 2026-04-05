@@ -38,8 +38,8 @@ flowchart TB
 
     subgraph Data["Data Layer"]
         SQLite[("SQLite")]
-        Uploads[("uploads/")]
-        Extracted[(".extracted/")]
+        Uploads[("~/.artifactminer/uploads/")]
+        Extracted[("~/.artifactminer/extracted/")]
     end
 
     React --> Gateway
@@ -74,7 +74,7 @@ flowchart LR
     Generate --> Review["Review + edit resume"]
 ```
 
-1. **Consent and configuration** — choose your name, email, and consent level (local LLM, cloud AI, or heuristic-only).
+1. **Consent and configuration** — choose your name, email, and AI mode (local LLM or cloud AI).
 2. **Upload** — select a ZIP archive containing one or more Git repositories.
 3. **Configure** — pick which repositories and identity to use for analysis.
 4. **Generate** — the system analyzes repositories, extracts skills, and generates a structured resume using local or cloud AI. The generated resume is saved to the SQLite database for future retrieval.
@@ -93,7 +93,7 @@ Runs entirely on your machine using [llama.cpp](https://github.com/ggml-org/llam
 - The server loads a GGUF model from `~/.artifactminer/models/`.
 - The pipeline extracts project facts from your repositories, generates a draft resume, and optionally polishes it — all via local inference.
 
-**Model:** Qwen 3.5 2B (Q4_K_M quantization, ~1.5 GB)
+**Default local model:** Qwen 2.5 Coder 3B Instruct (Q4_K_M quantization)
 
 ### Cloud Agent Generation (GitHub Copilot)
 
@@ -173,6 +173,13 @@ uv sync
 
 This creates a virtual environment and installs all Python dependencies automatically.
 
+When the API starts, it now keeps all writable runtime data in `~/.artifactminer/` by default:
+
+- `~/.artifactminer/artifactminer.db` — SQLite database
+- `~/.artifactminer/uploads/` — uploaded ZIPs and thumbnails
+- `~/.artifactminer/extracted/` — extracted repository contents
+- `~/.artifactminer/models/` — local GGUF model files
+
 **Install the frontend:**
 
 ```bash
@@ -230,11 +237,11 @@ Verify on all platforms: `llama-server --version`
 
 #### 3b. Download the model
 
-Download **Qwen3.5-2B-Q4_K_M.gguf** (~1.5 GB) from Hugging Face:
+Download **qwen2.5-coder-3b-instruct-q4_k_m.gguf** from Hugging Face:
 
-> [https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf)
+> [https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF?show_file_info=qwen2.5-coder-3b-instruct-q4_k_m.gguf](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF?show_file_info=qwen2.5-coder-3b-instruct-q4_k_m.gguf)
 
-On the Hugging Face page, click the **download** button next to `Qwen3.5-2B-Q4_K_M.gguf`.
+On the Hugging Face page, click the **download** button next to `qwen2.5-coder-3b-instruct-q4_k_m.gguf`.
 
 Then move the file into the Artifact Miner models directory:
 
@@ -242,17 +249,17 @@ Then move the file into the Artifact Miner models directory:
 
 ```bash
 mkdir -p ~/.artifactminer/models
-mv ~/Downloads/Qwen3.5-2B-Q4_K_M.gguf ~/.artifactminer/models/
+mv ~/Downloads/qwen2.5-coder-3b-instruct-q4_k_m.gguf ~/.artifactminer/models/
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
 New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.artifactminer\models"
-Move-Item "$env:USERPROFILE\Downloads\Qwen3.5-2B-Q4_K_M.gguf" "$env:USERPROFILE\.artifactminer\models\"
+Move-Item "$env:USERPROFILE\Downloads\qwen2.5-coder-3b-instruct-q4_k_m.gguf" "$env:USERPROFILE\.artifactminer\models\"
 ```
 
-The backend will automatically start and manage `llama-server` when you choose local generation. No manual server startup is needed.
+The backend will automatically start and manage `llama-server` when you choose local generation. No manual server startup is needed, and if you omit model selection the API will automatically use the preferred installed supported model from `~/.artifactminer/models/`.
 
 ### Step 4 — Run the system
 
@@ -262,8 +269,10 @@ You need **two terminals** open — one for the backend API server and one for t
 
 ```bash
 # From the project root directory:
-uv run api
+uv run api run
 ```
+
+`uv run api run` will automatically create `~/.artifactminer/artifactminer.db` if it does not exist and apply the latest Alembic migrations before serving requests.
 
 You should see output like:
 
@@ -275,6 +284,13 @@ Leave this terminal running. The API server is now ready.
 
 You can verify it's working by opening [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser — this shows the interactive Swagger API documentation.
 
+You can also verify the backend and local-model setup from the terminal:
+
+```bash
+curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/local-llm/setup
+```
+
 #### Terminal 2 — Start the OpenTUI client
 
 Open a **second** terminal window and run:
@@ -282,7 +298,7 @@ Open a **second** terminal window and run:
 ```bash
 cd opentui-react-exp
 bun install
-bun run src/index.tsx
+bun run dev
 ```
 
 The terminal client launches and connects to the backend automatically. You should see the Artifact Miner landing screen.
@@ -297,7 +313,6 @@ Once both terminals are running:
 2. **Consent** — choose your AI preference:
    - **Local LLM** — uses the Qwen model on your machine (requires Step 3 above).
    - **Cloud (GitHub Copilot)** — uses GitHub Copilot models over the internet (free with GitHub Education).
-   - **No AI** — heuristic-only analysis, no LLM generation.
 3. **File upload** — browse your filesystem and select a ZIP archive containing your project(s). Use arrow keys to navigate, Enter to open folders, and Enter on a `.zip` file to select it.
 4. **Configure** — select which repositories to analyze, enter your name and email, and choose your identity for collaborative projects.
 5. **Generate** — the system analyzes your code and generates a resume.
@@ -314,7 +329,7 @@ Once both terminals are running:
 | `llama-server: command not found` | Make sure llama-server is on your PATH (see Step 3a). Restart your terminal. |
 | Backend fails to start | Make sure port 8000 is not in use. Try `lsof -i :8000` (macOS/Linux) or `netstat -ano \| findstr :8000` (Windows) to check. |
 | TUI shows connection error | Make sure the backend is running in Terminal 1 before starting the TUI in Terminal 2. |
-| Model not found error | Verify `Qwen3.5-2B-Q4_K_M.gguf` is in `~/.artifactminer/models/` (or `%USERPROFILE%\.artifactminer\models\` on Windows). |
+| Model not found error | Verify `qwen2.5-coder-3b-instruct-q4_k_m.gguf` is in `~/.artifactminer/models/` (or `%USERPROFILE%\.artifactminer\models\` on Windows). |
 | Windows terminal renders incorrectly | Use **Windows Terminal** or **PowerShell** instead of `cmd.exe`. |
 | GitHub Copilot login fails | Make sure you have an active GitHub account. Students can get free Copilot access via [GitHub Education](https://education.github.com/). |
 
@@ -433,6 +448,12 @@ src/artifactminer/
   helpers/                Utility functions (project ranker, OpenAI client)
   cli/                    CLI entry point and interactive mode
 
+~/.artifactminer/         Runtime data created automatically by the API
+  artifactminer.db        SQLite database
+  uploads/                Uploaded ZIPs and project thumbnails
+  extracted/              Extracted repository contents
+  models/                 Supported local GGUF model files
+
 opentui-react-exp/        React terminal client (OpenTUI + Pi Agent SDK)
   src/
     api/                  API client and TypeScript interfaces
@@ -488,4 +509,4 @@ uv run alembic downgrade -1
 
 ## Local Model
 
-The local LLM runtime uses **Qwen 3.5 2B** (Q4_K_M quantization). Download `Qwen3.5-2B-Q4_K_M.gguf` from [Hugging Face](https://huggingface.co/unsloth/Qwen3.5-2B-GGUF?show_file_info=Qwen3.5-2B-Q4_K_M.gguf) and place it in `~/.artifactminer/models/`.
+The default OpenTUI local-generation path uses **Qwen 2.5 Coder 3B Instruct** (Q4_K_M quantization). Download `qwen2.5-coder-3b-instruct-q4_k_m.gguf` from [Hugging Face](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF?show_file_info=qwen2.5-coder-3b-instruct-q4_k_m.gguf) and place it in `~/.artifactminer/models/`.
