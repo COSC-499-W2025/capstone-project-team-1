@@ -3,7 +3,18 @@
 import uuid
 from zipfile import ZipFile
 
+import pytest
+
 from artifactminer.api import local_llm
+
+
+@pytest.fixture(autouse=True)
+def _mock_default_local_model(monkeypatch):
+    monkeypatch.setattr(
+        local_llm,
+        "select_default_model_name",
+        lambda _models_dir: "qwen2.5-coder-3b-q4",
+    )
 
 
 def test_local_llm_router_is_registered(client):
@@ -665,6 +676,46 @@ def test_generation_start_valid_request(client, tmp_path):
 
     # Verify job envelope persisted for subsequent workflow routes.
     assert data["job_id"] in local_llm._generation_jobs
+
+
+def test_generation_start_uses_installed_default_model_when_omitted(
+    client, tmp_path, monkeypatch
+):
+    """Test that omitted stage models resolve to the preferred installed model."""
+    zip_path = tmp_path / "generation_start_default_model.zip"
+
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo-one/.git/config", "[core]")
+        zf.writestr("repo-one/.git/HEAD", "ref: refs/heads/main")
+
+    monkeypatch.setattr(
+        local_llm,
+        "select_default_model_name",
+        lambda _models_dir: "qwen2.5-coder-3b-q4",
+    )
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    assert intake_response.status_code == 200
+    intake_data = intake_response.json()
+
+    response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_data["intake_id"],
+            "repo_ids": [intake_data["repos"][0]["id"]],
+            "user_email": "developer@example.com",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    job = local_llm._generation_jobs[data["job_id"]]
+    assert job["stage1_model"] == "qwen2.5-coder-3b-q4"
+    assert job["stage2_model"] == "qwen2.5-coder-3b-q4"
+    assert job["stage3_model"] == "qwen2.5-coder-3b-q4"
 
 
 def test_generation_start_invalid_email(client, tmp_path):

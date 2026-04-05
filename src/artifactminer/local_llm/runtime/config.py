@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import platform
-from pathlib import Path
+
+from artifactminer.app_paths import MODELS_DIR
 
 from ..models import InferenceOptions
 
-DEFAULT_MODEL_NAME = "qwen3.5-2b-q4"
-DEFAULT_MODELS_DIR = Path.home() / ".artifactminer" / "models"
+DEFAULT_MODEL_NAME = "qwen2.5-coder-3b-q4"
+DEFAULT_MODELS_DIR = MODELS_DIR
 DEFAULT_STARTUP_TIMEOUT_SECONDS = 60.0
 DEFAULT_HEALTH_TIMEOUT_SECONDS = 60.0
 DEFAULT_CONTEXT_WINDOW = 4096
-DEFAULT_MAX_TOKENS = 2048
+DEFAULT_MAX_TOKENS = 12288
 
 MODEL_FAMILY_SAMPLING_DEFAULTS: dict[str, InferenceOptions] = {
     "lfm2.5": InferenceOptions(
@@ -27,8 +28,8 @@ MODEL_FAMILY_SAMPLING_DEFAULTS: dict[str, InferenceOptions] = {
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
     "qwen3": InferenceOptions(
-        temperature=0.7,
-        top_p=0.8,
+        temperature=0.2,
+        top_p=0.9,
         max_tokens=DEFAULT_MAX_TOKENS,
     ),
     "fallback": InferenceOptions(

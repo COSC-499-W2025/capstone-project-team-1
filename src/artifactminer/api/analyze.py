@@ -27,6 +27,8 @@ from collections.abc import Callable
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from artifactminer.app_paths import EXTRACTION_BASE_DIR
+
 from ..db import get_db
 from ..helpers.zip_utils import safe_extract_zip
 from ..db.models import (
@@ -69,7 +71,6 @@ from ..evidence.extractors import (
 from ..helpers.project_ranker import rank_projects
 
 router = APIRouter(prefix="/analyze", tags=["analysis"])
-EXTRACTION_BASE_DIR = Path("./.extracted")
 
 
 def get_user_email(db: Session) -> str:
