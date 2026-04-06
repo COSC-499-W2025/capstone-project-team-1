@@ -247,6 +247,46 @@ export interface ResumeV3Portfolio {
 	top_skills: string[];
 }
 
+export interface PortfolioSkillsTimelineItem {
+	skill: string;
+	first_seen: string | null;
+	last_seen: string | null;
+	projects_count: number;
+	depth_score: number;
+}
+
+export interface PortfolioActivityHeatmapDateRange {
+	start: string | null;
+	end: string | null;
+}
+
+export interface PortfolioActivityHeatmap {
+	daily_activity: Record<string, number>;
+	total_days_active: number;
+	max_daily_commits: number;
+	date_range: PortfolioActivityHeatmapDateRange;
+}
+
+export interface PortfolioTopProject {
+	project_name: string;
+	project_type: string;
+	score: number;
+	contribution_pct: number | null;
+	commit_total: number;
+	first_commit: string | null;
+	last_commit: string | null;
+	recency_score: number;
+	activity_focus: string | null;
+	latest_change: string | null;
+	evolution_note: string | null;
+}
+
+export interface PortfolioDashboard {
+	skills_timeline: PortfolioSkillsTimelineItem[];
+	activity_heatmap: PortfolioActivityHeatmap;
+	top_projects: PortfolioTopProject[];
+}
+
 export interface ResumeV3Output {
 	professional_summary: string;
 	skills_section: string;
@@ -254,6 +294,7 @@ export interface ResumeV3Output {
 	projects: ResumeV3Project[];
 	metadata: ResumeV3Metadata;
 	portfolio?: ResumeV3Portfolio;
+	portfolio_dashboard?: PortfolioDashboard;
 }
 
 export interface PipelineTelemetry {
@@ -419,4 +460,5 @@ export interface DeveloperProfile {
 	talking_points: TalkingPoint[];
 	impact: Impact;
 	projects: ProjectCard[];
+	portfolio_dashboard?: PortfolioDashboard;
 }
