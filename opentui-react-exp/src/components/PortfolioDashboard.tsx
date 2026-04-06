@@ -83,7 +83,7 @@ export function PortfolioDashboard({ dashboard }: PortfolioDashboardProps) {
 		heatmap && Object.keys(heatmap.daily_activity ?? {}).length > 0,
 	);
 	const hasTopProjects = topProjects.length > 0;
-	const hasCompleteData = hasTimeline && hasHeatmap && hasTopProjects;
+	const hasAnyData = hasTimeline || hasHeatmap || hasTopProjects;
 
 	const heatmapGrid = useMemo(
 		() => buildHeatmapGrid(heatmap?.daily_activity ?? {}),
@@ -91,7 +91,7 @@ export function PortfolioDashboard({ dashboard }: PortfolioDashboardProps) {
 	);
 	const heatmapMax = heatmap?.max_daily_commits ?? 0;
 
-	if (!hasCompleteData) {
+	if (!hasAnyData) {
 		return (
 			<box
 				border

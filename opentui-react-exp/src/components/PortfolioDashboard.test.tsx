@@ -76,7 +76,7 @@ test("PortfolioDashboard shows a clear empty state without data", async () => {
 	expect(frame).toContain("Portfolio insights unavailable for this run.");
 });
 
-test("PortfolioDashboard shows unavailable state when any section is missing", async () => {
+test("PortfolioDashboard renders partial sections when one section is missing", async () => {
 	const partial: PortfolioDashboardData = {
 		skills_timeline: [
 			{
@@ -101,8 +101,10 @@ test("PortfolioDashboard shows unavailable state when any section is missing", a
 		height: 20,
 	});
 	await rendered.renderOnce();
+	const frame = rendered.captureCharFrame();
 
-	expect(rendered.captureCharFrame()).toContain(
-		"Portfolio insights unavailable for this run.",
-	);
+	expect(frame).toContain("Skills Timeline");
+	expect(frame).toContain("No activity heatmap data available.");
+	expect(frame).toContain("No ranked project showcase data available.");
+	expect(frame).not.toContain("Portfolio insights unavailable for this run.");
 });
