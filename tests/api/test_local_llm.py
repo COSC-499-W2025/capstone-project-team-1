@@ -1364,6 +1364,80 @@ def test_generation_status_with_draft_output(client, tmp_path, monkeypatch):
     assert data["output"] is None
 
 
+def test_generation_status_includes_portfolio_dashboard_in_draft_and_output(client, tmp_path):
+    """Test that status payload preserves portfolio dashboard in draft and output."""
+    zip_path = tmp_path / "dashboard_status_test.zip"
+    with ZipFile(zip_path, 'w') as zf:
+        zf.writestr("repo/.git/config", "[core]")
+        zf.writestr("repo/.git/HEAD", "ref: refs/heads/main")
+
+    intake_response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    intake_id = intake_response.json()["intake_id"]
+
+    start_response = client.post(
+        "/local-llm/generation/start",
+        json={
+            "intake_id": intake_id,
+            "repo_ids": ["repo"],
+            "user_email": "test@example.com",
+        },
+    )
+    job_id = start_response.json()["job_id"]
+
+    dashboard = {
+        "skills_timeline": [
+            {
+                "skill": "TypeScript",
+                "first_seen": "2024-01-01T00:00:00",
+                "last_seen": "2025-01-01T00:00:00",
+                "projects_count": 1,
+                "depth_score": 2.3,
+            }
+        ],
+        "activity_heatmap": {
+            "daily_activity": {"2025-01-01": 3},
+            "total_days_active": 1,
+            "max_daily_commits": 3,
+            "date_range": {"start": "2025-01-01", "end": "2025-01-01"},
+        },
+        "top_projects": [
+            {
+                "project_name": "repo",
+                "project_type": "tui",
+                "score": 0.91,
+                "contribution_pct": 80.0,
+                "commit_total": 12,
+                "first_commit": "2024-01-01T00:00:00",
+                "last_commit": "2025-01-01T00:00:00",
+                "recency_score": 0.8,
+                "activity_focus": "feature 67%",
+                "latest_change": "add dashboard",
+                "evolution_note": "Evolved over 365 days of commits.",
+            }
+        ],
+    }
+
+    local_llm._generation_jobs[job_id]["draft"] = {
+        "projects": [{"name": "repo"}],
+        "portfolio_dashboard": dashboard,
+    }
+    local_llm._generation_jobs[job_id]["output"] = {
+        "projects": [{"name": "repo"}],
+        "portfolio_dashboard": dashboard,
+    }
+    local_llm._generation_jobs[job_id]["status"] = "complete"
+
+    response = client.get("/local-llm/generation/status")
+    assert response.status_code == 200
+    data = response.json()
+
+    assert data["draft"]["portfolio_dashboard"] == dashboard
+    assert data["output"]["portfolio_dashboard"] == dashboard
+
+
 def test_generation_status_with_error(client, tmp_path):
     """Test status retrieval when an error occurred."""
     # Setup generation

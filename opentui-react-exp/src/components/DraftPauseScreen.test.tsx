@@ -157,3 +157,23 @@ test("DraftPauseScreen cancels the pipeline and updates app state", async () => 
 		"Pipeline cancelled at draft pause.",
 	);
 });
+
+test("DraftPauseScreen continues to resume preview when no feedback is provided", async () => {
+	const nextTargets: string[] = [];
+
+	const harness = createHarness({
+		onNext: (target) => {
+			nextTargets.push(target);
+		},
+	});
+	rendered = await testRender(harness.node, { width: 140, height: 40 });
+	await seedDraftState(harness.getContext());
+
+	await pressKeyboardShortcut({ name: "return" });
+
+	expect(nextTargets).toEqual(["resume-preview"]);
+	expect(harness.getContext().state.resumeV3Output).toEqual(sampleDraft);
+	expect(harness.getContext().state.pipelineNotice).toBe(
+		"Using draft without polish feedback.",
+	);
+});

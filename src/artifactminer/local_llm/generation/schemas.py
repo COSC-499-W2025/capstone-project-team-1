@@ -164,6 +164,60 @@ class ResumePortfolioModel(BaseModel):
     top_skills: list[str] = Field(default_factory=list)
 
 
+class ResumeSkillsTimelineItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    skill: str
+    first_seen: str | None = None
+    last_seen: str | None = None
+    projects_count: int = 0
+    depth_score: float = 0.0
+
+
+class ResumeActivityHeatmapDateRange(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    start: str | None = None
+    end: str | None = None
+
+
+class ResumeActivityHeatmapModel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    daily_activity: dict[str, int] = Field(default_factory=dict)
+    total_days_active: int = 0
+    max_daily_commits: int = 0
+    date_range: ResumeActivityHeatmapDateRange = Field(
+        default_factory=ResumeActivityHeatmapDateRange
+    )
+
+
+class ResumeTopProjectModel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    project_name: str
+    project_type: str
+    score: float = 0.0
+    contribution_pct: float | None = None
+    commit_total: int = 0
+    first_commit: str | None = None
+    last_commit: str | None = None
+    recency_score: float = 0.0
+    activity_focus: str | None = None
+    latest_change: str | None = None
+    evolution_note: str | None = None
+
+
+class ResumePortfolioDashboardModel(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    skills_timeline: list[ResumeSkillsTimelineItem] = Field(default_factory=list)
+    activity_heatmap: ResumeActivityHeatmapModel = Field(
+        default_factory=ResumeActivityHeatmapModel
+    )
+    top_projects: list[ResumeTopProjectModel] = Field(default_factory=list)
+
+
 class ResumeOutputModel(BaseModel):
     """Draft/final output contract consumed by the OpenTUI frontend."""
 
@@ -175,6 +229,7 @@ class ResumeOutputModel(BaseModel):
     projects: list[ResumeProjectModel] = Field(default_factory=list)
     metadata: ResumeMetadataModel = Field(default_factory=ResumeMetadataModel)
     portfolio: ResumePortfolioModel | None = None
+    portfolio_dashboard: ResumePortfolioDashboardModel | None = None
 
 
 class GenerationFeedback(BaseModel):

@@ -33,7 +33,12 @@ function getSectionShortcutIndex(
 }
 
 export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
-	const { state, setPipelineNotice, setPipelineStatus } = useAppState();
+	const {
+		state,
+		setPipelineNotice,
+		setPipelineStatus,
+		setResumeV3Output,
+	} = useAppState();
 	const toast = useToast();
 	const [selectedSection, setSelectedSection] = useState(0);
 	const [focusArea, setFocusArea] = useState<"content" | "feedback">("content");
@@ -50,7 +55,31 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 		[state.resumeV3Draft],
 	);
 
+	const hasFeedback = useMemo(
+		() =>
+			Boolean(generalNotes.trim()) ||
+			Boolean(tone.trim()) ||
+			parseList(additionsText).length > 0 ||
+			parseList(removalsText).length > 0,
+		[additionsText, generalNotes, removalsText, tone],
+	);
+
+	const continueWithoutFeedback = () => {
+		if (!state.resumeV3Draft) {
+			toast.show({ variant: "error", message: "No draft is available to continue." });
+			return;
+		}
+
+		setResumeV3Output(state.resumeV3Draft);
+		setPipelineNotice("Using draft without polish feedback.");
+		onNext("resume-preview");
+	};
+
 	const submitFeedback = async () => {
+		if (!hasFeedback) {
+			continueWithoutFeedback();
+			return;
+		}
 		if (!state.pipelineJobId) {
 			toast.show({ variant: "error", message: "No active pipeline job." });
 			return;
@@ -106,6 +135,11 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 			return;
 		}
 
+		if (key.name === "s") {
+			continueWithoutFeedback();
+			return;
+		}
+
 		if (key.name === "return" || key.name === "enter") {
 			void submitFeedback();
 			return;
@@ -155,7 +189,7 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 			<TopBar
 				step="Draft"
 				title="Stage 2 Pause"
-				description="Review the draft, add feedback, then submit for polish"
+				description="Review the draft, optionally add feedback, then continue"
 			/>
 
 			<box flexGrow={1} flexDirection="row" gap={1} padding={1}>
@@ -251,13 +285,17 @@ export function DraftPauseScreen({ onNext }: DraftPauseScreenProps) {
 					<text>
 						<span fg={theme.textDim}>
 							Tab toggles panes · 1-9 jumps sections · ↑/↓ navigates · Enter
-							submits · Esc cancels
+							{submittingLabel(hasFeedback)} · S skips to resume · Esc cancels
 						</span>
 					</text>
 				</box>
 			</box>
 		</box>
 	);
+}
+
+function submittingLabel(hasFeedback: boolean) {
+	return hasFeedback ? " submits polish" : " continues";
 }
 
 interface LabelledInputProps {

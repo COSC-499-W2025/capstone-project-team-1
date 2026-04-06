@@ -91,7 +91,45 @@ Produce a single JSON object with this exact structure:
         "1-2 specific, actionable suggestions for taking this project to the next level. E.g., 'Add integration tests for the API endpoints' or 'Extract the data layer into a reusable package'. Be concrete and relevant to the project."
       ]
     }
-  ]
+  ],
+  "portfolio_dashboard": {
+    "skills_timeline": [
+      {
+        "skill": "TypeScript",
+        "first_seen": "2024-01-15",
+        "last_seen": "2025-11-03",
+        "projects_count": 4,
+        "depth_score": 3.12
+      }
+    ],
+    "activity_heatmap": {
+      "daily_activity": {
+        "2025-10-01": 2,
+        "2025-10-02": 5
+      },
+      "total_days_active": 148,
+      "max_daily_commits": 11,
+      "date_range": {
+        "start": "2024-01-15",
+        "end": "2025-11-03"
+      }
+    },
+    "top_projects": [
+      {
+        "project_name": "artifact-miner",
+        "project_type": "TUI",
+        "score": 0.92,
+        "contribution_pct": 78.0,
+        "commit_total": 147,
+        "first_commit": "2024-03-01",
+        "last_commit": "2025-11-03",
+        "recency_score": 0.98,
+        "activity_focus": "feature 62%, refactor 21%",
+        "latest_change": "add portfolio dashboard tab",
+        "evolution_note": "Evolved over 612 days of commits."
+      }
+    ]
+  }
 }
 
 ## Resume Format (for resume_markdown field)
@@ -128,6 +166,10 @@ Bullet points highlighting cross-cutting achievements.
 - For the developer DNA archetype, choose something specific and meaningful, not generic like "Software Developer".
 - Include 3-5 hidden strengths, 3-5 growth areas, and 3-5 talking points.
 - Each project should have 1-2 next_level suggestions that are specific and achievable.
+- Include \`portfolio_dashboard\` with grounded values:
+  - \`skills_timeline\` sorted by first evidence date.
+  - \`activity_heatmap.daily_activity\` as YYYY-MM-DD -> commit count.
+  - \`top_projects\` should include at most 3 projects.
 - Keep the tone professional and insightful.
 - **CRITICAL**: Your final response must contain ONLY valid JSON. No preamble, no thinking, no narration, no markdown fences. Start with \`{\` and end with \`}\`.
 `;

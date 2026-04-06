@@ -9,13 +9,15 @@ import type {
 	TalkingPoint,
 } from "../api/types";
 import { theme } from "../types";
+import { PortfolioDashboard } from "./PortfolioDashboard";
 import { TopBar } from "./TopBar";
 
 // ── Tab definitions ──────────────────────────────────────────────
 
-type Tab = "resume" | "insights" | "projects";
+type Tab = "resume" | "insights" | "projects" | "dashboard";
 
 const TABS: Array<{ name: string; description: string; value: Tab }> = [
+	{ name: "Dashboard", description: "Timeline, heatmap, and top project evolution", value: "dashboard" },
 	{ name: "Insights", description: "Developer DNA, strengths, and impact", value: "insights" },
 	{ name: "Projects", description: "Project-by-project skill cards", value: "projects" },
 	{ name: "Resume", description: "Your generated resume", value: "resume" },
@@ -501,9 +503,14 @@ export function CloudResumePreview({
 	onBack,
 	onRestart,
 }: CloudResumePreviewProps) {
-	const [activeTab, setActiveTab] = useState<Tab>("insights");
+	const [activeTab, setActiveTab] = useState<Tab>("dashboard");
 
-	const TAB_KEYS: Record<string, Tab> = { "1": "insights", "2": "projects", "3": "resume" };
+	const TAB_KEYS: Record<string, Tab> = {
+		"1": "dashboard",
+		"2": "insights",
+		"3": "projects",
+		"4": "resume",
+	};
 
 	useKeyboard(
 		useCallback((key: { name: string }) => {
@@ -516,7 +523,7 @@ export function CloudResumePreview({
 		<box flexGrow={1} flexDirection="column" backgroundColor={theme.bgDark}>
 			<TopBar
 				title="Developer Profile"
-				description="Your AI-generated developer profile. Switch tabs to explore your resume, insights, and project analysis."
+				description="Your AI-generated developer profile. Switch tabs to explore dashboard insights, resume content, and project analysis."
 			/>
 
 			<box flexGrow={1} flexDirection="row">
@@ -575,11 +582,14 @@ export function CloudResumePreview({
 							viewportOptions: { padding: 2 },
 						}}
 					>
-						{activeTab === "resume" && <ResumeTab markdown={profile.resume_markdown} />}
-						{activeTab === "insights" && <InsightsTab profile={profile} />}
-						{activeTab === "projects" && <ProjectsTab projects={profile.projects} />}
-					</scrollbox>
-				</box>
+							{activeTab === "resume" && <ResumeTab markdown={profile.resume_markdown} />}
+							{activeTab === "dashboard" && (
+								<PortfolioDashboard dashboard={profile.portfolio_dashboard} />
+							)}
+							{activeTab === "insights" && <InsightsTab profile={profile} />}
+							{activeTab === "projects" && <ProjectsTab projects={profile.projects} />}
+						</scrollbox>
+					</box>
 			</box>
 		</box>
 	);

@@ -37,6 +37,22 @@ test("normalizeDeveloperProfile backfills missing sections from partial model ou
 			next_level: [],
 		},
 	]);
+	expect(profile.portfolio_dashboard?.skills_timeline).toEqual([]);
+	expect(profile.portfolio_dashboard?.top_projects).toEqual([
+		{
+			project_name: "artifactminer",
+			project_type: "",
+			score: 0,
+			contribution_pct: null,
+			commit_total: 0,
+			first_commit: null,
+			last_commit: null,
+			recency_score: 0,
+			activity_focus: null,
+			latest_change: null,
+			evolution_note: null,
+		},
+	]);
 });
 
 test("normalizeDeveloperProfile filters invalid entries and preserves valid nested values", () => {
@@ -116,6 +132,89 @@ test("normalizeDeveloperProfile filters invalid entries and preserves valid nest
 			next_level: ["Add schema validation"],
 		},
 	]);
+	expect(profile.portfolio_dashboard?.skills_timeline).toEqual([
+		{
+			skill: "TypeScript",
+			first_seen: null,
+			last_seen: null,
+			projects_count: 2,
+			depth_score: 0,
+		},
+	]);
+	expect(profile.portfolio_dashboard?.top_projects[0]?.project_name).toBe("capstone");
+});
+
+test("normalizeDeveloperProfile accepts and sanitizes portfolio dashboard payload", () => {
+	const profile = normalizeDeveloperProfile({
+		resume_markdown: "# Resume\n\nGenerated",
+		developer_dna: {
+			archetype: "Platform Engineer",
+			description: "You build resilient systems.",
+			defining_traits: ["Observability"],
+		},
+		impact: {
+			commits: { total: 30, avg_per_week: 5, conventional_commits_pct: 40 },
+			languages: [{ name: "Go", file_count: 4, projects: ["svc"] }],
+			collaboration: { branch_count: 2, workflow_style: "feature branches" },
+			complexity: { frameworks_used: 1, project_types: ["API"] },
+		},
+		projects: [
+			{
+				name: "svc",
+				what_it_says_about_you: "You ship backend services.",
+			},
+		],
+		portfolio_dashboard: {
+			skills_timeline: [
+				{
+					skill: "Go",
+					first_seen: "2024-01-05",
+					last_seen: "2025-02-01",
+					projects_count: 1,
+					depth_score: 2.4,
+				},
+			],
+			activity_heatmap: {
+				daily_activity: {
+					"2025-01-03": 3,
+					"2025-01-04": -2,
+				},
+				total_days_active: 1,
+				max_daily_commits: 3,
+				date_range: {
+					start: "2025-01-03",
+					end: "2025-01-04",
+				},
+			},
+			top_projects: [
+				{
+					project_name: "svc",
+					project_type: "API",
+					score: 0.88,
+					contribution_pct: 71,
+					commit_total: 42,
+					first_commit: "2024-01-05",
+					last_commit: "2025-02-01",
+					recency_score: 0.7,
+					activity_focus: "feature 60%",
+					latest_change: "add health checks",
+					evolution_note: "Evolved over 393 days of commits.",
+				},
+			],
+		},
+	});
+
+	expect(profile.portfolio_dashboard?.skills_timeline[0]).toEqual({
+		skill: "Go",
+		first_seen: "2024-01-05",
+		last_seen: "2025-02-01",
+		projects_count: 1,
+		depth_score: 2.4,
+	});
+	expect(profile.portfolio_dashboard?.activity_heatmap.daily_activity).toEqual({
+		"2025-01-03": 3,
+	});
+	expect(profile.portfolio_dashboard?.top_projects[0]?.project_name).toBe("svc");
 });
 
 test("buildFallbackProfile uses the resume section when present", () => {
@@ -128,4 +227,5 @@ test("buildFallbackProfile uses the resume section when present", () => {
 	);
 	expect(profile.developer_dna.archetype).toBe("Developer");
 	expect(profile.impact.commits.total).toBe(0);
+	expect(profile.portfolio_dashboard?.top_projects).toEqual([]);
 });
