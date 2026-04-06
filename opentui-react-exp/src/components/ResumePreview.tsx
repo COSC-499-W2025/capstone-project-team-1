@@ -10,6 +10,7 @@ import {
 	resumeToText,
 } from "../utils";
 import { MarkdownBlock } from "./MarkdownBlock";
+import { PortfolioDashboard } from "./PortfolioDashboard";
 import { TopBar } from "./TopBar";
 
 interface ResumePreviewProps {
@@ -20,9 +21,9 @@ interface ResumePreviewProps {
 	data?: unknown;
 }
 
-type PreviewMode = "draft" | "final" | "diff";
+type PreviewMode = "draft" | "final" | "diff" | "portfolio";
 
-const modeOrder: PreviewMode[] = ["draft", "final", "diff"];
+const modeOrder: PreviewMode[] = ["draft", "final", "diff", "portfolio"];
 
 export function ResumePreview({
 	onPolishAgain,
@@ -38,7 +39,11 @@ export function ResumePreview({
 	const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
 	const activeData =
-		mode === "draft" ? state.resumeV3Draft : state.resumeV3Output;
+		mode === "draft"
+			? state.resumeV3Draft
+			: mode === "portfolio"
+				? state.resumeV3Output ?? state.resumeV3Draft
+				: state.resumeV3Output;
 	const sections = useMemo(() => resumeToSections(activeData), [activeData]);
 	const stats = useMemo(() => resumeStats(activeData), [activeData]);
 
@@ -87,7 +92,7 @@ export function ResumePreview({
 			return;
 		}
 
-		if (mode !== "diff") {
+		if (mode !== "diff" && mode !== "portfolio") {
 			if (key.name === "up") {
 				setSelectedSection((sectionIndex) => Math.max(0, sectionIndex - 1));
 				return;
@@ -150,6 +155,19 @@ export function ResumePreview({
 			<box flexGrow={1} padding={1} paddingTop={0}>
 				{mode === "diff" ? (
 					<DiffView draftText={draftText} finalText={finalText} />
+				) : mode === "portfolio" ? (
+					<scrollbox
+						focused
+						style={{
+							rootOptions: { flexGrow: 1, backgroundColor: theme.bgDark },
+							wrapperOptions: { flexGrow: 1 },
+							viewportOptions: { paddingLeft: 1, paddingRight: 1 },
+						}}
+					>
+						<PortfolioDashboard
+							dashboard={(state.resumeV3Output ?? state.resumeV3Draft)?.portfolio_dashboard}
+						/>
+					</scrollbox>
 				) : (
 					<box flexGrow={1} flexDirection="row" gap={1}>
 						<SectionNav

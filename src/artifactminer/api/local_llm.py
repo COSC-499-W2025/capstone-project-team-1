@@ -414,6 +414,7 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
         draft_payload = finalize_output(
             draft_output,
             facts=project_facts,
+            snapshots=snapshots,
             stage="draft",
             models_used=[job["stage1_model"], job["stage2_model"]],
             generation_time_seconds=float(
@@ -423,6 +424,7 @@ async def _run_generation_job(job_id: str, repo_paths: list[Path]) -> None:
         )
         job["project_facts"] = [fact.model_dump() for fact in project_facts]
         job["draft"] = draft_payload
+        job["portfolio_dashboard"] = draft_payload.get("portfolio_dashboard")
         update_job(
             job,
             status="draft_ready",
@@ -481,6 +483,7 @@ async def _run_polish_job(job_id: str) -> None:
         output_payload = finalize_output(
             final_output,
             facts=project_facts_models,
+            portfolio_dashboard=job.get("portfolio_dashboard"),
             stage="polish",
             models_used=[job["stage1_model"], job["stage2_model"], job["stage3_model"]],
             generation_time_seconds=float(

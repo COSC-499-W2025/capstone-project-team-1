@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import UTC, datetime
+import math
 import subprocess
 from pathlib import Path
 from typing import Callable
@@ -9,6 +12,7 @@ from typing import Callable
 from ...RepositoryIntelligence.repo_intelligence_main import getRepoStats
 from ...RepositoryIntelligence.repo_intelligence_user import (
     collect_user_additions,
+    get_daily_commit_counts,
     getUserRepoStats,
 )
 import json as json_lib
@@ -31,6 +35,7 @@ from .schemas import (
     GenerationFeedback,
     ProjectFacts,
     ResumeOutputModel,
+    ResumePortfolioDashboardModel,
     ResumePortfolioModel,
     ResumeProjectModel,
     ResumeProjectPeriod,
@@ -89,6 +94,318 @@ def _sample_files(repo_path: Path, limit: int = 20) -> list[str]:
     return sampled
 
 
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
+def _format_iso_datetime(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _snapshot_by_project_name(
+    snapshots: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    by_project: dict[str, dict[str, object]] = {}
+    for snapshot in snapshots:
+        name = snapshot.get("project_name")
+        if isinstance(name, str) and name.strip():
+            by_project[name] = snapshot
+    return by_project
+
+
+def _commit_total_for_depth(
+    fact: ProjectFacts, snapshot: dict[str, object] | None
+) -> int:
+    if snapshot:
+        user_total = snapshot.get("user_total_commits")
+        if isinstance(user_total, bool):
+            return int(user_total)
+        if isinstance(user_total, (int, float)):
+            return max(0, int(user_total))
+    return max(0, sum(fact.commit_breakdown.values()))
+
+
+def _project_skills(fact: ProjectFacts) -> list[str]:
+    skills: list[str] = []
+    seen: set[str] = set()
+    for raw_skill in fact.technologies:
+        normalized = raw_skill.strip()
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        skills.append(normalized)
+    return skills
+
+
+def _build_skills_timeline(
+    facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    snapshots_by_project = _snapshot_by_project_name(snapshots)
+    timeline_map: dict[str, dict[str, object]] = {}
+
+    for fact in facts:
+        snapshot = snapshots_by_project.get(fact.project_name)
+        first_seen = _parse_iso_datetime(fact.first_commit)
+        last_seen = _parse_iso_datetime(fact.last_commit)
+        depth_score = math.log1p(_commit_total_for_depth(fact, snapshot))
+        for skill in _project_skills(fact):
+            row = timeline_map.setdefault(
+                skill,
+                {
+                    "skill": skill,
+                    "first_seen": None,
+                    "last_seen": None,
+                    "depth_score": 0.0,
+                    "projects": set(),
+                },
+            )
+            row["projects"].add(fact.project_name)
+            row["depth_score"] = float(row["depth_score"]) + depth_score
+            row_first_seen = row["first_seen"]
+            row_last_seen = row["last_seen"]
+            if first_seen and (row_first_seen is None or first_seen < row_first_seen):
+                row["first_seen"] = first_seen
+            if last_seen and (row_last_seen is None or last_seen > row_last_seen):
+                row["last_seen"] = last_seen
+
+    timeline_items: list[dict[str, object]] = []
+    for row in timeline_map.values():
+        projects = row["projects"]
+        timeline_items.append(
+            {
+                "skill": row["skill"],
+                "first_seen": _format_iso_datetime(row["first_seen"]),
+                "last_seen": _format_iso_datetime(row["last_seen"]),
+                "projects_count": len(projects),
+                "depth_score": round(float(row["depth_score"]), 4),
+            }
+        )
+
+    timeline_items.sort(
+        key=lambda item: (
+            _parse_iso_datetime(
+                item["first_seen"] if isinstance(item["first_seen"], str) else None
+            )
+            or datetime.max,
+            -float(item["depth_score"]),
+            str(item["skill"]).casefold(),
+        )
+    )
+    return timeline_items
+
+
+def _build_activity_heatmap(
+    snapshots: list[dict[str, object]],
+) -> dict[str, object]:
+    aggregated: dict[str, int] = defaultdict(int)
+    for snapshot in snapshots:
+        daily_commits = snapshot.get("daily_commits")
+        if not isinstance(daily_commits, dict):
+            continue
+        for raw_day, raw_count in daily_commits.items():
+            if not isinstance(raw_day, str):
+                continue
+            try:
+                datetime.fromisoformat(raw_day)
+            except ValueError:
+                continue
+            try:
+                count = int(raw_count)
+            except (TypeError, ValueError):
+                continue
+            if count <= 0:
+                continue
+            aggregated[raw_day] += count
+
+    daily_activity = dict(sorted(aggregated.items()))
+    if daily_activity:
+        start = next(iter(daily_activity))
+        end = next(reversed(daily_activity))
+    else:
+        start = None
+        end = None
+
+    return {
+        "daily_activity": daily_activity,
+        "total_days_active": len(daily_activity),
+        "max_daily_commits": max(daily_activity.values()) if daily_activity else 0,
+        "date_range": {"start": start, "end": end},
+    }
+
+
+def _derive_activity_focus(snapshot: dict[str, object]) -> str | None:
+    activity_breakdown = snapshot.get("activity_breakdown")
+    if not isinstance(activity_breakdown, dict):
+        return None
+
+    ranked: list[tuple[str, float, int]] = []
+    for activity, payload in activity_breakdown.items():
+        if not isinstance(activity, str) or not isinstance(payload, dict):
+            continue
+        percentage = payload.get("percentage", 0)
+        commits = payload.get("commits", 0)
+        try:
+            pct_value = float(percentage)
+        except (TypeError, ValueError):
+            pct_value = 0.0
+        try:
+            commit_value = int(commits)
+        except (TypeError, ValueError):
+            commit_value = 0
+        ranked.append((activity, pct_value, commit_value))
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda item: (-item[1], -item[2], item[0].casefold()))
+    top = ranked[:2]
+    return ", ".join(f"{name} {round(pct)}%" for name, pct, _ in top)
+
+
+def _derive_evolution_note(first_commit: datetime | None, last_commit: datetime | None) -> str:
+    if first_commit and last_commit:
+        span = max(0, (last_commit - first_commit).days)
+        return f"Evolved over {span} days of commits."
+    if first_commit:
+        return "Early project activity detected."
+    if last_commit:
+        return "Recent project activity detected."
+    return "Commit history unavailable."
+
+
+def _build_top_projects(
+    facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]],
+    *,
+    now: datetime | None = None,
+) -> list[dict[str, object]]:
+    snapshots_by_project = _snapshot_by_project_name(snapshots)
+    now_dt = now or datetime.now(UTC).replace(tzinfo=None)
+    project_rows: list[dict[str, object]] = []
+
+    for fact in facts:
+        snapshot = snapshots_by_project.get(fact.project_name, {})
+        contribution_pct = fact.contribution_pct
+        commit_total = _commit_total_for_depth(fact, snapshot)
+        first_commit = _parse_iso_datetime(fact.first_commit)
+        last_commit = _parse_iso_datetime(fact.last_commit)
+        recency_score = 0.0
+        if last_commit:
+            days_since_last_commit = max(0, (now_dt - last_commit).days)
+            recency_score = max(0.0, 1.0 - (days_since_last_commit / 365.0))
+
+        recent_messages = snapshot.get("recent_commit_messages")
+        latest_change = None
+        if isinstance(recent_messages, list):
+            latest_change = next(
+                (
+                    message.strip()
+                    for message in recent_messages
+                    if isinstance(message, str) and message.strip()
+                ),
+                None,
+            )
+
+        project_rows.append(
+            {
+                "project_name": fact.project_name,
+                "project_type": fact.project_type,
+                "contribution_pct": contribution_pct,
+                "commit_total": commit_total,
+                "first_commit": first_commit,
+                "last_commit": last_commit,
+                "recency_score": recency_score,
+                "activity_focus": _derive_activity_focus(snapshot),
+                "latest_change": latest_change,
+                "evolution_note": _derive_evolution_note(first_commit, last_commit),
+            }
+        )
+
+    max_contribution = max(
+        (
+            float(row["contribution_pct"])
+            for row in project_rows
+            if isinstance(row["contribution_pct"], (int, float))
+        ),
+        default=0.0,
+    )
+    max_commit_total = max((int(row["commit_total"]) for row in project_rows), default=0)
+
+    for row in project_rows:
+        contribution_raw = row["contribution_pct"]
+        contribution_value = (
+            float(contribution_raw) if isinstance(contribution_raw, (int, float)) else 0.0
+        )
+        normalized_contribution = (
+            contribution_value / max_contribution if max_contribution > 0 else 0.0
+        )
+        normalized_commit_total = (
+            int(row["commit_total"]) / max_commit_total if max_commit_total > 0 else 0.0
+        )
+        score = (
+            0.45 * normalized_contribution
+            + 0.35 * normalized_commit_total
+            + 0.20 * float(row["recency_score"])
+        )
+        row["score"] = score
+
+    project_rows.sort(
+        key=lambda row: (
+            -float(row["score"]),
+            -int(row["commit_total"]),
+            -(
+                row["last_commit"].timestamp()
+                if isinstance(row["last_commit"], datetime)
+                else float("-inf")
+            ),
+            str(row["project_name"]).casefold(),
+        )
+    )
+
+    top_rows = project_rows[:3]
+    top_projects: list[dict[str, object]] = []
+    for row in top_rows:
+        top_projects.append(
+            {
+                "project_name": row["project_name"],
+                "project_type": row["project_type"],
+                "score": round(float(row["score"]), 6),
+                "contribution_pct": row["contribution_pct"],
+                "commit_total": row["commit_total"],
+                "first_commit": _format_iso_datetime(row["first_commit"]),
+                "last_commit": _format_iso_datetime(row["last_commit"]),
+                "recency_score": round(float(row["recency_score"]), 6),
+                "activity_focus": row["activity_focus"],
+                "latest_change": row["latest_change"],
+                "evolution_note": row["evolution_note"],
+            }
+        )
+    return top_projects
+
+
+def _build_portfolio_dashboard(
+    facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]],
+) -> dict[str, object]:
+    return {
+        "skills_timeline": _build_skills_timeline(facts, snapshots),
+        "activity_heatmap": _build_activity_heatmap(snapshots),
+        "top_projects": _build_top_projects(facts, snapshots),
+    }
+
+
 def _build_snapshot(repo_path: Path, user_email: str) -> dict[str, object]:
     repo_stats = getRepoStats(repo_path)
     try:
@@ -120,6 +437,8 @@ def _build_snapshot(repo_path: Path, user_email: str) -> dict[str, object]:
                 elif isinstance(value, (int, float)):
                     commit_breakdown[str(key)] = int(value)
 
+    daily_commits = get_daily_commit_counts(repo_path, user_email)
+
     return {
         "project_name": repo_stats.project_name,
         "project_path": str(repo_path),
@@ -147,6 +466,7 @@ def _build_snapshot(repo_path: Path, user_email: str) -> dict[str, object]:
         ),
         "commit_breakdown": commit_breakdown,
         "activity_breakdown": activity_breakdown,
+        "daily_commits": daily_commits,
         "readme_excerpt": _read_readme(repo_path),
         "recent_commit_messages": _recent_commit_messages(repo_path, user_email),
         "recent_added_lines": additions[-8:],
@@ -187,6 +507,8 @@ def _normalize_output(
     output: ResumeOutputModel,
     *,
     facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]] | None = None,
+    portfolio_dashboard: dict[str, object] | None = None,
     stage: str,
     models_used: list[str],
     generation_time_seconds: float,
@@ -218,6 +540,13 @@ def _normalize_output(
     if output.portfolio is None:
         output.portfolio = ResumePortfolioModel.model_validate(
             _build_portfolio_summary(facts)
+        )
+    if output.portfolio_dashboard is None:
+        dashboard_payload = portfolio_dashboard or _build_portfolio_dashboard(
+            facts, snapshots or []
+        )
+        output.portfolio_dashboard = ResumePortfolioDashboardModel.model_validate(
+            dashboard_payload
         )
     output.metadata.stage = stage
     output.metadata.models_used = list(models_used)
@@ -482,6 +811,8 @@ def finalize_output(
     output: ResumeOutputModel,
     *,
     facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]] | None = None,
+    portfolio_dashboard: dict[str, object] | None = None,
     stage: str,
     models_used: list[str],
     generation_time_seconds: float,
@@ -490,6 +821,8 @@ def finalize_output(
     normalized = _normalize_output(
         output,
         facts=facts,
+        snapshots=snapshots,
+        portfolio_dashboard=portfolio_dashboard,
         stage=stage,
         models_used=models_used,
         generation_time_seconds=generation_time_seconds,

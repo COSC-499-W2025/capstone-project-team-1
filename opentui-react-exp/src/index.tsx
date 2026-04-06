@@ -93,6 +93,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 		{ key: "Esc", label: "Cancel" },
 	],
 	"resume-preview": [
+		{ key: "Tab", label: "Switch View" },
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
@@ -103,7 +104,7 @@ const screenActions: Record<Screen, KeyAction[]> = {
 	],
 	"cloud-generation": [{ key: "Esc", label: "Back" }],
 	"cloud-resume": [
-		{ key: "1/2/3", label: "Switch Tab" },
+		{ key: "1/2/3/4", label: "Switch Tab" },
 		{ key: "↑/↓", label: "Scroll" },
 		{ key: "r", label: "Restart" },
 		{ key: "Esc", label: "Exit" },
